@@ -1,0 +1,11 @@
+title:
+  Quantity
+
+  Takeoff
+
+tooltip:
+  Extracts geometric quantities from all model elements 
+  
+  and exports them to CSV, with optional additional parameters. 
+
+author: Claude.ai (Antonio Miano)

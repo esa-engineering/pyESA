@@ -1,0 +1,14 @@
+context:
+  zero-doc
+
+title:
+  IFC(s)
+
+  Export
+
+tooltip:
+  Export IFC(s) from selected RVT(s) by specifying 
+
+  the View Name and the Json File to be used.
+
+author: Antonio Miano

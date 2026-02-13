@@ -1,0 +1,13 @@
+title:
+  Paint
+
+  Remove
+
+tooltip:
+  Remove Paint from selected element's faces
+
+  (including splitted)
+
+context: selection
+
+author: Antonio Miano

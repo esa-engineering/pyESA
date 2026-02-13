@@ -1,0 +1,15 @@
+title:
+  Datum
+
+  Extents
+
+tooltip:
+  Trim or extend multiple datums (Grids, Levels, Ref. Planes)
+
+  to a boundary defined by a Ref. Plane.
+
+  If '2D' option is chosen, the changes will take place only
+  
+  in the selected views.
+
+author: Antonio Miano

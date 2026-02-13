@@ -1,0 +1,296 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AutoLegend - Configuration" 
+        Height="780" Width="520"
+        MinHeight="600" MinWidth="450"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="True">
+    
+    <Window.Resources>
+        <!-- Common Styles -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,10,0,5"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,15,0"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+    </Window.Resources>
+    
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Title -->
+        <TextBlock Grid.Row="0" 
+                   Text="🏗️ Automatic Legend Configuration" 
+                   FontSize="16" FontWeight="Bold" 
+                   Margin="0,0,0,10"
+                   HorizontalAlignment="Center"/>
+        
+        <!-- Main content with scroll -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,5,0">
+            <StackPanel Margin="0,0,10,0">
+                
+                <!-- SECTION: Category and Types -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📁 CATEGORY AND TYPES" Style="{StaticResource SectionHeader}"/>
+                        
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Category:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_category" Grid.Column="1" Style="{StaticResource ComboStyle}"/>
+                        </Grid>
+                        
+                        <TextBlock Text="Available types:" Margin="0,10,0,5"/>
+                        
+                        <!-- Search Box -->
+                        <Grid Margin="0,0,0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBox x:Name="txt_search" Grid.Column="1" 
+                                     Padding="5,3" 
+                                     ToolTip="Filter types by name"/>
+                            <Button x:Name="btn_clear_search" Grid.Column="2" 
+                                    Content="✕" Width="25" Margin="5,0,0,0"
+                                    ToolTip="Clear search"/>
+                        </Grid>
+                        
+                        <!-- Types list with checkboxes - resizable -->
+                        <ListBox x:Name="lst_types" 
+                                 MinHeight="120" Height="180"
+                                 SelectionMode="Extended"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        </ListBox>
+                        
+                        <!-- Resize grip for list -->
+                        <Thumb x:Name="thumb_resize" Height="8" Cursor="SizeNS"
+                               HorizontalAlignment="Stretch" 
+                               Background="#CCCCCC" Opacity="0.5"
+                               ToolTip="Drag to resize list"/>
+                        
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                            <Button x:Name="btn_select_all" Content="Select All" 
+                                    Padding="10,3" Margin="0,0,5,0"/>
+                            <Button x:Name="btn_deselect_all" Content="Deselect All" 
+                                    Padding="10,3"/>
+                        </StackPanel>
+                        
+                        <!-- Sort by -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Sort by:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_sort_param" Grid.Column="1" Style="{StaticResource ComboStyle}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION: Grid Layout -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📐 GRID LAYOUT" Style="{StaticResource SectionHeader}"/>
+                        
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Columns -->
+                            <TextBlock Text="Columns:" Style="{StaticResource FieldLabel}" Grid.Row="0"/>
+                            <TextBox x:Name="txt_columns" Grid.Column="1" Grid.Row="0" 
+                                     Style="{StaticResource InputField}" Text="3"/>
+                            
+                            <!-- Rows (calculated) -->
+                            <TextBlock Text="Rows:" Style="{StaticResource FieldLabel}" 
+                                       Grid.Row="0" Grid.Column="3" Margin="15,0,10,0"/>
+                            <TextBlock x:Name="lbl_rows" Grid.Column="4" Grid.Row="0" 
+                                       Text="Auto" VerticalAlignment="Center"
+                                       FontStyle="Italic" Foreground="Gray"/>
+                            
+                            <!-- Offset X -->
+                            <TextBlock Text="Offset X:" Style="{StaticResource FieldLabel}" Grid.Row="1"/>
+                            <TextBox x:Name="txt_offset_x" Grid.Column="1" Grid.Row="1" 
+                                     Style="{StaticResource InputField}" Text="1550"/>
+                            <TextBlock Text="mm" Grid.Column="2" Grid.Row="1" Style="{StaticResource UnitLabel}"/>
+                            
+                            <!-- Offset Y -->
+                            <TextBlock Text="Offset Y:" Style="{StaticResource FieldLabel}" Grid.Row="2"/>
+                            <TextBox x:Name="txt_offset_y" Grid.Column="1" Grid.Row="2" 
+                                     Style="{StaticResource InputField}" Text="800"/>
+                            <TextBlock Text="mm" Grid.Column="2" Grid.Row="2" Style="{StaticResource UnitLabel}"/>
+                        </Grid>
+                        
+                        <!-- Orientation -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Orientation:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_orientation" Grid.Column="1" Style="{StaticResource ComboStyle}">
+                                <ComboBoxItem Content="Horizontal" IsSelected="True"/>
+                                <ComboBoxItem Content="Vertical"/>
+                            </ComboBox>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION: Dimensions -->
+                <Border x:Name="border_dimensions" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📏 DIMENSIONS" Style="{StaticResource SectionHeader}"/>
+                        
+                        <CheckBox x:Name="chk_dimensions" Content="Insert dimensions" 
+                                  IsChecked="True" Margin="0,5"/>
+                        
+                        <Grid Margin="20,5,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Dimension Style -->
+                            <TextBlock Text="Style:" Style="{StaticResource FieldLabel}" Grid.Row="0"/>
+                            <ComboBox x:Name="cbo_dim_style" Grid.Column="1" Grid.Row="0" 
+                                      Grid.ColumnSpan="3" Style="{StaticResource ComboStyle}"/>
+                            
+                            <!-- Dimension Offset -->
+                            <TextBlock Text="Offset:" Style="{StaticResource FieldLabel}" Grid.Row="1"/>
+                            <TextBox x:Name="txt_dim_offset" Grid.Column="1" Grid.Row="1" 
+                                     Style="{StaticResource InputField}" Text="40"/>
+                            <TextBlock Text="mm" Grid.Column="2" Grid.Row="1" Style="{StaticResource UnitLabel}"/>
+                            
+                            <!-- Dimension Position -->
+                            <TextBlock Text="Position:" Style="{StaticResource FieldLabel}" Grid.Row="2"/>
+                            <ComboBox x:Name="cbo_dim_position" Grid.Column="1" Grid.Row="2" 
+                                      Grid.ColumnSpan="2" Style="{StaticResource ComboStyle}" Width="150">
+                                <ComboBoxItem Content="Above / Right" IsSelected="True"/>
+                                <ComboBoxItem Content="Below / Left"/>
+                            </ComboBox>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION: Material Tags -->
+                <Border x:Name="border_tags" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="🏷️ MATERIAL TAGS" Style="{StaticResource SectionHeader}"/>
+                        
+                        <CheckBox x:Name="chk_tags" Content="Insert material tags" 
+                                  IsChecked="True" Margin="0,5"/>
+                        
+                        <Grid Margin="20,5,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Tag Type -->
+                            <TextBlock Text="Type:" Style="{StaticResource FieldLabel}" Grid.Row="0"/>
+                            <ComboBox x:Name="cbo_tag_type" Grid.Column="1" Grid.Row="0" 
+                                      Grid.ColumnSpan="3" Style="{StaticResource ComboStyle}"/>
+                            
+                            <!-- Tag Offset -->
+                            <TextBlock Text="Offset:" Style="{StaticResource FieldLabel}" Grid.Row="1"/>
+                            <TextBox x:Name="txt_tag_offset" Grid.Column="1" Grid.Row="1" 
+                                     Style="{StaticResource InputField}" Text="200"/>
+                            <TextBlock Text="mm" Grid.Column="2" Grid.Row="1" Style="{StaticResource UnitLabel}"/>
+                            
+                            <!-- Tag Spacing -->
+                            <TextBlock Text="Spacing:" Style="{StaticResource FieldLabel}" Grid.Row="2"/>
+                            <TextBox x:Name="txt_tag_spacing" Grid.Column="1" Grid.Row="2" 
+                                     Style="{StaticResource InputField}" Text="60"/>
+                            <TextBlock Text="mm" Grid.Column="2" Grid.Row="2" Style="{StaticResource UnitLabel}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION: Element selection info -->
+                <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1" 
+                        CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="ℹ️ ELEMENT SELECTION (after OK)" 
+                                   Style="{StaticResource SectionHeader}" Foreground="Gray"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                            <Run Text="After confirming this dialog, you will be asked to select:"/>
+                            <LineBreak/>
+                            <Run Text="  • Source Legend Component (required)"/>
+                            <LineBreak/>
+                            <Run Text="  • TextNotes to copy (optional, ESC to skip)"/>
+                            <LineBreak/>
+                            <Run Text="  • Detail Items to copy (optional, ESC to skip)"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button x:Name="btn_cancel" Content="Cancel" Width="100" Height="30" 
+                    Margin="0,0,10,0"/>
+            <Button x:Name="btn_ok" Content="OK" Width="100" Height="30" 
+                    IsDefault="True"
+                    Background="#2D5A8A" Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>

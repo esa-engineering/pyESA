@@ -1,0 +1,11 @@
+layout:
+  - Selections
+  - GroupByParameters
+  - TransferParameter
+  - IsolateWarnings
+  - SumUpDimensions
+  - JoinUtils
+  - PaintRemove
+  - ElementsAtLevel
+  - DatumExtents
+  - CountInstances

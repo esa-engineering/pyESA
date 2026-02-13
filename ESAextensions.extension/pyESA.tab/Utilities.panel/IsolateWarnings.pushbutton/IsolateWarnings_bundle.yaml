@@ -1,0 +1,17 @@
+title: >
+  Isolate
+
+  Warnings
+
+tooltip: >
+  Temporary isolate elements of selected
+
+  Warning in the Active View.
+
+  ---
+
+  List format:
+
+  [Warning_Count] Warning_Description
+
+author: Macro4BIM

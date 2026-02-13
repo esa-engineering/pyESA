@@ -1,0 +1,15 @@
+title:
+  DWG
+
+  to Revit
+
+tooltip:
+  Change the Object Styles of the selectd DWGs
+
+  according to the CSV file of the ISO CTB standard
+
+  ---
+
+  SHIFT-CLICK to change the default CSV file
+
+author: Antonio Miano

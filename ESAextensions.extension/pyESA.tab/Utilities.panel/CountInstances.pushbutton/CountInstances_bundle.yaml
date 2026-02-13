@@ -1,0 +1,15 @@
+title:
+  Count
+
+  Instances
+
+tooltip:
+  Count instances in the current active document
+
+  grouped by Category
+
+  ---
+
+  SHIFT-CLICK to count instances in the selected RVT link
+
+author: Antonio Miano

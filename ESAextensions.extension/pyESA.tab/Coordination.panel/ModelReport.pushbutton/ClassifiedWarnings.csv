@@ -1,0 +1,230 @@
+Description;Severity Score
+A Area was deleted from all model views but still remains in this project. ;02_Medium
+A Corner Mullion has been placed at the end of a Curtain Wall that is not joined to another Curtain Wall. The angle of the Corner Mullion will default to 90 degrees.;01_High
+A curtain grid line had invalid removed segment data.  When correcting data, Revit may have split curtain panels that should be combined.;03_Low
+A Curtain System cannot be based on faces from multiple elements.;03_Low
+"A dimension labeled by a parameter is being deleted, but the elements will still be constrained. Push ""Unconstrain"" to remove the constraints or ""OK"" to leave elements constrained.";03_Low
+"A dimension that has EQ constraints is being deleted, but the elements will still be constrained. Push ""Unconstrain"" to remove the constraints or ""OK"" to leave elements constrained.";03_Low
+"A dimension that has lock constraints is being deleted, but the elements will still be constrained. Push ""Unconstrain"" to remove the constraints or ""OK"" to leave elements constrained.";03_Low
+A geometric inaccuracy was found in the element.;02_Medium
+A group has been changed outside group edit mode.  The change is being allowed because there is only one instance of the type.;03_Low
+A group member's sketch or family is constrained to an element that is not a member of the group.  These constraints have been removed.;03_Low
+A group or groups that was loaded was renamed because its name was not unique amongst the groups in the file being loaded.  Most likely a model subgroup had the same name as the loaded file.;02_Medium
+A large view has view detail level set to medium or fine. Generation of extraneous details harms performance. ;01_High
+A notch join can only be used when the run end tread is coplanar with the landing tread. Clear the Begin with Riser or End with Riser instance property for the run to use the notch join.;02_Medium
+A notch join can only be used when the run end tread is coplanar with the landing tread. Clear the Begin with Riser or End with Riser instance property for the run to use the notch join.;03_Low
+A pad in a Design Option cannot be hosted by a topography in another Design Option--if you continue it will not be added to the design option set.;02_Medium
+A pad in a design option cannot be hosted by topography in the Main Model--if you continue it will not be added to the design option set.;02_Medium
+A pad in the main model cannot be hosted by topography in a Design Option--if you continue it will not be added to the design option set.;02_Medium
+A panel schedule cannot be created for these panels. A default panel schedule template must be assigned for this template type.;02_Medium
+A piece of boundary is too short to create stringer on it.;02_Medium
+A Room was deleted from all model views but still remains in this project. ;02_Medium
+A Space Type Tag was deleted, but the corresponding Space Type still exists.  You can place another tag for the Space Type using the Space Type Tag tool or select the ... and delete it.;03_Low
+A Space was deleted from all model views but still remains in this project. ;02_Medium
+A structural element will be detached from grid(s) due to inconsistent group membership.;01_High
+A structural framing element is attached to a wall whose Structural Usage is set to Usage.;02_Medium
+A subwall of this stacked wall is unjoined from its neighbors because it was pulled too far.;02_Medium
+A wall and a room separation line overlap. One of them may be ignored when Revit finds room boundaries. Shorten or delete the room separation line to remove the overlap. You can tab-select one of the overlapping elements to exclude it from the group instance.;02_Medium
+A wall and a room separation line overlap. One of them may be ignored when Revit finds room boundaries. Shorten or delete the room separation line to remove the overlap.;03_Low
+A wall and a space separation line overlap. One of them may be ignored when Revit finds space boundaries. Shorten or delete the space separation line to remove the overlap.;03_Low
+Actual Number of Risers is different from Desired Number of Risers. Add/remove Risers or change Desired Number of Risers in Stairs Properties.;02_Medium
+An element cannot join to an element in a secondary Design Option unless it is in the same secondary Design Option.;02_Medium
+An element may not reference an element in another Option of the same Option Set.;02_Medium
+An elevation symbol references views on more than one sheet. It will show a blank sheet reference. To show the correct references, use a separate elevation symbol for the views on each sheet.;01_High
+"An error occurred in family ""Name"" and was automatically resolved. Please review changes made to the family.";02_Medium
+An insert in a Design Option cannot be hosted by an element in another Design Option--if you continue it will not be added to the design option set.;02_Medium
+An insert in a design option cannot be hosted by an element in the Main Model--if you continue it will not be added to the design option set.;02_Medium
+An insert in the main model cannot be hosted by an element in a Design Option--if you continue it will not be added to the design option set.;02_Medium
+Analytical Model for Structural Element has reset to its default location.;02_Medium
+Analytical Top Projection Plane is partially or completely below Analytical Bottom Projection Plane.  Please reset top and/or bottom planes to valid values.;01_High
+Annotations for some views cannot be displayed from the linked model.;03_Low
+Area is not in a properly enclosed region;02_Medium
+Area Reinforcement is sketched completely outside of its host.;01_High
+Area Reinforcements are colliding.  Aligning the Major Directions, or changing the Additional Offsets, can prevent collision.;01_High
+Area separation line is slightly off axis and may cause inaccuracies.;03_Low
+Area Tag is outside of its Area.  Enable Leader or move Area Tag within its Area.;02_Medium
+Assembly was changed to a new type, but did not match the type. Geometry could have been changed due to a join condition.;02_Medium
+At least one connector on the highlighted element is currently assigned to the element. In general items shouldn't be assigned to the Default Systems, but should be assigned as equipments or elements of a non-default system. Click the More Info button below for additional information on System Creation.;03_Low
+Attached detail group types cannot be copied without copying the model groups to which they refer.;03_Low
+Attempting to connect fabrication parts from different services.;02_Medium
+Axis cannot be copied.;02_Medium
+Beam and Slab Analytical Models do not have the same Analytical Projection Plane.;02_Medium
+Beam or Brace is slightly off axis and may cause inaccuracies.;03_Low
+Bind Link failed to add detail element(s) to the attached detail group.  This may occur when Bind Link is replacing an existing group.;02_Medium
+Cannot add element to Circuit. The Number of Poles for element does not match the Number of Poles (...) for the Circuit.;01_High
+Cannot add element to Circuit. The Type for the available connector does not match the Type (Type Name) for the Circuit.;01_High
+Cannot add element to Circuit. The Voltage for element is out of range for the Voltage (Voltage) for the Circuit.;01_High
+Cannot add element to Circuit. There is no available connector matching the Type (Type Name) for the Circuit.;01_High
+Cannot add element to System. The System Type for the available connector does not match the System Type (Type Name) for the System.;01_High
+Cannot add element to System. There is no available connector matching the System Type (Type Name) for the System.;01_High
+Cannot add or assign element to circuit.  Electrical objects belonging to different design options cannot be connected.;01_High
+Cannot align the support on the posts.;02_Medium
+Cannot assign or add element to Circuit. The Voltage (Voltage) for the Circuit is out of range for the Line to Ground Voltage for element (The Line to Ground Voltage is specified in the assigned Distribution System).;02_Medium
+Cannot assign or add element to Circuit. The Voltage (Voltage) for the Circuit is out of range for the Line to Line Voltage for element (The Line to Line Voltage is specified in the assigned Distribution System).;02_Medium
+Cannot assign or add element to Circuit. There is no assigned distribution system for element.;02_Medium
+Cannot assign or add element to Circuit. There is no assigned secondary distribution system for element.;02_Medium
+Cannot copy wall panels unless their parent wall is also being copied.;03_Low
+Cannot create specified fillet at selected rail join because the curves are already smoothed.;03_Low
+Cannot create specified fillet for rail join(s). Please try a different value.;03_Low
+Cannot keep reference of joined element.;02_Medium
+Cannot place the supports along the rail path.;02_Medium
+Cannot solve rebar shape using data from dimension.;02_Medium
+Can't compute elevation profile for one or more Rails;02_Medium
+Can't compute Railings Elevation Profile;02_Medium
+Can't construct surface.;01_High
+Can't convert Edges to Analytical Model curves.;01_High
+Can't create any energy analysis surfaces. There are no Room bounding elements defined in the current phase. Please check the Project Information settings.;03_Low
+Can't create any energy analysis surfaces. There are no Space bounding elements defined in the current phase. Please check the Project Information settings.;03_Low
+Can't create Baluster Patterns for Railings;02_Medium
+Can't create corner Baluster;02_Medium
+Can't create Curtain Panel in opening. The opening is probably too small.;03_Low
+Can't create element in this family.;02_Medium
+Can't create geometry for one or more Rails;01_High
+Can't create geometry for one or more risers.;01_High
+Can't create geometry for one or more treads.;01_High
+Can't create nosing on one or more treads.;02_Medium
+Can't create one or more Balusters;02_Medium
+Can't create one or more Middle Stringers.;02_Medium
+Can't create one or more Rails with desired offset;02_Medium
+Can't create one or more Side Stringers.;02_Medium
+Can't cut instance of Symbol out of Wall.;03_Low
+Can't cut instance(s) of Symbol out of its host.;03_Low
+Can't end Stairs with Riser because Riser Thickness is too small.;01_High
+Can't find a host for Area Reinforcement.;02_Medium
+Can't find a host for Fabric Area.;02_Medium
+Can't find a host for Fabric Sheet.;02_Medium
+Can't find a host for Path Reinforcement.;02_Medium
+Can't find a host for Rebar.;02_Medium
+Can't find new Area Scheme for Area Boundary;02_Medium
+Can't find new hosts for this Element.;01_High
+Can't find some new hosts for this Element.;01_High
+Can't Finish Group while in Sketch Mode.;02_Medium
+Can't keep elements joined.;01_High
+Can't make monolithic Stairs.;01_High
+Can't make roof.;01_High
+Changing the family for a MEP fitting might cause unexpected results.;02_Medium
+Circular support chain detected;01_High
+Column and target are both concrete. Geometries have been joined.;03_Low
+Conditions for wall embedding are no longer satisfied.;01_High
+Conduit with Fittings do not support Concentric Bend Radius, the bend radius of the conduit fittings will be same.;02_Medium
+Connection creation failed;01_High
+Connection to a group failed. Modification of elements within a group is not allowed.;01_High
+Connections already exits for selected element.;03_Low
+Constraints are not satisfied;01_High
+Could not create geometry for Room.;02_Medium
+Curtain grid lines must have at least one segment.;01_High
+Curve-Based Family is slightly off axis and may cause inaccuracies.;03_Low
+Element is slightly off axis and may cause inaccuracies.;03_Low
+Element will be detached from its associated plane;02_Medium
+Elements do not intersect.;01_High
+"Elements have duplicate ""Mark"" values.";02_Medium
+"Elements have duplicate ""Number"" values.";03_Low
+"Elements have duplicate ""Type Mark"" values.";02_Medium
+Group members failed while updating group.;01_High
+Group members have been excluded from this group instance.;01_High
+Highlighted elements are joined but do not intersect.;01_High
+Highlighted floors overlap.;01_High
+Highlighted geometry no longer determines a plane;02_Medium
+Highlighted inserts overlap with other inserts or completely miss their hosts.;01_High
+Highlighted levels overlap...;01_High
+Highlighted lines overlap. Lines may not form closed loops.;02_Medium
+Highlighted lines overlap. Lines may not form closed loops. You can tab-select one of the overlapping elements to exclude it from the group instance.;02_Medium
+Highlighted room separation lines overlap. One of them may be ignored when Revit finds room boundaries. Delete one of the lines.;02_Medium
+Highlighted room separation lines overlap. One of them may be ignored when Revit finds room boundaries. Delete one of the lines. You can tab-select one of the overlapping elements to exclude it from the group instance.;01_High
+Highlighted walls are attached to, but miss, the highlighted targets.;02_Medium
+Highlighted walls overlap. One of them may be ignored when Revit finds room boundaries. Use Cut Geometry to embed one wall within the other or tab-select one of the grouped overlapping walls and exclude it from the group instance.;01_High
+Highlighted walls overlap. One of them may be ignored when Revit finds room boundaries. Use Cut Geometry to embed one wall within the other.;01_High
+Imported model is out of range.;01_High
+"Imported objects located a large distance from the model might not display properly.  The ""Center-to-Center"" option will be used.";01_High
+Imported Toposurface Points are located a large distance from the model and might not display properly. Points will be centered on the model instead.;01_High
+In-place family contains multiple disjoined solids. Consider splitting in several in-place families.;02_Medium
+Insert conflicts with joined Wall.;01_High
+Instance is not cutting host.;02_Medium
+Instance of in-place family is not cutting host.;02_Medium
+Instance of link needs Coordination Review;01_High
+Invalid Balusters Pattern;02_Medium
+Landing depth is less than run width.;02_Medium
+Level is slightly off axis and may cause inaccuracies.;02_Medium
+Line in Massing Sketch is slightly off axis and may cause inaccuracies.;03_Low
+Line in Sketch is slightly off axis and may cause inaccuracies.;03_Low
+Line is slightly off axis and may cause inaccuracies.;03_Low
+Line is too short.;02_Medium
+Manually placed curtain grid lines are on the wall edges or outside the wall boundaries.;02_Medium
+Mass contains both solid and mesh geometry.  Mass Floors, volume, and surface area, may appear incorrect.;03_Low
+Mass contains no solid geometry. Mass Floors, volume, and surface area, won't be computed.;03_Low
+Mass contains only mesh geometry, which can't be used to compute Mass Floors, volume, or surface area.;03_Low
+Mass Floors may appear incorrect since the Mass contains mesh and solid geometry.;01_High
+Maximum pipe size diameter reached during sizing;02_Medium
+Maximum width and height reached during sizing;02_Medium
+Monitored Link moved.;01_High
+Monolithic Stairs without Treads can't have Risers. Riser Thickness for Stairs Type was automatically set to zero.;01_High
+"Multiple Areas are in the same enclosed region.  The correct area and perimeter will be assigned to one Area and the others will display ""Redundant Area.""  You should separate the regions, delete the extra Areas, or move them into different regions.";01_High
+"Multiple Rooms are in the same enclosed region.  The correct area and perimeter will be assigned to one Room and the others will display ""Redundant Room.""  You should separate the regions, delete the extra Rooms, or move them into different regions.";01_High
+"Multiple Space Type are in the same enclosed region.  The correct area and perimeter will be assigned to one Space Type and the others will display ""Redundant Space Type.""  You should separate the regions, delete the extra Space Type, or move them into different regions.";01_High
+Mutistory Stairs already have a Stair attaching to this level.;02_Medium
+No auto-route solution was found.;02_Medium
+No columns are joined to grid lines, or view parameters exclude all columns.;03_Low
+No Loss Defined;03_Low
+One element is completely inside another.;01_High
+One of the stairs inside multistory stairs bottom ends exceeds or cannot reach the base elevation of the stair.;02_Medium
+One of the stairs inside multistory stairs top ends exceed or cannot reach the top elevation of the stair.;02_Medium
+One or more references of the highlighted element have become invalid.;01_High
+Opening not cutting anything.;01_High
+Opening partially cuts its host.;01_High
+Overlapping gridlines should be avoided, unless there are only two and one is host type dependent and the other is not.;02_Medium
+Panels and mullions created by a curtain grid were created with slight inaccuracies.;02_Medium
+Performance Warning: This family now contains labeled dimensions or tangency constraints as well as sketches with many segments. This may hurt performance. To improve performance, create elements that require complex sketches as nested families.;01_High
+Previous edits and /or wall joins will not be preserved on this operation.;01_High
+Project contains unused families and/or types. Consider purging them out.;01_High
+Property lines do not form a closed loop.  Area will not be computed.;01_High
+Property lines intersect.  Area calculations will not be precise.;01_High
+Railings are placed completely outside the host. It may change the adjustment of the railing to the host and its vertical position.;01_High
+Rectangular opening doesn't cut its host.;01_High
+Ref Plane is slightly off axis and may cause inaccuracies.;03_Low
+Room is not in a properly enclosed region;01_High
+Room separation line is slightly off axis and may cause inaccuracies.;03_Low
+Room Tag is outside of its Room.  Enable Leader or move Room Tag within its Room.;02_Medium
+Room Volume is being calculated above the Upper Limit of this Room. Change the Upper Limit and Offset or change the height of volume calculations.;01_High
+Room volumes overlap. Adjust the Upper Limit and Limit Offset properties of the Rooms.;02_Medium
+"Some panels in this curtain system are slightly malformed.  The problem is most likely ignorable. This problem usually occurs when a panel or parts of a panel have been divided so that they are very narrow.  To better see the malformed panels, temporarily hide the mullion category and set display of lines to ""thin lines"" (using the command on the view menu).";03_Medium
+"Stair bottom end exceeds or cannot reach the base elevation of the stair. Add/remove risers at the bottom end by control or change the stair run's ""Relative Base Height"" parameter in the properties palette.";02_Medium
+Stair components are not connected.;01_High
+Stair components are not continuously connected. This may cause incorrect representation and annotation.;01_High
+"Stair top end exceeds or cannot reach the top elevation of the stair. Add/remove risers at the top end by control or change the stair run's ""Relative Top Height"" parameter in the properties palette.";01_High
+Structural Truss sketch can't be constrained to its members.;01_High
+The Actual Riser Height of stair is greater than the Maximum Riser Height specified in the stair type. ;02_Medium
+The Actual Run Width of one or more runs is less than the Minimum Run Width specified in the stair type.;01_High
+The Actual Tread Depth of stair is less than the Minimum Tread Depth specified in the stair type.;02_Medium
+The analytical model for the structural element cannot be created by the auto-detect method. Adjust the analytical element or change the tolerance of the analytical model settings if the model is needed.;03_Low
+The area can be removed from any schedule or placed back in the model using the Area command.;03_Low
+The column and target are joined. The attachment has been removed. ;03_Low
+The column is already attached. It will be detached and attached to the new target.;03_Low
+The geometry in this Mass instance is too complex to take advantage of the capabilities a Mass provides.  Please break it down into multiple Mass and family instances that are less complex.;03_Low
+The highlighted column can't maintain attachment to the target.  It will be treated as unattached until it can intersect.;01_High
+The Mass contains geometry that cannot be combined.   Mass Floors, volume, and surface area, won't be computed.;03_Low
+The rail is not continuous.  Breaks in the rail usually occur at sharply-angled transitions. To fix the problem, try:;01_High
+The ramp is not long enough to reach the top constraint plus top offset. Change the slope or increase the length of the ramp.;02_Medium
+The ramp is not long enough to reach the top constraint.  Change the slope or increase the length of the ramp. ;02_Medium
+The surface-based splitter does not intersect a face to be divided and will be ignored;03_Low
+There are identical instances in the same place. This will result in double counting in schedules.;01_High
+There are identical instances in the same place. This will result in double counting in schedules. You can tab-select one of the overlapping elements to exclude it from the group instance.;01_High
+There are identical points in the same place. Lines created from points may not work as expected.;03_Low
+Thickness of this Floor may be slightly inaccurate due to extreme Shape Editing. Dimensions to this element in sections and details may not accurately indicate the Thickness shown in Type Properties.;03_Low
+Thickness of this Roof may be slightly inaccurate due to extreme Shape Editing. Dimensions to this element in sections and details may not accurately indicate the Thickness shown in Type Properties.;03_Low
+Top reference is below Bottom reference for one or more Balusters. These Balusters are not created.;01_High
+Two elements were not automatically joined because one or both is not editable.;01_High
+Two elements were not automatically joined because other elements at join are not editable.;02_Medium
+Wall is slightly off axis and may cause inaccuracies.;03_Low
+Grid is slightly off axis and may cause inaccuracies.;01_High
+Wall and instance have different phasing settings. Automatic creation of the infilling wall fails.;02_Medium
+Geometry in imported file has extents greater than 20 miles (33km).;01_High
+It is not possible to calculate the flow since the flow direction mismatch. Please check flow direction on all equipment in this system.;03_Low
+It is not possible to calculate the flow since all the components in this system have the flow configuration set to Preset or System. At least one component is required to have the flow configuration set to Calculated.;02_Medium
+are not connected in a single physical network due to one or both of the following;03_Low
+Could not create geometry for Space.;02_Medium
+Multiple Spaces are in the same enclosed region.  The correct area and perimeter will be assigned to one Space and the others will display "Redundant Space."  You should separate the regions, delete the extra Spaces, or move them into different regions.;02_Medium
+Space Tag is outside of its Space.  Enable Leader or move Space Tag within its Space.;03_Low
+Space volumes overlap. Adjust the Upper Limit and Limit Offset properties of the Spaces.;02_Medium
+Mass contains no solid geometry. Mass Floors, volume, and surface area, won't be computed.;03_Low
+Space is not in a properly enclosed region;02_Medium
+Coping applied, but no cut was made. Adjust Coping Distance or Extension parameters.;03_Low

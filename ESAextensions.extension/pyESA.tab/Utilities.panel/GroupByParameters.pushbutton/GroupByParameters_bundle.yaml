@@ -1,0 +1,17 @@
+title:
+  Group by
+
+  Parameters
+
+tooltip:
+  Group Elements of the selected Category by combining
+
+  the values of a list of Parameters in a new Parameter
+
+  (works for instance and type parameters)
+
+  ---
+
+  SHIFT-CLICK for Door-Schedule Parameters
+
+author: Antonio Miano

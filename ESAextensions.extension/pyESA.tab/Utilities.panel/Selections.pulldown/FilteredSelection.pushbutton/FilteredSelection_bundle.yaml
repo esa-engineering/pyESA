@@ -1,0 +1,25 @@
+title:
+  Filtered
+  
+  Selection
+
+tooltip:
+  Select elements in the document filtering by
+
+  Categories
+
+  Levels
+
+  Loadable Families
+
+  Materials
+
+  Worksets
+
+  ---
+
+  If some elements are already selected, it will apply the
+  filtering rules inside the selection
+
+author:
+  Antonio Miano

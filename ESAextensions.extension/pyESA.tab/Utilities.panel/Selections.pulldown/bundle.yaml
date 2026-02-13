@@ -1,0 +1,5 @@
+title: |-
+  Selections
+layout:
+  - FilteredSelection
+  - TagInViews

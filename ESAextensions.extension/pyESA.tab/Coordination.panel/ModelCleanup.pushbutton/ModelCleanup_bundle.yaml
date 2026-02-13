@@ -1,0 +1,21 @@
+context:
+  zero-doc
+
+title:
+  Model(s)
+
+  Cleanup
+
+tooltip:
+  Tool for cleaning RVT file(s) by keeping only some
+
+  specified Views and Sheets, deleting Worksets
+
+  (elements on Worksets for RVT < 2023), purging
+
+  unused elements and saving back the file(s)
+
+  as detached in the same position.
+
+author:
+  Antonio Miano

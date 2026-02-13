@@ -1,0 +1,13 @@
+title:
+  Join
+
+  Utils
+
+tooltip:
+  Apply the Join operations (Join/Unjoin/Switch)
+  
+  to all the selected elements.
+
+context: selection
+
+author: Antonio Miano

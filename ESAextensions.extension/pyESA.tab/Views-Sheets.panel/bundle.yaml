@@ -1,0 +1,8 @@
+layout:
+  - RenameFilters&Views
+  - Filters
+  - CategoriesVisibility
+  - AutoComponents
+  - ReplaceTitleBlocks
+  - SectionBoxRevitLinks
+  - Tag

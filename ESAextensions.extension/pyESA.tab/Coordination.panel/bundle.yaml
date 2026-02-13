@@ -1,0 +1,4 @@
+layout:
+  - ModelReport
+  - ModelCleanup
+  - ModelPurge
