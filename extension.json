@@ -1,0 +1,14 @@
+﻿{
+    "builtin": "False",
+    "default_enabled": "True",
+    "type": "extension",
+    "rocket_mode_compatible": "True",
+    "name": "ESAextensions",
+    "description": "ESA Engineering pyRevit extension tools",
+    "author": "ESA Engineering",
+    "author_profile": "https://github.com/esa-engineering",
+    "url": "https://github.com/esa-engineering/pyESA.git",
+    "website": "https://www.esa-engineering.it",
+    "image": "",
+    "dependencies": []
+}
