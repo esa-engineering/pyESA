@@ -14,8 +14,8 @@ Official ESA Engineering repository for the **ESAextensions** pyRevit extension.
 pyESA/                        ← repo root (= ESAextensions.extension on disk)
 ├── pyESA.tab/                ← main tab with all panels and tools
 ├── extension.json            ← pyRevit extension metadata
-├── .gitignore
-└── README.md
+├── .gitignore                ← files to be ignored  
+└── README.md                 ← pyESA guidelines  
 ```
 
 > The repo root IS the extension. pyRevit clones it into a folder named
