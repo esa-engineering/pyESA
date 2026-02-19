@@ -1,5 +1,5 @@
 layout:
   - IfcExport
+  - QuantityTakeoff
   - DwgToRevit
   - ExportSchedules
-  - QuantityTakeoff

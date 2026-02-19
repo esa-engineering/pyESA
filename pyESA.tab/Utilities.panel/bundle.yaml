@@ -1,11 +1,8 @@
 layout:
-  - Selections
-  - GroupByParameters
-  - TransferParameter
   - IsolateWarnings
-  - SumUpDimensions
-  - JoinUtils
-  - PaintRemove
-  - ElementsAtLevel
-  - DatumExtents
-  - CountInstances
+  - '-----'
+  - Utilities1
+  - Utilities2
+  - Utilities3
+  - Utilities4
+  - Utilities5
