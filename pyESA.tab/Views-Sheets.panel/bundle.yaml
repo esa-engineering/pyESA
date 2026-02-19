@@ -1,8 +1,10 @@
+title:
+  Views-Sheets
+
 layout:
-  - RenameFilters&Views
-  - Filters
-  - CategoriesVisibility
+  - ViewsSheets1
+  - ViewsSheets2
+  - '-----'
   - AutoComponents
-  - ReplaceTitleBlocks
   - SectionBoxRevitLinks
   - Tag
