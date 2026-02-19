@@ -1,2 +1,4 @@
 layout:
-  - FilterUtilities
+  - RenameFilters&Views
+  - CategoriesVisibility
+  - ReplaceTitleBlocks
