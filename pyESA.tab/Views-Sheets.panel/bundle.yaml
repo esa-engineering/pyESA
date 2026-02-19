@@ -3,7 +3,7 @@ title:
 
 layout:
   - ViewsSheets1
-  - Filter\nUtilities
+  - FilterUtilities
   - AutoComponents
   - SectionBoxRevitLinks
   - Tag
