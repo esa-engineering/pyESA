@@ -1,5 +1,4 @@
-﻿$json = @'
-{
+﻿{
     "builtin": "False",
     "default_enabled": "True",
     "type": "extension",
@@ -13,5 +12,3 @@
     "image": "",
     "dependencies": []
 }
-'@
-[System.IO.File]::WriteAllText("$env:APPDATA\pyRevit\Extensions\ESAextensions.extension\extension.json", $json, [System.Text.UTF8Encoding]::new($false))
