@@ -13,12 +13,6 @@ Official ESA Engineering repository for the **ESAextensions** pyRevit extension.
 ```
 pyESA/                        ← repo root (= ESAextensions.extension on disk)
 ├── pyESA.tab/                ← main tab with all panels and tools
-│   ├── Coordination.panel/
-│   ├── Import-Export.panel/
-│   ├── MEP.panel/
-│   ├── Utilities.panel/
-│   ├── Views-Sheets.panel/
-│   └── WIP.panel/
 ├── extension.json            ← pyRevit extension metadata
 ├── .gitignore
 └── README.md
