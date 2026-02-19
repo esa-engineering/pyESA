@@ -2,8 +2,6 @@ title:
   Utilities
 
 layout:
-  - IsolateWarnings
-  - '-----'
   - Utilities1
   - Utilities2
   - Utilities3
