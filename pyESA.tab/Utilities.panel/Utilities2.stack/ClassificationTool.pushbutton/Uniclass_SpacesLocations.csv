@@ -1,0 +1,1151 @@
+SL;20;;;Administrative, commercial and protective service spaces
+SL;20;10;;Legislative spaces
+SL;20;10;47;Legislative chambers
+SL;20;10;49;Legislative chamber viewing galleries
+SL;20;15;;Administrative spaces
+SL;20;15;15;Confidential meetings rooms
+SL;20;15;27;Enclosed offices
+SL;20;15;50;Meeting rooms
+SL;20;15;59;Offices
+SL;20;15;61;Open-plan offices
+SL;20;15;71;Reception areas
+SL;20;15;73;Reprographics rooms
+SL;20;45;;Motor vehicle maintenance and fuelling spaces
+SL;20;45;27;Electric motor vehicle charging points
+SL;20;45;29;Fuel filling station air and water points
+SL;20;45;30;Fuel filling station forecourts
+SL;20;45;31;Fuel filling station tanks areas
+SL;20;45;53;Motor vehicle maintenance areas
+SL;20;45;95;Vehicle inspection pits
+SL;20;45;96;Vehicle servicing areas
+SL;20;50;;Commercial spaces
+SL;20;50;03;Ambient wholesale spaces
+SL;20;50;05;Auction rooms
+SL;20;50;10;Beauty salons
+SL;20;50;12;Checkout points
+SL;20;50;22;Department store shop floors
+SL;20;50;29;Financial and professional services outlets
+SL;20;50;30;Fitting rooms
+SL;20;50;32;Food and drink outlets
+SL;20;50;36;Hair and beauty salons
+SL;20;50;37;Hair salons
+SL;20;50;47;Livestock auction rooms
+SL;20;50;51;Market stalls
+SL;20;50;55;Motor vehicle showrooms
+SL;20;50;70;Refrigerated wholesale spaces
+SL;20;50;72;Retail kiosks
+SL;20;50;74;Retail spaces
+SL;20;50;85;Supermarket shop floors
+SL;20;50;86;Tan spray booths
+SL;20;50;87;Tattoo and piercing parlours
+SL;20;50;96;Waste and scrap yards
+SL;20;55;;Postal communications spaces
+SL;20;55;45;Letter sorting offices
+SL;20;55;50;Mail order sorting and despatch facilities
+SL;20;55;60;Parcel sorting offices
+SL;20;55;65;Post rooms
+SL;20;60;;Military protective spaces
+SL;20;60;08;Bombardment shelters
+SL;20;60;27;Emergency shelters
+SL;20;60;70;Radiation protection shelters
+SL;20;60;98;War emergency centres
+SL;20;62;;Parade spaces
+SL;20;62;65;Parade grounds
+SL;20;65;;Law enforcement spaces
+SL;20;65;15;Command and control spaces
+SL;20;65;28;Examination rooms
+SL;20;65;39;Identification control rooms
+SL;20;65;40;Identification suites
+SL;20;65;41;Interview monitoring rooms
+SL;20;65;42;Interview rooms
+SL;20;65;65;Police boxes
+SL;20;70;;Judicial spaces
+SL;20;70;15;Courtrooms
+SL;20;70;18;Courtroom viewing galleries
+SL;20;70;23;Defendant docks
+SL;20;70;28;Evidence rooms
+SL;20;70;41;Judicial benches
+SL;20;70;44;Jury boxes
+SL;20;70;97;Witness stands
+SL;20;75;;Detention spaces
+SL;20;75;02;Accessible cells
+SL;20;75;13;Charge areas
+SL;20;75;15;Communal inmate dayrooms
+SL;20;75;17;Constant observation cells
+SL;20;75;22;Detention cells
+SL;20;75;23;Dirty protest cells
+SL;20;75;24;Double-occupancy cells
+SL;20;75;25;Dry cells
+SL;20;75;28;Exercise yards
+SL;20;75;35;Guard stations
+SL;20;75;38;Holding cells
+SL;20;75;39;Holding rooms
+SL;20;75;46;Listener suites
+SL;20;75;48;Low-mobility cells
+SL;20;75;50;Medical single-occupancy cells
+SL;20;75;51;Medical single-occupancy end-of-life cells
+SL;20;75;52;Medical single-occupancy isolation cells
+SL;20;75;53;Medical single-occupancy social care cells
+SL;20;75;54;Medical multiple-occupancy wards
+SL;20;75;55;Multiple-occupancy bedrooms
+SL;20;75;65;Protest cells
+SL;20;75;70;Regular care and separation unit (CaSU) cells
+SL;20;75;75;Sally ports
+SL;20;75;77;Secure visiting rooms
+SL;20;75;79;Single-occupancy cells
+SL;20;75;82;Specimen capture cells
+SL;20;75;95;Vehicle impound yards
+SL;20;80;;Weapons training spaces
+SL;20;80;03;Artillery firing ranges
+SL;20;80;30;Firing ranges
+SL;20;80;63;Pistol firing ranges
+SL;20;80;72;Rifle firing ranges
+SL;20;85;;Security spaces
+SL;20;85;63;Pedestrian security checkpoints
+SL;20;85;75;Security control spaces
+SL;20;85;80;Security offices
+SL;20;85;95;Vehicular security checkpoints
+SL;20;90;;Fire and incident support spaces
+SL;20;90;23;Emergency and rescue equipment spaces
+SL;20;90;25;Escape stairs
+SL;20;90;28;Firefighting stairs
+SL;20;90;30;Fire refuge spaces
+SL;20;90;31;Fire training spaces
+SL;20;90;60;Protected escape corridors
+SL;20;95;;Protected zones
+SL;20;95;20;Detection zones
+SL;20;95;28;Evacuation zones
+SL;20;95;30;Fire compartments
+SL;20;95;32;Fire suppression zones
+SL;20;95;80;Smoke control zones
+SL;25;;;Cultural, educational, scientific and information spaces
+SL;25;05;;Commemoration spaces
+SL;25;05;72;Commemoration sites
+SL;25;10;;Educational spaces
+SL;25;10;01;Activity studios
+SL;25;10;04;Art rooms
+SL;25;10;05;Assembly halls
+SL;25;10;08;Biology teaching laboratories
+SL;25;10;13;Chemistry teaching laboratories
+SL;25;10;14;Classrooms
+SL;25;10;15;Common rooms
+SL;25;10;17;Craft classrooms
+SL;25;10;21;Dance studios
+SL;25;10;22;Dissection theatres
+SL;25;10;24;Drama studios
+SL;25;10;25;Driving skid pans
+SL;25;10;26;Driving tuition spaces
+SL;25;10;28;Educational workshops
+SL;25;10;30;Food rooms
+SL;25;10;39;Infant classrooms
+SL;25;10;40;Information and communications technology (ICT) laboratories
+SL;25;10;41;Information and communications technology (ICT)-rich classrooms
+SL;25;10;44;Junior classrooms
+SL;25;10;46;Language laboratories
+SL;25;10;47;Lecture theatres
+SL;25;10;53;Multi-purpose practical rooms
+SL;25;10;54;Music and drama classrooms
+SL;25;10;55;Music rooms
+SL;25;10;57;Nursery playrooms
+SL;25;10;58;Open access computer laboratories
+SL;25;10;60;Outdoor classrooms
+SL;25;10;61;Outdoor class spaces
+SL;25;10;66;Physics teaching laboratories
+SL;25;10;67;Primary practical rooms
+SL;25;10;68;Primary special educational needs (SEN) classrooms
+SL;25;10;72;Reception classrooms
+SL;25;10;74;Science studios
+SL;25;10;75;Science laboratories
+SL;25;10;76;Secondary special educational needs (SEN) classrooms
+SL;25;10;77;Semi-open classbases
+SL;25;10;78;Seminar rooms
+SL;25;10;79;Shared teaching areas
+SL;25;10;81;Sixth form special educational needs (SEN) classrooms
+SL;25;10;84;Study spaces
+SL;25;20;;Design spaces
+SL;25;20;04;Artists' studios
+SL;25;20;18;Creative art studios
+SL;25;20;23;Designers' studios
+SL;25;30;;Scientific and laboratory spaces
+SL;25;30;02;Anechoic chambers
+SL;25;30;04;Astronomical observatories
+SL;25;30;05;Autoclave rooms
+SL;25;30;07;Biological laboratories
+SL;25;30;08;Biological samples storage room
+SL;25;30;09;Biomechanics laboratories
+SL;25;30;10;Bioscience laboratories
+SL;25;30;13;Chemistry laboratories
+SL;25;30;14;Clean rooms
+SL;25;30;15;Clinical biochemistry laboratories
+SL;25;30;16;Clinical microbiology laboratories
+SL;25;30;17;Clinical pathology laboratories
+SL;25;30;19;Containment laboratories
+SL;25;30;21;Darkrooms
+SL;25;30;22;Dental laboratories
+SL;25;30;23;Dissection rooms
+SL;25;30;24;EMI shielded room
+SL;25;30;25;Ecology laboratories
+SL;25;30;26;Earth sciences laboratories
+SL;25;30;27;Engineering laboratories
+SL;25;30;28;Experiment control rooms
+SL;25;30;29;Flow cytometry rooms
+SL;25;30;30;Food testing laboratories
+SL;25;30;31;Forensics laboratories
+SL;25;30;32;Forensic scientific support rooms
+SL;25;30;33;Geology laboratories
+SL;25;30;35;Growth chamber
+SL;25;30;42;Instrument rooms
+SL;25;30;46;Laboratory cold rooms
+SL;25;30;47;Laboratory warm rooms
+SL;25;30;50;Material testing laboratories
+SL;25;30;66;Physics laboratories
+SL;25;30;68;Psychology laboratories
+SL;25;30;70;Radiation shielded rooms
+SL;25;30;71;Radiation laboratories
+SL;25;30;76;Scientific equipment rooms
+SL;25;30;78;Seismograph rooms
+SL;25;30;87;Temperature-controlled room
+SL;25;30;88;Testing rooms
+SL;25;40;;Training spaces
+SL;25;40;03;Animal care training rooms
+SL;25;40;11;Catering training kitchens
+SL;25;40;15;Construction workshops
+SL;25;40;22;Design technology studios
+SL;25;40;23;Design technology workshops
+SL;25;40;27;Engineering workshops
+SL;25;40;36;Hair and beauty training salons
+SL;25;40;38;Health and clinical training rooms
+SL;25;40;40;Information and communications technology (ICT)-rich studios
+SL;25;40;42;Independent life skills rooms
+SL;25;40;50;Manufacturing workshops
+SL;25;40;51;Media studios
+SL;25;40;61;Outdoor training spaces
+SL;25;40;65;Photography studios
+SL;25;40;70;Rail training simulators
+SL;25;40;90;Training restaurants
+SL;25;40;94;Vehicle workshops
+SL;25;50;;Exhibition spaces
+SL;25;50;15;Collection exhibition spaces
+SL;25;50;16;Conservation rooms
+SL;25;50;21;Diorama rooms
+SL;25;50;26;External galleries
+SL;25;50;29;Fauna exhibition spaces
+SL;25;50;31;Flora exhibition spaces
+SL;25;50;42;Internal galleries
+SL;25;50;63;Planetariums
+SL;25;50;94;Viewing spaces
+SL;25;70;;Information spaces
+SL;25;70;02;Archives
+SL;25;70;04;Audiovisual archives
+SL;25;70;05;Audiovisual study rooms
+SL;25;70;13;Conference rooms
+SL;25;70;47;Library rooms
+SL;25;70;72;Reading rooms
+SL;25;70;73;Records stores
+SL;25;75;;Learning resources spaces
+SL;25;75;04;Art and design resource spaces
+SL;25;75;37;Heavy practical resource spaces
+SL;25;75;40;Information and communications technology (ICT) resource spaces
+SL;25;75;45;Learning resource centres
+SL;25;75;47;Light practical resource spaces
+SL;25;75;55;Music practice rooms
+SL;25;75;76;School libraries
+SL;25;75;80;Small group rooms
+SL;25;75;82;Special educational needs (SEN) resource spaces
+SL;25;80;;Preparation spaces
+SL;25;80;22;Design technology preparation rooms
+SL;25;80;27;Engineering preparation rooms
+SL;25;80;30;Food preparation rooms
+SL;25;80;75;Science preparation rooms
+SL;25;90;;Worship spaces
+SL;25;90;30;Faith spaces
+SL;25;90;65;Prayer rooms
+SL;25;90;78;Shrines
+SL;30;;;Industrial spaces
+SL;30;10;;Mineral extraction spaces
+SL;30;10;57;Offshore oil and gas drilling spaces
+SL;30;10;59;Onshore oil and gas drilling spaces
+SL;30;10;69;Quarrying areas
+SL;30;10;85;Surface mine workings
+SL;30;10;91;Underground mine chambers
+SL;30;10;93;Underground mineshafts
+SL;30;10;94;Underground mine tunnels
+SL;30;20;;Nuclear and chemical management spaces
+SL;30;20;70;Radioactive decontamination spaces
+SL;30;20;75;Radioactive waste package transfer spaces
+SL;30;30;;Mineral processing spaces
+SL;30;30;33;Gas processing spaces
+SL;30;30;58;Oil processing spaces
+SL;30;30;59;Ore processing spaces
+SL;30;40;;Animal and plant products processing spaces
+SL;30;40;07;Bottling rooms
+SL;30;40;10;Butter making rooms
+SL;30;40;18;Cheesemaking rooms
+SL;30;40;30;Fish processing rooms
+SL;30;40;32;Fresh fruit and vegetable packing rooms
+SL;30;40;44;Juicing rooms
+SL;30;40;50;Meat processing rooms
+SL;30;40;54;Milk processing rooms
+SL;30;40;63;Plant fibre sorting rooms
+SL;30;40;65;Poultry and game processing rooms
+SL;30;40;75;Sawmills
+SL;30;40;80;Silk production rooms
+SL;30;40;82;Spinning rooms
+SL;30;40;87;Tanneries
+SL;30;40;88;Threshing rooms
+SL;30;40;90;Tobacco drying rooms
+SL;30;40;96;Weaving rooms
+SL;30;40;98;Wool sorting rooms
+SL;30;50;;Manufacturing spaces
+SL;30;50;27;Electronics clean rooms
+SL;30;50;30;Heavy industrial spaces
+SL;30;50;40;Kiln rooms
+SL;30;50;43;Light industrial spaces
+SL;30;50;50;Manufacturing workshops
+SL;30;50;60;Packaging lines
+SL;30;50;61;Paint spray booths
+SL;30;50;62;Pharmaceuticals clean rooms
+SL;30;50;64;Printing spaces
+SL;30;60;;Cleaning and maintenance spaces
+SL;30;60;03;Animal cage washing areas
+SL;30;60;11;Caretaker rooms
+SL;30;60;13;Clothes drying and airing rooms
+SL;30;60;22;Decontamination spaces
+SL;30;60;24;Dry cleaning spaces
+SL;30;60;42;Ironing rooms
+SL;30;60;46;Laundrettes
+SL;30;60;47;Laundries
+SL;30;60;50;Maintenance workshops
+SL;30;60;75;Service laundries
+SL;30;60;93;Vehicle-cleaning areas
+SL;30;60;94;Vehicle washes
+SL;30;60;96;Wash-up spaces
+SL;30;80;;Kinetic power generation spaces
+SL;30;80;96;Watermill houses
+SL;30;80;97;Windmill houses
+SL;30;85;;Marine and water maintenance spaces
+SL;30;85;08;Boat repair spaces
+SL;30;85;20;Dock faces
+SL;30;85;22;Dock sills
+SL;30;85;24;Dry dock chambers
+SL;30;85;30;Floating docks
+SL;30;90;;Warehousing and distribution spaces
+SL;30;90;33;Goods delivery bays
+SL;30;90;48;Loading docks
+SL;30;90;80;Sorting and distribution spaces
+SL;30;90;84;Storage yards
+SL;30;90;96;Warehouse spaces
+SL;32;;;Water and land management spaces
+SL;32;10;;Agricultural and horticultural spaces
+SL;32;10;03;Arable fields
+SL;32;10;26;Farmyards
+SL;32;10;28;Fisheries
+SL;32;10;30;Fish farm tanks
+SL;32;10;34;Glasshouse spaces
+SL;32;10;37;Hedges
+SL;32;10;39;Hothouse spaces
+SL;32;10;47;Livestock fields
+SL;32;10;52;Milking parlours
+SL;32;10;55;Mushroom cultivation spaces
+SL;32;10;58;Organic waste treatment spaces
+SL;32;10;60;Paddocks
+SL;32;10;65;Polytunnel spaces
+SL;32;10;66;Poultry batteries
+SL;32;10;73;Seed banks
+SL;32;10;75;Seed processing spaces
+SL;32;10;77;Shearing spaces
+SL;32;10;78;Sheep dips
+SL;32;10;94;Vineyard spaces
+SL;32;15;;Dam spaces
+SL;32;15;17;Dam crests
+SL;32;15;29;Dam faces
+SL;32;15;37;Dam heels
+SL;32;15;81;Dam spillway crests
+SL;32;15;82;Dam spillway funnels
+SL;32;15;83;Dam spillway faces
+SL;32;15;89;Dam toes
+SL;32;35;;Ground spaces
+SL;32;35;02;Access strips
+SL;32;35;04;Allotments
+SL;32;35;22;Decking areas
+SL;32;35;24;Driveways
+SL;32;35;30;Flower beds
+SL;32;35;46;Lawns
+SL;32;35;60;Patios
+SL;32;35;94;Vegetable gardens
+SL;32;40;;Land managed spaces
+SL;32;40;06;Berms
+SL;32;40;16;Contaminated land areas
+SL;32;40;26;Easement access areas
+SL;32;40;27;Embankment cores
+SL;32;40;28;Embankment crests
+SL;32;40;29;Embankment faces
+SL;32;40;30;Embankment toes
+SL;32;40;31;Embankment transition zones
+SL;32;40;32;Fill zones
+SL;32;40;37;High ground crests
+SL;32;40;38;High ground faces
+SL;32;40;70;Rain gauge central wells
+SL;32;40;71;Rain gauge turf walls
+SL;32;40;90;Tree protection zones
+SL;32;50;;Marine ways and waterway spaces
+SL;32;50;03;Anchorages
+SL;32;50;06;Beach ramps
+SL;32;50;11;Canoe passes
+SL;32;50;12;Canoe portage spaces
+SL;32;50;18;Deep berths
+SL;32;50;30;Fords
+SL;32;50;43;Jetty cores
+SL;32;50;44;Jetty faces
+SL;32;50;45;Jetty toes
+SL;32;50;46;Landing faces
+SL;32;50;47;Lifeboat vessel launch spaces
+SL;32;50;53;Moorings
+SL;32;50;68;Quay faces
+SL;32;50;69;Quay stems
+SL;32;50;72;Roller boat lifts
+SL;32;50;76;Scour protection aprons
+SL;32;50;79;Slipways
+SL;32;65;;Natural spaces
+SL;32;65;12;Caves
+SL;32;65;71;Riverbeds
+SL;32;65;72;River reaches
+SL;32;65;74;Sand dune active zones
+SL;32;65;75;Sand dune stabilized zones
+SL;32;80;;Semi-natural spaces
+SL;32;80;03;Amenity grass areas
+SL;32;80;08;Brownfield sites
+SL;32;80;23;Disused mineral extraction sites
+SL;32;80;46;Living roof areas
+SL;32;80;47;Living willow structures
+SL;32;80;48;Managed water habitats
+SL;32;80;49;Managed wildlife habitats
+SL;32;80;50;Mowing strips
+SL;32;80;89;Transport corridor verges
+SL;32;80;92;Vegetated buffer strips
+SL;32;80;95;Wetland habitats
+SL;32;80;96;Wildflower gardens
+SL;32;80;97;Woodland habitats
+SL;32;85;;Water control and retaining spaces
+SL;32;85;06;Barrier beach faces
+SL;32;85;10;Breakwater faces
+SL;32;85;15;Control gate sills
+SL;32;85;30;Fishtails
+SL;32;85;35;Groyne faces
+SL;32;85;42;Intake towers
+SL;32;85;58;Orifice flow control structures
+SL;32;85;60;Paddles and rymers
+SL;32;85;65;Preliminary weirs
+SL;32;85;70;Roundheads
+SL;32;85;81;Spillway crests
+SL;32;85;82;Spillway funnels
+SL;32;85;83;Spillway faces
+SL;32;85;84;Stilling wells
+SL;32;85;94;Vortex flow control structures
+SL;32;85;95;Water-retaining wall cores
+SL;32;85;96;Water-retaining wall faces
+SL;32;85;97;Water-retaining wall toes
+SL;32;85;98;Weir faces
+SL;32;95;;Waterways spaces
+SL;32;95;15;Channel sides
+SL;32;95;18;Culvert soffits
+SL;32;95;20;Culvert walls
+SL;32;95;23;Fish, eel and lamprey pass crests
+SL;32;95;29;Fish, eel and lamprey pass faces
+SL;32;95;30;Fish, eel and lamprey pass sills
+SL;35;;;Medical, health, welfare and sanitary spaces
+SL;35;10;;Medical spaces
+SL;35;10;08;Birthing rooms
+SL;35;10;10;Burns units
+SL;35;10;12;Clean Utility
+SL;35;10;15;Consulting rooms
+SL;35;10;18;Day rooms/ lounges
+SL;35;10;22;Dental treatment rooms
+SL;35;10;23;Diagnostics laboratories
+SL;35;10;30;First aid posts
+SL;35;10;31;First aid rooms
+SL;35;10;36;Hearing test rooms
+SL;35;10;39;Hydrotherapy pools
+SL;35;10;40;Hygiene lobbies
+SL;35;10;42;Intensive care units
+SL;35;10;43;Isolation units
+SL;35;10;51;Medical scanning and x-ray rooms
+SL;35;10;53;Medical treatment rooms
+SL;35;10;58;Occupational therapy rooms
+SL;35;10;59;Operating theatres
+SL;35;10;63;Phlebotomy room
+SL;35;10;64;Pharmaceutical dispensaries
+SL;35;10;65;Phototherapy spaces
+SL;35;10;66;Physiotherapy rooms
+SL;35;10;70;Radiography rooms
+SL;35;10;71;Radiotherapy rooms
+SL;35;10;72;Radiology reading room
+SL;35;10;73;Recovery rooms
+SL;35;10;74;Rehabilitation rooms
+SL;35;10;82;Sterilization room
+SL;35;10;88;Therapy rooms
+SL;35;10;94;Venepuncture room
+SL;35;10;96;Wards
+SL;35;10;97;Warm water pools
+SL;35;50;;Welfare spaces
+SL;35;50;17;Crèches and nurseries
+SL;35;50;21;Day-care spaces
+SL;35;50;60;Parent and baby rooms
+SL;35;50;69;Quiet calming spaces
+SL;35;50;75;Sauna rooms
+SL;35;50;78;Sensory rooms
+SL;35;50;90;Treatment rooms
+SL;35;60;;Food management spaces
+SL;35;60;14;Commercial kitchens
+SL;35;60;16;Cooking spaces
+SL;35;60;30;Food preparation areas
+SL;35;60;45;Kitchenettes
+SL;35;60;56;Non-domestic kitchens
+SL;35;60;78;Servery areas
+SL;35;70;;Funerary spaces
+SL;35;70;12;Cemetery plots
+SL;35;70;15;Funerary columbariums
+SL;35;70;18;Crematorium oven rooms
+SL;35;70;32;Funeral vaults
+SL;35;70;50;Mausoleums
+SL;35;70;90;Tombs
+SL;35;80;;Sanitary spaces
+SL;35;80;00;Ablutions rooms
+SL;35;80;01;Accessible changing rooms
+SL;35;80;03;Accessible toilets
+SL;35;80;06;Baby changing rooms
+SL;35;80;08;Bathrooms
+SL;35;80;39;Hygiene rooms
+SL;35;80;59;Open shower areas
+SL;35;80;68;Public toilets
+SL;35;80;80;Showers
+SL;35;80;85;Supervisable toilets
+SL;35;80;89;Toilets
+SL;35;85;;Animal spaces
+SL;35;85;00;Animal arks
+SL;35;85;01;Animal cages
+SL;35;85;03;Animal enclosures
+SL;35;85;04;Animal exercise arenas
+SL;35;85;05;Aviaries
+SL;35;85;12;Cattle byres
+SL;35;85;39;Fish tanks
+SL;35;85;45;Kennels
+SL;35;85;47;Loose boxes
+SL;35;85;62;Pens
+SL;35;85;83;Stables
+SL;35;85;84;Stable yards
+SL;35;85;85;Stalls
+SL;35;85;86;Sties
+SL;35;85;88;Tack rooms
+SL;35;90;;Animal medical, health, welfare and funerary spaces
+SL;35;90;10;Animal burial plots
+SL;35;90;15;Animal clinics
+SL;35;90;22;Animal dispensaries
+SL;35;90;32;Animal funerary spaces
+SL;35;90;34;Animal grooming facilities
+SL;35;90;37;Animal hydrotherapy pools
+SL;35;90;59;Animal operating theatres
+SL;35;90;72;Animal wards
+SL;40;;;Recreational spaces
+SL;40;05;;Amusement spaces
+SL;40;05;03;Amusement arcades
+SL;40;05;13;Casino floors
+SL;40;05;27;Esport spaces
+SL;40;05;42;Indoor fairground spaces
+SL;40;05;43;Indoor play spaces
+SL;40;05;58;Observation decks
+SL;40;05;59;Outdoor activity areas
+SL;40;05;60;Outdoor fairground spaces
+SL;40;05;68;Public gardens
+SL;40;05;79;Sensory gardens
+SL;40;05;81;Soft play rooms
+SL;40;20;;Dining spaces
+SL;40;20;06;Bars
+SL;40;20;09;Beverage stations
+SL;40;20;22;Dining halls
+SL;40;20;27;Enclosed dining areas
+SL;40;20;28;Food courts
+SL;40;20;42;Indoor dining rooms
+SL;40;20;43;Informal dining spaces
+SL;40;20;59;Outdoor dining areas
+SL;40;35;;Historic spaces
+SL;40;35;65;Protected historic zones
+SL;40;55;;Outdoor play and social areas
+SL;40;55;04;Artificial grass play areas
+SL;40;55;34;Grass play and social areas
+SL;40;55;36;Hard play and social areas
+SL;40;55;59;Outdoor seating areas
+SL;40;55;61;Playgrounds
+SL;40;55;64;Play equipment areas
+SL;40;55;97;Woodland play and social areas
+SL;40;60;;Performing arts spaces
+SL;40;60;05;Auditoriums
+SL;40;60;06;Bandstands
+SL;40;60;11;Catwalks
+SL;40;60;13;Circus rings
+SL;40;60;21;Dance floors
+SL;40;60;31;Fixed stages
+SL;40;60;40;Indoor theatre spaces
+SL;40;60;52;Mobile stages
+SL;40;60;58;Orchestra pits
+SL;40;60;59;Outdoor theatre spaces
+SL;40;60;78;Sound recording studios
+SL;40;60;80;Sound shells
+SL;40;60;81;Sound stages
+SL;40;65;;Performing arts ancillary spaces
+SL;40;65;04;Audience lobbies
+SL;40;65;24;Dressing rooms
+SL;40;65;35;Green rooms
+SL;40;65;47;Lighting and audio control spaces
+SL;40;65;66;Projection booths
+SL;40;65;70;Recording control spaces
+SL;40;65;72;Rehearsal rooms
+SL;40;65;76;Scenery control booths
+SL;40;65;79;Sound control spaces
+SL;40;65;80;Sound locks
+SL;40;65;85;Stage wings
+SL;42;;;Sport and activity spaces
+SL;42;15;;Courts, pitches and field sports spaces
+SL;42;15;04;Artificial grass pitches
+SL;42;15;17;Cricket fields
+SL;42;15;18;Cricket pitches
+SL;42;15;32;Grass athletics areas
+SL;42;15;33;Grass pitches
+SL;42;15;34;Grass tennis courts
+SL;42;15;36;Hard outdoor tennis courts
+SL;42;15;37;High jump areas
+SL;42;15;44;Javelin throwing areas
+SL;42;15;47;Long jump tracks and pits
+SL;42;15;55;Multi-use games courts
+SL;42;15;59;Outdoor sports courts
+SL;42;15;60;Outdoor sports pitches and fields
+SL;42;15;65;Pole vaulting areas
+SL;42;15;72;Rounders fields
+SL;42;15;74;Running tracks
+SL;42;15;78;Shot put and hammer throwing areas
+SL;42;40;;Indoor activity spaces
+SL;42;40;09;Bouldering spaces
+SL;42;40;14;Climbing wall spaces
+SL;42;40;20;Cycle tracks
+SL;42;40;23;Dojo
+SL;42;40;30;Fitness rooms
+SL;42;40;35;Gymnasiums
+SL;42;40;37;Gymnastics areas
+SL;42;40;42;Indoor sports courts
+SL;42;40;79;Snooker, billiards and pool halls
+SL;42;40;82;Sports halls
+SL;42;40;83;Squash courts
+SL;42;40;90;Ten pin bowling alleys
+SL;42;55;;Outdoor activity spaces
+SL;42;55;01;Archery ranges
+SL;42;55;06;Ball-stop net areas
+SL;42;55;07;BMX cycling tracks
+SL;42;55;08;Bowling greens
+SL;42;55;17;Cross-country cycling courses
+SL;42;55;18;Cross-country equestrian courses
+SL;42;55;19;Cross-country rallying courses
+SL;42;55;20;Cross-country running courses
+SL;42;55;21;Cycling trails
+SL;42;55;23;Dog racing tracks
+SL;42;55;26;Equestrian arenas
+SL;42;55;35;Golf fairways
+SL;42;55;39;Horse racing courses
+SL;42;55;52;Mobility training trails
+SL;42;55;53;Motor racing tracks
+SL;42;55;56;Nature trails
+SL;42;55;58;Outdoor climbing areas
+SL;42;55;60;Parkour courses
+SL;42;55;65;Putting greens
+SL;42;55;72;Road running courses
+SL;42;55;76;Skateboarding parks
+SL;42;55;82;Speedway tracks
+SL;42;55;90;Trim trails
+SL;42;55;96;Walking trails
+SL;42;80;;Sports and activity ancillary spaces
+SL;42;80;65;Press boxes
+SL;42;80;88;Technical areas and dugouts
+SL;42;85;;Swimming spaces
+SL;42;85;23;Diving pools
+SL;42;85;41;Indoor swimming pools
+SL;42;85;59;Outdoor swimming pools
+SL;42;85;64;Plunge pools
+SL;42;85;80;Spa pools
+SL;42;85;82;Splash pools
+SL;42;85;94;Water flumes, slides and tubes
+SL;42;85;97;Wave pools
+SL;42;85;98;Whirlpools
+SL;42;90;;Water activity spaces
+SL;42;90;11;Canoe slalom courses
+SL;42;90;12;Canoe sprint courses
+SL;42;90;50;Motorboat courses
+SL;42;90;73;Rowing courses
+SL;42;90;75;Sailing courses
+SL;42;90;97;Water skiing courses
+SL;42;90;98;White water canoe courses
+SL;42;95;;Winter sports spaces
+SL;42;95;02;Alpine skiing courses
+SL;42;95;04;Artificial ski slopes
+SL;42;95;08;Bobsleigh courses
+SL;42;95;19;Cross-country skiing courses
+SL;42;95;20;Curling rinks
+SL;42;95;32;Freestyle skiing courses
+SL;42;95;40;Ice skating rinks
+SL;42;95;76;Short track speed skating tracks
+SL;42;95;79;Ski jumps
+SL;42;95;80;Snowboarding courses
+SL;42;95;83;Speed skating courses
+SL;45;;;Residential spaces
+SL;45;10;;Living spaces
+SL;45;10;06;Balconies
+SL;45;10;08;Bedroom-studies
+SL;45;10;09;Bedrooms
+SL;45;10;12;Caravan pitches
+SL;45;10;14;Communal living rooms
+SL;45;10;16;Concierge offices
+SL;45;10;18;Conservatories
+SL;45;10;22;Domestic dining rooms
+SL;45;10;23;Domestic kitchens
+SL;45;10;24;Dormitories
+SL;45;10;37;Hotel rooms
+SL;45;10;44;Kitchen-dining rooms
+SL;45;10;45;Kitchen-dining-living rooms
+SL;45;10;49;Living rooms
+SL;45;10;57;Nursing home bedrooms
+SL;45;10;60;Panic rooms
+SL;45;10;78;Single-occupancy bedrooms
+SL;45;10;85;Studies
+SL;45;10;88;Tent pitches
+SL;45;10;93;Utility rooms
+SL;45;10;94;Verandas
+SL;50;;;Waste disposal spaces and locations
+SL;50;10;;Gas waste collection spaces
+SL;50;10;94;Waste gas storage spaces
+SL;50;20;;Non-aqueous waste collection spaces
+SL;50;25;;Drainage collection locations
+SL;50;25;36;Grip inlets
+SL;50;25;41;Inlet discharge
+SL;50;25;59;Outlet discharge
+SL;50;30;;Drainage collection spaces
+SL;50;30;68;Pump-out stations
+SL;50;35;;Wastewater collection spaces
+SL;50;35;08;Bioretention basins
+SL;50;35;60;Solid waste storage spaces
+SL;50;40;;Dry waste collection spaces
+SL;50;40;24;Dry waste storage spaces
+SL;50;40;72;Refuse storage space
+SL;50;50;;Gas waste treatment and disposal spaces
+SL;50;50;92;Waste gas treatment spaces
+SL;50;60;;Non-aqueous waste treatment and disposal spaces
+SL;50;60;94;Waste liquids treatment spaces
+SL;50;60;95;Waste liquids storage spaces
+SL;50;70;;Drainage treatment and disposal spaces
+SL;50;75;;Wastewater treatment and disposal spaces
+SL;50;75;26;Effluent outfalls
+SL;50;75;28;Evaporation ponds
+SL;50;75;35;Wastewater grass plots
+SL;50;75;71;Wastewater reed beds
+SL;50;75;85;Stormwater overflows
+SL;50;75;95;Wastewater wetlands
+SL;50;80;;Dry waste treatment and disposal spaces
+SL;50;80;40;Dry waste treatment spaces
+SL;50;80;70;Dry waste disposal spaces
+SL;55;;;Piped supply spaces
+SL;55;05;;Gas extraction and treatment spaces
+SL;55;05;30;Gas extraction spaces
+SL;55;05;70;Gas treatment spaces
+SL;55;10;;Liquid fuel extraction and treatment spaces
+SL;55;10;10;Oil extraction spaces
+SL;55;10;50;Oil treatment spaces
+SL;55;15;;Water extraction and treatment spaces
+SL;55;15;10;Water extraction spaces
+SL;55;15;50;Water treatment spaces
+SL;55;15;70;Raw water intakes
+SL;55;20;;Gas supply spaces
+SL;55;20;34;Gas storage spaces
+SL;55;20;65;Service gas supply pipes
+SL;55;30;;Fire-extinguishing supply spaces
+SL;55;30;80;Sprinkler tank enclosures
+SL;55;40;;Steam supply spaces
+SL;55;50;;Liquid fuel supply spaces
+SL;55;50;32;Fuel storage areas
+SL;55;50;58;Oil storage spaces
+SL;55;60;;Process liquid supply spaces
+SL;55;65;;Ventilation and air conditioning spaces
+SL;55;70;;Water supply spaces
+SL;55;70;65;Private water supply pipes
+SL;55;70;95;Water supply pedestals
+SL;55;90;;Piped solids supply spaces
+SL;60;;;Heating, cooling and refrigeration spaces
+SL;60;30;;Rail and paving heating spaces
+SL;60;40;;Space heating and cooling spaces
+SL;60;60;;Refrigeration spaces
+SL;60;60;20;Cryogenic storage room
+SL;60;60;29;Freezer room
+SL;60;60;70;Refrigeration room
+SL;60;80;;Drying spaces
+SL;60;80;25;Drying rooms
+SL;70;;;Electrical power generation and lighting spaces
+SL;70;10;;Electrical power generation spaces
+SL;70;10;33;Generator rooms
+SL;70;10;82;Solar arrays
+SL;70;10;91;Turbine rooms
+SL;70;20;;Electricity transmission spaces
+SL;70;20;05;Auxiliary transformer equipment bay
+SL;70;20;08;Bus coupler bay
+SL;70;20;10;Bus section bay
+SL;70;20;11;Cable sealing end bay
+SL;70;20;13;Capacitor banks
+SL;70;20;26;Earthing transformer bay
+SL;70;20;27;Enclosed high-voltage switchgear room
+SL;70;20;29;Electricity feeder bay
+SL;70;20;30;Flexible a.c. transmission system (FACTS) bay
+SL;70;20;32;Grid battery bay
+SL;70;20;33;Grid transformer bay
+SL;70;20;35;High-voltage electricity substation chambers
+SL;70;20;50;Main busbar section
+SL;70;20;64;Power transformer equipment bay
+SL;70;20;70;Reactor equipment bay
+SL;70;20;72;Relay and control equipment bay
+SL;70;20;74;Reserve busbar section
+SL;70;20;83;Static VAR compensator bay
+SL;70;20;85;Supergrid transformer bay
+SL;70;20;86;Synchronous condenser bay
+SL;70;20;89;Transmission cable section
+SL;70;20;90;Transmission line span
+SL;70;20;92;Underground transmission cable inspection and monitoring access points
+SL;70;30;;Electricity distribution spaces
+SL;70;30;06;Battery room
+SL;70;30;15;Combined switch and direct current (d.c.) distribution room
+SL;70;30;22;Direct current (d.c.) distribution room
+SL;70;30;24;Electrical Cupboards
+SL;70;30;26;Electrical distribution pedestals
+SL;70;30;45;Low-voltage electricity substation chambers
+SL;70;30;52;Metering room
+SL;70;30;83;Substation bays
+SL;70;30;92;Uninterruptible power supply rooms
+SL;75;;;Communications, security, safety and protection spaces
+SL;75;10;;Communications spaces
+SL;75;10;21;Communications equipment rooms
+SL;75;10;23;Digital data transmission networks
+SL;75;10;70;Radio broadcast control booths
+SL;75;10;73;Radio studios
+SL;75;10;88;Telecommunications control spaces
+SL;75;10;89;Telephone boxes and booths
+SL;75;10;90;Telephone exchange spaces
+SL;75;10;91;Television broadcast control booths
+SL;75;10;93;Television studios
+SL;75;30;;Signalling spaces
+SL;75;30;80;Signal boxes
+SL;75;40;;Electronic security spaces
+SL;75;40;28;Electronic security control rooms
+SL;75;50;;Safety and protection spaces
+SL;75;50;30;Exclusion zones
+SL;75;50;33;Gas zones
+SL;75;60;;Environmental safety
+SL;75;70;;Control and management spaces
+SL;75;80;;Protection spaces
+SL;80;;;Transport spaces
+SL;80;05;;Aerospace ground spaces
+SL;80;05;01;Aircraft apron bays
+SL;80;05;02;Aeroplane landing strips
+SL;80;05;03;Aeroplane runways
+SL;80;05;04;Aircraft fuelling spaces
+SL;80;05;05;Aircraft manoeuvring areas
+SL;80;05;06;Aircraft standing areas
+SL;80;05;07;Aircraft storage spaces
+SL;80;05;33;Gliding runways
+SL;80;05;37;Hang-gliding launch spaces
+SL;80;05;38;Helipads
+SL;80;05;82;Spacecraft landing strips
+SL;80;05;84;Spacecraft launch pads
+SL;80;10;;Loading and embarkation spaces
+SL;80;10;06;Baggage claim areas
+SL;80;10;07;Baggage handling areas
+SL;80;10;09;Boarding areas
+SL;80;10;10;Bus stops
+SL;80;10;12;Cargo handling areas
+SL;80;10;13;Cargo loading areas
+SL;80;10;16;Concourses
+SL;80;10;20;Customs control areas
+SL;80;10;22;Departure lounges
+SL;80;10;55;Passenger gates
+SL;80;10;60;Passport control offices
+SL;80;10;77;Security screening areas
+SL;80;10;80;Ship gangways
+SL;80;10;94;Vehicle drop-off areas
+SL;80;15;;Aerospace maintenance spaces
+SL;80;15;01;Aircraft cleaning spaces
+SL;80;15;04;Aircraft repair spaces
+SL;80;15;06;Airport control spaces
+SL;80;15;79;Spacecraft cleaning spaces
+SL;80;15;81;Spacecraft preparation spaces
+SL;80;15;82;Spacecraft repair spaces
+SL;80;20;;Cableways
+SL;80;20;13;Cableways
+SL;80;30;;Cable transport storage and maintenance spaces
+SL;80;30;34;Gondola repair and cleaning spaces
+SL;80;30;35;Gondola storage spaces
+SL;80;35;;Road spaces
+SL;80;35;04;Arrestor beds
+SL;80;35;08;Bus manoeuvring areas
+SL;80;35;09;Bus travel lanes
+SL;80;35;11;Car manoeuvring areas
+SL;80;35;13;Carriageways
+SL;80;35;16;Central reservations
+SL;80;35;17;Channelizing islands
+SL;80;35;18;Crossover spaces
+SL;80;35;19;Cycle crossings
+SL;80;35;20;Cycle lanes
+SL;80;35;22;Diversion routes
+SL;80;35;36;Hard shoulders
+SL;80;35;37;Hard standings
+SL;80;35;39;Highway pull-offs
+SL;80;35;40;Highway roundabouts
+SL;80;35;42;Intersections
+SL;80;35;44;Junctions
+SL;80;35;45;Lanes
+SL;80;35;46;Lay-bys and passing places
+SL;80;35;57;Non-motorized use crossings
+SL;80;35;59;Oxbow laybys
+SL;80;35;62;Pedestrian crossings
+SL;80;35;63;Pedestrian routes
+SL;80;35;64;Pedestrian refuges and islands
+SL;80;35;66;Police ramps
+SL;80;35;70;Railway crossings
+SL;80;35;71;Refuge areas
+SL;80;35;72;Roadside rest areas
+SL;80;35;74;Road sections
+SL;80;35;75;Roundabouts
+SL;80;35;77;Roadside reservations
+SL;80;35;78;Side road carriageways
+SL;80;35;80;Slip road carriageways
+SL;80;35;81;Soft shoulders
+SL;80;35;87;Taxi ranks
+SL;80;35;90;Truck manoeuvring areas
+SL;80;35;94;Vaulted spaces
+SL;80;40;;Pathway spaces
+SL;80;40;15;Covered paths
+SL;80;40;60;Paths
+SL;80;45;;Vehicle storage spaces
+SL;80;45;01;Accessible parking spaces
+SL;80;45;09;Bus standing spaces
+SL;80;45;11;Car park attendant booths
+SL;80;45;13;Car park ramps
+SL;80;45;15;Cycle parking spaces
+SL;80;45;40;Indoor vehicle parking spaces
+SL;80;45;59;Outdoor vehicle parking spaces
+SL;80;45;91;Truck standing spaces
+SL;80;50;;Railway spaces
+SL;80;50;11;Carriage cleaning spaces
+SL;80;50;24;Double-sided platforms
+SL;80;50;26;Engine fuelling areas
+SL;80;50;27;Engine inspection pits
+SL;80;50;28;Engine servicing areas
+SL;80;50;29;Engine wash areas
+SL;80;50;44;Railway junctions
+SL;80;50;47;Light rail stops
+SL;80;50;50;Marshalling yards
+SL;80;50;58;Railway overpasses
+SL;80;50;70;Rail repair spaces
+SL;80;50;71;Railway side reservations
+SL;80;50;72;Railway lines
+SL;80;50;74;Railway sections
+SL;80;50;76;Railway sidings
+SL;80;50;77;Railway signal control spaces
+SL;80;50;78;Rolling stock inspection spaces
+SL;80;50;79;Signalling equipment rooms
+SL;80;50;80;Single-sided platforms
+SL;80;50;85;Stabling yards
+SL;80;50;88;Track paralleling huts
+SL;80;50;90;Train halts
+SL;80;50;92;Railway underpasses
+SL;80;50;95;Wagon decontamination spaces
+SL;80;50;97;Wagon maintenance spaces
+SL;80;70;;Marine and waterways transport spaces
+SL;80;70;11;Canal lock chambers
+SL;80;70;33;Gate quoins
+SL;80;70;37;Harbour locks
+SL;80;70;46;Lock gate sills
+SL;80;70;48;Lock islands
+SL;80;70;96;Winding holes
+SL;80;90;;Transport hubs
+SL;80;92;;Grid systems
+SL;80;92;34;Geospatial grids
+SL;80;92;37;Horizontal alignment grids
+SL;80;92;94;Vertical alignment grids
+SL;80;94;;Bridge and structure spaces
+SL;80;94;02;Abutment faces
+SL;80;94;07;Bearing shelves
+SL;80;94;09;Bridge aprons
+SL;80;94;71;Retaining wall aprons
+SL;80;96;;Tunnel and shaft spaces
+SL;80;96;15;Concourse tunnels
+SL;80;96;18;Crossover tunnels
+SL;80;96;20;Drift tunnel portals
+SL;80;96;44;Junction tunnels
+SL;80;96;58;Overrun tunnels
+SL;80;96;60;Passageway tunnels
+SL;80;96;64;Platform tunnels
+SL;80;96;78;Sidings tunnels
+SL;80;96;89;Tunnel boring machine (TBM) launching and retrieval shafts
+SL;80;96;90;Tunnel dives
+SL;80;96;91;Turnback tunnels
+SL;80;98;;Transport kinematic envelopes
+SL;80;98;09;Bridge headrooms
+SL;80;98;13;Chainage
+SL;80;98;15;Collapse radius
+SL;80;98;46;Lateral safety zones
+SL;80;98;48;Longitudinal safety zones
+SL;80;98;70;Rail kinematic envelope
+SL;80;98;72;Restricted speed zones
+SL;80;98;75;Safety clearance zones
+SL;80;98;83;Structure gauge
+SL;80;98;85;Swept path areas
+SL;80;98;90;Tunnel headrooms
+SL;80;98;94;Vehicle loading gauge
+SL;80;98;97;Working widths
+SL;82;;;Vehicle spaces
+SL;82;61;;Passenger spaces
+SL;82;61;61;Passenger seating spaces
+SL;82;61;62;Passenger standing spaces
+SL;82;61;63;Passenger wheelchair spaces
+SL;82;61;65;Priority passenger seating spaces
+SL;90;;;General spaces
+SL;90;10;;Circulation spaces
+SL;90;10;02;Airlocks
+SL;90;10;04;Atriums
+SL;90;10;08;Breezeways
+SL;90;10;15;Corridors
+SL;90;10;16;Covered walkways and internal bridges
+SL;90;10;17;Courtyards
+SL;90;10;24;Drop-off and collection areas
+SL;90;10;27;Entrance halls
+SL;90;10;28;Escalators
+SL;90;10;34;Goods conveyors
+SL;90;10;35;Goods lifts
+SL;90;10;36;Hallways
+SL;90;10;46;Landings
+SL;90;10;47;Lifts
+SL;90;10;51;Lobbies
+SL;90;10;62;Passenger lifts
+SL;90;10;64;Porches
+SL;90;10;68;Public squares
+SL;90;10;71;Retail circulation spaces
+SL;90;10;77;Shelters
+SL;90;10;87;Stairways
+SL;90;10;90;Travellators
+SL;90;10;94;Vestibules
+SL;90;10;95;Walkways
+SL;90;10;96;Wheelchair circulation spaces
+SL;90;20;;Common spaces
+SL;90;20;01;Accident and emergency waiting rooms
+SL;90;20;02;Air spaces
+SL;90;20;04;Audience seating areas
+SL;90;20;05;Audience standing areas
+SL;90;20;08;Breakout spaces
+SL;90;20;13;Changing rooms
+SL;90;20;14;Cloakrooms
+SL;90;20;15;Corporate boxes and VIP seating
+SL;90;20;16;Customer service counter areas
+SL;90;20;27;Entry points
+SL;90;20;69;Queuing areas
+SL;90;20;80;Social spaces
+SL;90;20;82;Spectator seating areas
+SL;90;20;83;Spectator standing areas
+SL;90;20;85;Staff rooms
+SL;90;20;86;Staff workrooms
+SL;90;20;88;Temporary seating areas
+SL;90;20;89;Ticket offices
+SL;90;20;91;Terraces
+SL;90;20;94;Vacant spaces
+SL;90;20;96;Waiting rooms
+SL;90;20;98;Work booths
+SL;90;30;;Construction voids
+SL;90;30;25;Excavation volumes
+SL;90;30;30;Finishes allowances
+SL;90;30;80;Space proofing envelopes
+SL;90;30;90;Tolerance zones
+SL;90;40;;General levels
+SL;90;40;46;Levels
+SL;90;50;;Storage spaces
+SL;90;50;04;Arms depots and armouries
+SL;90;50;06;Baggage storage areas
+SL;90;50;07;Battery stores
+SL;90;50;08;Blood banks
+SL;90;50;09;Boat storage spaces
+SL;90;50;10;Building services stores
+SL;90;50;11;Cargo storage areas
+SL;90;50;12;Carports
+SL;90;50;13;Chemicals stores
+SL;90;50;14;Clothes stores
+SL;90;50;15;Cold stores
+SL;90;50;16;Cleaners' stores
+SL;90;50;17;Cycle storage spaces
+SL;90;50;18;Classroom stores
+SL;90;50;19;Coats and bags stores
+SL;90;50;22;Dining furniture stores
+SL;90;50;25;Dungsteads
+SL;90;50;27;Equipment stores
+SL;90;50;28;Explosives and ordnance storerooms
+SL;90;50;29;Food stores
+SL;90;50;30;Feed stores
+SL;90;50;31;Flammable chemical stores
+SL;90;50;32;Furniture stores
+SL;90;50;33;Garages
+SL;90;50;35;General storerooms
+SL;90;50;36;Goods stores
+SL;90;50;37;Grain stores
+SL;90;50;38;Hazardous waste storage spaces
+SL;90;50;44;Janitor stores
+SL;90;50;45;Keg stores
+SL;90;50;46;Larders and pantries
+SL;90;50;47;Left luggage stores
+SL;90;50;48;Locker rooms
+SL;90;50;52;Mineral storage spaces
+SL;90;50;54;Morgues
+SL;90;50;55;Mortuaries
+SL;90;50;65;Pharmaceutical stores
+SL;90;50;71;Raw materials storage spaces
+SL;90;50;73;Retractable seating storage
+SL;90;50;77;Secure storerooms
+SL;90;50;80;Solid fuel storerooms
+SL;90;50;82;Sports equipment stores
+SL;90;50;84;Storage rooms
+SL;90;50;85;Storage silos
+SL;90;50;86;Storage tanks
+SL;90;50;87;Teaching resources stores
+SL;90;50;88;Tissue and organ stores
+SL;90;50;90;Vaults and strong rooms
+SL;90;50;93;Walk-in wardrobes
+SL;90;50;98;Wine cellars
+SL;90;60;;Unoccupied voids
+SL;90;60;01;Access spaces
+SL;90;60;02;Air shafts
+SL;90;60;07;Belfries
+SL;90;60;10;Cavities
+SL;90;60;13;Chutes
+SL;90;60;18;Crawl spaces
+SL;90;60;30;Flues
+SL;90;60;49;Lift pits
+SL;90;60;50;Lift shafts
+SL;90;60;51;Light wells
+SL;90;60;64;Platform voids
+SL;90;60;72;Roof surface spaces
+SL;90;60;74;Roof voids
+SL;90;90;;Plant and control spaces
+SL;90;90;01;Access floor voids
+SL;90;90;08;Boiler rooms
+SL;90;90;13;Ceiling voids
+SL;90;90;15;Control rooms
+SL;90;90;32;Furnace rooms
+SL;90;90;42;Incinerator rooms
+SL;90;90;48;Lift machine rooms
+SL;90;90;63;Plant enclosures
+SL;90;90;64;Plant rooms
+SL;90;90;68;Pump rooms
+SL;90;90;77;Server rooms
+SL;90;90;78;Services shafts
+SL;90;90;85;Switch rooms
+SL;90;90;87;Tank rooms
+SL;90;90;90;Transformer rooms
+SL;90;90;96;Wall services voids

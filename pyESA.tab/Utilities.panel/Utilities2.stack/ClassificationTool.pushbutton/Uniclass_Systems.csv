@@ -1,0 +1,2716 @@
+Ss;15;;;;Earthworks, remediation and temporary systems
+Ss;15;10;;;Groundworks and earthworks systems
+Ss;15;10;16;;Contaminant containment systems
+Ss;15;10;16;75;Subsurface asbestos encapsulation cell systems
+Ss;15;10;30;;Excavating, filling and erosion control systems
+Ss;15;10;30;5;Backfill systems
+Ss;15;10;30;25;Earthworks excavating systems
+Ss;15;10;30;27;Earthworks filling systems
+Ss;15;10;30;29;Earthworks filling systems around trees
+Ss;15;10;30;31;Earthworks filling systems behind retaining walls
+Ss;15;10;30;33;Erosion control systems
+Ss;15;10;30;65;Puddled clay lining systems
+Ss;15;10;30;90;Topsoil filling systems
+Ss;15;10;33;;Ground gas disposal systems
+Ss;15;10;33;34;Ground gas collection and venting systems
+Ss;15;10;35;;Ground remediation systems
+Ss;15;10;35;7;Bioremediation systems
+Ss;15;10;35;12;Chemical stabilization systems
+Ss;15;10;35;23;Deep dry soil mixing systems
+Ss;15;10;35;25;Dynamic deep compaction systems
+Ss;15;10;35;92;Vibro-compaction systems
+Ss;15;10;35;94;Vibro-stone column systems
+Ss;15;10;35;97;Wet soil mixing systems
+Ss;15;10;45;;Landfill systems
+Ss;15;10;76;;Site waste disposal systems
+Ss;15;10;76;21;Dewatering systems
+Ss;15;10;78;;Slurry wall systems
+Ss;15;10;80;;Stabilization systems
+Ss;15;10;80;15;Concrete column stabilization systems
+Ss;15;10;80;70;Rock bolting and dowelling systems
+Ss;15;10;80;75;Rock fissure grouting systems
+Ss;15;10;80;80;Soil nailing systems
+Ss;15;10;80;85;Subterranean void filling systems
+Ss;15;30;;;Remediation, repair and renovation systems
+Ss;15;30;10;;Building services remediation systems
+Ss;15;30;12;;Ceramics repair and renovation systems
+Ss;15;30;15;;Concrete and masonry cleaning systems
+Ss;15;30;15;15;Concrete cleaning systems
+Ss;15;30;15;50;Masonry cleaning systems
+Ss;15;30;15;65;Preliminary concrete cleaning systems
+Ss;15;30;15;66;Preliminary masonry cleaning systems
+Ss;15;30;17;;Concrete repair and renovation systems
+Ss;15;30;17;10;Bonded plate repair systems
+Ss;15;30;17;12;Concrete crack repair or filling systems
+Ss;15;30;17;14;Concrete mortar or overlay systems
+Ss;15;30;17;16;Concrete protective coating systems
+Ss;15;30;17;18;Concrete repair systems
+Ss;15;30;17;85;Sprayed concrete repair systems
+Ss;15;30;32;;Fungus and beetle eradication systems
+Ss;15;30;32;5;Beetle eradication systems
+Ss;15;30;32;15;Combined fungus and beetle treatment systems
+Ss;15;30;32;35;Hot air infestation treatment systems
+Ss;15;30;32;50;Masonry fungus treatment systems
+Ss;15;30;32;85;Termite treatment systems
+Ss;15;30;32;90;Timber fungus treatment systems
+Ss;15;30;33;;Glass repair and renovation systems
+Ss;15;30;50;;Masonry repair and renovation systems
+Ss;15;30;50;50;Masonry repair systems
+Ss;15;30;50;53;Mortar joint repair systems
+Ss;15;30;50;55;Mortar repointing systems
+Ss;15;30;52;;Metal repair and renovation systems
+Ss;15;30;52;3;Aluminium repair systems
+Ss;15;30;52;15;Copper repair systems
+Ss;15;30;52;42;Iron repair systems
+Ss;15;30;52;46;Lead repair systems
+Ss;15;30;52;84;Steel repair systems
+Ss;15;30;65;;Pipeline renovation systems
+Ss;15;30;65;15;Close-fit plastics pipe lining systems
+Ss;15;30;65;17;Continuous plastics pipe lining systems
+Ss;15;30;65;20;Cured in place lining systems
+Ss;15;30;65;65;Preformed lining systems
+Ss;15;30;65;72;Rigidly anchored plastics inner layer (RAPL) lining systems
+Ss;15;30;65;80;Spray lining systems
+Ss;15;30;65;81;Spirally wound plastics pipe lining systems
+Ss;15;30;90;;Timber repair and renovation systems
+Ss;15;30;90;84;Timber joint strengthening systems
+Ss;15;30;90;86;Timber section repair systems
+Ss;15;30;90;90;Timber section strengthening systems
+Ss;15;95;;;Temporary works systems
+Ss;15;95;15;;Temporary preparatory works systems
+Ss;15;95;15;10;Borehole systems
+Ss;15;95;17;;Temporary protection systems
+Ss;15;95;17;90;Temporary backfill systems
+Ss;15;95;20;;Temporary whole entity structural works systems
+Ss;15;95;20;30;Flying shores systems
+Ss;15;95;20;32;Framed retention structure systems
+Ss;15;95;20;70;Raking shores systems
+Ss;15;95;20;72;Retention structure systems
+Ss;15;95;20;75;Scaffold retention structure systems
+Ss;15;95;20;87;Thrust pit systems
+Ss;15;95;25;;Temporary wall and barrier systems
+Ss;15;95;25;30;Temporary flood barrier systems
+Ss;15;95;25;60;Temporary pedestrian barrier systems
+Ss;15;95;25;70;Temporary rail barrier systems
+Ss;15;95;25;75;Temporary road barrier systems
+Ss;15;95;25;85;Temporary traffic barrier systems
+Ss;15;95;25;90;Temporary water barrier systems
+Ss;15;95;30;;Temporary roof, floor and paving systems
+Ss;15;95;32;;Temporary water and land management systems
+Ss;15;95;32;85;Sedimentation ponds
+Ss;15;95;35;;Temporary stair and ramp systems
+Ss;15;95;37;;Temporary tunnel, shaft, vessel and tower systems
+Ss;15;95;40;;Temporary signage and fittings, furnishings and equipment (FF&E) systems
+Ss;15;95;45;;Temporary flora and fauna systems
+Ss;15;95;45;42;Intercropping systems
+Ss;15;95;45;85;Spoil heap temporary crop systems
+Ss;15;95;45;90;Topsoil heap temporary crop systems
+Ss;15;95;50;;Temporary disposal systems
+Ss;15;95;55;;Temporary piped supply systems
+Ss;15;95;55;90;Tunnelling compressed air systems
+Ss;15;95;60;;Temporary heating, cooling and refrigeration systems
+Ss;15;95;65;;Temporary ventilation and air conditioning systems
+Ss;15;95;70;;Temporary electrical systems
+Ss;15;95;75;;Temporary communications, security, safety, control and protection systems
+Ss;15;95;75;88;Temporary fire detection and alarm systems
+Ss;15;95;75;89;Temporary security systems
+Ss;15;95;80;;Temporary transport systems
+Ss;15;95;80;2;Temporary access road systems
+Ss;15;95;80;72;Temporary roadwork systems
+Ss;15;95;85;;Temporary process engineering systems
+Ss;15;95;90;;Temporary soft facility management services
+Ss;20;;;;Structural systems
+Ss;20;5;;;Substructure systems
+Ss;20;5;15;;Concrete foundation systems
+Ss;20;5;15;65;Precast concrete pad and strip foundation systems
+Ss;20;5;15;70;Reinforced concrete pad and strip foundation systems
+Ss;20;5;15;71;Reinforced concrete pilecap and ground beam foundation systems
+Ss;20;5;15;72;Reinforced concrete raft foundation systems
+Ss;20;5;15;80;Steel ground beam foundation systems
+Ss;20;5;15;90;Unreinforced concrete foundation systems for cast-in products
+Ss;20;5;15;91;Unreinforced concrete pad and strip foundation systems
+Ss;20;5;15;92;Unreinforced concrete trench fill foundation systems
+Ss;20;5;50;;Minor concrete substructure systems
+Ss;20;5;50;15;Concrete haunching systems
+Ss;20;5;50;65;Precast concrete foundation and plinth systems
+Ss;20;5;50;70;Reinforced concrete foundation and plinth systems
+Ss;20;5;50;92;Unreinforced concrete foundation for cast-in products systems
+Ss;20;5;50;93;Unreinforced concrete foundation and plinth systems
+Ss;20;5;65;;Piling systems
+Ss;20;5;65;24;Driven precast or prestressed concrete piling systems
+Ss;20;5;65;40;In situ concrete augered piling systems
+Ss;20;5;65;41;In situ concrete bored piling systems
+Ss;20;5;65;42;In situ concrete cased displacement piling systems
+Ss;20;5;65;43;In situ concrete displacement piling systems
+Ss;20;5;65;44;Concrete micro-piling systems
+Ss;20;5;65;64;Plunge column piling systems
+Ss;20;5;65;76;Screw piling systems
+Ss;20;5;65;84;Steel bearing piling systems
+Ss;20;5;65;89;Timber piling systems
+Ss;20;5;80;;Structural grouting systems
+Ss;20;5;80;12;Cementitious grout systems
+Ss;20;5;80;40;Interstitial grouting systems
+Ss;20;5;80;57;Non-cementitious grout systems
+Ss;20;5;80;71;Retaining wall cementitious grout systems
+Ss;20;5;80;73;Retaining wall self-hardening slurry systems
+Ss;20;5;80;80;Soil nailing cementitious grout systems
+Ss;20;5;90;;Underpinning systems
+Ss;20;5;90;10;Beam and pier underpinning systems
+Ss;20;5;90;35;Grouted underpinning systems
+Ss;20;5;90;45;Jacked pile underpinning systems
+Ss;20;5;90;46;Jet grouted underpinning systems
+Ss;20;5;90;50;Mass concrete underpinning systems
+Ss;20;5;90;60;Pile and cantilever support underpinning systems
+Ss;20;5;90;61;Pile and needle underpinning systems
+Ss;20;5;90;70;Raking pile underpinning systems
+Ss;20;10;;;Structural frame systems
+Ss;20;10;30;;Complete bridge structure systems
+Ss;20;10;30;30;Footbridge systems
+Ss;20;10;30;65;Pipe bridge systems
+Ss;20;10;30;84;Steel arch bridge systems
+Ss;20;10;60;;Prefabricated framed and panelled structures
+Ss;20;10;60;33;Geodesic dome systems
+Ss;20;10;60;34;Glazed enclosure systems
+Ss;20;10;60;50;Modular pod systems
+Ss;20;10;60;60;Panelled and framed modular systems
+Ss;20;10;60;65;Prefabricated plantroom systems
+Ss;20;10;60;84;Structural insulated panel systems
+Ss;20;10;60;95;Volumetric modular systems
+Ss;20;10;65;;Prefabricated room systems
+Ss;20;10;65;12;Prefabricated catering room systems
+Ss;20;10;65;15;Composite pods
+Ss;20;10;65;17;Concrete pods
+Ss;20;10;65;38;Prefabricated hospital care room systems
+Ss;20;10;65;52;Prefabricated meeting room systems
+Ss;20;10;65;58;Prefabricated office room systems
+Ss;20;10;65;65;Polypropylene pods
+Ss;20;10;65;96;Prefabricated welfare room systems
+Ss;20;10;70;;Shelter systems
+Ss;20;10;70;3;Animal shelter systems
+Ss;20;10;70;62;People shelter systems
+Ss;20;10;70;64;Plant shelter systems
+Ss;20;10;70;84;Storage shelter systems
+Ss;20;10;75;;Structural framing systems
+Ss;20;10;75;35;Heavy steel framing systems
+Ss;20;10;75;45;Light steel framing systems
+Ss;20;10;75;65;Precast reinforced concrete framing systems
+Ss;20;10;75;70;Reinforced concrete framing systems
+Ss;20;10;75;85;Timber framing systems
+Ss;20;20;;;Structural beams
+Ss;20;20;75;;Structural beam systems
+Ss;20;20;75;35;Heavy steel beam systems
+Ss;20;20;75;45;Light steel beam systems
+Ss;20;20;75;65;Precast reinforced concrete beam systems
+Ss;20;20;75;67;Prestressed concrete beam systems
+Ss;20;20;75;70;Reinforced concrete beam systems
+Ss;20;20;75;85;Timber beam systems
+Ss;20;30;;;Structural columns
+Ss;20;30;75;;Structural column systems
+Ss;20;30;75;35;Heavy steel column systems
+Ss;20;30;75;45;Light steel column systems
+Ss;20;30;75;50;Masonry column systems
+Ss;20;30;75;65;Precast reinforced concrete column systems
+Ss;20;30;75;70;Reinforced concrete column systems
+Ss;20;30;75;85;Timber column systems
+Ss;20;40;;;Structural sheet and cable systems
+Ss;20;40;10;;Building cable systems
+Ss;20;50;;;Bridge structure systems
+Ss;20;50;10;;Abutment systems
+Ss;20;50;10;10;Bank seat abutments
+Ss;20;50;10;30;Embedded retaining wall bridge abutments
+Ss;20;50;10;40;Integral abutments
+Ss;20;50;10;50;Masonry bridge abutments
+Ss;20;50;10;70;Reinforced concrete bridge abutments
+Ss;20;50;10;80;Sheet piled bridge abutments
+Ss;20;50;10;85;Spill-through abutments
+Ss;20;50;10;90;Tied embedded retaining wall bridge abutments
+Ss;20;50;10;95;Wing wall systems
+Ss;20;50;15;;Bridge bearing systems
+Ss;20;50;15;20;Curved bearing systems
+Ss;20;50;15;23;Disk bearing systems
+Ss;20;50;15;27;Elastomeric bearing systems
+Ss;20;50;15;65;Pot bearing systems
+Ss;20;50;15;72;Rocker and pin bearing systems
+Ss;20;50;15;74;Roller bearing systems
+Ss;20;50;15;78;Sliding bearing systems
+Ss;20;50;15;80;Spherical bearing systems
+Ss;20;50;20;;Bridge pier and pylon systems
+Ss;20;50;20;50;Masonry bridge pier systems
+Ss;20;50;20;70;Reinforced concrete bridge pier systems
+Ss;20;50;20;72;Reinforced concrete bridge pylon systems
+Ss;20;50;20;74;Reinforced concrete bridge tower systems
+Ss;20;50;20;85;Steel bridge pier systems
+Ss;20;50;20;87;Steel bridge pylon systems
+Ss;20;50;20;89;Steel bridge tower systems
+Ss;20;50;20;90;Timber bridge pier systems
+Ss;20;50;25;;Bridge deck systems
+Ss;20;50;25;8;Box girder bridge deck systems
+Ss;20;50;25;12;Composite steel and concrete bridge deck systems
+Ss;20;50;25;15;Concrete half through deck systems
+Ss;20;50;25;16;Concrete slab deck systems
+Ss;20;50;25;30;Filler beam deck systems
+Ss;20;50;25;31;Flat and stepped deck systems
+Ss;20;50;25;53;Modular precast concrete deck systems
+Ss;20;50;25;59;Orthotropic deck systems
+Ss;20;50;25;63;Post-tensioned concrete beam deck systems
+Ss;20;50;25;65;Pre-tensioned concrete beam deck systems
+Ss;20;50;25;70;Reinforced concrete arch bridge systems
+Ss;20;50;25;80;Solid steel slab systems
+Ss;20;50;30;;Abutment and pier component systems
+Ss;20;50;30;11;Capping beam systems
+Ss;20;50;30;37;Bridge headwall systems
+Ss;20;50;30;80;Spandrel arch wall systems
+Ss;20;50;35;;Bridge cable systems
+Ss;20;50;35;11;Cable-stayed bridge cable systems
+Ss;20;50;35;85;Suspension bridge cable systems
+Ss;20;50;40;;Bridge expansion and movement joint systems
+Ss;20;50;40;4;Asphaltic plug joint systems
+Ss;20;50;40;9;Buried expansion joint systems
+Ss;20;50;40;56;Nosing expansion joint systems with poured sealants
+Ss;20;50;40;57;Nosing expansion joint systems with preformed compression seals
+Ss;20;50;90;;Bridge deck waterproofing systems
+Ss;20;50;90;8;Bridge deck sheet waterproofing systems
+Ss;20;50;90;10;Bridge deck sprayed liquid waterproofing systems
+Ss;20;60;;;Retaining wall systems
+Ss;20;60;30;;Embedded retaining wall systems
+Ss;20;60;30;3;Anchored steel sheet pile retaining wall systems
+Ss;20;60;30;8;Bored king post retaining wall systems
+Ss;20;60;30;13;Combi retaining wall systems
+Ss;20;60;30;15;Contiguous pile retaining wall systems
+Ss;20;60;30;24;Driven king post retaining wall systems
+Ss;20;60;30;70;Reinforced concrete diaphragm retaining wall systems
+Ss;20;60;30;80;Secant pile retaining wall systems
+Ss;20;60;30;83;Slurry diaphragm retaining wall systems
+Ss;20;60;30;85;Steel sheet pile retaining wall systems
+Ss;20;60;30;92;Unreinforced concrete diaphragm retaining wall systems
+Ss;20;60;35;;Gravity retaining wall systems
+Ss;20;60;35;6;Bagwork retaining wall systems
+Ss;20;60;35;10;Caged fill retaining wall systems
+Ss;20;60;35;13;Concrete bagwork retaining wall systems
+Ss;20;60;35;15;Crib retaining wall systems
+Ss;20;60;35;25;Drystack masonry unit retaining wall systems
+Ss;20;60;35;50;Masonry retaining wall systems
+Ss;20;60;35;53;Mesh formwork and geogrid retaining wall systems
+Ss;20;60;35;66;Precast concrete stem wall retaining wall systems
+Ss;20;60;35;70;Reinforced concrete retaining wall systems
+Ss;20;60;35;72;Reinforced earth retaining wall systems
+Ss;20;60;35;90;Timber retaining wall systems
+Ss;20;60;35;91;Tyre bale retaining wall systems
+Ss;20;60;40;;Headwall systems
+Ss;20;60;40;20;Culvert headwall systems
+Ss;20;60;40;40;Inlet headwall systems
+Ss;20;60;40;60;Outfall headwall systems
+Ss;20;70;;;Structural protection systems
+Ss;20;70;10;;Cathodic protection systems
+Ss;20;70;10;2;Adhesive-backed zinc sheet anode systems
+Ss;20;70;10;9;Buried galvanic anode systems
+Ss;20;70;10;10;Buried impressed current anode systems
+Ss;20;70;10;27;Embedded impressed current anode systems
+Ss;20;70;10;28;Embedded zinc anode systems
+Ss;20;70;10;41;Immersed galvanic anode systems
+Ss;20;70;10;42;Immersed impressed current anode systems
+Ss;20;70;10;72;Recess-mounted impressed current anode systems
+Ss;20;70;10;85;Surface-mounted impressed current anode systems
+Ss;20;70;10;99;Zinc mesh in overlay systems
+Ss;20;70;15;;Concrete protection systems
+Ss;20;70;65;;Protective painting systems
+Ss;20;70;80;;Steel encasement systems
+Ss;20;80;;;Structure accessory systems
+Ss;20;80;12;;Bearing systems
+Ss;20;80;12;28;Expansion bearings systems
+Ss;20;80;12;30;Fixed bearings systems
+Ss;20;80;60;;Permanent formwork systems
+Ss;25;;;;Wall and barrier systems
+Ss;25;10;;;Framed wall systems
+Ss;25;10;20;;Curtain walling systems
+Ss;25;10;20;85;Stick curtain walling systems
+Ss;25;10;20;90;Unitized curtain walling systems
+Ss;25;10;30;;Framed partition systems
+Ss;25;10;30;35;Gypsum board partition systems
+Ss;25;10;30;70;Rigid sheet partition systems
+Ss;25;10;32;;Framed wall structure systems
+Ss;25;10;32;3;Aluminium wall framing systems
+Ss;25;10;32;35;Heavy steel wall framing systems
+Ss;25;10;32;45;Light steel wall framing systems
+Ss;25;10;32;58;Plastics wall framing systems
+Ss;25;10;32;62;Post-tensioned concrete wall systems
+Ss;25;10;32;65;Precast concrete wall systems
+Ss;25;10;32;70;Reinforced concrete wall structure systems
+Ss;25;10;32;90;Timber wall framing systems
+Ss;25;10;35;;Framed glazed wall systems
+Ss;25;10;35;35;Glazed screen systems
+Ss;25;10;35;95;Vertical patent glazing systems
+Ss;25;10;35;97;Window wall glazed screen systems
+Ss;25;10;60;;Air-pressurized panel wall structure systems
+Ss;25;10;60;28;Ethylene tetrafluoroethylene (ETFE) wall systems
+Ss;25;11;;;Monolithic wall structure systems
+Ss;25;11;13;;Cob wall systems
+Ss;25;11;15;;Concrete form masonry unit wall systems
+Ss;25;11;16;;Concrete wall systems
+Ss;25;11;16;80;Sprayed concrete wall structure systems
+Ss;25;11;70;;Rammed earth wall systems
+Ss;25;11;70;55;Non-stabilized rammed earth wall systems
+Ss;25;11;70;83;Stabilized rammed earth plinth systems
+Ss;25;11;70;85;Stabilized rammed earth wall systems
+Ss;25;11;90;;Timber wall systems
+Ss;25;11;90;15;Cross-laminated timber wall systems
+Ss;25;11;90;96;Wood log wall systems
+Ss;25;12;;;Panel wall structure systems
+Ss;25;12;10;;Brick panel wall systems
+Ss;25;12;10;14;Clay brick panel wall systems
+Ss;25;12;10;16;Concrete brick panel wall systems
+Ss;25;12;15;;Concrete panel wall systems
+Ss;25;12;15;5;Autoclaved aerated concrete (AAC) panel wall systems
+Ss;25;12;15;15;Composite concrete panel wall systems
+Ss;25;12;60;;Panel enclosure systems
+Ss;25;12;60;30;Fully-framed panel cubicle systems
+Ss;25;12;60;60;Panel cubicle systems
+Ss;25;12;60;65;Privacy screen systems
+Ss;25;12;65;;Partitioning systems
+Ss;25;12;65;50;Media wall systems
+Ss;25;12;65;55;Mesh panel partition systems
+Ss;25;12;65;60;Plasterboard laminated partition systems
+Ss;25;12;65;65;Panel partition systems
+Ss;25;12;65;70;Relocatable partition and ceiling systems
+Ss;25;12;65;75;Relocatable partition systems
+Ss;25;12;65;85;Storage wall systems
+Ss;25;12;70;;Retractable partition systems
+Ss;25;12;70;30;Fabric dividing partition systems
+Ss;25;12;70;80;Sliding stacking panel partition systems
+Ss;25;12;80;;Structural glass wall systems
+Ss;25;12;80;65;Point-fixed structural glass wall systems
+Ss;25;12;80;83;Stacked structural glass wall systems
+Ss;25;12;80;85;Suspended structural glass wall systems
+Ss;25;12;85;;Structural steel panel wall systems
+Ss;25;12;85;60;Prefabricated metal wall systems
+Ss;25;12;85;63;Profile metal sheet wall systems
+Ss;25;13;;;Unit wall structure systems
+Ss;25;13;5;;Adobe block wall systems
+Ss;25;13;24;;Dry stone wall systems
+Ss;25;13;33;;Glass wall systems
+Ss;25;13;33;33;Glass block wall systems
+Ss;25;13;33;64;Prefabricated glass block wall systems
+Ss;25;13;35;;Gypsum block wall systems
+Ss;25;13;45;;Lead brick wall systems
+Ss;25;13;50;;Masonry wall systems
+Ss;25;13;50;49;Masonry exposed feature systems
+Ss;25;13;50;51;Masonry wall leaf systems
+Ss;25;13;50;54;Masonry free-standing wall leaf systems
+Ss;25;13;50;56;Masonry internal partition systems
+Ss;25;13;70;;Reinforced masonry wall systems
+Ss;25;13;70;71;Reinforced masonry wall leaf systems
+Ss;25;13;70;74;Reinforced masonry free-standing wall leaf systems
+Ss;25;13;70;76;Reinforced masonry internal partition systems
+Ss;25;13;85;;Straw bale wall systems
+Ss;25;13;85;30;Framed straw bale wall systems
+Ss;25;13;85;95;Unframed straw bale wall systems
+Ss;25;14;;;Fence systems
+Ss;25;14;8;;Board, palisade and continuous infill fencing systems
+Ss;25;14;8;8;Board or palisade fencing systems
+Ss;25;14;8;14;Cleft chestnut pale fencing systems
+Ss;25;14;8;52;Metal vertical pale fencing systems
+Ss;25;14;8;64;Precast concrete palisade fencing systems
+Ss;25;14;8;85;Steel palisade panel fencing systems
+Ss;25;14;8;95;Wood close-boarded fencing systems
+Ss;25;14;8;96;Wood palisade fencing systems
+Ss;25;14;30;;Framed fence systems
+Ss;25;14;30;56;Natural stone fencing systems
+Ss;25;14;52;;Mesh fencing systems
+Ss;25;14;52;12;Chain link fencing systems
+Ss;25;14;52;15;Continuous mesh fencing systems
+Ss;25;14;52;34;General pattern wire mesh fencing systems
+Ss;25;14;52;80;Spring steel and high-tensile wire mesh fencing systems
+Ss;25;14;55;;Monolithic fence systems
+Ss;25;14;61;;Panel fencing systems
+Ss;25;14;61;51;Metal mesh panel fencing systems
+Ss;25;14;61;56;Natural hurdle fencing systems
+Ss;25;14;61;62;Post and panel fencing systems
+Ss;25;14;61;65;Precast concrete post and panel fencing systems
+Ss;25;14;61;67;Prefabricated wood or plastics panel fencing systems
+Ss;25;14;61;84;Steel hurdle fencing systems
+Ss;25;14;61;86;Steel vertical bar fencing systems
+Ss;25;14;61;98;Wrought iron panel fencing systems
+Ss;25;14;63;;Rail fencing systems
+Ss;25;14;63;11;Carbon steel continuous bar fencing systems
+Ss;25;14;63;51;Metal post and rail fencing systems
+Ss;25;14;63;63;Post and rail fencing systems
+Ss;25;14;63;66;Precast concrete post and rail fencing systems
+Ss;25;14;63;97;Wood post and rail fencing systems
+Ss;25;14;67;;Post and wire fencing systems
+Ss;25;14;67;24;Dropper pattern strained wire fencing systems
+Ss;25;14;67;27;Electric fencing systems
+Ss;25;14;67;28;Electric security fencing systems
+Ss;25;14;67;33;General pattern strained wire fencing systems
+Ss;25;14;67;70;Rope or chain fencing systems
+Ss;25;14;67;97;Wire fencing systems
+Ss;25;15;;;Fixed pedestrian barrier systems
+Ss;25;15;60;;Pedestrian safety barrier and guarding systems
+Ss;25;15;60;14;Composite barrier systems
+Ss;25;15;60;15;Composite pedestrian parapet systems
+Ss;25;15;60;16;Composite post and panel barrier systems
+Ss;25;15;60;17;Composite post and rail barrier systems
+Ss;25;15;60;18;Concrete post and rail barrier systems
+Ss;25;15;60;37;Hoop barrier systems
+Ss;25;15;60;52;Metal modular barrier systems
+Ss;25;15;60;53;Metal pedestrian parapet systems
+Ss;25;15;60;54;Metal post and mesh panel barrier systems
+Ss;25;15;60;55;Metal post and panel barrier systems
+Ss;25;15;60;56;Metal post and rail barrier systems
+Ss;25;15;60;57;Metal vertical bar pedestrian guard rail systems
+Ss;25;15;60;60;Pedestrian parapet systems
+Ss;25;15;60;65;Post and panel barrier systems
+Ss;25;15;60;66;Post and rail barrier systems
+Ss;25;15;60;67;Post and rope barrier systems
+Ss;25;15;60;68;Post and wire barrier systems
+Ss;25;15;60;96;Wood post and panel barrier systems
+Ss;25;15;60;97;Wood post and rail barrier systems
+Ss;25;15;85;;Sports barrier systems
+Ss;25;15;85;55;Multi-use games fencing systems
+Ss;25;16;;;Fixed traffic and protective barrier systems
+Ss;25;16;4;;Artificial reef systems
+Ss;25;16;5;;Avalanche and snow barrier systems
+Ss;25;16;8;;Blast barrier systems
+Ss;25;16;8;44;Jet blast deflection systems
+Ss;25;16;21;;Debris flow barrier systems
+Ss;25;16;46;;Landslide barrier systems
+Ss;25;16;50;;Coastal, river and waterways protection systems
+Ss;25;16;50;72;Rock armour systems
+Ss;25;16;50;77;Scouring protection systems
+Ss;25;16;50;80;Sea wall systems
+Ss;25;16;50;82;Splash deck systems
+Ss;25;16;50;84;Splash wall systems
+Ss;25;16;73;;Road and rail barrier systems
+Ss;25;16;73;3;Acoustic barrier systems
+Ss;25;16;73;5;Anti-throw barrier systems
+Ss;25;16;73;26;Environment protection screen systems
+Ss;25;16;73;79;Sight barrier systems
+Ss;25;16;73;80;Socket for temporary barrier systems
+Ss;25;16;76;;Rockfall barrier systems
+Ss;25;16;94;;Vehicle restraint systems
+Ss;25;16;94;10;Bollard systems
+Ss;25;16;94;14;Combined metal and concrete vehicle safety parapet systems
+Ss;25;16;94;16;Concrete safety barrier (CSB) systems
+Ss;25;16;94;44;Low-speed precast concrete safety parapet (PCONC) systems
+Ss;25;16;94;46;Low-speed masonry safety parapet (PMAS) systems
+Ss;25;16;94;48;Low-speed metal vehicle safety parapet systems
+Ss;25;16;94;50;Metal vehicle safety fence systems
+Ss;25;16;94;65;Protective rail systems
+Ss;25;16;94;95;Vehicle safety control systems
+Ss;25;16;94;96;Vehicle security barrier systems
+Ss;25;16;94;97;Wire rope safety fence (WRSF) systems
+Ss;25;17;;;Dam and levee structure systems
+Ss;25;17;5;;Arch dam systems
+Ss;25;17;10;;Buttress dam systems
+Ss;25;17;25;;Embankment dam and levee systems
+Ss;25;17;25;30;Flow control embankments
+Ss;25;17;35;;Gravity dam systems
+Ss;25;17;35;60;Orifice check dam systems
+Ss;25;20;;;Wall cladding systems
+Ss;25;20;8;;Board cladding systems
+Ss;25;20;8;95;Weatherboarding systems
+Ss;25;20;12;;Cladding support systems
+Ss;25;20;12;2;Aluminium cladding support systems
+Ss;25;20;12;80;Stainless steel cladding support systems
+Ss;25;20;14;;Composite panel cladding systems
+Ss;25;20;14;10;Built-up metal insulating sandwich panel cladding systems
+Ss;25;20;14;52;Metal composite panel cladding systems
+Ss;25;20;14;54;Metal insulating sandwich panel cladding systems
+Ss;25;20;14;55;Metal semi-composite panel cladding systems
+Ss;25;20;15;;Concrete cladding systems
+Ss;25;20;15;16;Concrete panel cladding systems
+Ss;25;20;33;;Glass fibre-reinforced concrete (GRC) cladding systems
+Ss;25;20;33;35;Glass fibre-reinforced concrete (GRC) wall cladding systems
+Ss;25;20;34;;Glass fibre-reinforced gypsum (GRG) cladding systems
+Ss;25;20;34;35;Glass fibre-reinforced gypsum (GRG) wall cladding systems
+Ss;25;20;35;;Glass fibre-reinforced plastics (GRP) cladding systems
+Ss;25;20;35;35;Glass fibre-reinforced plastics (GRP) wall cladding systems
+Ss;25;20;50;;Metal sheet fully supported wall-covering systems
+Ss;25;20;50;5;Aluminium sheet fully supported wall-covering systems
+Ss;25;20;50;11;Carbon steel sheet fully supported wall-covering systems
+Ss;25;20;50;15;Copper sheet fully supported wall-covering systems
+Ss;25;20;50;45;Lead sheet fully supported wall-covering systems
+Ss;25;20;50;50;Lead-wrapped panel cladding systems
+Ss;25;20;50;85;Stainless steel sheet fully supported wall-covering systems
+Ss;25;20;50;95;Zinc sheet fully supported wall-covering systems
+Ss;25;20;60;;Panel and sheet cladding systems
+Ss;25;20;68;;Profiled sheet self-supporting cladding systems
+Ss;25;20;68;30;Fibre cement profiled sheet self-supporting cladding systems
+Ss;25;20;68;50;Metal profiled sheet self-supporting cladding systems
+Ss;25;20;68;65;Plastics profiled sheet self-supporting cladding systems
+Ss;25;20;70;;Rainscreen cladding systems
+Ss;25;20;70;25;Drained and back-ventilated rainscreen cladding systems
+Ss;25;20;70;65;Pressure equalized rainscreen cladding systems
+Ss;25;20;72;;Sheet cladding systems
+Ss;25;20;72;72;Rigid sheet cladding systems
+Ss;25;20;85;;Stone cladding systems
+Ss;25;20;85;50;Manufactured stone cladding systems
+Ss;25;20;85;55;Natural stone slab cladding systems
+Ss;25;20;90;;Unit cladding systems
+Ss;25;20;90;8;Brick slip cladding systems
+Ss;25;20;90;13;Clay plain tile cladding systems
+Ss;25;20;90;15;Concrete plain tile cladding systems
+Ss;25;20;90;30;Fibre cement slate cladding systems
+Ss;25;20;90;50;Metal tile cladding systems
+Ss;25;20;90;55;Natural slate cladding systems
+Ss;25;20;90;65;Precast concrete panel cladding systems
+Ss;25;20;90;95;Wood shingle or shake cladding systems
+Ss;25;25;;;Wall lining systems
+Ss;25;25;5;;Acoustic panel systems
+Ss;25;25;45;;Lining and casing systems
+Ss;25;25;45;25;Duct and wall panel lining systems
+Ss;25;25;45;33;Gypsum board casing systems
+Ss;25;25;45;35;Gypsum board wall lining systems
+Ss;25;25;45;47;Linear wall lining systems
+Ss;25;25;45;50;Metal framed wall lining systems
+Ss;25;25;45;68;Rigid sheet casing systems
+Ss;25;25;45;70;Rigid sheet wall lining systems
+Ss;25;25;45;88;Timber board casing systems
+Ss;25;25;45;90;Timber board wall lining systems
+Ss;25;25;70;;Radiation shielding lining systems
+Ss;25;25;70;8;Brick and block radiation shielding lining systems
+Ss;25;25;70;78;Sheeted radiation shielding lining systems
+Ss;25;25;70;96;Wet-applied radiation shielding lining systems
+Ss;25;25;75;;Rigid sheet fine lining and panelling systems
+Ss;25;25;75;5;Acoustic panel lining systems
+Ss;25;25;75;63;Plastics panel lining systems
+Ss;25;25;75;65;Plastics veneered panel lining systems
+Ss;25;25;75;85;Specialist faced panel lining systems
+Ss;25;25;75;94;Wood panel lining systems
+Ss;25;25;75;95;Wood veneered panel lining systems
+Ss;25;25;85;;Stone lining systems
+Ss;25;25;85;50;Manufactured stone lining systems
+Ss;25;25;85;55;Natural stone lining systems
+Ss;25;25;95;;Wall sheathing systems
+Ss;25;25;95;28;External wall sheathing systems
+Ss;25;30;;;Door and window systems
+Ss;25;30;15;;Concrete wall glazing systems
+Ss;25;30;15;66;Precast concrete security window systems
+Ss;25;30;20;;Door, shutter and hatch systems
+Ss;25;30;20;16;Collapsible gate and grille doorset systems
+Ss;25;30;20;22;Door assembly systems
+Ss;25;30;20;25;Doorset systems
+Ss;25;30;20;30;Frame and door leaf systems
+Ss;25;30;20;32;Frameless glass door systems
+Ss;25;30;20;35;Hatch systems
+Ss;25;30;20;37;High-security doorset systems
+Ss;25;30;20;38;High-speed doorset systems
+Ss;25;30;20;39;Hinged doorset systems
+Ss;25;30;20;40;Industrial doorset systems
+Ss;25;30;20;45;Loading bay doorset systems
+Ss;25;30;20;46;Louvre doorset systems
+Ss;25;30;20;62;Pivot doorset systems
+Ss;25;30;20;65;Platform door systems
+Ss;25;30;20;70;Revolving doorset systems
+Ss;25;30;20;73;Roller grille doorset systems
+Ss;25;30;20;74;Roller shutter doorset systems
+Ss;25;30;20;76;Sectional overhead doorset systems
+Ss;25;30;20;77;Sliding doorset systems
+Ss;25;30;20;78;Sliding folding doorset systems
+Ss;25;30;20;84;Strip curtain doorset systems
+Ss;25;30;20;93;Up-and-over doorset systems
+Ss;25;30;29;;Fire and smoke curtain systems
+Ss;25;30;29;30;Fire curtain systems
+Ss;25;30;29;80;Smoke curtain systems
+Ss;25;30;95;;Window and window walling systems
+Ss;25;30;95;11;Casement window systems
+Ss;25;30;95;75;Sash window systems
+Ss;25;30;95;95;Window systems
+Ss;25;30;95;96;Window walling systems
+Ss;25;32;;;Gate and access control systems
+Ss;25;32;35;;Gate systems
+Ss;25;32;35;5;Animal gate systems
+Ss;25;32;35;15;Chicane systems
+Ss;25;32;35;30;Folding gate systems
+Ss;25;32;35;37;Hinged gate systems
+Ss;25;32;35;41;In-line inhibitor systems
+Ss;25;32;35;45;Kissing gate systems
+Ss;25;32;35;80;Sliding gate systems
+Ss;25;32;35;85;Stile systems
+Ss;25;32;35;90;Turnstile systems
+Ss;25;32;60;;Access control gate systems
+Ss;25;32;60;15;Controlled pedestrian access systems
+Ss;25;32;60;26;e-passport gate systems
+Ss;25;32;60;60;Passport gate systems
+Ss;25;32;70;;Railway platform barrier systems
+Ss;25;32;70;64;Platform end barrier gate systems
+Ss;25;36;;;Operable barrier systems
+Ss;25;36;24;;Dry dock automated gate systems
+Ss;25;36;30;;Flood and storm surge barrier systems
+Ss;25;36;30;30;Flood gate systems
+Ss;25;36;50;;Marina and sea gate automated systems
+Ss;25;36;58;;Operable rail barrier systems
+Ss;25;36;62;;Operable water barrier systems
+Ss;25;36;62;47;Lock gate systems
+Ss;25;36;62;65;Prop arm systems
+Ss;25;36;62;96;Water control gate systems
+Ss;25;36;64;;Operable bridge barrier systems
+Ss;25;36;66;;Operable tunnel barrier systems
+Ss;25;36;70;;Railway crossing systems
+Ss;25;36;95;;Vehicle access point control systems
+Ss;25;36;95;5;Automated heavy-duty gate systems
+Ss;25;36;95;35;Heavy-duty sliding beam barrier systems
+Ss;25;36;95;36;Height restrictor systems
+Ss;25;36;95;38;Horizontal swing gate systems
+Ss;25;36;95;40;Hydraulic ramp systems
+Ss;25;36;95;50;Movable bollard and car park post systems
+Ss;25;36;95;70;Rising arm barrier systems
+Ss;25;36;95;72;Rising bollard systems
+Ss;25;36;95;85;Static bollard systems
+Ss;25;36;95;94;Vehicle flow plate systems
+Ss;25;36;95;96;Vehicle stop systems
+Ss;25;38;;;Wall and barrier opening hardware systems
+Ss;25;38;10;;Barrier and gate control systems
+Ss;25;38;10;33;Gate hardware systems
+Ss;25;38;10;95;Water control gate displacer systems
+Ss;25;38;20;;Door and window hardware systems
+Ss;25;38;20;20;Door hardware systems
+Ss;25;38;20;30;Garage door hardware systems
+Ss;25;38;20;35;Hatch hardware systems
+Ss;25;38;20;70;Relocatable partition hardware systems
+Ss;25;38;20;80;Shutter hardware systems
+Ss;25;38;20;95;Window hardware systems
+Ss;25;45;;;Wall covering and finish systems
+Ss;25;45;2;;Acoustic covering systems
+Ss;25;45;12;;Cavity wall insulation systems
+Ss;25;45;12;40;Injected and blown cavity wall insulation systems
+Ss;25;45;25;;Drapery systems
+Ss;25;45;70;;Render and roughcast coating systems
+Ss;25;45;70;55;Multicoat render systems
+Ss;25;45;70;60;One-coat render systems
+Ss;25;45;70;65;Parge coat systems
+Ss;25;45;70;90;Tiling and mosaic render substrate systems
+Ss;25;45;72;;Wall insulation systems
+Ss;25;45;72;2;Adhesive-fixed external wall insulation systems
+Ss;25;45;72;28;External wall insulation systems
+Ss;25;45;72;42;Insulated plinth systems
+Ss;25;45;72;44;Internal wall insulation systems
+Ss;25;45;72;70;Rail-fixed external wall insulation systems
+Ss;25;45;74;;Rolled paper and fabric covering systems
+Ss;25;45;74;70;Rolled covering systems
+Ss;25;45;85;;Sprayed coating systems
+Ss;25;45;85;82;Sprayed external monolithic coating systems
+Ss;25;45;85;85;Sprayed internal monolithic coating systems
+Ss;25;45;86;;Suspended render systems
+Ss;25;45;88;;Tiling systems
+Ss;25;45;88;25;External wall tiling systems
+Ss;25;45;88;40;Internal wall tiling systems
+Ss;25;45;88;90;Tiling and mosaic mortar substrate systems
+Ss;25;45;90;;Unit facing systems
+Ss;25;45;92;;Terrazzo wall tiling and screed systems
+Ss;25;45;92;88;Terrazzo wall tiling systems
+Ss;25;50;;;Wall-mounted canopy and screen systems
+Ss;25;50;45;;Louvre and screening systems
+Ss;25;50;45;22;Decorative screen systems
+Ss;25;50;45;35;Grille systems
+Ss;25;50;45;45;Louvre screen systems
+Ss;25;50;45;60;Panellized louvre screen systems
+Ss;25;50;45;80;Shutter systems
+Ss;25;50;75;;Shading systems
+Ss;25;50;75;5;Awning systems
+Ss;25;50;75;10;Canopy systems
+Ss;25;50;75;30;Facade-aligned brise soleil systems
+Ss;25;50;75;65;Projecting brise soleil systems
+Ss;25;60;;;Wall and barrier accessory systems
+Ss;25;60;5;;Balustrade and handrail systems
+Ss;25;60;5;5;Balustrade and guarding systems
+Ss;25;60;5;35;Handrail systems
+Ss;25;60;10;;Cavity wall tie renewal and insertion systems
+Ss;25;60;30;;Fire-stopping systems
+Ss;25;60;30;40;Individual services penetrations fire-stopping systems
+Ss;25;60;30;45;Linear gap fire-stopping systems
+Ss;25;60;30;48;Loose fire-stopping systems
+Ss;25;60;30;55;Multiple services penetrations fire-stopping systems
+Ss;25;60;30;62;Pipe collar fire-stopping systems
+Ss;25;60;35;;Glazing systems
+Ss;25;60;35;6;Bead-fixed insulating glazing systems
+Ss;25;60;35;8;Bead-fixed single glazing systems
+Ss;25;60;35;30;Fire-resistant glazing systems
+Ss;25;60;35;33;Glazing film systems
+Ss;25;60;35;35;Groove-fixed single glazing systems
+Ss;25;60;35;40;Internal use bead and tape, groove or channel glazing systems
+Ss;25;60;35;50;Mirror glazing systems
+Ss;25;60;35;65;Putty-fronted single glazing systems
+Ss;25;60;35;75;Single-sided gasket glazing systems
+Ss;25;60;35;85;Structural zipper gasket glazing systems
+Ss;25;60;35;95;U-profiled glazing systems
+Ss;30;;;;Roof, floor and paving systems
+Ss;30;10;;;Roof structure systems
+Ss;30;10;30;;Framed roof structure systems
+Ss;30;10;30;3;Aluminium roof framing systems
+Ss;30;10;30;20;Glazed unit roof framing systems
+Ss;30;10;30;25;Heavy steel roof framing systems
+Ss;30;10;30;30;Heavy steel roof space frame systems
+Ss;30;10;30;35;Heavy steel roof space truss systems
+Ss;30;10;30;45;Light steel roof framing systems
+Ss;30;10;30;58;Plastics roof framing systems
+Ss;30;10;30;60;Precast concrete roof structure systems
+Ss;30;10;30;70;Reinforced concrete roof framing systems
+Ss;30;10;30;85;Timber roof framing systems
+Ss;30;10;50;;Monolithic roof structure systems
+Ss;30;10;50;70;Sprayed concrete roof systems
+Ss;30;10;60;;Air-pressurized panel roof structure systems
+Ss;30;10;60;28;Ethylene tetrafluoroethylene (ETFE) roof systems
+Ss;30;10;90;;Unit roof structure systems
+Ss;30;10;90;50;Masonry roof systems
+Ss;30;12;;;Floor and deck structure systems
+Ss;30;12;5;;Beam and block floor systems
+Ss;30;12;15;;Concrete plank floor systems
+Ss;30;12;20;;Deck systems
+Ss;30;12;32;;Framed decking systems
+Ss;30;12;33;;Framed floor systems
+Ss;30;12;33;50;Light steel framed floor systems
+Ss;30;12;33;90;Timber-framed floor systems
+Ss;30;12;35;;Glass unit masonry floor systems
+Ss;30;12;45;;Lift-up concrete plank floor systems
+Ss;30;12;50;;Masonry (flat arch) floor systems
+Ss;30;12;60;;Pier and jetty structure systems
+Ss;30;12;64;;Platform systems
+Ss;30;12;64;17;Crosswall platform systems
+Ss;30;12;64;30;Front wall platform systems
+Ss;30;12;64;53;Modular platform systems
+Ss;30;12;64;65;Plant enclosure and platform systems
+Ss;30;12;85;;Structural deck systems
+Ss;30;12;85;15;Composite concrete deck systems
+Ss;30;12;85;16;Composite steel and concrete deck systems
+Ss;30;12;85;17;Concrete beam and block deck systems
+Ss;30;12;85;18;Concrete deck systems
+Ss;30;12;85;30;Glazed unit deck systems
+Ss;30;12;85;40;Heavy steel deck systems
+Ss;30;12;85;50;Light steel deck systems
+Ss;30;12;85;65;Post-tensioned concrete deck systems
+Ss;30;12;85;70;Reinforced concrete deck systems
+Ss;30;12;85;90;Timber deck systems
+Ss;30;14;;;Paving systems
+Ss;30;14;2;;Acrylic and resin bound aggregate paving systems
+Ss;30;14;2;30;Fibre-reinforced resin-bound aggregate overlay systems
+Ss;30;14;2;41;Impact absorbing synthetic play and sport paving systems
+Ss;30;14;2;42;Impervious acrylic coated sports paving systems
+Ss;30;14;2;70;Resin-bonded aggregate paving systems
+Ss;30;14;2;71;Resin-bound aggregate light-duty paving systems
+Ss;30;14;2;72;Resin-bound aggregate heavy-duty paving systems
+Ss;30;14;2;73;Resin-bound aggregate overlay systems
+Ss;30;14;2;74;Resin-bound stone aggregate sports paving systems
+Ss;30;14;2;85;Synthetic play surfacing systems
+Ss;30;14;5;;Asphalt road and paving systems
+Ss;30;14;5;5;Asphalt concrete light-duty paving systems
+Ss;30;14;5;6;Asphalt concrete paving systems
+Ss;30;14;5;7;Asphalt concrete runway paving systems
+Ss;30;14;5;8;Asphalt concrete surface overlay systems
+Ss;30;14;5;35;Hot rolled asphalt paving systems
+Ss;30;14;5;36;Hot rolled asphalt runway paving systems
+Ss;30;14;5;40;Hot rolled asphalt sports paving systems
+Ss;30;14;5;50;Mastic asphalt pedestrian paving systems
+Ss;30;14;5;65;Porous asphalt concrete paving systems
+Ss;30;14;5;70;Porous asphalt concrete sports paving systems
+Ss;30;14;5;73;Porous asphalt surfacing systems
+Ss;30;14;5;75;Stone mastic asphalt paving systems
+Ss;30;14;5;80;Slurry surfacing overlay systems
+Ss;30;14;5;85;Surface dressing overlay systems
+Ss;30;14;15;;Concrete road and paving systems
+Ss;30;14;15;14;Concrete grass-filled paving systems
+Ss;30;14;15;16;Concrete paving systems
+Ss;30;14;15;17;Concrete porous paving systems
+Ss;30;14;15;18;Concrete runway paving systems
+Ss;30;14;50;;Mat and sheet paving systems
+Ss;30;14;50;25;Dry ski slope synthetic matting systems
+Ss;30;14;50;65;Polymeric sports paving systems
+Ss;30;14;50;80;Synthetic grass surfacing systems
+Ss;30;14;65;;Paving structure systems
+Ss;30;14;65;6;Base layer systems
+Ss;30;14;65;8;Binder course systems
+Ss;30;14;65;25;Drainage layer systems
+Ss;30;14;65;40;Improvement layer systems
+Ss;30;14;65;41;Intermediate layer systems
+Ss;30;14;65;82;Sub-base layer systems
+Ss;30;14;65;83;Subgrade layer systems
+Ss;30;14;65;85;Surface layer systems
+Ss;30;14;80;;Unbound aggregate paving systems
+Ss;30;14;80;30;Fast dry clay sports paving systems
+Ss;30;14;80;37;Hoggin paving systems
+Ss;30;14;80;40;Hard binding gravel paving systems
+Ss;30;14;80;45;Loose laid aggregate paving systems
+Ss;30;14;80;47;Loose aggregate overlay systems
+Ss;30;14;80;48;Loose gravel paving systems
+Ss;30;14;80;75;Sand play surfacing systems
+Ss;30;14;80;90;Unbound aggregate cycle paving systems
+Ss;30;14;80;95;Woodchip and stone trim trail paving systems
+Ss;30;14;80;98;Woodchip and woodfibre surface paving systems
+Ss;30;14;90;;Unit paving systems
+Ss;30;14;90;11;Cellular plastics grass-filled paving systems
+Ss;30;14;90;12;Cellular plastics gravel-filled paving systems
+Ss;30;14;90;30;Flag and slab bound paving systems
+Ss;30;14;90;32;Flag and slab paving overlay systems
+Ss;30;14;90;34;Flag and slab pedestal-supported paving systems
+Ss;30;14;90;36;Flag and slab unbound paving systems
+Ss;30;14;90;50;Mosaic paving systems
+Ss;30;14;90;60;Permeable flag and slab paving systems
+Ss;30;14;90;62;Permeable small unit paving systems
+Ss;30;14;90;70;Rail track paving systems
+Ss;30;14;90;75;Small unit bound paving systems
+Ss;30;14;90;80;Small unit paving overlay systems
+Ss;30;14;90;85;Small unit unbound paving systems
+Ss;30;20;;;Flooring and decking systems
+Ss;30;20;10;;Board and rigid sheet floor systems
+Ss;30;20;10;10;Battened timber board floating floor systems
+Ss;30;20;10;15;Battened wood-based rigid sheet floating floor systems
+Ss;30;20;10;43;Joist-supported mineral-based sheet and board floor systems
+Ss;30;20;10;45;Joist-supported timber board floor systems
+Ss;30;20;10;50;Joist-supported wood-based rigid sheet floor systems
+Ss;30;20;10;95;Wood-based rigid sheet floating floor systems
+Ss;30;20;22;;Demountable athletics floor systems
+Ss;30;20;30;;External deck and boardwalk systems
+Ss;30;20;30;10;Boardwalk systems
+Ss;30;20;30;25;Decking systems
+Ss;30;20;70;;Raised flooring systems
+Ss;30;20;70;37;Hollow floor systems
+Ss;30;20;70;70;Raised access floor systems
+Ss;30;20;90;;Wood and composite unit flooring systems
+Ss;30;20;90;15;Composition block flooring systems
+Ss;30;20;90;50;Mosaic parquet panel flooring systems
+Ss;30;20;90;95;Wood block flooring systems
+Ss;30;20;95;;Wood strip and board fine flooring systems
+Ss;30;20;95;10;Battened wood floating floor systems
+Ss;30;20;95;15;Composite laminate floating floor systems
+Ss;30;20;95;20;Direct-fixed wood floor systems
+Ss;30;20;95;25;Direct-glued wood floor systems
+Ss;30;20;95;95;Wood floating floor systems
+Ss;30;25;;;Ceiling and soffit systems
+Ss;30;25;10;;Board and sheet ceiling systems
+Ss;30;25;10;10;Board suspended ceiling systems
+Ss;30;25;10;26;External ceiling systems
+Ss;30;25;10;28;External soffit systems
+Ss;30;25;10;35;Gypsum board suspended ceiling systems
+Ss;30;25;10;52;Monolithic suspended ceiling systems
+Ss;30;25;10;80;Soffit lining and beam casing systems
+Ss;30;25;22;;Demountable suspended ceiling systems
+Ss;30;25;22;1;Acoustic baffle suspended ceiling systems
+Ss;30;25;22;30;Fabric membrane ceiling systems
+Ss;30;25;22;47;Linear ceiling lining systems
+Ss;30;25;22;51;Modular suspended ceiling systems
+Ss;30;25;22;70;Raft or island suspended ceiling systems
+Ss;30;30;;;Roof and floor opening systems
+Ss;30;30;15;;Concrete roof and floor glazing systems
+Ss;30;30;15;42;In situ concrete roof and floor glazing systems
+Ss;30;30;15;64;Precast concrete lift-out access roof and floor glazing systems
+Ss;30;30;15;65;Precast concrete roof and floor glazing systems
+Ss;30;30;30;;Floor hatch systems
+Ss;30;30;34;;Glass unit masonry roof light systems
+Ss;30;30;71;;Roof hatch systems
+Ss;30;30;72;;Rooflight and roof window systems
+Ss;30;30;72;21;Daylight pipe systems
+Ss;30;30;72;72;Rooflight systems
+Ss;30;30;72;73;Roof window systems
+Ss;30;30;73;;Roof ventilator systems
+Ss;30;30;73;60;Passive roof natural ventilator systems
+Ss;30;30;73;72;Roof smoke ventilator systems
+Ss;30;34;;;Pavement opening systems
+Ss;30;34;3;;Animal grid systems
+Ss;30;34;3;11;Cattle grid systems
+Ss;30;34;15;;Pavement glazing systems
+Ss;30;34;15;15;Concrete pavement glazing systems
+Ss;30;34;15;64;Precast concrete lift-out access pavement glazing systems
+Ss;30;34;15;65;Precast concrete pavement glazing systems
+Ss;30;34;16;;Pavement smoke venting systems
+Ss;30;34;16;15;Concrete pavement glazing smoke venting systems
+Ss;30;34;16;16;Concrete pavement non-glazed smoke venting systems
+Ss;30;34;16;64;Precast concrete pavement glazing smoke venting systems
+Ss;30;34;16;65;Precast concrete pavement non-glazed smoke venting systems
+Ss;30;36;;;Ceiling and soffit opening systems
+Ss;30;36;10;;Ceiling hatch systems
+Ss;30;36;75;;Soffit vent systems
+Ss;30;40;;;Roof and balcony covering and finish systems
+Ss;30;40;10;;Board roof covering systems
+Ss;30;40;10;30;Flat board roof deck systems
+Ss;30;40;10;60;Pitched board roof sarking systems
+Ss;30;40;30;;Flat roof covering systems
+Ss;30;40;30;7;Blue roof systems
+Ss;30;40;30;40;Liquid-applied cold roof covering systems
+Ss;30;40;30;42;Liquid-applied inverted roof covering systems
+Ss;30;40;30;43;Liquid-applied warm roof covering systems
+Ss;30;40;30;50;Mastic asphalt cold roof covering systems
+Ss;30;40;30;52;Mastic asphalt inverted roof covering systems
+Ss;30;40;30;55;Mastic asphalt warm roof covering systems
+Ss;30;40;30;70;Reinforced bitumen membrane cold roof covering systems
+Ss;30;40;30;71;Reinforced bitumen membrane inverted roof covering systems
+Ss;30;40;30;72;Reinforced bitumen membrane warm roof covering systems
+Ss;30;40;30;78;Single-layer sheet cold roof covering systems
+Ss;30;40;30;79;Single-layer sheet inverted roof covering systems
+Ss;30;40;30;80;Single-layer sheet warm roof covering systems
+Ss;30;40;32;;Framed glazed roof systems
+Ss;30;40;32;75;Sloping patent glazing systems
+Ss;30;40;34;;Glass roofing systems
+Ss;30;40;34;15;Cantilevered structural glass beam canopy systems
+Ss;30;40;34;60;Point-fixed structural glass canopy systems
+Ss;30;40;34;65;Point-fixed structural glass roof systems
+Ss;30;40;34;70;Point-fixed structural glass soffit systems
+Ss;30;40;50;;Metal sheet fully supported roof and dormer covering systems
+Ss;30;40;50;5;Aluminium sheet dormer covering systems
+Ss;30;40;50;10;Aluminium sheet fully supported roof covering systems
+Ss;30;40;50;12;Carbon steel sheet dormer covering systems
+Ss;30;40;50;13;Carbon steel sheet fully supported roof covering systems
+Ss;30;40;50;15;Copper sheet dormer covering systems
+Ss;30;40;50;20;Copper sheet fully supported roof covering systems
+Ss;30;40;50;40;Lead sheet dormer covering systems
+Ss;30;40;50;45;Lead sheet fully supported roof covering systems
+Ss;30;40;50;50;Lead-wrapped panel roofing systems
+Ss;30;40;50;75;Stainless steel sheet dormer covering systems
+Ss;30;40;50;80;Stainless steel sheet fully supported roof covering systems
+Ss;30;40;50;90;Zinc sheet dormer covering systems
+Ss;30;40;50;95;Zinc sheet fully supported roof covering systems
+Ss;30;40;55;;Metal composite panel roof covering systems
+Ss;30;40;55;10;Built up metal insulating sandwich panel roof systems
+Ss;30;40;55;50;Metal composite panel roofing systems
+Ss;30;40;55;54;Metal insulating sandwich panel roof systems
+Ss;30;40;55;55;Metal semi-composite panel roofing systems
+Ss;30;40;65;;Profiled sheet self-supporting roof covering systems
+Ss;30;40;65;30;Fibre cement profiled self-supporting sheet roof covering systems
+Ss;30;40;65;50;Metal profiled sheet self-supporting roof covering systems
+Ss;30;40;65;60;Plastics profiled sheet self-supporting roof covering systems
+Ss;30;40;90;;Tensile fabric roofing systems
+Ss;30;40;90;40;Internal single-layer tensile fabric roofing systems
+Ss;30;40;90;50;Multilayer tensile fabric roofing systems
+Ss;30;40;90;75;Single-layer tensile fabric roofing systems
+Ss;30;40;92;;Thatch roof covering systems
+Ss;30;40;92;85;Thatch roofing systems
+Ss;30;40;95;;Unit roofing systems
+Ss;30;40;95;10;Bitumen membrane shingle roofing systems
+Ss;30;40;95;15;Ceramic slate roofing systems
+Ss;30;40;95;30;Fibre cement slate roofing systems
+Ss;30;40;95;40;Interlocking tile roofing systems
+Ss;30;40;95;50;Metal tile roofing systems
+Ss;30;40;95;55;Natural slate roofing systems
+Ss;30;40;95;60;Natural stone slate roofing systems
+Ss;30;40;95;65;Plain tile roofing systems
+Ss;30;40;95;70;Reconstituted slate roofing systems
+Ss;30;40;95;74;Roofing edges and junction systems
+Ss;30;40;95;95;Wood shake or shingle roofing systems
+Ss;30;42;;;Floor covering and finishing systems
+Ss;30;42;10;;Calcium sulfate-based screed systems
+Ss;30;42;10;10;Bonded calcium sulfate-based screed systems
+Ss;30;42;10;30;Floating calcium sulfate-based screed systems
+Ss;30;42;10;90;Unbonded calcium sulfate-based screed systems
+Ss;30;42;15;;Cementitious screed systems
+Ss;30;42;15;10;Bonded or partially bonded cementitious levelling screed systems
+Ss;30;42;15;15;Cementitious wearing screed systems
+Ss;30;42;15;30;Floating cementitious levelling screed systems
+Ss;30;42;15;90;Unbonded cementitious levelling screed systems
+Ss;30;42;20;;Deck covering systems
+Ss;30;42;30;;Floor coating and paint systems
+Ss;30;42;30;30;Floor coating systems
+Ss;30;42;32;;Floor tiling systems
+Ss;30;42;32;30;External floor tiling systems
+Ss;30;42;32;40;Internal floor tiling systems
+Ss;30;42;40;;Ice rink floor systems
+Ss;30;42;52;;Mastic asphalt flooring and floor underlay systems
+Ss;30;42;52;50;Mastic asphalt flooring systems
+Ss;30;42;52;52;Mastic asphalt floor underlay systems
+Ss;30;42;54;;Monolithic flooring systems
+Ss;30;42;54;75;Resin flooring systems
+Ss;30;42;56;;Natural stone flooring systems
+Ss;30;42;56;56;Natural stone slab flooring systems
+Ss;30;42;56;57;Natural stone tile flooring systems
+Ss;30;42;72;;Resilient and textile floor covering systems
+Ss;30;42;72;5;Adhesive-fixed rolled carpet systems
+Ss;30;42;72;10;Carpet tile systems
+Ss;30;42;72;25;Edge-fixed carpet systems
+Ss;30;42;72;72;Resilient sheet floor covering systems
+Ss;30;42;72;75;Resilient tile floor covering systems
+Ss;30;42;90;;Terrazzo floor tiling and screed systems
+Ss;30;42;90;90;Terrazzo floor covering systems
+Ss;30;45;;;Pavement covering and finishing systems
+Ss;30;47;;;Ceiling and soffit covering and finishing systems
+Ss;30;60;;;Roof, floor and paving accessory systems
+Ss;30;60;30;;Floor feature systems
+Ss;30;60;30;26;Entrance matting systems
+Ss;30;60;45;;Kerb and traffic separation systems
+Ss;30;60;45;3;Asphalt kerb systems
+Ss;30;60;45;15;Concrete kerb systems
+Ss;30;60;45;20;Demarcation paving systems
+Ss;30;60;45;45;Light-duty kerb systems
+Ss;30;60;45;55;Multi-unit traffic-calming systems
+Ss;30;60;45;65;Precast kerb systems
+Ss;30;60;45;80;Single-unit traffic-calming systems
+Ss;30;60;45;85;Traffic kerb systems
+Ss;30;60;45;86;Traffic separation systems
+Ss;30;60;70;;Roof feature systems
+Ss;30;75;;;Roof, floor and paving drainage systems
+Ss;30;75;40;;Surface drainage channel systems
+Ss;30;75;40;30;Footway grating systems
+Ss;30;75;40;50;Multi unit surface drainage channel systems
+Ss;30;75;40;75;Single unit surface drainage channel systems
+Ss;30;75;50;;Metal sheet gutter lining systems
+Ss;30;75;50;5;Aluminium sheet gutter lining systems
+Ss;30;75;50;11;Carbon steel sheet gutter lining systems
+Ss;30;75;50;15;Copper sheet gutter lining systems
+Ss;30;75;50;45;Lead sheet gutter lining systems
+Ss;30;75;50;75;Stainless steel sheet gutter lining systems
+Ss;30;75;50;95;Zinc sheet gutter lining systems
+Ss;32;;;;Damp-proofing, waterproofing, insulating and plaster-finishing systems
+Ss;32;10;;;Insulating treatment systems
+Ss;32;10;10;;Cavity and void insulation systems
+Ss;32;10;10;40;Injected and blown insulation systems
+Ss;32;20;;;Damp-proofing systems
+Ss;32;20;20;;Damp-proof course renewal and insertion systems
+Ss;32;20;20;15;Chemical injection damp-proof course systems
+Ss;32;20;20;47;Lead damp-proof course systems
+Ss;32;20;20;62;Physical insertion horizontal damp-proof course systems
+Ss;32;20;20;63;Physical insertion horizontal or stepped cavity tray systems
+Ss;32;20;20;64;Physical insertion proprietary rising damp remedial systems
+Ss;32;20;20;65;Physical insertion vertical damp-proof course systems
+Ss;32;20;30;;Floor damp-proofing systems
+Ss;32;20;30;10;Cementitious mortar slurry floor damp-proofing systems
+Ss;32;20;30;15;Cold-applied liquid floor damp-proofing systems
+Ss;32;20;30;30;Fully bonded bitumen membrane overslab damp-proofing systems
+Ss;32;20;30;35;Fully bonded bitumen membrane underslab damp-proofing systems
+Ss;32;20;30;40;Hot-applied liquid floor damp-proofing systems
+Ss;32;20;30;45;Loose-laid bitumen membrane overslab damp-proofing systems
+Ss;32;20;30;46;Loose-laid bitumen membrane underslab damp-proofing systems
+Ss;32;20;30;48;Loose-laid polyethylene membrane oversite damp-proofing systems
+Ss;32;20;30;50;Loose-laid polyethylene membrane overslab damp-proofing systems
+Ss;32;20;30;51;Loose-laid polyethylene membrane underslab damp-proofing systems
+Ss;32;20;30;55;Mastic asphalt floor damp-proofing systems
+Ss;32;20;30;60;Plastics studded membrane floor damp-proofing systems
+Ss;32;20;30;65;Pre-applied anchored membrane underslab damp-proofing systems
+Ss;32;20;30;75;Self-adhesive bitumen membrane floor damp-proofing systems
+Ss;32;20;95;;Wall damp-proofing systems
+Ss;32;20;95;10;Cementitious mortar slurry internal wall damp-proofing systems
+Ss;32;20;95;15;Cold-applied liquid internal wall damp-proofing systems
+Ss;32;20;95;65;Plastics studded membrane internal wall damp-proofing systems
+Ss;32;30;;;Flashing and weathering systems
+Ss;32;30;30;;Flashing systems
+Ss;32;30;30;3;Aluminium flashing systems
+Ss;32;30;30;11;Carbon steel flashing systems
+Ss;32;30;30;14;Copper flashing systems
+Ss;32;30;30;47;Lead flashing systems
+Ss;32;30;30;84;Stainless steel flashing systems
+Ss;32;30;30;98;Zinc flashing systems
+Ss;32;30;90;;Weathering systems
+Ss;32;30;90;4;Aluminium weathering systems
+Ss;32;30;90;12;Carbon steel weathering systems
+Ss;32;30;90;15;Copper weathering systems
+Ss;32;30;90;48;Lead weathering systems
+Ss;32;30;90;85;Stainless steel weathering systems
+Ss;32;30;90;99;Zinc weathering systems
+Ss;32;46;;;Lath and plaster systems
+Ss;32;46;50;;Metal lathing and anchored mesh reinforcement systems
+Ss;32;46;50;5;Anchored mesh reinforcement systems
+Ss;32;46;50;50;Metal lathing casing systems
+Ss;32;46;50;51;Metal lathing on framing systems
+Ss;32;46;50;52;Metal lathing on hangers, bearers and runners systems
+Ss;32;46;50;53;Metal lathing on solid substrate systems
+Ss;32;46;65;;Plaster-coating systems
+Ss;32;46;65;15;Clay plaster systems
+Ss;32;46;65;55;Multicoat plaster systems
+Ss;32;46;65;58;One-coat plaster systems
+Ss;32;46;65;90;Tiling and mosaic plaster substrate systems
+Ss;32;80;;;Waterproofing and tanking systems
+Ss;32;80;3;;Applied waterproofing and tanking systems
+Ss;32;80;3;10;Cementitious proprietary mortar slurry tanking systems
+Ss;32;80;3;12;Cementitious site-batched-and-mixed mortar tanking systems
+Ss;32;80;3;14;Cold-applied liquid waterproofing systems
+Ss;32;80;3;16;Cold-applied liquid sandwiched tanking systems
+Ss;32;80;3;18;Crystallization-active cementitious mortar dry shake tanking systems
+Ss;32;80;3;20;Crystallization-active cementitious mortar slurry tanking systems
+Ss;32;80;3;50;Mastic asphalt external tanking systems
+Ss;32;80;3;52;Mastic asphalt sandwiched tanking systems
+Ss;32;80;3;54;Mastic asphalt tank lining systems
+Ss;32;80;3;90;Tunnel spray-applied membrane systems
+Ss;32;80;79;;Sheeted waterproofing and tanking systems
+Ss;32;80;79;30;Fully bonded bitumen membrane external tanking systems
+Ss;32;80;79;32;Fully bonded bitumen membrane sandwiched tanking systems
+Ss;32;80;79;33;Fully bonded flexible sheet membrane waterproofing systems
+Ss;32;80;79;36;Hard rigid plastics sheet membrane waterproofing systems
+Ss;32;80;79;40;High-density plastics studded membrane cavity drain waterproofing systems
+Ss;32;80;79;45;Loose-laid bentonite membrane external or sandwiched tanking systems
+Ss;32;80;79;75;Self-adhesive bitumen membrane external tanking systems
+Ss;32;80;79;77;Self-adhesive bitumen membrane sandwiched tanking systems
+Ss;32;80;79;84;Steel membrane waterproofing systems
+Ss;32;80;79;86;Structure-supported sheet membrane waterproofing systems
+Ss;32;80;79;90;Tunnel sheet membrane systems
+Ss;32;80;79;92;Unbonded flexible sheet membrane waterproofing systems
+Ss;32;80;90;;Water feature and pond sheet lining systems
+Ss;32;80;90;35;Ground-supported water retention sheet lining systems
+Ss;32;80;90;85;Structure-supported water retention sheet lining systems
+Ss;35;;;;Stair and ramp systems
+Ss;35;10;;;Stair and ramp structure systems
+Ss;35;10;25;;External stair and ramp systems
+Ss;35;10;25;34;Ground bearing external ramp systems
+Ss;35;10;25;35;Ground bearing external stair systems
+Ss;35;10;25;83;Suspended external ramp systems
+Ss;35;10;25;85;Suspended external stair systems
+Ss;35;10;30;;Fixed utilitarian access systems
+Ss;35;10;30;15;Companionway ladder systems
+Ss;35;10;30;40;Industrial stair systems
+Ss;35;10;30;60;Permanently-fixed roof ladder systems
+Ss;35;10;30;62;Permanently-fixed vertical ladder systems
+Ss;35;10;30;95;Working platform and walkway systems
+Ss;35;10;40;;Internal stair and ramp systems
+Ss;35;10;40;20;Curved internal stair systems
+Ss;35;10;40;40;Internal ramp systems
+Ss;35;10;40;42;Internal composite material stair systems
+Ss;35;10;40;84;Straight internal loft ladder systems
+Ss;35;10;50;;Marine and waterside ramp systems
+Ss;35;10;50;29;Fixed ramp systems
+Ss;35;10;50;31;Floating pontoon ramp systems
+Ss;35;10;50;42;Integral pontoon ramp systems
+Ss;35;10;85;;Structural stair and ramp systems
+Ss;35;10;85;13;Concrete ramp systems
+Ss;35;10;85;15;Concrete stair systems
+Ss;35;10;85;33;Heavy steel ramp systems
+Ss;35;10;85;35;Heavy steel stair systems
+Ss;35;10;85;63;Precast concrete ramp systems
+Ss;35;10;85;65;Precast concrete stair systems
+Ss;35;10;85;88;Timber ramp systems
+Ss;35;10;85;90;Timber stair systems
+Ss;35;30;;;Stair and ramp opening systems
+Ss;35;30;15;;Concrete stair and ramp glazing systems
+Ss;35;30;15;15;Concrete stair tread glazing systems
+Ss;35;40;;;Stair and ramp covering and finishing systems
+Ss;35;40;82;;Stair carpeting systems
+Ss;35;40;82;5;Adhesive-fixed stair carpeting systems
+Ss;37;;;;Tunnel, shaft, vessel and tower systems
+Ss;37;14;;;Chute systems
+Ss;37;14;10;;Bulk material chute systems
+Ss;37;14;25;;Escape chute systems
+Ss;37;14;70;;Refuse and linen chute systems
+Ss;37;14;70;8;Built-in linen chute systems
+Ss;37;14;70;10;Built-in refuse chute systems
+Ss;37;14;70;63;Post-fixed linen chute systems
+Ss;37;14;70;65;Post-fixed refuse chute systems
+Ss;37;16;;;Vessel and trench systems
+Ss;37;16;2;;Above-ground pool systems
+Ss;37;16;5;;Basement water-retaining systems
+Ss;37;16;10;;Bund and sump systems
+Ss;37;16;10;32;Fuel tank bund systems
+Ss;37;16;10;42;Impounding sump systems
+Ss;37;16;10;90;Transformer bund systems
+Ss;37;16;10;92;Tunnel drainage sump systems
+Ss;37;16;50;;Metal and plastics water-retaining systems
+Ss;37;16;65;;Pond and wetland systems
+Ss;37;16;65;40;Informal pond systems
+Ss;37;16;65;70;Raised formal pond systems
+Ss;37;16;65;85;Submerged formal pond systems
+Ss;37;16;65;95;Amenity wetland systems
+Ss;37;16;75;;Silo systems
+Ss;37;16;90;;Trench, pipeway and pit systems
+Ss;37;16;90;11;Cable protection systems
+Ss;37;16;90;28;External underground service duct systems
+Ss;37;16;90;63;Pit systems
+Ss;37;16;95;;Watertight structural systems
+Ss;37;16;95;78;Sewage treatment vessel systems
+Ss;37;17;;;Tower, chimney and mast systems
+Ss;37;17;13;;Chimney systems
+Ss;37;17;13;50;Masonry chimney stack systems
+Ss;37;17;13;65;Pollution control systems
+Ss;37;17;35;;Gantry systems
+Ss;37;17;35;11;Cantilever gantry systems
+Ss;37;17;35;32;Full span gantry systems
+Ss;37;17;35;50;Mast arm sign gantry systems
+Ss;37;17;35;60;Portal sign gantry systems
+Ss;37;17;35;70;Reefer gantry systems
+Ss;37;17;45;;Lattice tower and pylon systems
+Ss;37;17;50;;Mast and pole systems
+Ss;37;17;50;54;Multi-function pole systems
+Ss;37;17;50;72;Road mast systems
+Ss;37;17;90;;Tower systems
+Ss;37;40;;;Tunnel, shaft, vessel and tower covering and finishing systems
+Ss;37;40;85;;Swimming pool tiling systems
+Ss;37;40;85;83;Swimming pool floor tiling systems
+Ss;37;40;85;85;Swimming pool wall tiling systems
+Ss;37;50;;;Shaft and tunnel structural systems
+Ss;37;50;80;;Shaft structure systems
+Ss;37;50;80;50;Masonry lined shaft systems
+Ss;37;50;80;71;Reinforced concrete shaft structure systems
+Ss;37;50;80;77;Segmental shaft structure systems
+Ss;37;50;80;83;Sprayed concrete shaft lining systems
+Ss;37;50;80;90;Unit lined shaft systems
+Ss;37;50;92;;Tunnel structure systems
+Ss;37;50;92;11;Cast concrete tunnel invert systems
+Ss;37;50;92;15;Colliery arch tunnel or adit systems
+Ss;37;50;92;50;Masonry tunnel structure systems
+Ss;37;50;92;64;Primary regulating layer sprayed concrete lining systems
+Ss;37;50;92;66;Primary sprayed concrete lining systems
+Ss;37;50;92;71;Reinforced concrete tunnel structure systems
+Ss;37;50;92;75;Secondary cast concrete lining systems
+Ss;37;50;92;76;Secondary regulating layer sprayed concrete lining systems
+Ss;37;50;92;77;Secondary sprayed concrete lining systems
+Ss;37;50;92;79;Sectional tunnel structure systems
+Ss;37;50;92;83;Sprayed concrete tunnel lining systems
+Ss;37;50;92;86;Tunnel support systems
+Ss;37;50;92;90;Unit lined tunnel systems
+Ss;37;55;;;Tunnel and shaft opening systems
+Ss;37;55;60;;Opening frame systems
+Ss;37;55;60;90;Tunnel opening frame systems
+Ss;37;60;;;Tunnel, shaft, vessel and tower accessory systems
+Ss;37;60;30;;Tunnel and shaft expansion joint systems
+Ss;37;60;30;30;Fire-rated tunnel expansion joint systems
+Ss;37;60;90;;Tunnel and shaft waterproofing systems
+Ss;37;60;90;70;Tunnel regrouting systems
+Ss;40;;;;Signage, fittings, furnishings and equipment (FF&E) and general finishing systems
+Ss;40;5;;;Modular systems
+Ss;40;5;80;;Sanitary modular systems
+Ss;40;5;80;10;Bathroom pod systems
+Ss;40;10;;;Signage systems
+Ss;40;10;20;;Direction signage systems
+Ss;40;10;20;70;Route marker signage systems
+Ss;40;10;20;96;Wayfinding signage systems
+Ss;40;10;25;;External signage and interpretation systems
+Ss;40;10;25;25;Electrical external signage systems
+Ss;40;10;25;30;Fixed external signage systems
+Ss;40;10;25;32;Free-standing external architectural signage systems
+Ss;40;10;30;;Fire and safety signage systems
+Ss;40;10;30;20;Emergency 'do not enter' signage systems
+Ss;40;10;30;25;Evacuation and safe condition signage systems
+Ss;40;10;30;27;Evacuation and safety way guidance systems
+Ss;40;10;30;30;Fire signage systems
+Ss;40;10;30;36;Hazard signage systems
+Ss;40;10;30;70;Regulatory signage systems
+Ss;40;10;30;75;Safety signage systems
+Ss;40;10;30;93;Warning signage systems
+Ss;40;10;30;95;Water safety signage systems
+Ss;40;10;35;;Identification signage systems
+Ss;40;10;35;10;Building signage systems
+Ss;40;10;35;70;Room signage systems
+Ss;40;10;35;80;Spaces signage systems
+Ss;40;10;40;;Internal architectural signage systems
+Ss;40;10;40;25;Electrical internal architectural signage systems
+Ss;40;10;40;30;Fixed internal architectural signage systems
+Ss;40;10;40;32;Free-standing internal architectural signage systems
+Ss;40;10;50;;Information signage systems
+Ss;40;10;50;3;Advertising signage systems
+Ss;40;10;50;5;Advisory signage systems
+Ss;40;10;50;22;Descriptive signage systems
+Ss;40;10;50;24;Directory signage systems
+Ss;40;10;50;42;Interpretive signage systems
+Ss;40;10;90;;Traffic signage and marking systems
+Ss;40;10;90;3;Air traffic signage systems
+Ss;40;10;90;18;Crossing road marking systems
+Ss;40;10;90;20;Cycle traffic signage systems
+Ss;40;10;90;23;Diagrammatic road marking systems
+Ss;40;10;90;36;Hatched road marking systems
+Ss;40;10;90;50;Marine traffic signage systems
+Ss;40;10;90;70;Rail traffic signage systems
+Ss;40;10;90;71;Road marker post systems
+Ss;40;10;90;72;Road traffic signage systems
+Ss;40;15;;;General fittings, furnishings and equipment (FF&E) systems
+Ss;40;15;25;;Catering FF&E systems
+Ss;40;15;25;15;Commercial catering FF&E systems
+Ss;40;15;25;20;Domestic catering FF&E systems
+Ss;40;15;35;;General FF&E systems
+Ss;40;15;35;19;Curtain and blind systems
+Ss;40;15;35;29;Fireplace furniture systems
+Ss;40;15;35;31;Free-standing furniture systems
+Ss;40;15;35;35;General fixtures systems
+Ss;40;15;35;80;Shelving, storage and enclosures systems
+Ss;40;15;44;;Joinery FF&E systems
+Ss;40;15;44;50;Minor joinery systems
+Ss;40;15;44;90;Trims, guards and finishing systems
+Ss;40;15;46;;Laundry FF&E systems
+Ss;40;15;46;15;Commercial laundry FF&E systems
+Ss;40;15;46;20;Domestic laundry FF&E systems
+Ss;40;15;58;;Office equipment systems
+Ss;40;15;58;50;Meeting booth or pod systems
+Ss;40;15;70;;Sanitary appliances and FF&E systems
+Ss;40;15;70;6;Bathroom appliances and FF&E systems
+Ss;40;15;75;;Sanitary appliance systems
+Ss;40;15;75;2;Accessible WC package systems
+Ss;40;15;75;5;Bath systems
+Ss;40;15;75;10;Bidet systems
+Ss;40;15;75;20;Disposal unit (slop hopper) systems
+Ss;40;15;75;25;Drinking fountain systems
+Ss;40;15;75;35;Health care macerator systems
+Ss;40;15;75;45;Janitorial unit systems
+Ss;40;15;75;75;Sanitary accessory systems
+Ss;40;15;75;77;Scrub-up trough systems
+Ss;40;15;75;78;Shower area systems
+Ss;40;15;75;79;Shower cubicle systems
+Ss;40;15;75;80;Sink systems
+Ss;40;15;75;83;Squatting WC systems
+Ss;40;15;75;91;Urinal systems
+Ss;40;15;75;92;Washbasin systems
+Ss;40;15;75;93;Wash fountain systems
+Ss;40;15;75;94;Wash trough systems
+Ss;40;15;75;95;Waterless toilet systems
+Ss;40;15;75;96;WC and washbasin combination systems
+Ss;40;15;75;97;WC systems
+Ss;40;15;75;98;WC wash and dry combination systems
+Ss;40;15;77;;Sauna FF&E systems
+Ss;40;15;77;76;Sauna package systems
+Ss;40;15;85;;Steam bath FF&E systems
+Ss;40;15;85;85;Steam bath package systems
+Ss;40;20;;;Administrative, commercial and protective service FF&E systems
+Ss;40;20;1;;Administrative FF&E systems
+Ss;40;20;1;60;Office FF&E systems
+Ss;40;20;1;71;Reception FF&E systems
+Ss;40;20;15;;Commercial FF&E systems
+Ss;40;20;15;71;Retail FF&E systems
+Ss;40;20;15;89;Trading floor FF&E systems
+Ss;40;20;30;;External public realm FF&E systems
+Ss;40;20;30;1;Acceptance and dispensing systems
+Ss;40;20;30;28;External furniture systems
+Ss;40;20;30;30;Fixed bin systems
+Ss;40;20;30;65;Playground equipment systems
+Ss;40;20;65;;Protective service FF&E systems
+Ss;40;20;65;22;Detention FF&E systems
+Ss;40;20;65;25;Emergency shelter FF&E systems
+Ss;40;20;65;46;Law court FF&E systems
+Ss;40;25;;;Cultural, educational, scientific and information FF&E systems
+Ss;40;25;20;;Cultural FF&E systems
+Ss;40;25;20;2;Aquarium FF&E systems
+Ss;40;25;20;3;Art gallery FF&E systems
+Ss;40;25;20;4;Artwork systems
+Ss;40;25;20;5;Auditorium FF&E systems
+Ss;40;25;20;22;Display FF&E systems
+Ss;40;25;20;28;Exhibition FF&E systems
+Ss;40;25;20;85;Studio FF&E systems
+Ss;40;25;20;90;Theatre FF&E systems
+Ss;40;25;26;;Education and information FF&E systems
+Ss;40;25;26;15;Classroom FF&E systems
+Ss;40;25;26;47;Library FF&E systems
+Ss;40;25;32;;Funerary FF&E systems
+Ss;40;25;32;12;Cemetery equipment systems
+Ss;40;25;71;;Religious FF&E systems
+Ss;40;25;71;11;Cathedral, church and chapel FF&E systems
+Ss;40;25;71;52;Mosque FF&E systems
+Ss;40;25;71;86;Synagogue FF&E systems
+Ss;40;25;71;90;Temple FF&E systems
+Ss;40;25;75;;Scientific FF&E systems
+Ss;40;25;75;21;Dark room FF&E systems
+Ss;40;25;75;45;Laboratory FF&E systems
+Ss;40;25;75;58;Observatory FF&E systems
+Ss;40;25;80;;Stage FF&E systems
+Ss;40;25;80;90;Tension wire grid systems
+Ss;40;30;;;Industrial and agricultural FF&E systems
+Ss;40;30;2;;Agricultural FF&E systems
+Ss;40;30;2;37;Horticultural FF&E systems
+Ss;40;30;2;47;Livestock FF&E systems
+Ss;40;30;42;;Industrial FF&E systems
+Ss;40;30;42;29;Factory FF&E systems
+Ss;40;30;42;52;Mine FF&E systems
+Ss;40;30;42;58;Offshore platform FF&E systems
+Ss;40;30;42;96;Warehouse FF&E systems
+Ss;40;30;85;;Static permanent access and safety equipment systems
+Ss;40;30;85;55;Netting systems
+Ss;40;45;;;Living space FF&E systems
+Ss;40;45;37;;Hotel living space FF&E systems
+Ss;40;45;37;28;External FF&E systems
+Ss;40;45;37;36;Hotel bedroom FF&E systems
+Ss;40;45;37;38;Hotel dining room FF&E systems
+Ss;40;45;37;45;Kitchen FF&E systems
+Ss;40;45;37;47;Lounge FF&E systems
+Ss;40;45;70;;Residential living space FF&E systems
+Ss;40;45;70;7;Bedroom FF&E systems
+Ss;40;45;70;22;Dining room FF&E systems
+Ss;40;45;70;24;Domestic kitchen FF&E systems
+Ss;40;45;70;33;Garden FF&E systems
+Ss;40;45;70;47;Living room FF&E systems
+Ss;40;50;;;Medical, health and welfare FF&E systems
+Ss;40;50;50;;Medical and health FF&E systems
+Ss;40;50;50;18;Crèche FF&E systems
+Ss;40;50;50;37;Hospital ward FF&E systems
+Ss;40;50;50;50;Medical and dental surgery FF&E systems
+Ss;40;50;50;59;Operating theatre FF&E systems
+Ss;40;50;96;;Welfare FF&E systems
+Ss;40;50;96;4;Animal welfare FF&E systems
+Ss;40;50;96;71;Rehabilitation FF&E systems
+Ss;40;70;;;Recreational FF&E systems
+Ss;40;70;20;;Casino FF&E systems
+Ss;40;70;55;;Play FF&E systems
+Ss;40;70;55;10;Climbing equipment systems
+Ss;40;70;55;15;Combination play equipment systems
+Ss;40;70;55;35;Gymnastics and exercising equipment systems
+Ss;40;70;55;70;Rocking equipment systems
+Ss;40;70;55;73;Runway equipment systems
+Ss;40;70;55;75;Sand and water play equipment systems
+Ss;40;70;55;80;Slide equipment systems
+Ss;40;70;55;83;Spinning equipment systems
+Ss;40;70;55;85;Swinging equipment systems
+Ss;40;70;60;;Pool FF&E systems
+Ss;40;70;60;15;Competitive swimming pool FF&E systems
+Ss;40;70;60;25;Diving pool FF&E systems
+Ss;40;70;60;45;Leisure swimming pool FF&E systems
+Ss;40;70;60;62;Pool transfer aid equipment systems
+Ss;40;70;65;;Public house FF&E systems
+Ss;40;70;70;;Restaurant FF&E systems
+Ss;40;70;75;;Sports FF&E systems
+Ss;40;70;75;5;Ball court FF&E systems
+Ss;40;70;75;20;Cycle course FF&E systems
+Ss;40;70;75;27;Equestrian equipment systems
+Ss;40;70;75;50;Multi-use games area FF&E systems
+Ss;40;70;75;80;Skate park FF&E systems
+Ss;40;70;75;85;Sports pitch FF&E systems
+Ss;40;70;75;90;Trim trail FF&E systems
+Ss;40;70;80;;Stadium FF&E systems
+Ss;40;70;95;;Wildlife, eco site and nature conservation FF&E systems
+Ss;40;85;;;Transport FF&E systems
+Ss;40;85;1;;Aerospace FF&E systems
+Ss;40;85;1;1;Aircraft fire training simulation systems
+Ss;40;85;11;;Cable transport FF&E systems
+Ss;40;85;50;;Marine and waterway FF&E systems
+Ss;40;85;50;95;Waterside FF&E systems
+Ss;40;85;70;;Rail FF&E systems
+Ss;40;85;70;60;Passenger concourse FF&E systems
+Ss;40;85;72;;Road FF&E systems
+Ss;40;85;72;11;Car park equipment systems
+Ss;40;85;72;20;Cycle parking equipment systems
+Ss;40;85;72;33;Garage FF&E systems
+Ss;40;85;75;;Rolling stock depot systems
+Ss;40;85;75;7;Bogie handling systems
+Ss;40;85;75;15;Controlled emission toilet (CET) systems
+Ss;40;85;75;24;Drop systems
+Ss;40;85;75;65;Press systems
+Ss;40;85;75;70;Rail lifting systems
+Ss;40;85;75;75;Sand feeding systems
+Ss;40;85;75;97;Wheel lathe systems
+Ss;40;90;;;General finishing systems
+Ss;40;90;5;;Anodizing systems
+Ss;40;90;5;5;Aluminium anodic coating systems
+Ss;40;90;35;;Galvanizing systems
+Ss;40;90;35;26;Electroplated galvanizing systems
+Ss;40;90;35;35;Hot-dip galvanizing systems
+Ss;40;90;40;;Intumescent systems
+Ss;40;90;40;40;Intumescent casting systems
+Ss;40;90;40;42;Intumescent coating systems
+Ss;40;90;60;;Painting and clear finishing systems
+Ss;40;90;60;5;Anti-graffiti coating systems
+Ss;40;90;60;20;Decorative varnish or lacquer systems
+Ss;40;90;60;22;Decorative wood stain or dye systems
+Ss;40;90;60;55;Multicolour coating systems
+Ss;40;90;60;60;Oil gilding systems
+Ss;40;90;60;65;Plastic texture coating systems
+Ss;40;90;60;80;Solvent-borne paint systems
+Ss;40;90;60;85;Special coating systems
+Ss;40;90;60;94;Water-based anti-corrosion systems
+Ss;40;90;60;95;Waterborne paint systems
+Ss;40;90;65;;Powder-coating systems
+Ss;40;90;65;5;Powder-coating for aluminium systems
+Ss;40;90;65;85;Powder-coating for steel systems
+Ss;40;90;95;;Wood preservative and fire retardant treatment systems
+Ss;40;90;95;30;Fire retardant treatment systems
+Ss;40;90;95;65;Preservative treatment systems
+Ss;45;;;;Flora and fauna systems
+Ss;45;5;;;Ecosystems
+Ss;45;10;;;Flora and fauna control systems
+Ss;45;10;10;;Bird, insect and vermin control systems
+Ss;45;10;10;4;Animal control systems
+Ss;45;10;10;10;Bird control systems
+Ss;45;10;10;14;Chemical termite protection systems
+Ss;45;10;10;40;Insect control systems
+Ss;45;10;10;64;Physical termite protection systems
+Ss;45;10;10;72;Rodent control systems
+Ss;45;10;40;;Invasive microbial and invertebrate control systems
+Ss;45;10;40;40;Invertebrate control systems
+Ss;45;10;40;50;Microbial control systems
+Ss;45;10;95;;Vegetation control systems
+Ss;45;10;95;50;Moss, algae and lichen control systems
+Ss;45;10;95;72;Rooted plants on hard surfaces control systems
+Ss;45;10;95;80;Selective vegetation control systems
+Ss;45;10;95;81;Self-clinging plants on hard surfaces control systems
+Ss;45;10;95;83;Site vegetation control systems
+Ss;45;10;95;95;Waterborne vegetation control systems
+Ss;45;30;;;Aquatic flora systems
+Ss;45;30;5;;Aquatic and wetland planting systems
+Ss;45;30;5;5;Aquatic planting systems
+Ss;45;30;5;50;Marginal planting systems
+Ss;45;30;5;70;Reed bed planting systems
+Ss;45;30;40;;Hydroponic planting systems
+Ss;45;35;;;Ground-based flora systems
+Ss;45;35;5;;Amenity and ornamental planting systems
+Ss;45;35;5;8;Bed-planted annual, perennial and bulb systems
+Ss;45;35;5;35;Grass-planted bulb and wildflower systems
+Ss;45;35;5;37;Grass-planted small tree and shrub systems
+Ss;45;35;5;42;Long-stem-planted small tree and shrub systems
+Ss;45;35;5;62;Pit-planted climber systems
+Ss;45;35;5;64;Pit-planted perennial systems
+Ss;45;35;5;66;Pit-planted large tree systems
+Ss;45;35;5;67;Pit-planted small tree and shrub systems
+Ss;45;35;8;;Biodiversity and environmental conservation systems
+Ss;45;35;8;29;Flora species introduction systems
+Ss;45;35;8;30;Flora species protection systems
+Ss;45;35;8;35;Habitat creation systems
+Ss;45;35;8;37;Habitat management and enhancement systems
+Ss;45;35;8;38;Habitat protection systems
+Ss;45;35;30;;Forestry, biomass, hedging and roadside planting systems
+Ss;45;35;30;40;Hydraulic seeded tree and shrub systems
+Ss;45;35;30;55;Notch-planted tree and shrub systems
+Ss;45;35;30;62;Pit-planted tree and shrub systems
+Ss;45;35;30;72;Ridge and furrow-planted tree and shrub systems
+Ss;45;35;30;75;Seeded tree and shrub systems
+Ss;45;35;30;90;Trench-planted tree and shrub systems
+Ss;45;35;45;;Lawn and meadow planting systems
+Ss;45;35;45;33;Grass and wildflower seeding systems
+Ss;45;35;45;35;Grass seeding systems
+Ss;45;35;45;40;Hydraulic seeding systems
+Ss;45;35;45;62;Plastics paving and turf systems
+Ss;45;35;45;65;Pre-seeded mat systems
+Ss;45;35;45;70;Reinforced grass planting systems
+Ss;45;35;45;90;Turf planting systems
+Ss;45;40;;;Artificially supported flora systems
+Ss;45;40;28;;External container planting systems
+Ss;45;40;28;25;External planter systems
+Ss;45;40;28;32;Free-standing external container planting systems
+Ss;45;40;28;35;Hanging container planting systems
+Ss;45;40;28;85;External planting systems
+Ss;45;40;40;;Internal container planting systems
+Ss;45;40;40;32;Free-standing internal container planting systems
+Ss;45;40;40;34;Ground level internal container planting systems
+Ss;45;40;40;41;Internal hanging container planting systems
+Ss;45;40;40;42;Internal planter systems
+Ss;45;40;47;;Living roof systems
+Ss;45;40;47;9;Biodiverse roof systems
+Ss;45;40;47;28;Extensive green roof systems
+Ss;45;40;47;40;Intensive green roof systems
+Ss;45;40;47;75;Semi-intensive green roof systems
+Ss;45;40;95;;Vertical planting systems
+Ss;45;40;95;8;Biofiltration vertical planting systems
+Ss;45;40;95;52;Membranous vertical planting systems
+Ss;45;40;95;54;Modular unit vertical planting systems
+Ss;45;50;;;Artificial flora systems
+Ss;45;50;5;;Artificial planting systems
+Ss;45;50;5;40;Internal artificial planting systems
+Ss;45;55;;;Land fauna systems
+Ss;45;55;5;;Animal conservation systems
+Ss;45;55;5;29;Animal species introduction systems
+Ss;45;55;5;30;Animal species protection systems
+Ss;45;55;10;;Avian fauna systems
+Ss;45;55;27;;Animal crossing systems
+Ss;45;55;27;2;Amphibian tunnel systems
+Ss;45;55;27;4;Animal resting post systems
+Ss;45;55;27;6;Animal underpass systems
+Ss;45;55;27;11;Canopy bridge systems
+Ss;45;55;27;13;Cattle creep systems
+Ss;45;55;27;18;Crab bridge systems
+Ss;45;55;27;34;Green bridge systems
+Ss;45;55;27;59;Overhead rope crossing systems
+Ss;45;55;40;;Invertebrate fauna systems
+Ss;45;55;50;;Mammalian fauna systems
+Ss;45;55;70;;Reptilian fauna systems
+Ss;45;75;;;Piscine fauna systems
+Ss;45;75;5;;Baffle fish pass systems
+Ss;45;75;5;3;Alaskan A baffle fish pass systems
+Ss;45;75;5;13;Chevron bottom baffle fish pass systems
+Ss;45;75;5;35;Hurn-type baffle fish pass systems
+Ss;45;75;5;46;Larinier super-active baffle fish pass systems
+Ss;45;75;5;63;Plane baffle Denil fish pass systems
+Ss;45;75;8;;Brush and bristle fish pass systems
+Ss;45;75;8;13;Combined baffle-brush fish pass systems
+Ss;45;75;8;16;Cylindrical bristle cluster brush fish pass systems
+Ss;45;75;8;35;Hassinger brush-furnished fish pass systems
+Ss;45;75;20;;Culvert fish pass systems
+Ss;45;75;20;13;Corner baffle pipe culvert fish pass systems
+Ss;45;75;20;16;Culvert brush fish pass systems
+Ss;45;75;20;26;Embedded blockstone culvert fish pass systems
+Ss;45;75;20;35;Horizontal slotted baffle culvert fish pass systems
+Ss;45;75;20;55;Notch baffle pipe culvert fish pass systems
+Ss;45;75;20;59;Offset baffle culvert fish pass systems
+Ss;45;75;20;82;Spoiler baffle culvert fish pass systems
+Ss;45;75;20;88;Triangular-crested baffle culvert fish pass systems
+Ss;45;75;20;95;Weir baffle culvert fish pass systems
+Ss;45;75;25;;Fish deterrent systems
+Ss;45;75;25;5;Fish barrier systems
+Ss;45;75;25;35;Fish guidance systems
+Ss;45;75;26;;Elevator fish pass systems
+Ss;45;75;26;10;Borland lift fish pass systems
+Ss;45;75;26;30;Fish lock fish pass systems
+Ss;45;75;26;80;Siphon fish pass systems
+Ss;45;75;26;94;Venturi pump fish pass systems
+Ss;45;75;30;;Flap gate and sluice fish pass systems
+Ss;45;75;30;4;Automated gate fish pass systems
+Ss;45;75;30;15;Counter-balanced gate fish pass systems
+Ss;45;75;30;20;Damper and retarder fish pass systems
+Ss;45;75;30;24;Duckbill valve fish pass systems
+Ss;45;75;30;62;Petflap fish pass systems
+Ss;45;75;30;76;Self-regulating gate fish pass systems
+Ss;45;75;30;79;Side-hung gate fish pass systems
+Ss;45;75;34;;Gravity eel pass systems
+Ss;45;75;34;4;Bristle substrate cassette eel pass systems
+Ss;45;75;34;5;Bristle substrate channel eel pass systems
+Ss;45;75;34;7;Bristle substrate recessed eel pass systems
+Ss;45;75;34;10;Bristle substrate tilting weir eel pass systems
+Ss;45;75;34;15;Combined substrate eel pass systems
+Ss;45;75;34;53;Netting substrate eel pass systems
+Ss;45;75;34;61;Peg substrate cassette eel pass systems
+Ss;45;75;34;62;Peg substrate channel eel pass systems
+Ss;45;75;34;64;Peg substrate recessed eel pass systems
+Ss;45;75;34;70;Rope eel pass systems
+Ss;45;75;34;85;Textured substrate eel pass systems
+Ss;45;75;44;;Lamprey pass systems
+Ss;45;75;55;;Nature-like fish pass systems
+Ss;45;75;55;10;Bypass channel fish pass systems
+Ss;45;75;55;15;Column bypass fish pass systems
+Ss;45;75;55;72;Rock ramp fish pass systems
+Ss;45;75;55;85;Sweep fish pass systems
+Ss;45;75;60;;Pool fish pass systems
+Ss;45;75;60;21;Deep notch and orifice pool fish pass systems
+Ss;45;75;60;23;Deep notch no-orifice pool fish pass systems
+Ss;45;75;60;40;Informal pool fish pass systems
+Ss;45;75;60;63;Pool and chute fish pass systems
+Ss;45;75;60;65;Pool and orifice fish pass systems
+Ss;45;75;60;67;Pool and traverse fish pass systems
+Ss;45;75;60;69;Pre-barrage fish pass systems
+Ss;45;75;60;77;Shallow ‘V’ notch pool fish pass systems
+Ss;45;75;60;94;Vertical slot pool fish pass systems
+Ss;45;75;67;;Pumped eel pass systems
+Ss;45;75;67;5;Bristle substrate pumped eel pass systems
+Ss;45;75;67;15;Combined substrate pumped eel pass systems
+Ss;45;75;67;65;Peg substrate pumped eel pass systems
+Ss;45;75;67;85;Textured substrate pumped eel pass systems
+Ss;45;75;85;;Simple fish pass systems
+Ss;45;75;85;10;Baulk fish pass systems
+Ss;45;75;85;13;Chute fish pass systems
+Ss;45;75;85;55;Notch fish pass systems
+Ss;45;75;85;59;Orifice fish pass systems
+Ss;45;75;85;69;Pre-obstacle bed modification fish pass systems
+Ss;45;75;85;88;Slot fish pass systems
+Ss;45;85;;;Artificial fauna systems
+Ss;45;85;5;;Artificial fauna habitat systems
+Ss;45;85;5;6;Artificial badger sett systems
+Ss;45;85;5;56;Artificial nesting platform systems
+Ss;45;85;5;70;Artificial reef systems
+Ss;50;;;;Disposal systems
+Ss;50;10;;;Gas waste collection and distribution systems
+Ss;50;10;45;;Landfill gas collection and distribution systems
+Ss;50;10;95;;Waste gas collection and distribution systems
+Ss;50;20;;;Non-aqueous liquid waste collection and distribution systems
+Ss;50;20;45;;Landfill liquid collection and distribution systems
+Ss;50;20;90;;Waste liquid fuel collection and distribution systems
+Ss;50;20;95;;Waste process liquid collection and distribution systems
+Ss;50;30;;;Above-ground drainage collection systems
+Ss;50;30;2;;Rainwater drainage systems
+Ss;50;30;2;28;External gravity rainwater drainage systems
+Ss;50;30;2;40;Internal gravity rainwater drainage systems
+Ss;50;30;2;65;Pressure-assisted full bore rainwater drainage systems
+Ss;50;30;2;80;Siphonic full bore rainwater drainage systems
+Ss;50;30;4;;Above-ground wastewater drainage systems
+Ss;50;30;4;3;Above-ground drainage oil and petrol separator systems
+Ss;50;30;4;5;Basement wastewater drainage systems
+Ss;50;30;4;12;Chemical wastewater drainage systems
+Ss;50;30;4;15;Commercial catering wastewater drainage systems
+Ss;50;30;4;46;Laboratory wastewater drainage systems
+Ss;50;30;4;70;Radioactive wastewater drainage systems
+Ss;50;30;4;93;Above-ground vacuum drainage systems
+Ss;50;30;4;95;Above-ground external stack wastewater drainage systems
+Ss;50;30;4;97;Above-ground internal stack wastewater drainage systems
+Ss;50;35;;;Wastewater collection systems
+Ss;50;35;3;;Wastewater collection pipeline systems
+Ss;50;35;3;8;Brine gravity collection pipeline systems
+Ss;50;35;3;9;Brine pressure collection pipeline systems
+Ss;50;35;3;13;Wastewater channel systems
+Ss;50;35;3;15;Wastewater control chamber systems
+Ss;50;35;3;26;Wastewater emergency relief structure systems
+Ss;50;35;3;34;Wastewater gravity pipeline systems
+Ss;50;35;3;40;Wastewater inspection chamber systems
+Ss;50;35;3;50;Wastewater maintenance hole systems
+Ss;50;35;3;59;Wastewater overflow structure systems
+Ss;50;35;3;65;Wastewater pressure pipeline systems
+Ss;50;35;3;67;Wastewater pressure relief systems
+Ss;50;35;3;78;Wastewater siphon systems
+Ss;50;35;6;;Below-ground inspection systems
+Ss;50;35;6;6;Brick manhole systems
+Ss;50;35;6;8;Brick shallow inspection chamber systems
+Ss;50;35;6;10;Brick shallow silt trap and flow control chamber systems
+Ss;50;35;6;12;Concrete deep manhole systems
+Ss;50;35;6;14;Concrete manhole systems
+Ss;50;35;6;16;Concrete shallow inspection chamber systems
+Ss;50;35;6;18;Concrete silt trap and flow control chamber systems
+Ss;50;35;6;62;Plastics deep non-entry inspection chamber systems
+Ss;50;35;6;64;Plastics distribution and sampling chamber systems
+Ss;50;35;6;66;Plastics shallow inspection chamber systems
+Ss;50;35;8;;Below-ground gravity drainage systems
+Ss;50;35;8;15;Combined below-ground drainage pipeline systems
+Ss;50;35;8;16;Combined sewer overflow systems
+Ss;50;35;8;30;Foul wastewater below-ground drainage pipeline systems
+Ss;50;35;8;40;Highways drainage systems
+Ss;50;35;8;85;Surface water below-ground drainage pipeline systems
+Ss;50;35;10;;Below-ground pumped drainage systems
+Ss;50;35;10;6;Below-ground package pumping station and pressure pipeline drainage systems
+Ss;50;35;10;8;Below-ground pressure pipeline drainage systems
+Ss;50;35;10;10;Below-ground pumping station drainage systems
+Ss;50;35;68;;Wastewater collection pumping systems
+Ss;50;35;68;24;Wastewater collection dry well pumping systems
+Ss;50;35;68;96;Wastewater collection wet well pumping systems
+Ss;50;35;85;;Wastewater collection storage systems
+Ss;50;35;85;2;Wastewater collection above-ground storage systems
+Ss;50;35;85;7;Wastewater collection below-ground storage systems
+Ss;50;35;85;64;Wastewater collection pipeline storage systems
+Ss;50;40;;;Solid waste collection and distribution systems
+Ss;50;40;95;;Waste collection systems
+Ss;50;40;95;65;Pneumatic waste collection systems
+Ss;50;50;;;Gas waste storage, treatment and disposal systems
+Ss;50;50;45;;Landfill gas disposal systems
+Ss;50;50;95;;Waste gas treatment and disposal systems
+Ss;50;60;;;Non-aqueous liquid waste storage, treatment and disposal systems
+Ss;50;60;45;;Landfill liquid disposal systems
+Ss;50;60;90;;Waste liquid fuel storage and treatment systems
+Ss;50;60;95;;Waste process liquid storage and treatment systems
+Ss;50;60;95;25;Waste process liquid disposal systems
+Ss;50;60;95;85;Waste process liquid storage systems
+Ss;50;60;95;90;Waste process liquid treatment systems
+Ss;50;70;;;Drainage storage, treatment and disposal systems
+Ss;50;70;5;;Below-ground drainage disposal systems
+Ss;50;70;5;20;Below-ground drainage wastewater drainage field systems
+Ss;50;70;5;22;Below-ground drainage foul wastewater grease separator and converter systems
+Ss;50;70;5;23;Below-ground drainage septic tank systems
+Ss;50;70;5;24;Below-ground drainage packaged sewage treatment systems
+Ss;50;70;5;25;Below-ground drainage foul wastewater storage tank systems
+Ss;50;70;5;79;Below-ground drainage concrete soakaway systems
+Ss;50;70;5;80;Below-ground drainage granular fill soakaway systems
+Ss;50;70;5;81;Below-ground drainage modular plastics attenuation or storage tank systems
+Ss;50;70;5;82;Below-ground drainage modular plastics soakaway systems
+Ss;50;70;5;83;Below-ground drainage oil and petrol separator systems
+Ss;50;70;5;84;Below-ground drainage packaged silt trap systems
+Ss;50;70;5;85;Below-ground drainage surface water storage tank systems
+Ss;50;70;5;86;Below-ground drainage wet well systems
+Ss;50;70;5;95;Below-ground drainage outfall systems
+Ss;50;70;24;;Drainage disposal systems
+Ss;50;70;24;80;Soakaway borehole systems
+Ss;50;70;45;;Land drainage systems
+Ss;50;70;45;8;Blanket drain land drainage systems
+Ss;50;70;45;20;Culvert land drainage systems
+Ss;50;70;45;30;Filter drain land drainage systems
+Ss;50;70;45;32;Fin drain land drainage systems
+Ss;50;70;45;53;Mole and subsoiling drain land drainage systems
+Ss;50;70;45;75;Slitting and grooving drain land drainage systems
+Ss;50;70;45;85;Subsoil drainage pipe drain systems
+Ss;50;70;45;90;Trenchless drain land drainage systems
+Ss;50;70;60;;Private drainage treatment systems
+Ss;50;70;60;70;Radioactive wastewater treatment systems
+Ss;50;70;65;;Pressure relief drainage systems
+Ss;50;70;65;8;Blanket drain pressure relief systems
+Ss;50;70;65;30;Filter drain pressure relief systems
+Ss;50;70;65;35;Geocomposite sheet fin drain pressure relief systems
+Ss;50;70;80;;Storm water gravity drainage systems
+Ss;50;70;80;10;Bifurcation storm water overflow systems
+Ss;50;70;80;72;Rigid attenuation or storage tank for storm water flood attenuation systems
+Ss;50;70;82;;Surface and wastewater gravity drainage systems
+Ss;50;70;82;41;Inlet drainage systems
+Ss;50;70;82;59;Outlet drainage systems
+Ss;50;70;82;73;Road drainage systems
+Ss;50;70;83;;Surface water tank systems
+Ss;50;70;85;;Sustainable drainage systems (SuDS)
+Ss;50;70;85;0;SuDS management train systems
+Ss;50;70;85;6;Below-ground surface water storage tank systems
+Ss;50;70;85;8;Bioretention area systems
+Ss;50;70;85;15;Conveyance swale systems
+Ss;50;70;85;21;Detention basin systems
+Ss;50;70;85;24;Dry swale systems
+Ss;50;70;85;30;Filter strip systems
+Ss;50;70;85;31;Filter drain systems
+Ss;50;70;85;32;Filtration and separation systems
+Ss;50;70;85;33;Geocellular attenuation tank systems
+Ss;50;70;85;34;Geocellular soakaway systems
+Ss;50;70;85;35;Granular fill soakaway systems
+Ss;50;70;85;41;Infiltration basin systems
+Ss;50;70;85;42;Infiltration trench systems
+Ss;50;70;85;58;Open channel conveyance systems
+Ss;50;70;85;61;Pervious pavement systems
+Ss;50;70;85;64;Pond systems
+Ss;50;70;85;66;Precast concrete soakaway systems
+Ss;50;70;85;70;Rainwater harvesting systems
+Ss;50;70;85;75;Sand filter bed systems
+Ss;50;70;85;76;Sand filter bed surface systems
+Ss;50;70;85;85;Swale systems
+Ss;50;70;85;96;Water butt systems
+Ss;50;70;85;97;Wet swale systems
+Ss;50;70;85;98;Wetland systems
+Ss;50;75;;;Wastewater storage, treatment and disposal systems
+Ss;50;75;1;;Aeration systems
+Ss;50;75;1;22;Diffused aeration systems
+Ss;50;75;1;44;Jet aeration systems
+Ss;50;75;1;51;Mechanical aeration systems
+Ss;50;75;1;90;Tray cascade aeration systems
+Ss;50;75;3;;Aquaculture disposal systems
+Ss;50;75;3;21;Aquaculture degasser systems
+Ss;50;75;3;23;Aquaculture discharge systems
+Ss;50;75;3;80;Aquaculture sludge treatment systems
+Ss;50;75;20;;Decanting systems
+Ss;50;75;20;96;Wastewater decanting systems
+Ss;50;75;21;;Wastewater sludge management systems
+Ss;50;75;21;13;Wastewater sludge collection systems
+Ss;50;75;21;15;Wastewater sludge concentrate treatment systems
+Ss;50;75;21;23;Wastewater sludge drying systems
+Ss;50;75;21;33;Wastewater sludge gas treatment systems
+Ss;50;75;21;64;Wastewater sludge post-treatment systems
+Ss;50;75;21;66;Wastewater sludge pre-treatment systems
+Ss;50;75;21;70;Wastewater sludge recuperation systems
+Ss;50;75;21;76;Wastewater sludge blanket settling systems
+Ss;50;75;21;79;Wastewater sludge biosolids systems
+Ss;50;75;21;81;Wastewater sludge dewatering systems
+Ss;50;75;21;82;Sludge treatment systems
+Ss;50;75;21;83;Wastewater sludge digestion systems
+Ss;50;75;21;95;Wastewater sludge thickening systems
+Ss;50;75;22;;Wastewater disinfection systems
+Ss;50;75;22;13;Wastewater chloramine disinfection systems
+Ss;50;75;22;15;Wastewater chlorine dioxide disinfection systems
+Ss;50;75;22;17;Wastewater chlorine disinfection systems
+Ss;50;75;22;21;Wastewater dechlorination systems
+Ss;50;75;22;59;Wastewater ozone disinfection systems
+Ss;50;75;22;93;Wastewater ultraviolet (UV) radiation disinfection systems
+Ss;50;75;26;;Effluent transfer and disposal pipeline systems
+Ss;50;75;26;8;Brine gravity pipeline systems
+Ss;50;75;26;9;Brine pressure pipeline systems
+Ss;50;75;26;34;Effluent gravity pipeline systems
+Ss;50;75;26;65;Effluent pressure pipeline systems
+Ss;50;75;27;;Effluent transfer and disposal pumping systems
+Ss;50;75;27;24;Effluent dry well pumping systems
+Ss;50;75;27;68;Effluent storage systems
+Ss;50;75;27;96;Effluent wet well pumping systems
+Ss;50;75;30;;Wastewater fixed-film attached-growth process systems
+Ss;50;75;30;8;Wastewater biological aerated filter systems
+Ss;50;75;30;30;Wastewater filter bed systems
+Ss;50;75;30;70;Wastewater rotating biological contactor systems
+Ss;50;75;30;80;Wastewater soil biotechnology systems
+Ss;50;75;34;;Grit treatment and removal systems
+Ss;50;75;34;16;Cross-flow grit removal systems
+Ss;50;75;34;60;Package grit treatment and removal systems
+Ss;50;75;34;94;Vortex grit removal systems
+Ss;50;75;36;;Groundwater treatment systems
+Ss;50;75;36;30;Groundwater settlement lagoon systems
+Ss;50;75;36;34;Groundwater sludge mixing systems
+Ss;50;75;36;38;Groundwater treatment vessel systems
+Ss;50;75;41;;Inlet works systems
+Ss;50;75;41;15;Concrete inlet works systems
+Ss;50;75;41;60;Package inlet works systems
+Ss;50;75;41;66;Prefabricated inlet works systems
+Ss;50;75;56;;Wastewater nutrient removal systems
+Ss;50;75;56;8;Biological nutrient removal systems
+Ss;50;75;56;13;Chemical nutrient removal systems
+Ss;50;75;72;;Wastewater receival systems
+Ss;50;75;72;8;Wastewater brine receival systems
+Ss;50;75;72;78;Wastewater septage receival systems
+Ss;50;75;72;81;Wastewater solid organic waste receival systems
+Ss;50;75;75;;Wastewater floatables removal systems
+Ss;50;75;75;96;Wastewater scum removal systems
+Ss;50;75;77;;Wastewater activated sludge systems
+Ss;50;75;77;1;Wastewater activated sludge aeration tank systems
+Ss;50;75;77;7;Wastewater biological filter tank systems
+Ss;50;75;77;70;Wastewater return activated sludge systems
+Ss;50;75;82;;Wastewater lagoon systems
+Ss;50;75;82;2;Wastewater aerobic lagoon systems
+Ss;50;75;82;4;Wastewater anaerobic lagoon systems
+Ss;50;75;92;;Wastewater chemical dosing systems
+Ss;50;75;92;32;Wastewater gas dosing systems
+Ss;50;75;92;48;Wastewater liquid dosing systems
+Ss;50;75;92;82;Wastewater solid dosing systems
+Ss;50;75;93;;Wastewater filtration systems
+Ss;50;75;93;7;Wastewater biological percolating filtration systems
+Ss;50;75;93;31;Wastewater fixed media bed filtration systems
+Ss;50;75;93;33;Wastewater fluidized bed filtration systems
+Ss;50;75;93;52;Wastewater membrane filtration systems
+Ss;50;75;94;;Wastewater screenings handling systems
+Ss;50;75;94;16;Combined screenings capture and handling systems
+Ss;50;75;94;56;Screenings capture systems
+Ss;50;75;94;64;Screenings handling systems
+Ss;50;75;95;;Wastewater treatment pumping systems
+Ss;50;75;95;24;Wastewater treatment dry well pumping systems
+Ss;50;75;95;96;Wastewater treatment wet well pumping systems
+Ss;50;75;98;;Wastewater storage systems
+Ss;50;75;98;1;Wastewater treatment above-ground storage systems
+Ss;50;75;98;10;Wastewater treatment below-ground storage systems
+Ss;50;75;98;96;Wastewater tank flushing systems
+Ss;50;80;;;Solid waste storage, treatment and disposal systems
+Ss;50;80;40;;Incinerator systems
+Ss;50;80;80;;Solid waste systems
+Ss;50;80;80;80;Solid waste disposal systems
+Ss;50;80;80;82;Solid waste sorting systems
+Ss;50;80;80;96;Waste compactor systems
+Ss;50;80;96;;Weighbridge systems
+Ss;50;80;96;0;Above-ground weighbridge systems
+Ss;50;80;96;63;Pit weighbridge systems
+Ss;55;;;;Piped supply systems
+Ss;55;5;;;Gas extraction, treatment and storage systems
+Ss;55;5;30;;Gas extraction systems
+Ss;55;5;75;;Gas storage tank systems
+Ss;55;5;85;;Gas treatment systems
+Ss;55;5;95;;Gas well systems
+Ss;55;10;;;Liquid fuel extraction, treatment and storage systems
+Ss;55;10;70;;Liquid fuel extraction systems
+Ss;55;10;75;;Liquid fuel storage tank systems
+Ss;55;10;85;;Liquid fuel treatment systems
+Ss;55;10;95;;Liquid fuel well systems
+Ss;55;15;;;Water extraction, treatment and storage systems
+Ss;55;15;10;;Raw water pipeline systems
+Ss;55;15;10;13;Raw water channel systems
+Ss;55;15;10;35;Raw water gravity pipeline systems
+Ss;55;15;10;65;Raw water pressure pipeline systems
+Ss;55;15;10;85;Raw water siphon systems
+Ss;55;15;20;;Raw water pumping systems
+Ss;55;15;20;23;Raw water dry well pumping systems
+Ss;55;15;20;95;Raw water wet well pumping systems
+Ss;55;15;30;;Raw water storage systems
+Ss;55;15;30;2;Raw water above-ground storage systems
+Ss;55;15;30;6;Raw water below-ground storage systems
+Ss;55;15;30;65;Raw water pipeline storage systems
+Ss;55;15;50;;Water treatment pre-oxidation systems
+Ss;55;15;50;10;Chlorine dioxide pre-disinfection systems
+Ss;55;15;50;12;Chlorine pre-disinfection systems
+Ss;55;15;50;14;Chloramine pre-disinfection systems
+Ss;55;15;50;16;Coagulation systems
+Ss;55;15;50;30;Flocculation systems
+Ss;55;15;50;60;Ozone pre-disinfection systems
+Ss;55;15;50;64;Potassium permanganate pre-disinfection systems
+Ss;55;15;55;;Water treatment sludge management systems
+Ss;55;15;55;15;Sludge collection systems
+Ss;55;15;55;22;Water treatment sludge dewatering systems
+Ss;55;15;55;44;Sludge lagoon systems
+Ss;55;15;55;46;Sludge lamella plate settling systems
+Ss;55;15;55;70;Sludge-removal systems
+Ss;55;15;55;76;Sludge blanket settling systems
+Ss;55;15;55;78;Sludge contact systems
+Ss;55;15;55;87;Sludge-thickening systems
+Ss;55;15;60;;Water treatment adsorption systems
+Ss;55;15;60;34;Granular activated carbon adsorption systems
+Ss;55;15;60;64;Powdered activated carbon adsorption systems
+Ss;55;15;60;72;Resin adsorption systems
+Ss;55;15;72;;Water extraction and monitoring systems
+Ss;55;15;72;20;Water extraction borehole systems
+Ss;55;15;72;50;Water monitoring borehole systems
+Ss;55;15;80;;Water treatment disinfection systems
+Ss;55;15;80;10;Chlorine dioxide disinfection systems
+Ss;55;15;80;12;Chlorine disinfection systems
+Ss;55;15;80;14;Chloramine disinfection systems
+Ss;55;15;80;60;Ozone disinfection systems
+Ss;55;15;80;90;Ultraviolet (UV) radiation disinfection systems
+Ss;55;15;85;;Water treatment filtration systems
+Ss;55;15;85;8;Biological aerated flooded filtration systems
+Ss;55;15;85;31;Fixed media bed filtration systems
+Ss;55;15;85;33;Fluidized bed filtration systems
+Ss;55;15;85;46;Lamella plate filtration systems
+Ss;55;15;85;50;Water treatment membrane filtration systems
+Ss;55;15;85;85;Submerged aerated filtration systems
+Ss;55;15;90;;Water treatment chemical dosing systems
+Ss;55;15;90;32;Water treatment gas dosing systems
+Ss;55;15;90;48;Water treatment liquid dosing systems
+Ss;55;15;90;82;Water treatment solid dosing systems
+Ss;55;20;;;Gas and vacuum distribution and supply systems
+Ss;55;20;14;;Central vacuum systems
+Ss;55;20;14;40;Industrial central vacuum systems
+Ss;55;20;14;70;Residential central vacuum systems
+Ss;55;20;33;;Gas distribution network systems
+Ss;55;20;33;56;Natural gas distribution network systems
+Ss;55;20;34;;Gas supply systems
+Ss;55;20;34;5;Biogas supply systems
+Ss;55;20;34;40;Incoming gas supply systems
+Ss;55;20;34;46;Liquefied petroleum gas (LPG) supply systems
+Ss;55;20;34;57;Natural gas supply systems
+Ss;55;20;34;95;Welding gas supply systems
+Ss;55;20;40;;Inert gas supply systems
+Ss;55;20;45;;Laboratory gas supply systems
+Ss;55;20;45;5;Laboratory argon supply systems
+Ss;55;20;45;15;Laboratory compressed air supply systems
+Ss;55;20;45;36;Laboratory helium supply systems
+Ss;55;20;45;39;Laboratory hydrogen supply systems
+Ss;55;20;45;56;Laboratory nitrogen supply systems
+Ss;55;20;45;59;Laboratory oxygen supply systems
+Ss;55;20;51;;Medical gas and vacuum systems
+Ss;55;20;51;3;Medical anaesthetic gas scavenging systems
+Ss;55;20;51;15;Medical compressed air supply systems
+Ss;55;20;51;36;Medical helium/ oxygen mixture supply systems
+Ss;55;20;51;56;Medical nitrous oxide supply systems
+Ss;55;20;51;57;Medical nitrous oxide/ oxygen mixture supply systems
+Ss;55;20;51;59;Medical oxygen supply systems
+Ss;55;20;51;94;Medical vacuum systems
+Ss;55;20;60;;Process gas systems
+Ss;55;20;60;5;Process argon supply systems
+Ss;55;20;60;15;Compressed air supply systems
+Ss;55;20;60;33;Gas vaporizing systems
+Ss;55;20;60;56;Process nitrogen supply systems
+Ss;55;20;60;59;Process oxygen supply systems
+Ss;55;20;85;;Specialist and high purity gas supply systems
+Ss;55;30;;;Fire-extinguishing systems
+Ss;55;30;30;;Foam fire-extinguishing and fire-suppression systems
+Ss;55;30;30;31;Foam fire-extinguishing systems
+Ss;55;30;35;;Gaseous fire-extinguishing systems
+Ss;55;30;35;10;Carbon dioxide fire-extinguishing systems
+Ss;55;30;35;35;Halocarbon gas total flooding fire-extinguishing systems
+Ss;55;30;35;40;Inert gas total flooding fire-extinguishing systems
+Ss;55;30;60;;Particle-based fire-extinguishing systems
+Ss;55;30;60;15;Condensed aerosol fire-suppression systems
+Ss;55;30;60;24;Dry chemical fire-extinguishing systems
+Ss;55;30;65;;Portable fire-extinguishing systems
+Ss;55;30;65;30;Fire blanket systems
+Ss;55;30;65;35;Fire bucket systems
+Ss;55;30;65;65;Portable fire extinguisher systems
+Ss;55;30;96;;Water firefighting systems
+Ss;55;30;96;24;Dry dropper systems
+Ss;55;30;96;25;Dry riser systems
+Ss;55;30;96;29;Fire hose reel systems
+Ss;55;30;96;30;Fire hydrant systems
+Ss;55;30;96;95;Water cannon firefighting systems
+Ss;55;30;96;97;Wet riser systems
+Ss;55;30;98;;Water fire suppression systems
+Ss;55;30;98;21;Deluge systems
+Ss;55;30;98;23;Domestic and residential sprinkler systems
+Ss;55;30;98;70;Residential water mist systems
+Ss;55;30;98;85;Sprinkler systems
+Ss;55;30;98;96;Water mist systems
+Ss;55;40;;;Steam distribution and supply systems
+Ss;55;40;85;;Steam supply and condensate systems
+Ss;55;40;85;38;Hospital steam supply and condensate systems
+Ss;55;40;85;41;Industrial steam supply and condensate systems
+Ss;55;50;;;Liquid fuel distribution and supply systems
+Ss;55;50;46;;Liquid fuel distribution network systems
+Ss;55;50;46;58;Oil distribution network systems
+Ss;55;50;47;;Liquid fuel supply systems
+Ss;55;50;47;10;Biodiesel supply systems
+Ss;55;50;47;12;Bioethanol supply systems
+Ss;55;50;47;21;Diesel supply systems
+Ss;55;50;47;32;Fuel oil supply systems
+Ss;55;50;47;45;Kerosene/ jet fuel supply systems
+Ss;55;50;47;46;Liquid biofuel supply systems
+Ss;55;50;47;61;Petrol supply systems
+Ss;55;60;;;Process liquid distribution and supply systems
+Ss;55;60;45;;Liquid acids and bases supply systems
+Ss;55;60;47;;Liquid chemicals supply systems
+Ss;55;60;47;27;Electrolyte supply systems
+Ss;55;60;47;56;N-Methyl-2-pyrrolidone (NMP) supply systems
+Ss;55;60;50;;Liquid polymer supply systems
+Ss;55;60;55;;Lubrication supply systems
+Ss;55;60;55;70;Rail lubrication supply systems
+Ss;55;70;;;Water distribution and supply systems
+Ss;55;70;3;;Aquaculture supply and recirculation systems
+Ss;55;70;3;29;Feeding systems
+Ss;55;70;3;31;Freshwater intake systems
+Ss;55;70;3;70;Recirculating aquaculture systems
+Ss;55;70;3;78;Seawater intake systems
+Ss;55;70;3;80;Skimming systems
+Ss;55;70;3;94;Vaccination systems
+Ss;55;70;38;;Hot and cold water supply systems
+Ss;55;70;38;15;Cold water supply systems
+Ss;55;70;38;20;Direct hot water storage supply systems
+Ss;55;70;38;40;Incoming water supply systems
+Ss;55;70;38;42;Indirect hot water storage supply systems
+Ss;55;70;38;45;Instantaneous hot water supply systems
+Ss;55;70;38;65;Pumped cold water supply systems
+Ss;55;70;38;72;Reclaimed water distribution systems
+Ss;55;70;38;92;Ultrapure water supply systems
+Ss;55;70;39;;Hydroelectric pressure water supply systems
+Ss;55;70;39;10;Buried pressure pipeline systems
+Ss;55;70;42;;Irrigation and aeration systems
+Ss;55;70;42;20;Drip irrigation systems
+Ss;55;70;42;50;Manual irrigation systems
+Ss;55;70;42;60;Passive irrigation and aeration systems
+Ss;55;70;42;85;Sprinkler irrigation systems
+Ss;55;70;42;87;Subirrigation and aeration systems
+Ss;55;70;65;;Treated water storage systems
+Ss;55;70;65;2;Treated water above-ground storage systems
+Ss;55;70;65;6;Treated water below-ground storage systems
+Ss;55;70;70;;Treated water pumping systems
+Ss;55;70;70;23;Treated water dry well pumping systems
+Ss;55;70;70;95;Treated water wet well pumping systems
+Ss;55;70;94;;Washing systems
+Ss;55;70;94;94;Wash plant systems
+Ss;55;70;94;96;Wheel washing systems
+Ss;55;70;95;;Water distribution network systems
+Ss;55;70;95;34;Treated water gravity pipeline systems
+Ss;55;70;95;50;Treated water pressure pipeline systems
+Ss;55;70;95;66;Private water distribution network systems
+Ss;55;70;95;85;Treated water siphon systems
+Ss;55;70;96;;Water feature systems
+Ss;55;70;96;15;Cascade and waterfall systems
+Ss;55;70;96;31;Fountain and jet systems
+Ss;55;70;96;83;Self-contained water feature systems
+Ss;55;70;96;96;Water play systems
+Ss;55;70;97;;Consumer water reclamation systems
+Ss;55;70;97;8;Black water reclamation systems
+Ss;55;70;97;35;Grey water reclamation systems
+Ss;55;70;97;70;Rainwater reclamation systems
+Ss;55;70;98;;Consumer water treatment systems
+Ss;55;70;98;8;Bore water treatment systems
+Ss;55;70;98;13;Chemical-free water treatment systems
+Ss;55;70;98;85;Swimming pool water treatment systems
+Ss;55;70;98;92;Ultrapure water treatment systems
+Ss;55;70;99;;Water movement systems
+Ss;55;70;99;84;Stoplog systems
+Ss;55;70;99;96;Water baffle systems
+Ss;55;90;;;Piped solids distribution and supply systems
+Ss;55;90;65;;Piped granule and powder supply systems
+Ss;60;;;;Heating, cooling and refrigeration systems
+Ss;60;30;;;Rail and paving heating systems
+Ss;60;30;60;;Pavement heating systems
+Ss;60;30;60;27;Electric pavement heating systems
+Ss;60;30;70;;Railway heating systems
+Ss;60;30;70;65;Points heating systems
+Ss;60;30;75;;Runway heating systems
+Ss;60;30;90;;Tramway heating systems
+Ss;60;40;;;Space heating and cooling systems
+Ss;60;40;13;;Climatic ceiling and beam systems
+Ss;60;40;13;13;Climatic beam systems
+Ss;60;40;13;14;Climatic ceiling systems
+Ss;60;40;15;;Combined heating, cooling and power systems
+Ss;60;40;15;40;Combined heat and power systems
+Ss;60;40;17;;Cooling systems
+Ss;60;40;17;12;Chilled water systems
+Ss;60;40;17;15;Condenser water systems
+Ss;60;40;17;21;District cooling systems
+Ss;60;40;17;40;Ice storage systems
+Ss;60;40;17;96;Water cooling systems
+Ss;60;40;36;;Heat pump systems
+Ss;60;40;36;5;Air source heat pump systems
+Ss;60;40;36;35;Ground source heat pump systems
+Ss;60;40;36;96;Water source heat pump systems
+Ss;60;40;37;;Heating systems
+Ss;60;40;37;21;Direct-fired heating systems
+Ss;60;40;37;22;District heating systems
+Ss;60;40;37;26;Electric heating systems
+Ss;60;40;37;42;Indirect-fired heating systems
+Ss;60;40;37;48;Low-temperature hot water heating systems
+Ss;60;40;37;51;Medium-temperature hot water heating systems
+Ss;60;40;37;81;Solar heating systems
+Ss;60;40;37;85;Steam heating systems
+Ss;60;40;84;;District heating, cooling or ambient network systems
+Ss;60;40;84;21;District cooling – primary distribution network systems
+Ss;60;40;84;22;District heating - primary distribution network systems
+Ss;60;40;84;23;District cooling – primary energy centre cooling systems
+Ss;60;40;84;24;District heating – primary energy centre heating systems
+Ss;60;40;84;25;District cooling – secondary/ building distribution network systems
+Ss;60;40;84;26;District heating – secondary/ building distribution network systems
+Ss;60;40;90;;Trace heating systems
+Ss;60;40;90;28;Electrical resistance trace heating systems
+Ss;60;40;92;;Underfloor heating and cooling systems
+Ss;60;40;92;15;Combined underfloor heating and cooling systems
+Ss;60;40;92;27;Electric underfloor heating systems
+Ss;60;40;92;92;Underfloor chilled water systems
+Ss;60;40;92;94;Underfloor low-temperature hot water heating systems
+Ss;60;60;;;Refrigeration systems
+Ss;60;60;15;;Cold room systems
+Ss;60;60;15;10;Catering cold room systems
+Ss;60;60;15;15;Cold storage room systems
+Ss;60;60;15;50;Mortuary cold room systems
+Ss;60;60;17;;Cold storage systems
+Ss;60;60;70;;Refrigerant systems
+Ss;60;60;70;15;Refrigerant charging systems
+Ss;60;60;70;70;Refrigerant recovery systems
+Ss;60;60;70;71;Refrigerant cooling systems
+Ss;60;60;70;94;Variable refrigerant flow (VRF) systems
+Ss;60;80;;;Drying systems
+Ss;60;80;8;;Bottle and can drying systems
+Ss;65;;;;Ventilation and air conditioning systems
+Ss;65;40;;;Ventilation systems
+Ss;65;40;32;;Fume extract systems
+Ss;65;40;32;32;Fume cupboard extract systems
+Ss;65;40;32;70;Recirculatory fume cupboard systems
+Ss;65;40;32;75;Safety cabinet extract systems
+Ss;65;40;33;;General space ventilation systems
+Ss;65;40;33;23;Destratification air distribution systems
+Ss;65;40;33;45;Kitchen extract ventilation systems
+Ss;65;40;33;48;Local extract ventilation systems
+Ss;65;40;33;49;Mechanical supply and extract ventilation systems
+Ss;65;40;33;50;Mechanical extract ventilation systems
+Ss;65;40;33;51;Mechanical supply ventilation systems
+Ss;65;40;33;52;Mechanical whole-house ventilation systems
+Ss;65;40;33;56;Natural ventilation systems
+Ss;65;40;33;60;Passive stack ventilation systems
+Ss;65;40;33;90;Toilet extract ventilation systems
+Ss;65;40;42;;Industrial fume extract systems
+Ss;65;40;42;25;Dust extract systems
+Ss;65;40;42;36;Hazardous area extract systems
+Ss;65;40;42;45;Local exhaust ventilation systems
+Ss;65;40;42;95;Vehicle exhaust extract systems
+Ss;65;40;80;;Smoke extract and control systems
+Ss;65;40;80;56;Natural smoke and heat exhaust ventilation systems
+Ss;65;40;80;65;Pressure differential systems
+Ss;65;40;80;80;Smoke and heat exhaust ventilation systems
+Ss;65;40;94;;Vehicular space ventilation systems
+Ss;65;40;94;10;Car park extract systems
+Ss;65;40;94;11;Car park supply systems
+Ss;65;40;94;88;Tunnel pressurization systems
+Ss;65;40;94;90;Tunnel ventilation systems
+Ss;65;60;;;Specialist ventilation systems
+Ss;65;60;55;;Hazardous processes ventilation systems
+Ss;65;60;55;22;Decontamination areas ventilation systems
+Ss;65;60;55;36;Helium quench pipe systems
+Ss;65;60;95;;Wind tunnel systems
+Ss;65;80;;;Air conditioning systems
+Ss;65;80;5;;Central air conditioning systems
+Ss;65;80;5;10;Centralized all-air conditioning systems
+Ss;65;80;5;30;Fan coil unit air conditioning systems
+Ss;65;80;5;40;Induction unit air conditioning systems
+Ss;65;80;15;;Controlled environment systems
+Ss;65;80;15;14;Chilled air aisle containment systems
+Ss;65;80;15;16;Clean room air supply systems
+Ss;65;80;15;30;Fan wall systems
+Ss;65;80;15;36;Hot air aisle containment systems
+Ss;65;80;45;;Local air conditioning systems
+Ss;65;80;45;25;Evaporative cooling systems
+Ss;65;80;45;48;Local underfloor air conditioning systems
+Ss;65;80;45;72;Room air conditioning systems
+Ss;70;;;;Electrical systems
+Ss;70;10;;;Electrical power generation systems
+Ss;70;10;30;;Fossil fuel power generation systems
+Ss;70;10;30;33;Gas power generating systems
+Ss;70;10;30;70;Reciprocating internal combustion engine
+Ss;70;10;30;72;Reciprocating internal combustion engine driven alternating current generator systems
+Ss;70;10;70;;Renewable power generation systems
+Ss;70;10;70;33;Geothermal power generation systems
+Ss;70;10;70;35;Grid-connected photovoltaic systems
+Ss;70;10;70;36;Hydroelectric power generation systems
+Ss;70;10;70;80;Small-scale wave and tidal power generation systems
+Ss;70;10;70;82;Small-scale wind-powered electricity generation systems
+Ss;70;10;70;85;Stand-alone photovoltaic systems
+Ss;70;10;70;95;Water mill systems
+Ss;70;10;70;97;Water turbine systems
+Ss;70;10;70;98;Wind power generating systems
+Ss;70;20;;;Electrical power transmission and distribution systems
+Ss;70;20;25;;High-voltage power transformation systems
+Ss;70;20;25;62;Phase-shifting power transformer systems
+Ss;70;20;25;65;Prefabricated distribution substation systems
+Ss;70;20;25;89;Transmission and distribution power transformer systems
+Ss;70;20;30;;High-voltage substation systems
+Ss;70;20;30;10;Breaker-and-a-half substation systems
+Ss;70;20;30;22;Double bus double breaker substation systems
+Ss;70;20;30;24;Double bus single breaker substation systems
+Ss;70;20;30;50;Main bus and transfer bus substation systems
+Ss;70;20;30;70;Ring bus substation systems
+Ss;70;20;30;80;Single bus substation systems
+Ss;70;20;35;;High-voltage transmission and distribution systems
+Ss;70;20;35;24;Double-circuit transmission line section systems
+Ss;70;20;35;34;Grid battery systems
+Ss;70;20;35;36;High-voltage outage group systems
+Ss;70;20;35;37;High-voltage power reactor systems
+Ss;70;20;35;76;Series variable compensation systems
+Ss;70;20;35;78;Shunt capacitor systems
+Ss;70;20;35;80;Single-circuit transmission line section systems
+Ss;70;20;35;84;Static VAR (volt-ampere reactive) compensator systems
+Ss;70;20;35;86;Synchronous condenser systems
+Ss;70;20;35;90;Transmission cable systems
+Ss;70;20;60;;High-voltage control and protection systems
+Ss;70;20;60;9;Bus coupler protection systems
+Ss;70;20;60;10;Busbar protection system
+Ss;70;20;60;12;Capacitor protection system
+Ss;70;20;60;41;Inter-zone unit protection systems
+Ss;70;20;60;47;Line protection system
+Ss;70;20;60;60;Network protection systems
+Ss;70;20;60;76;Series reactor protection system
+Ss;70;20;60;78;Shunt reactor protection system
+Ss;70;20;60;84;Substation protection, automation and control systems (PACS)
+Ss;70;20;60;90;Transformer protection system
+Ss;70;20;70;;Electricity network monitoring systems
+Ss;70;20;70;23;Disturbance monitoring systems
+Ss;70;20;70;29;Fault monitoring and location systems
+Ss;70;20;70;58;Online condition monitoring systems
+Ss;70;20;70;69;Quality-of-supply monitoring systems
+Ss;70;20;70;72;Revenue metering systems
+Ss;70;30;;;Electricity distribution systems
+Ss;70;30;10;;Cable management systems
+Ss;70;30;10;28;Extra-low-voltage cable management systems
+Ss;70;30;10;35;High-voltage cable management systems
+Ss;70;30;10;45;Low-voltage cable management systems
+Ss;70;30;25;;Electrical protection systems
+Ss;70;30;25;25;Earthing and bonding systems
+Ss;70;30;25;28;Earth grid systems
+Ss;70;30;25;45;Lightning protection systems
+Ss;70;30;35;;High-voltage systems
+Ss;70;30;35;30;High-voltage site connection systems
+Ss;70;30;35;35;High-voltage distribution systems
+Ss;70;30;45;;Low-voltage systems
+Ss;70;30;45;23;Direct current (d.c.) supply systems
+Ss;70;30;45;28;Extra-low-voltage distribution systems
+Ss;70;30;45;40;Low-voltage site connection systems
+Ss;70;30;45;45;Low-voltage distribution systems
+Ss;70;30;45;51;Medical power supply systems
+Ss;70;30;45;92;Uninterruptible power supply systems
+Ss;70;30;50;;Medium-voltage systems
+Ss;70;30;50;50;Medium-voltage site connection systems
+Ss;70;30;50;55;Medium-voltage distribution systems
+Ss;70;30;60;;Overhead line traction power distribution systems
+Ss;70;30;60;5;Autotransformer feeder (ATF) systems
+Ss;70;30;60;11;Catenary cantilever overhead line systems
+Ss;70;30;60;58;Overhead wiring mast arm gantry systems
+Ss;70;30;60;59;Overhead wiring portal gantry systems
+Ss;70;30;60;71;Retractable overhead wiring systems
+Ss;70;30;60;89;Trolley wire overhead line systems
+Ss;70;30;80;;Small power systems
+Ss;70;30;80;35;Hardwired low-voltage small power systems
+Ss;70;30;80;45;Low-voltage small power systems with prefabricated wiring
+Ss;70;30;90;;Conductor rail traction power distribution systems
+Ss;70;30;90;15;Conductor rail electrification systems
+Ss;70;30;94;;Vehicle charging systems
+Ss;70;30;94;27;Electric vehicle charging systems
+Ss;70;80;;;Lighting systems
+Ss;70;80;1;;Aeronautical lighting systems
+Ss;70;80;1;2;Approach lighting systems
+Ss;70;80;1;3;Apron lighting systems
+Ss;70;80;1;36;Heliport lighting systems
+Ss;70;80;1;47;Lighting beacon systems
+Ss;70;80;1;65;Precision approach path indicator systems
+Ss;70;80;1;74;Runway lighting systems
+Ss;70;80;1;87;Taxiway lighting systems
+Ss;70;80;25;;External lighting systems
+Ss;70;80;25;5;Amenity lighting systems
+Ss;70;80;25;59;Outdoor workplace lighting systems
+Ss;70;80;25;65;Platform lighting systems
+Ss;70;80;25;69;Railway lighting systems
+Ss;70;80;25;70;Roadway lighting systems
+Ss;70;80;25;80;Shaft lighting systems
+Ss;70;80;25;88;Tunnel emergency lighting systems
+Ss;70;80;25;90;Tunnel lighting systems
+Ss;70;80;33;;General lighting systems
+Ss;70;80;33;12;Central battery-supplied emergency lighting systems
+Ss;70;80;33;30;Fibre-optic lighting systems
+Ss;70;80;33;33;General lighting systems with prefabricated wiring
+Ss;70;80;33;35;Hardwired general lighting systems
+Ss;70;80;33;78;Self-contained emergency lighting systems
+Ss;70;80;33;88;Theatrical/ stage lighting systems
+Ss;70;80;85;;Submersible lighting systems
+Ss;70;80;85;92;Underwater lighting systems
+Ss;70;80;95;;Vehicle lighting systems
+Ss;70;80;95;28;External vehicle lighting systems
+Ss;70;80;95;40;Internal vehicle lighting systems
+Ss;75;;;;Communications, security, safety, control and protection systems
+Ss;75;10;;;Communications systems
+Ss;75;10;21;;Data distribution and telecommunications systems
+Ss;75;10;21;21;Data distribution systems
+Ss;75;10;21;48;Local area network (LAN) systems
+Ss;75;10;21;52;Mobile telecommunications systems
+Ss;75;10;21;55;Multiplexing systems
+Ss;75;10;21;88;Telecommunications systems
+Ss;75;10;21;97;Wide area network (WAN) systems
+Ss;75;10;46;;Listening systems
+Ss;75;10;46;5;Audio frequency induction loop systems
+Ss;75;10;46;42;Infrared listening systems
+Ss;75;10;51;;Medical communications systems
+Ss;75;10;51;51;Medical audiovisual systems
+Ss;75;10;68;;Public communications systems
+Ss;75;10;68;2;Advertising display systems
+Ss;75;10;68;7;Bell communication systems
+Ss;75;10;68;13;Clock systems
+Ss;75;10;68;42;Information display systems
+Ss;75;10;68;68;Public address systems
+Ss;75;10;68;69;Queue management systems
+Ss;75;10;70;;Radio and television distribution systems
+Ss;75;10;70;70;Radio distribution systems
+Ss;75;10;70;88;Television distribution systems
+Ss;75;10;72;;Emergency communication systems
+Ss;75;10;72;30;Firefighting intercom systems
+Ss;75;10;72;70;Radio communications systems
+Ss;75;10;72;72;Roadway emergency communication systems
+Ss;75;10;88;;Timing and scoring systems
+Ss;75;10;88;5;Athletics timing and scoring systems
+Ss;75;10;88;86;Swimming pool timing and scoring systems
+Ss;75;30;;;Signal systems
+Ss;75;30;35;;Road signal and control systems
+Ss;75;30;35;60;Pedestrian crossing signal systems
+Ss;75;30;35;70;Ramp metering systems
+Ss;75;30;35;86;Toll systems
+Ss;75;30;35;88;Traffic signal systems
+Ss;75;30;50;;Marine signal systems
+Ss;75;30;60;;Obstacle beacon systems
+Ss;75;30;70;;Railway signal and control systems
+Ss;75;30;70;2;Automatic train operation (ATO) systems
+Ss;75;30;70;3;Automatic train protection (ATP) systems
+Ss;75;30;70;4;Automatic train stop (ATS) systems
+Ss;75;30;70;5;Automatic warning systems (AWS)
+Ss;75;30;70;15;Communications based train control (CBTC) systems
+Ss;75;30;70;27;Emergency traction current discharge systems (ETCDS)
+Ss;75;30;70;30;Fixed block signalling systems
+Ss;75;30;70;42;Interlocking systems
+Ss;75;30;70;53;Moving block signalling systems
+Ss;75;30;70;70;Rail signal systems
+Ss;75;30;70;90;Train protection warning systems (TPWS)
+Ss;75;30;90;;Tramway signal systems
+Ss;75;30;97;;Waterway signal systems
+Ss;75;30;98;;Wind direction indication systems
+Ss;75;30;98;96;Windsock systems
+Ss;75;40;;;Security systems
+Ss;75;40;2;;Access control systems
+Ss;75;40;2;5;Audio intercom systems
+Ss;75;40;2;11;Credential access control systems
+Ss;75;40;2;94;Video intercom systems
+Ss;75;40;53;;Monitoring systems
+Ss;75;40;53;70;Radio-frequency identification (RFID) tagging systems
+Ss;75;40;53;86;Surveillance CCTV systems
+Ss;75;40;53;90;Train dispatch CCTV systems
+Ss;75;40;53;95;Voice recording systems
+Ss;75;40;73;;Security screening systems
+Ss;75;40;73;11;Cabin baggage screening systems
+Ss;75;40;73;60;Passenger screening systems
+Ss;75;40;75;;Security detection alarm systems
+Ss;75;40;75;2;Aerospace security detection and warning systems
+Ss;75;40;75;40;Intrusion and hold-up alarm systems
+Ss;75;40;75;50;Marine and waterway security detection and warning systems
+Ss;75;50;;;Safety and protection systems
+Ss;75;50;8;;Critical incident alert systems
+Ss;75;50;8;47;Lockdown systems
+Ss;75;50;11;;Emergency call systems
+Ss;75;50;11;7;Baby protection systems
+Ss;75;50;11;18;Custody suite call systems
+Ss;75;50;11;25;Emergency assistance call systems
+Ss;75;50;11;27;Emergency voice communication systems
+Ss;75;50;11;57;Nurse call systems
+Ss;75;50;26;;Debris detection systems
+Ss;75;50;26;30;Foreign object debris (FOD) detection systems
+Ss;75;50;28;;Fire and smoke detection and alarm systems
+Ss;75;50;28;5;Aspirating smoke detector systems
+Ss;75;50;28;22;Domestic premises' fire detection and alarm systems
+Ss;75;50;28;24;Duct smoke detector systems
+Ss;75;50;28;27;Evacuation alert systems
+Ss;75;50;28;29;Fire detection and alarm systems
+Ss;75;50;28;95;Voice alarm systems
+Ss;75;50;33;;Gas detection and alarm systems
+Ss;75;50;33;30;Fixed gas detection and alarm systems
+Ss;75;50;33;32;Flow sample gas detection and alarm systems
+Ss;75;50;33;71;Refrigerant leak detection and alarm systems
+Ss;75;50;35;;Healthcare imaging systems
+Ss;75;50;50;;Liquid detection and alarm systems
+Ss;75;50;50;45;Liquid presence detection and alarm systems
+Ss;75;50;50;96;Water leak detection and alarm systems
+Ss;75;50;60;;Patient monitoring and telemetry systems
+Ss;75;60;;;Environmental safety systems
+Ss;75;60;45;;Manmade disaster warning systems
+Ss;75;60;45;15;Chemical spill detection and alarm systems
+Ss;75;60;45;60;Oil spill detection and alarm systems
+Ss;75;60;45;70;Radiation detection and alarm systems
+Ss;75;60;50;;Meteorological systems
+Ss;75;60;50;50;Meteorological detection and warning systems
+Ss;75;60;50;95;Weather observation systems
+Ss;75;60;55;;Natural disaster warning and protection systems
+Ss;75;60;55;25;Earthquake warning systems
+Ss;75;60;55;29;Flood resilience systems
+Ss;75;60;55;30;Flood warning systems
+Ss;75;60;55;75;Seismic instrumentation systems
+Ss;75;60;55;90;Tsunami warning systems
+Ss;75;60;55;95;Volcanic eruption warning systems
+Ss;75;70;;;Control and management systems
+Ss;75;70;5;;Airport control systems
+Ss;75;70;5;4;Automatic aircraft docking systems
+Ss;75;70;6;;Automation and intelligence systems
+Ss;75;70;6;9;Building automation and intelligence systems
+Ss;75;70;6;35;Guest room management systems
+Ss;75;70;10;;Bridge control systems
+Ss;75;70;20;;Dam control systems
+Ss;75;70;50;;Marine control systems
+Ss;75;70;52;;Mechanical engineering services control and management systems
+Ss;75;70;52;3;Air-to-air heat pump control systems
+Ss;75;70;52;14;Climatic ceiling panels and beams control systems
+Ss;75;70;52;15;Combined heat and power control systems
+Ss;75;70;52;16;Constant volume air conditioning control systems
+Ss;75;70;52;17;Cooling system control systems
+Ss;75;70;52;23;Domestic heating system control systems
+Ss;75;70;52;28;Extract ventilation control systems
+Ss;75;70;52;29;Fan coil unit air conditioning control systems
+Ss;75;70;52;32;Fuel supply control systems
+Ss;75;70;52;33;Gas-fired heating control systems
+Ss;75;70;52;36;Heating system control systems
+Ss;75;70;52;38;Heat pump control systems
+Ss;75;70;52;52;Mixed mode ventilation control systems
+Ss;75;70;52;56;Natural ventilation control systems
+Ss;75;70;52;70;Radiant heating control systems
+Ss;75;70;52;80;Smoke and heat detection extract control systems
+Ss;75;70;52;81;Smoke and heat detection shut down control systems
+Ss;75;70;52;85;Steam and condensate control systems
+Ss;75;70;52;93;Variable volume air conditioning control systems
+Ss;75;70;52;94;Ventilation control systems
+Ss;75;70;52;96;Water supply control systems
+Ss;75;70;52;97;Water-to-air heat pump control systems
+Ss;75;70;54;;Metering, monitoring and management systems
+Ss;75;70;54;3;Active water monitoring systems
+Ss;75;70;54;5;Air quality monitoring systems
+Ss;75;70;54;10;Building monitoring and management systems
+Ss;75;70;54;15;Communications monitoring and management systems
+Ss;75;70;54;25;Electricity metering systems
+Ss;75;70;54;28;Fire systems management and control systems
+Ss;75;70;54;30;Fuel metering systems
+Ss;75;70;54;36;Heat metering systems
+Ss;75;70;54;41;Instrumentation, automation and control systems
+Ss;75;70;54;60;Passive water monitoring systems
+Ss;75;70;54;75;Supervisory control and data acquisition (SCADA) systems
+Ss;75;70;54;88;Telemetry systems
+Ss;75;70;54;95;Water metering systems
+Ss;75;70;54;96;Water quality monitoring systems
+Ss;75;70;54;97;Wastewater quality monitoring systems
+Ss;75;70;75;;Rail control and monitoring systems
+Ss;75;70;75;10;Brake monitoring systems (BMS)
+Ss;75;70;75;70;Railway power control systems
+Ss;75;70;85;;Structural monitoring systems
+Ss;75;70;85;18;Crack gauge monitoring systems
+Ss;75;70;85;27;Electrolevel monitoring systems
+Ss;75;70;85;30;Fibre-optic monitoring systems
+Ss;75;70;85;47;Liquid levelling monitoring systems
+Ss;75;70;85;48;Load cell monitoring systems
+Ss;75;70;85;62;Piezometer monitoring systems
+Ss;75;70;85;66;Precise levelling monitoring systems
+Ss;75;70;85;67;Prism monitoring systems
+Ss;75;70;85;84;Strain gauge monitoring systems
+Ss;75;70;85;86;Subsurface monitoring array systems
+Ss;75;70;85;87;Tape extensometer monitoring systems
+Ss;75;70;85;90;Tilt sensor monitoring systems
+Ss;75;70;85;92;Total station monitoring systems
+Ss;75;70;90;;Transport management systems
+Ss;75;70;90;5;Automatic number plate recognition (ANPR) systems
+Ss;75;70;90;6;Automatic traffic counter and classifier (ATCC) systems
+Ss;75;70;90;89;Traffic electronic signage systems
+Ss;75;70;90;90;Traffic enforcement camera systems
+Ss;75;70;90;91;Traffic management control systems
+Ss;75;70;90;92;Traveller information systems
+Ss;75;70;90;94;Vehicle tag-reading systems
+Ss;75;70;90;96;Vehicle monitoring and management systems
+Ss;75;70;96;;Water supply and wastewater control systems
+Ss;75;70;96;21;Desludging control systems
+Ss;75;70;96;30;Flow measurement and control systems
+Ss;75;70;96;96;Wastewater supply control systems
+Ss;75;70;96;98;Water supply quality control systems
+Ss;75;70;97;;Waterway control systems
+Ss;75;90;;;Ticket management systems
+Ss;75;90;80;;Ticketing systems
+Ss;75;90;80;88;Ticket-dispensing systems
+Ss;75;90;93;;Ticket validation systems
+Ss;75;90;93;11;Card reading systems
+Ss;75;90;93;60;Passenger check-in systems
+Ss;75;90;93;88;Ticket reading systems
+Ss;80;;;;Transport systems
+Ss;80;10;;;Cable transport systems
+Ss;80;10;5;;Aerial tram systems
+Ss;80;10;10;;Cable car systems
+Ss;80;10;15;;Chairlift systems
+Ss;80;10;30;;Funicular systems
+Ss;80;10;35;;Gondola systems
+Ss;80;10;70;;Ropeway tow systems
+Ss;80;10;85;;Surface lift systems
+Ss;80;20;;;Conveying systems
+Ss;80;20;5;;Automatic guided vehicle systems
+Ss;80;20;6;;Baggage handling and tray systems
+Ss;80;20;6;4;Airport baggage handling systems
+Ss;80;20;6;90;Tray return systems
+Ss;80;20;10;;Bulk material conveying systems
+Ss;80;20;11;;Cargo handling systems
+Ss;80;20;23;;Document conveying systems
+Ss;80;20;23;65;Pneumatic document conveying systems
+Ss;80;20;60;;Parcel sorting systems
+Ss;80;20;62;;People conveying systems
+Ss;80;20;62;28;Escalator systems
+Ss;80;20;62;53;Moving walkway systems
+Ss;80;20;63;;Piece conveying systems
+Ss;80;20;63;59;Overhead piece conveying systems
+Ss;80;20;65;;Pneumatic conveying systems
+Ss;80;30;;;Crane and hoist systems
+Ss;80;30;15;;Crane systems
+Ss;80;30;15;10;Bulk handling crane systems
+Ss;80;30;15;15;Container handling crane systems
+Ss;80;30;15;59;Overhead crane systems
+Ss;80;30;20;;Derrick systems
+Ss;80;30;25;;Dynamic permanent access and safety equipment systems
+Ss;80;30;25;30;Fixed rig suspended access systems
+Ss;80;30;25;32;Gantry access systems
+Ss;80;30;25;35;Guided type fall arrest systems
+Ss;80;30;25;50;Mobile rig monorail suspended access systems
+Ss;80;30;25;52;Mobile rig tracked suspended access systems
+Ss;80;30;25;55;Mobile rig trackless suspended access systems
+Ss;80;30;25;75;Robotic cleaning systems
+Ss;80;30;25;80;Single point anchorage fall arrest systems
+Ss;80;30;25;90;Travelling ladder access systems
+Ss;80;30;40;;Hoist systems
+Ss;80;50;;;Lift systems
+Ss;80;50;1;;Accessible goods-only and service lift systems
+Ss;80;50;1;5;Electric accessible goods-only lift (AGOL) systems
+Ss;80;50;1;26;Electric service lift systems
+Ss;80;50;1;39;Hydraulic accessible goods-only lift (AGOL) systems
+Ss;80;50;1;40;Hydraulic service lift systems
+Ss;80;50;1;50;Manual dumb waiter systems
+Ss;80;50;2;;Accessibility lifts and platform systems
+Ss;80;50;2;65;Powered homelift systems
+Ss;80;50;2;83;Stairlift systems
+Ss;80;50;2;85;Step lift systems
+Ss;80;50;2;94;Vertical lifting platform systems
+Ss;80;50;60;;Passenger and goods lift systems
+Ss;80;50;60;26;Electric passenger and goods-passenger lift systems
+Ss;80;50;60;39;Hydraulic passenger and goods-passenger lift systems
+Ss;80;50;60;60;Paternoster systems
+Ss;80;50;92;;Vehicle and boat lifting systems
+Ss;80;50;92;8;Boat lifting systems
+Ss;80;50;92;95;Vehicle maintenance lifting systems
+Ss;80;50;94;;Vehicle and boat stacking systems
+Ss;80;50;94;8;Boat-stacking systems
+Ss;80;50;94;11;Car-stacking systems
+Ss;80;50;96;;Warehouse stacking systems
+Ss;80;70;;;Track systems
+Ss;80;70;46;;Level crossing systems
+Ss;80;70;46;60;Pedestrian level crossing systems
+Ss;80;70;46;93;User worked level crossing systems
+Ss;80;70;46;95;Vehicular level crossing systems
+Ss;80;70;50;;Monorail systems
+Ss;80;70;70;;Rail track systems
+Ss;80;70;70;6;Ballasted rail track systems
+Ss;80;70;70;27;Embedded rail systems
+Ss;80;70;70;56;Non-embedded slab track rail systems
+Ss;80;70;70;65;Precast track bed systems
+Ss;80;70;89;;Train arrestor systems
+Ss;80;70;89;30;Fixed train arrestor systems
+Ss;80;70;89;50;Moveable train arrestor systems
+Ss;80;80;;;Turntable systems
+Ss;80;80;20;;Display turntable systems
+Ss;80;80;30;;Floor turntable systems
+Ss;80;80;40;;Industrial turntable systems
+Ss;80;80;70;;Railway turntable systems
+Ss;80;80;85;;Stage turntable systems
+Ss;80;90;;;Vehicle access systems
+Ss;80;90;5;;Aircraft passenger loading bridge systems
+Ss;80;90;5;60;Passenger loading bridge systems
+Ss;80;90;70;;Spacecraft passenger access systems
+Ss;80;90;75;;Ship passenger loading bridge systems
+Ss;82;;;;Vehicle systems
+Ss;82;70;;;Rolling stock systems
+Ss;82;70;65;;Rail power supply systems
+Ss;82;70;65;5;Auxiliary power supply systems
+Ss;82;70;70;;Rail wagon systems
+Ss;82;70;70;9;Brake systems
+Ss;82;70;70;84;Steering systems
+Ss;82;70;70;94;Vehicle body systems
+Ss;82;70;70;95;Vehicle door systems
+Ss;82;70;70;97;Wheelset systems
+Ss;85;;;;Process engineering systems
+Ss;85;30;;;General process systems
+Ss;85;30;58;;Odour control systems
+Ss;85;30;58;7;Biofiltration systems
+Ss;85;30;58;8;Bio-scrubber systems
+Ss;85;30;58;10;Carbon filter systems
+Ss;85;30;58;11;Catalytic iron filter systems
+Ss;85;30;58;23;Dry installation systems
+Ss;85;30;58;25;Dust and odour suppression systems
+Ss;85;30;58;96;Wet scrubber systems
+Ss;85;45;;;Manufacturing process systems
+Ss;85;45;6;;Battery manufacturing process systems
+Ss;85;45;6;6;Battery cell assembly systems
+Ss;85;45;6;13;Chemical mixing systems
+Ss;85;45;6;17;Coating process systems
+Ss;85;45;6;27;Electrode calendering systems
+Ss;85;45;6;28;Electrolyte filling systems
+Ss;85;45;6;30;Formation and ageing systems
+Ss;85;45;6;80;Slitting systems
+Ss;85;45;6;85;Stacking and winding systems
+Ss;85;50;;;Mechanical power systems
+Ss;85;50;65;;Power supply systems
+Ss;85;50;65;27;Engine cooling systems
+Ss;85;50;65;28;Engine exhaust systems
+Ss;85;50;65;38;Hydraulic power systems
+Ss;85;50;65;40;Internal combustion engine systems
+Ss;85;72;;;Robotic systems
+Ss;90;;;;Soft facility management systems
+Ss;90;5;;;Demand for space
+Ss;90;6;;;Demand for technical infrastructure
+Ss;90;7;;;Demand for cleaning
+Ss;90;8;;;Demand related to outdoor space
+Ss;90;9;;;Workplace
+Ss;90;10;;;Specific demand related to space and infrastructure
+Ss;90;11;;;Demand for health, safety and security
+Ss;90;12;;;Hospitality demands
+Ss;90;13;;;Demand for information and communication
+Ss;90;14;;;Demand for logistics
+Ss;90;15;;;Demand for integrated management, consultancy and administration
+Ss;90;20;;;Specific demand of administrative, commercial and protective services
+Ss;90;25;;;Specific demand of cultural, educational, scientific and information organizations
+Ss;90;30;;;Specific demand of industrial organizations
+Ss;90;35;;;Specific demand of medical, health, welfare and sanitary organizations
+Ss;90;40;;;Specific demand of recreational organizations
+Ss;90;45;;;Specific demand of residential organizations
+Ss;90;50;;;Specific demand of disposal organizations
+Ss;90;55;;;Specific demand of piped supply organizations
+Ss;90;60;;;Specific demand of heating, cooling and refrigeration organizations
+Ss;90;65;;;Specific demand of ventilation and air conditioning organizations
+Ss;90;70;;;Specific demand of electrical organizations
+Ss;90;75;;;Specific demand of communications, security, safety and protection organizations
+Ss;90;80;;;Specific demand of rail organizations
+Ss;90;81;;;Specific demand of road organizations
+Ss;90;82;;;Specific demand of marine and waterway organizations
+Ss;90;83;;;Specific demand of cable transport organizations
+Ss;90;84;;;Specific demand of aerospace organizations

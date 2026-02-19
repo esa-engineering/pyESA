@@ -1,3 +1,4 @@
 layout:
   - GroupByParameters
   - TransferParameter
+  - ClassificationTool
