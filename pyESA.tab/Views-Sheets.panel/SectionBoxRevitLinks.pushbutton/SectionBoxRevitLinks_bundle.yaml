@@ -7,11 +7,11 @@ tooltip:
   Create a section box around selected linked elements
 
   ---
-  
+
   SHIFT-CLICK to select the RVTLinkInstance first
 
   and then specify the Id(s) of the linked element(s)
-
+  
   separated by ";"
 
 author:
