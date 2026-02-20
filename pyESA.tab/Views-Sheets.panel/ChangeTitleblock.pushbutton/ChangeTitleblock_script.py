@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Gestione Cartigli - Cambia il tipo di cartiglio nelle tavole selezionate."""
+__doc__     = """Version = 1.0
+Date    = 20.02.2026
+________________________________________________________________
+Gestione Cartigli - Modifica il tipo di cartiglio applicato alle singole tavole inserite nel modello Revit.
+1. Selezionare le tavole da modificare usando le checkbox; 
+è possibile filtrare per nome/numero e usare i pulsanti "Seleziona tutto / Deseleziona tutto".
+2. Per ogni tavola selezionata, scegliere il nuovo cartiglio dal menu a tendina accanto al cartiglio attuale.
+In alternativa, usare la riga "Applica a tutte" per impostare lo stesso tipo su tutte le tavole.
+N.B. Tutte le sostituzioni vengono eseguite in un'unica transazione, annullabile premendo Ctrl+Z.
+________________________________________________________________"""
 
 __title__   = "Change\nTitleblocks"
 __author__  = "Andrea Patti"
