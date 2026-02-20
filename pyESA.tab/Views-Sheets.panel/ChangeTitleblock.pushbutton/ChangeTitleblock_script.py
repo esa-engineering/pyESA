@@ -72,6 +72,20 @@ def get_all_sheets():
     return sorted(sheets, key=lambda s: s.SheetNumber)
 
 
+def get_selected_sheets():
+    """Restituisce le ViewSheet attualmente selezionate in Revit.
+    Se non ci sono tavole nella selezione, restituisce una lista vuota."""
+    sel_ids = uidoc.Selection.GetElementIds()
+    if not sel_ids:
+        return []
+    sheets = []
+    for eid in sel_ids:
+        el = doc.GetElement(eid)
+        if isinstance(el, ViewSheet):
+            sheets.append(el)
+    return sorted(sheets, key=lambda s: s.SheetNumber) if sheets else []
+
+
 def get_titleblock_on_sheet(sheet):
     collector = (
         FilteredElementCollector(doc, sheet.Id)
@@ -149,7 +163,7 @@ def make_small_button(text, bg, bg_hover):
 
 class TitleBlockManagerWindow(Window):
 
-    def __init__(self):
+    def __init__(self, preselected_sheets=None):
         self.Title  = "Gestione Cartigli"
         self.Width  = 950
         self.Height = 620
@@ -158,7 +172,16 @@ class TitleBlockManagerWindow(Window):
         self.Background = CLR_BG
 
         # -- Dati --------------------------------------------------------------
-        self.all_sheets    = get_all_sheets()
+        # Se ci sono tavole preselezionate usa solo quelle, altrimenti tutte
+        if preselected_sheets:
+            self.all_sheets = preselected_sheets
+            self.preselected_ids = set(
+                s.Id.IntegerValue for s in preselected_sheets
+            )
+        else:
+            self.all_sheets = get_all_sheets()
+            self.preselected_ids = set()
+
         self.tb_types      = get_all_titleblock_types()
         self.tb_type_names = sorted(self.tb_types.keys())
         self.sheet_map     = {}   # int_id -> (checkbox, sheet, tb_instance)
@@ -181,7 +204,12 @@ class TitleBlockManagerWindow(Window):
 
         # ---- Riga 0: Titolo fase 1 ----
         title1 = TextBlock()
-        title1.Text       = "Fase 1 - Seleziona le tavole"
+        if self.preselected_ids:
+            title1.Text = "Fase 1 - Tavole dalla selezione attiva ({})".format(
+                len(self.preselected_ids)
+            )
+        else:
+            title1.Text = "Fase 1 - Seleziona le tavole"
         title1.FontSize   = 16
         title1.FontWeight = FontWeights.SemiBold
         title1.Foreground = CLR_PRIMARY
@@ -380,6 +408,9 @@ class TitleBlockManagerWindow(Window):
             cb.Tag      = sheet.Id.IntegerValue
             cb.FontSize = 12.5
             cb.Margin   = Thickness(0, 2, 0, 2)
+            # Pre-spunta se la tavola era nella selezione attiva
+            if sheet.Id.IntegerValue in self.preselected_ids:
+                cb.IsChecked = True
             self.stack_sheets.Children.Add(cb)
             self.sheet_map[sheet.Id.IntegerValue] = (cb, sheet, tb)
 
@@ -602,5 +633,7 @@ else:
             title="Attenzione"
         )
     else:
-        window = TitleBlockManagerWindow()
+        # Se ci sono tavole selezionate in Revit, carica solo quelle
+        pre = get_selected_sheets()
+        window = TitleBlockManagerWindow(pre if pre else None)
         window.ShowDialog()
