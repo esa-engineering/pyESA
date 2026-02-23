@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-__doc__     = """Version = 1.0
+__doc__     = """Version = 1.1
 Date    = 20.02.2026
 ________________________________________________________________
 Gestione Cartigli - Modifica il tipo di cartiglio applicato alle singole tavole inserite nel modello Revit.
-1. Selezionare le tavole da modificare usando le checkbox; 
-è possibile filtrare per nome/numero e usare i pulsanti "Seleziona tutto / Deseleziona tutto".
+1. Selezionare le tavole da modificare usando le checkbox;
+e possibile filtrare per nome/numero e usare i pulsanti "Seleziona tutto / Deseleziona tutto".
 2. Per ogni tavola selezionata, scegliere il nuovo cartiglio dal menu a tendina accanto al cartiglio attuale.
 In alternativa, usare la riga "Applica a tutte" per impostare lo stesso tipo su tutte le tavole.
-N.B. Tutte le sostituzioni vengono eseguite in un'unica transazione, annullabile premendo Ctrl+Z.
+N.B. Tutte le sostituzioni vengono eseguite in un unica transazione, annullabile premendo Ctrl+Z.
 ________________________________________________________________"""
 
 __title__   = "Change\nTitleblocks"
@@ -41,11 +41,25 @@ from Autodesk.Revit.DB import (
     BuiltInParameter,
     ViewSheet,
     Transaction,
+    ElementId,
 )
 from pyrevit import revit, forms
 
 doc   = revit.doc
 uidoc = revit.uidoc
+
+# ==============================================================================
+#  Compatibilita Revit 2025 / 2026
+#  In Revit 2026 ElementId.IntegerValue e stato rimosso -> ElementId.Value
+# ==============================================================================
+
+def eid_int(element_id):
+    """Restituisce il valore intero di un ElementId.
+    Compatibile con Revit <= 2025 (.IntegerValue) e >= 2026 (.Value)."""
+    try:
+        return element_id.IntegerValue
+    except AttributeError:
+        return element_id.Value
 
 # ==============================================================================
 #  Colori
@@ -172,11 +186,10 @@ class TitleBlockManagerWindow(Window):
         self.Background = CLR_BG
 
         # -- Dati --------------------------------------------------------------
-        # Se ci sono tavole preselezionate usa solo quelle, altrimenti tutte
         if preselected_sheets:
             self.all_sheets = preselected_sheets
             self.preselected_ids = set(
-                s.Id.IntegerValue for s in preselected_sheets
+                eid_int(s.Id) for s in preselected_sheets
             )
         else:
             self.all_sheets = get_all_sheets()
@@ -184,14 +197,13 @@ class TitleBlockManagerWindow(Window):
 
         self.tb_types      = get_all_titleblock_types()
         self.tb_type_names = sorted(self.tb_types.keys())
-        self.sheet_map     = {}   # int_id -> (checkbox, sheet, tb_instance)
-        self.combo_map     = {}   # int_id -> ComboBox
+        self.sheet_map     = {}
+        self.combo_map     = {}
 
         # -- Costruisci UI -----------------------------------------------------
         self._build_ui()
 
     def _build_ui(self):
-        # Griglia principale
         main = Grid()
         main.Margin = Thickness(16)
         for h in ["Auto", "Auto", "*", "Auto", "Auto"]:
@@ -277,7 +289,6 @@ class TitleBlockManagerWindow(Window):
         Grid.SetRow(border_sheets, 2)
         main.Children.Add(border_sheets)
 
-        # Popola le tavole
         self._populate_sheets()
 
         # ---- Riga 3: Pannello fase 2 (nascosto) ----
@@ -308,7 +319,6 @@ class TitleBlockManagerWindow(Window):
         Grid.SetRow(title2, 0)
         phase2_grid.Children.Add(title2)
 
-        # Riga "Applica a tutte"
         apply_all_grid = Grid()
         apply_all_grid.Margin = Thickness(12, 2, 12, 6)
         for w in ["Auto", "*", "Auto"]:
@@ -342,7 +352,6 @@ class TitleBlockManagerWindow(Window):
         Grid.SetRow(apply_all_grid, 1)
         phase2_grid.Children.Add(apply_all_grid)
 
-        # Griglia assegnamenti
         sv_assign = ScrollViewer()
         sv_assign.VerticalScrollBarVisibility = ScrollBarVisibility.Auto
         sv_assign.Margin = Thickness(0, 0, 0, 8)
@@ -365,7 +374,6 @@ class TitleBlockManagerWindow(Window):
         Grid.SetRow(self.phase2_border, 3)
         main.Children.Add(self.phase2_border)
 
-        # Popola combo "applica a tutte"
         self._populate_apply_all_combo()
 
         # ---- Riga 4: Pulsanti azione ----
@@ -403,16 +411,16 @@ class TitleBlockManagerWindow(Window):
             label = "{} - {}   [{}]".format(
                 sheet.SheetNumber, sheet.Name, tb_name
             )
+            sid = eid_int(sheet.Id)
             cb = CheckBox()
             cb.Content  = label
-            cb.Tag      = sheet.Id.IntegerValue
+            cb.Tag      = sid
             cb.FontSize = 12.5
             cb.Margin   = Thickness(0, 2, 0, 2)
-            # Pre-spunta se la tavola era nella selezione attiva
-            if sheet.Id.IntegerValue in self.preselected_ids:
+            if sid in self.preselected_ids:
                 cb.IsChecked = True
             self.stack_sheets.Children.Add(cb)
-            self.sheet_map[sheet.Id.IntegerValue] = (cb, sheet, tb)
+            self.sheet_map[sid] = (cb, sheet, tb)
 
     def _populate_apply_all_combo(self):
         self.cmb_apply_all.Items.Clear()
@@ -466,7 +474,6 @@ class TitleBlockManagerWindow(Window):
         for c in to_remove:
             grid.Children.Remove(c)
 
-        # Intestazioni
         rd = RowDefinition()
         rd.Height = GridLength.Auto
         grid.RowDefinitions.Add(rd)
@@ -489,7 +496,6 @@ class TitleBlockManagerWindow(Window):
             rd.Height = GridLength.Auto
             grid.RowDefinitions.Add(rd)
 
-            # Col 0 - Tavola
             lbl = TextBlock()
             lbl.Text              = "{} - {}".format(sheet.SheetNumber, sheet.Name)
             lbl.FontSize          = 12
@@ -499,7 +505,6 @@ class TitleBlockManagerWindow(Window):
             Grid.SetColumn(lbl, 0)
             grid.Children.Add(lbl)
 
-            # Col 1 - Cartiglio attuale
             current_name = titleblock_display_name(tb_inst)
             lbl2 = TextBlock()
             lbl2.Text              = current_name
@@ -511,7 +516,6 @@ class TitleBlockManagerWindow(Window):
             Grid.SetColumn(lbl2, 1)
             grid.Children.Add(lbl2)
 
-            # Col 2 - Freccia
             arrow = TextBlock()
             arrow.Text                  = ">>"
             arrow.FontSize              = 13
@@ -522,7 +526,6 @@ class TitleBlockManagerWindow(Window):
             Grid.SetColumn(arrow, 2)
             grid.Children.Add(arrow)
 
-            # Col 3 - ComboBox
             cmb = ComboBox()
             cmb.FontSize = 12
             cmb.Margin   = Thickness(0, 2, 0, 2)
@@ -540,11 +543,12 @@ class TitleBlockManagerWindow(Window):
                 cmb.Items.Add(item)
 
             cmb.SelectedIndex = 0
-            cmb.Tag = sheet.Id.IntegerValue
+            sid = eid_int(sheet.Id)
+            cmb.Tag = sid
             Grid.SetRow(cmb, row)
             Grid.SetColumn(cmb, 3)
             grid.Children.Add(cmb)
-            self.combo_map[sheet.Id.IntegerValue] = cmb
+            self.combo_map[sid] = cmb
 
     # -- Applica a tutte -------------------------------------------------------
     def apply_all_click(self, sender, args):
@@ -633,7 +637,6 @@ else:
             title="Attenzione"
         )
     else:
-        # Se ci sono tavole selezionate in Revit, carica solo quelle
         pre = get_selected_sheets()
         window = TitleBlockManagerWindow(pre if pre else None)
         window.ShowDialog()
