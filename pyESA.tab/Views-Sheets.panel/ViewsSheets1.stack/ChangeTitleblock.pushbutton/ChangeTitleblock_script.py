@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-__doc__     = """Version = 1.1
-Date    = 20.02.2026
+__doc__     = """Version = 1.2
+Date    = 23.02.2026
 ________________________________________________________________
 Gestione Cartigli - Modifica il tipo di cartiglio applicato alle singole tavole inserite nel modello Revit.
 1. Selezionare le tavole da modificare usando le checkbox;
@@ -42,11 +42,17 @@ from Autodesk.Revit.DB import (
     ViewSheet,
     Transaction,
     ElementId,
+    ParameterValueProvider,
+    FilterStringEquals,
+    FilterStringRule,
+    ElementParameterFilter,
 )
 from pyrevit import revit, forms
 
 doc   = revit.doc
 uidoc = revit.uidoc
+app   = doc.Application
+rvt_year = int(app.VersionNumber)
 
 # ==============================================================================
 #  Compatibilita Revit 2025 / 2026
@@ -100,14 +106,50 @@ def get_selected_sheets():
     return sorted(sheets, key=lambda s: s.SheetNumber) if sheets else []
 
 
-def get_titleblock_on_sheet(sheet):
-    collector = (
-        FilteredElementCollector(doc, sheet.Id)
+def build_sheet_tb_map():
+    """Raccoglie TUTTI i cartigli del progetto in una singola query e li mappa
+    per SheetNumber. Restituisce un dict {sheet_number: tb_instance}.
+    Questo e enormemente piu veloce rispetto a fare una query per ogni tavola."""
+    all_tbs = (
+        FilteredElementCollector(doc)
         .OfCategory(BuiltInCategory.OST_TitleBlocks)
         .WhereElementIsNotElementType()
+        .ToElements()
     )
-    tbs = list(collector)
-    return tbs[0] if tbs else None
+    tb_map = {}
+    for tb in all_tbs:
+        param = tb.get_Parameter(BuiltInParameter.SHEET_NUMBER)
+        if param:
+            sheet_num = param.AsString()
+            if sheet_num:
+                # Prende il primo cartiglio trovato per ogni tavola
+                if sheet_num not in tb_map:
+                    tb_map[sheet_num] = tb
+    return tb_map
+
+
+def get_titleblocks_from_sheet(sheet):
+    """Metodo di fallback: recupera i cartigli di una singola tavola usando
+    ParameterValueProvider + FilterStringRule (compatibile Revit 2021-2026)."""
+    rule_value         = sheet.SheetNumber
+    param_sheet_number = ElementId(BuiltInParameter.SHEET_NUMBER)
+    f_pvp              = ParameterValueProvider(param_sheet_number)
+    evaluator          = FilterStringEquals()
+
+    if rvt_year < 2022:
+        f_rule = FilterStringRule(f_pvp, evaluator, rule_value, True)
+    else:
+        f_rule = FilterStringRule(f_pvp, evaluator, rule_value)
+
+    tb_filter = ElementParameterFilter(f_rule)
+    tbs = (
+        FilteredElementCollector(doc)
+        .OfCategory(BuiltInCategory.OST_TitleBlocks)
+        .WhereElementIsNotElementType()
+        .WherePasses(tb_filter)
+        .ToElements()
+    )
+    return list(tbs)
 
 
 def get_all_titleblock_types():
@@ -197,6 +239,7 @@ class TitleBlockManagerWindow(Window):
 
         self.tb_types      = get_all_titleblock_types()
         self.tb_type_names = sorted(self.tb_types.keys())
+        self.tb_map        = build_sheet_tb_map()  # {sheet_number: tb_instance}
         self.sheet_map     = {}
         self.combo_map     = {}
 
@@ -406,7 +449,8 @@ class TitleBlockManagerWindow(Window):
         self.stack_sheets.Children.Clear()
         self.sheet_map.clear()
         for sheet in self.all_sheets:
-            tb = get_titleblock_on_sheet(sheet)
+            # Lookup veloce dal dizionario (nessuna query aggiuntiva)
+            tb = self.tb_map.get(sheet.SheetNumber, None)
             tb_name = titleblock_display_name(tb)
             label = "{} - {}   [{}]".format(
                 sheet.SheetNumber, sheet.Name, tb_name
