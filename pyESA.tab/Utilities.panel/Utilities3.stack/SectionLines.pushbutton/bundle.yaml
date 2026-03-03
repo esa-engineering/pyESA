@@ -1,0 +1,11 @@
+title:
+  Sections
+
+  from Lines
+
+tooltip:
+  Creates Section Views perpendicular to selected model lines.
+  
+  Pick a reference point to define the viewing direction
+
+author: Antonio Miano
