@@ -449,7 +449,13 @@ def process_filter(view_template, filter_id, filter_name, settings):
         # Applica colore in base alla direzione
         if settings["direction"] == "line_to_surface":
             # Linea -> Superficie
-            if settings["surface_pattern_id"]:
+            if settings["surface_pattern_id"] == DB.ElementId.InvalidElementId:
+                # <No Pattern>: rimuovi pattern ma applica comunque il colore
+                new_overrides.SetSurfaceForegroundPatternId(DB.ElementId.InvalidElementId)
+                new_overrides.SetSurfaceForegroundPatternColor(source_color)
+                new_overrides.SetCutForegroundPatternId(DB.ElementId.InvalidElementId)
+                new_overrides.SetCutForegroundPatternColor(source_color)
+            elif settings["surface_pattern_id"]:
                 new_overrides.SetSurfaceForegroundPatternId(settings["surface_pattern_id"])
                 new_overrides.SetSurfaceForegroundPatternColor(source_color)
                 new_overrides.SetCutForegroundPatternId(settings["surface_pattern_id"])
@@ -652,19 +658,27 @@ def get_user_settings(loaded_preset=None):
             pattern_names.remove(solid_pattern_name)
             pattern_names.insert(0, solid_pattern_name + " (Solido)")
             patterns_dict[solid_pattern_name + " (Solido)"] = patterns_dict.pop(solid_pattern_name)
-        
+
+        # Aggiungi opzione <No Pattern> in cima alla lista
+        no_pattern_label = "<No Pattern>"
+        pattern_names.insert(0, no_pattern_label)
+
         selected_pattern_name = forms.SelectFromList.show(
             pattern_names,
             title="Seleziona Pattern Superficie",
             button_name="Continua",
             multiselect=False
         )
-        
+
         if not selected_pattern_name:
             return None
-        
-        settings["surface_pattern_id"] = patterns_dict[selected_pattern_name]
-        settings["surface_pattern_name"] = selected_pattern_name
+
+        if selected_pattern_name == no_pattern_label:
+            settings["surface_pattern_id"] = DB.ElementId.InvalidElementId
+            settings["surface_pattern_name"] = no_pattern_label
+        else:
+            settings["surface_pattern_id"] = patterns_dict[selected_pattern_name]
+            settings["surface_pattern_name"] = selected_pattern_name
         
         # 7a. Opzioni colore linea
         line_color_options = [
