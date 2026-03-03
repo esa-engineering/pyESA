@@ -33,82 +33,28 @@ offset = 0.02 #scale percentage
 ##Select linked elements
 bboxes = []
 if __shiftclick__:
-	search_mode = forms.CommandSwitchWindow.show(
-		['ID', 'GUID'],
-		message='Find linked element by:'
-	)
-	if not search_mode:
+	with forms.WarningBar(title='Select RVT Link'):
+		try:
+			link_inst = revit.pick_element_by_category(BIC.OST_RvtLinks,message='Select RVT Link')
+		except:
+			script.exit()
+	if link_inst:
+		form_text = TextInput(title='Linked Elements\' ID(s)',description='Use \';\' as separator (eg: 111;222;...)')
+	else:
 		script.exit()
-
-	if search_mode == 'ID':
-		with forms.WarningBar(title='Select RVT Link'):
-			try:
-				link_inst = revit.pick_element_by_category(BIC.OST_RvtLinks,message='Select RVT Link')
-			except:
-				script.exit()
-		if link_inst:
-			form_text = TextInput(title='Linked Elements\' ID(s)',description='Use \';\' as separator (eg: 111;222;...)')
-		else:
-			script.exit()
-		if len(form_text)>0:
-			link_inst_transform = link_inst.GetTotalTransform()
-			link_doc = link_inst.GetLinkDocument()
-			form_text_ids = form_text.replace('; ',';').replace(' ;',';').split(';')
-			link_elem_ids = []
-			for fti in form_text_ids:
-				try:	link_elem_ids.append(int(fti))
-				except:	pass
-			if len(link_elem_ids)>0:
-				for lei in link_elem_ids:
-					link_elem = link_doc.GetElement(DB.ElementId(lei))
-					try:
-						link_elem_geom = link_elem.get_Geometry(DB.Options()).GetTransformed(link_inst_transform)
-						bb = link_elem_geom.GetBoundingBox()
-						link_elem_geom.Dispose()
-						bboxes.append(bb)
-					except:
-						script.exit()
-			else:
-				script.exit()
-
-	elif search_mode == 'GUID':
-		form_text = TextInput(title='IfcGUID(s)',description='Use \';\' as separator (eg: abc-123;def-456;...)')
-		if not form_text or len(form_text) == 0:
-			script.exit()
-		form_text_guids = form_text.replace('; ',';').replace(' ;',';').split(';')
-		link_guids = [g.strip() for g in form_text_guids if g.strip()]
-		if len(link_guids)>0:
-			try:
-				IFC_GUID_BIP = DB.BuiltInParameter.IFC_GUID
-				has_bip_ifc_guid = True
-			except AttributeError:
-				has_bip_ifc_guid = False
-			docs_transforms = [(doc, DB.Transform.Identity)] + [
-				(li.GetLinkDocument(), li.GetTotalTransform())
-				for li in DB.FilteredElementCollector(doc).OfClass(DB.RevitLinkInstance).ToElements()
-				if li.GetLinkDocument() is not None
-			]
-			for guid in link_guids:
-				found_elem = None
-				found_transform = None
-				for search_doc, search_transform in docs_transforms:
-					for elem in DB.FilteredElementCollector(search_doc).WhereElementIsNotElementType():
-						try:
-							param = None
-							if has_bip_ifc_guid:
-								param = elem.get_Parameter(IFC_GUID_BIP)
-							if param is None:
-								param = elem.LookupParameter('IfcGUID')
-							if param is not None and param.AsString() == guid:
-								found_elem = elem
-								found_transform = search_transform
-								break
-						except:
-							pass
-					if found_elem is not None:
-						break
+	if len(form_text)>0:
+		link_inst_transform = link_inst.GetTotalTransform()
+		link_doc = link_inst.GetLinkDocument()
+		form_text_ids = form_text.replace('; ',';').replace(' ;',';').split(';')
+		link_elem_ids = []
+		for fti in form_text_ids:
+			try:	link_elem_ids.append(int(fti))
+			except:	pass
+		if len(link_elem_ids)>0:
+			for lei in link_elem_ids:
+				link_elem = link_doc.GetElement(DB.ElementId(lei))
 				try:
-					link_elem_geom = found_elem.get_Geometry(DB.Options()).GetTransformed(found_transform)
+					link_elem_geom = link_elem.get_Geometry(DB.Options()).GetTransformed(link_inst_transform)
 					bb = link_elem_geom.GetBoundingBox()
 					link_elem_geom.Dispose()
 					bboxes.append(bb)
