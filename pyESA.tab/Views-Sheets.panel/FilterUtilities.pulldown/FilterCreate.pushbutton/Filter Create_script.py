@@ -33,6 +33,15 @@ doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
 app = __revit__.Application
 
+# ---------------------------------------------------------------------------
+# Compatibilita ElementId: Revit <= 2025 usa .IntegerValue, Revit >= 2026 usa .Value
+# ---------------------------------------------------------------------------
+def get_element_id_value(eid):
+    """Restituisce il valore numerico di un ElementId, compatibile con tutte le versioni."""
+    if hasattr(eid, "Value"):
+        return eid.Value          # Revit 2026+
+    return eid.IntegerValue       # Revit <= 2025
+
 # Funzione per ottenere tutti i parametri di progetto disponibili
 def ottieni_parametri_progetto():
     parametri = {}
@@ -108,30 +117,68 @@ def trova_parametro_id(nome_parametro, categoria_id, e_parametro_tipo):
     
     return None
 
+# ---------------------------------------------------------------------------
+# Rilevamento versione Revit per gestire le differenze API
+# ---------------------------------------------------------------------------
+_revit_year = int(app.VersionNumber)
+
+
 # Funzione per creare la regola del filtro in base al tipo selezionato
 def crea_regola_filtro(param_id, valore, tipo_regola):
-    # Crea la regola appropriata in base al tipo selezionato
-    if tipo_regola == "Equals":
-        return ParameterFilterRuleFactory.CreateEqualsRule(param_id, valore, True)
-    elif tipo_regola == "Not Equals":
-        return ParameterFilterRuleFactory.CreateNotEqualsRule(param_id, valore, True)
-    elif tipo_regola == "Greater":
-        return ParameterFilterRuleFactory.CreateGreaterRule(param_id, valore)
-    elif tipo_regola == "Greater or Equal":
-        return ParameterFilterRuleFactory.CreateGreaterOrEqualRule(param_id, valore)
-    elif tipo_regola == "Less":
-        return ParameterFilterRuleFactory.CreateLessRule(param_id, valore)
-    elif tipo_regola == "Less or Equal":
-        return ParameterFilterRuleFactory.CreateLessOrEqualRule(param_id, valore)
-    elif tipo_regola == "Contains":
-        return ParameterFilterRuleFactory.CreateContainsRule(param_id, valore, True)
-    elif tipo_regola == "Begins With":
-        return ParameterFilterRuleFactory.CreateBeginsWithRule(param_id, valore, True)
-    elif tipo_regola == "Ends With":
-        return ParameterFilterRuleFactory.CreateEndsWithRule(param_id, valore, True)
+    """Crea una FilterRule compatibile con Revit 2020-2025 e Revit 2026+."""
+
+    if _revit_year < 2026:
+        # ----- Revit <= 2025: usa la factory classica -----
+        if tipo_regola == "Equals":
+            return ParameterFilterRuleFactory.CreateEqualsRule(param_id, valore, True)
+        elif tipo_regola == "Not Equals":
+            return ParameterFilterRuleFactory.CreateNotEqualsRule(param_id, valore, True)
+        elif tipo_regola == "Greater":
+            return ParameterFilterRuleFactory.CreateGreaterRule(param_id, valore)
+        elif tipo_regola == "Greater or Equal":
+            return ParameterFilterRuleFactory.CreateGreaterOrEqualRule(param_id, valore)
+        elif tipo_regola == "Less":
+            return ParameterFilterRuleFactory.CreateLessRule(param_id, valore)
+        elif tipo_regola == "Less or Equal":
+            return ParameterFilterRuleFactory.CreateLessOrEqualRule(param_id, valore)
+        elif tipo_regola == "Contains":
+            return ParameterFilterRuleFactory.CreateContainsRule(param_id, valore, True)
+        elif tipo_regola == "Begins With":
+            return ParameterFilterRuleFactory.CreateBeginsWithRule(param_id, valore, True)
+        elif tipo_regola == "Ends With":
+            return ParameterFilterRuleFactory.CreateEndsWithRule(param_id, valore, True)
+        else:
+            return ParameterFilterRuleFactory.CreateEqualsRule(param_id, valore, True)
     else:
-        # Default a Equals
-        return ParameterFilterRuleFactory.CreateEqualsRule(param_id, valore, True)
+        # ----- Revit 2026+: costruisci FilterStringRule direttamente -----
+        # In Revit 2026+ pythonnet non riesce a risolvere gli overload della
+        # factory quando il valore e una stringa Python. Usiamo quindi il
+        # costruttore FilterStringRule(ParameterValueProvider, evaluator, value)
+        # che non ha ambiguita di overload.
+        provider = ParameterValueProvider(param_id)
+
+        evaluator_map = {
+            "Equals":           FilterStringEquals(),
+            "Not Equals":       FilterStringEquals(),       # invertito dopo
+            "Greater":          FilterStringGreater(),
+            "Greater or Equal": FilterStringGreaterOrEqual(),
+            "Less":             FilterStringLess(),
+            "Less or Equal":    FilterStringLessOrEqual(),
+            "Contains":         FilterStringContains(),
+            "Begins With":      FilterStringBeginsWith(),
+            "Ends With":        FilterStringEndsWith(),
+        }
+
+        evaluator = evaluator_map.get(tipo_regola, FilterStringEquals())
+
+        # FilterStringRule(provider, evaluator, ruleString) - Revit 2026+ non ha piu il 4o parametro caseSensitive
+        regola = FilterStringRule(provider, evaluator, valore)
+
+        # Per "Not Equals" avvolgiamo in FilterInverseRule
+        if tipo_regola == "Not Equals":
+            regola = FilterInverseRule(regola)
+
+        return regola
 
 # Funzione per creare filtri per un dato parametro
 def crea_filtri(nome_parametro, prefisso_filtro, valori, categorie_nomi, tipo_regola, e_parametro_tipo):
@@ -170,7 +217,7 @@ def crea_filtri(nome_parametro, prefisso_filtro, valori, categorie_nomi, tipo_re
                         break
                 
                 if categoria and categoria.AllowsBoundParameters:
-                    cat_id = ElementId(categoria.Id.IntegerValue)
+                    cat_id = categoria.Id
                     categorie_filtro.Add(cat_id)
                     
                     # Trova l'ID del parametro per questa categoria
