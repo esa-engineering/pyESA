@@ -12,15 +12,6 @@ from rpw.ui.forms import (TaskDialog, FlexForm, Label, ComboBox, TextBox, Separa
 
 doc = revit.doc
 
-# ---------------------------------------------------------------------------
-# Compatibilita ElementId: Revit <= 2025 usa .IntegerValue, Revit >= 2026 usa .Value
-# ---------------------------------------------------------------------------
-def get_element_id_value(eid):
-    """Restituisce il valore numerico di un ElementId, compatibile con tutte le versioni."""
-    if hasattr(eid, "Value"):
-        return eid.Value          # Revit 2026+
-    return eid.IntegerValue       # Revit <= 2025
-
 #DEFINITIONS
 ##Return the value of the parameter as a string
 def f_pValue_string(parameter):
@@ -52,11 +43,11 @@ def f_elem_pValue_string(elem,parName):
 					param = elemSysType.LookupParameter(parName)
 					if param != None:
 						elem_pValue = f_pValue_string(param)
-				except Exception as e1:
+				except Exception, e1:
 					elem_pValue = str(e1)
 			else:
 				elem_pValue = f_pValue_string(param)
-		except Exception as e2:
+		except Exception, e2:
 			elem_pValue = str(e2)
 	else:
 		elem_pValue = f_pValue_string(param)
@@ -71,7 +62,7 @@ def f_replaceNone(val):
 #CODE
 categories = doc.Settings.Categories
 cats_names = [cat.Name for cat in categories]
-bics_from_cats = [System.Enum.ToObject(DB.BuiltInCategory, get_element_id_value(cat.Id)) for cat in categories]
+bics_from_cats = [System.Enum.ToObject(DB.BuiltInCategory, cat.Id.IntegerValue) for cat in categories]
 cats_dic = dict(zip(cats_names,bics_from_cats))
 
 ##Create form for inputs
@@ -133,7 +124,7 @@ try:
 	temp_keys = range(len(elems_dic))
 	temp_keys = [str(tk).zfill(2)+'_Group' for tk in temp_keys]
 
-	for old_key,temp_key in zip(list(elems_dic.keys()),temp_keys):
+	for old_key,temp_key in zip(elems_dic.keys(),temp_keys):
 		elems_dic[temp_key] = elems_dic.pop(old_key)
 
 	n_elems = len(elems)
