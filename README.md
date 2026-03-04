@@ -35,6 +35,7 @@ Every change must be developed on a branch and merged via PR approved by the adm
 
 **Rule 3 — Branch naming**
 - `newfeature/<short-description>`
+- `upgrade/<short-description>`
 - `fix/<short-description>`
 - `docs/<short-description>`
 
