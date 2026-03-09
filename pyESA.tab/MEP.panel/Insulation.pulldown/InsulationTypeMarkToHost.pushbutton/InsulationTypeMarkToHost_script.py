@@ -21,6 +21,15 @@ doc = revit.doc
 uidoc = revit.uidoc
 output = script.get_output()
 
+# ---------------------------------------------------------------------------
+# Compatibilita ElementId: Revit <= 2025 usa .IntegerValue, Revit >= 2026 usa .Value
+# ---------------------------------------------------------------------------
+def get_element_id_value(eid):
+    """Restituisce il valore numerico di un ElementId, compatibile con tutte le versioni."""
+    if hasattr(eid, "Value"):
+        return eid.Value          # Revit 2026+
+    return eid.IntegerValue       # Revit <= 2025
+
 def get_all_pipes():
     """Ottiene tutte le tubazioni del modello"""
     return list(DB.FilteredElementCollector(doc)
@@ -40,7 +49,7 @@ def get_selected_pipes():
     selection = [doc.GetElement(id) for id in uidoc.Selection.GetElementIds()]
     pipes = []
     for elem in selection:
-        if elem and elem.Category and elem.Category.Id.IntegerValue == int(DB.BuiltInCategory.OST_PipeCurves):
+        if elem and elem.Category and get_element_id_value(elem.Category.Id) == int(DB.BuiltInCategory.OST_PipeCurves):
             pipes.append(elem)
     return pipes
 
@@ -49,7 +58,7 @@ def get_selected_ducts():
     selection = [doc.GetElement(id) for id in uidoc.Selection.GetElementIds()]
     ducts = []
     for elem in selection:
-        if elem and elem.Category and elem.Category.Id.IntegerValue == int(DB.BuiltInCategory.OST_DuctCurves):
+        if elem and elem.Category and get_element_id_value(elem.Category.Id) == int(DB.BuiltInCategory.OST_DuctCurves):
             ducts.append(elem)
     return ducts
 

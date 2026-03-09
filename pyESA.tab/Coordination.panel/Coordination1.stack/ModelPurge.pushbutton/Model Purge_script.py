@@ -23,6 +23,15 @@ doc = revit.doc
 uidoc = revit.uidoc
 output = script.get_output()
 
+# ---------------------------------------------------------------------------
+# Compatibilita ElementId: Revit <= 2025 usa .IntegerValue, Revit >= 2026 usa .Value
+# ---------------------------------------------------------------------------
+def get_element_id_value(eid):
+    """Restituisce il valore numerico di un ElementId, compatibile con tutte le versioni."""
+    if hasattr(eid, "Value"):
+        return eid.Value          # Revit 2026+
+    return eid.IntegerValue       # Revit <= 2025
+
 
 def get_sheets_with_views():
     """Restituisce un set con le viste contenute nelle tavole."""
@@ -60,7 +69,7 @@ def get_views_with_templates():
         template_id = view.ViewTemplateId
         
         # Se la vista ha un template assegnato
-        if not template_id.IntegerValue == -1:
+        if not get_element_id_value(template_id) == -1:
             if template_id not in template_dict:
                 template_dict[template_id] = []
             
