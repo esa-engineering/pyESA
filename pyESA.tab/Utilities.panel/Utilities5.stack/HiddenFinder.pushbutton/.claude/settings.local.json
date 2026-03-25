@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Read(///10.10.2.157/AreaTecnica/BIM/99_WIP/99_Test/149_pyrevit Test/pyTest.extension/pyTest.tab/Dev.panel/HideInView.pushbutton/Local/**)",
+      "Read(///10.10.2.157/AreaTecnica/BIM/99_WIP/99_Test/149_pyrevit Test/pyTest.extension/pyTest.tab/Dev.panel/HideInView.pushbutton/$LOCALAPPDATA/**)",
+      "Read(//c/Users/tommasol/AppData/Local/**)",
+      "Bash(find C:/Users/tommasol/AppData/Roaming/pyRevit/2025 -name *pyTest* -o -name *hideinview* -o -name *HideInView*)"
+    ]
+  }
+}
