@@ -1,0 +1,33 @@
+title: "Model Report"
+tooltip: >-
+  BIM Data Extractor - Estrae dati completi da uno o piu' modelli Revit
+  e genera file CSV pronti per l'analisi in Power BI.
+  
+  COME FUNZIONA:
+  1. Selezionare i file Revit (.rvt) da analizzare
+  2. Scegliere la cartella di destinazione per i CSV
+  N.B. La cartella radice selezionata deve contenere _Old e CurrentData
+  3. Definire la mappatura Disciplina (codice nel nome file -> descrizione)
+  4. (Opzionale) Inserire parametri aggiuntivi da esportare (digitazione libera)
+  5. (Opzionale) Definire regole di validazione con valori ammessi per parametro
+  6. Premere Avvia: lo script apre ogni file in detach con workset chiusi,
+     estrae i dati e genera i CSV nella sottocartella CurrentData
+
+  DATI ESTRATTI (CSV):
+  - TAB_Files, TAB_Links, TAB_Views, TAB_Sheets, TAB_Warnings
+  - TAB_Worksets, TAB_Levels, TAB_Grids, TAB_ScopeBoxes, TAB_Filters
+  - TAB_Families, TAB_Types, TAB_Instances, TAB_Materials
+  - TAB_Rooms, TAB_Spaces, TAB_Areas, TAB_Tags
+  - TAB_ViewTemplates, TAB_PurgeableElements, TAB_HealthChecks
+  - TAB_DataValidation (Families, Types, Instances)
+  - ColorLegend_FileName (palette colori per differenziare i modelli)
+
+  NOTE:
+  - I file vengono aperti in modalita' Detach (nessuna modifica al modello)
+  - Le impostazioni vengono salvate in un file JSON nella cartella di output
+  - I dati precedenti vengono archiviati automaticamente nella sottocartella _Old
+  - Il binding dei parametri (istanza/tipo) viene rilevato automaticamente
+author: "pyESA"
+
+# Permette l'esecuzione anche senza un documento aperto
+context: zero-doc

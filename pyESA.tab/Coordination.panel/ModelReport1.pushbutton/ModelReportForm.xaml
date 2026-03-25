@@ -1,0 +1,346 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="BIM Data Extractor - Configuration" 
+        Height="620" Width="600"
+        MinHeight="500" MinWidth="480"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="True">
+    
+    <Window.Resources>
+        <!-- Common Styles -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,10,0,5"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="PathTextBox" TargetType="TextBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="Background" Value="#F5F5F5"/>
+        </Style>
+        <Style x:Key="BrowseButton" TargetType="Button">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Margin" Value="5,2,0,2"/>
+            <Setter Property="Content" Value="..."/>
+            <Setter Property="ToolTip" Value="Sfoglia..."/>
+        </Style>
+    </Window.Resources>
+    
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Title -->
+        <TextBlock Grid.Row="0" 
+                   Text="🏗️ BIM Data Extractor" 
+                   FontSize="16" FontWeight="Bold" 
+                   Margin="0,0,0,10"
+                   HorizontalAlignment="Center"/>
+        
+        <!-- Main content with scroll -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,5,0">
+            <StackPanel Margin="0,0,10,0">
+                
+                <!-- SECTION 1: File Revit Selection -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📁 FILE REVIT" Style="{StaticResource SectionHeader}"/>
+                        
+                        <TextBlock Text="Seleziona i file Revit (.rvt) da analizzare:" 
+                                   Margin="0,0,0,5" FontSize="11" Foreground="Gray"/>
+                        
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="btn_select_files" Grid.Column="0"
+                                    Content="📂 Seleziona file Revit..." 
+                                    Height="28" Padding="10,3"
+                                    HorizontalAlignment="Stretch"/>
+                        </Grid>
+                        
+                        <!-- File list -->
+                        <ListBox x:Name="lst_files" 
+                                 MinHeight="60" Height="120"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 FontSize="11"
+                                 Margin="0,5,0,0"/>
+                        
+                        <!-- File count label -->
+                        <TextBlock x:Name="lbl_file_count" 
+                                   Text="Nessun file selezionato" 
+                                   FontSize="11" FontStyle="Italic" 
+                                   Foreground="Gray" Margin="0,3,0,0"/>
+                        
+                        <!-- Remove selected button -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                            <Button x:Name="btn_remove_file" Content="Rimuovi selezionato" 
+                                    Padding="10,3" Margin="0,0,5,0" FontSize="11"/>
+                            <Button x:Name="btn_clear_files" Content="Rimuovi tutti" 
+                                    Padding="10,3" FontSize="11"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION 2: Output Folder -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📂 CARTELLA DESTINAZIONE" Style="{StaticResource SectionHeader}"/>
+                        
+                        <TextBlock Text="Seleziona la cartella radice per i CSV (conterrà CurrentData e _Old):" 
+                                   Margin="0,0,0,5" FontSize="11" Foreground="Gray"/>
+                        
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="txt_output_folder" Grid.Column="0" 
+                                     Style="{StaticResource PathTextBox}"/>
+                            <Button x:Name="btn_browse_folder" Grid.Column="1" 
+                                    Style="{StaticResource BrowseButton}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION: Discipline Classification (initially hidden, shown after folder selection) -->
+                <Border x:Name="pnl_discipline_section" BorderBrush="#FF9800" BorderThickness="1.5" 
+                        CornerRadius="5" Padding="10" Margin="0,0,0,10"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="🏷️ CLASSIFICAZIONE DISCIPLINA" 
+                                   Style="{StaticResource SectionHeader}" Foreground="#FF9800"/>
+                        
+                        <!-- Sub-panel: discipline loaded from JSON (initially hidden) -->
+                        <StackPanel x:Name="pnl_discipline_loaded" Margin="0,5,0,5">
+                            <TextBlock Text="Mappatura discipline caricata dal setup:" 
+                                       FontSize="11" Foreground="#4CAF50" Margin="0,0,0,5"/>
+                            <ListBox x:Name="lst_discipline_loaded" MaxHeight="100" 
+                                     IsEnabled="False" FontSize="11"
+                                     BorderBrush="#E0E0E0" Background="#F5F5F5"/>
+                            <CheckBox x:Name="chk_modify_discipline" 
+                                      Content="Modifica mappatura discipline" 
+                                      IsChecked="False" Margin="0,5,0,0"/>
+                        </StackPanel>
+                        
+                        <!-- Sub-panel: discipline edit table (shown when no JSON or user wants to modify) -->
+                        <StackPanel x:Name="pnl_discipline_edit">
+                            <TextBlock Text="Definisci i codici disciplina da cercare nei nomi file/link:" 
+                                       Margin="0,0,0,5" FontSize="11" Foreground="Gray"/>
+                            
+                            <!-- Header row -->
+                            <Grid Margin="0,5,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="1.5*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="DisciplineCode" 
+                                           FontWeight="Bold" FontSize="11"/>
+                                <TextBlock Grid.Column="2" Text="DisciplineDesc" 
+                                           FontWeight="Bold" FontSize="11"/>
+                            </Grid>
+                            
+                            <!-- Dynamic rows container -->
+                            <StackPanel x:Name="pnl_discipline_rows" Margin="0,2,0,5"/>
+                            
+                            <!-- + / - buttons -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,3,0,0">
+                                <Button x:Name="btn_discipline_add" Content="＋" Width="30" Height="24" 
+                                        Margin="0,0,5,0" FontWeight="Bold" FontSize="13"
+                                        ToolTip="Aggiungi riga"/>
+                                <Button x:Name="btn_discipline_remove" Content="－" Width="30" Height="24" 
+                                        FontWeight="Bold" FontSize="13"
+                                        ToolTip="Rimuovi ultima riga"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION: Loaded JSON Setup (initially hidden) -->
+                <Border x:Name="pnl_json_setup" BorderBrush="#4CAF50" BorderThickness="1.5" 
+                        CornerRadius="5" Padding="10" Margin="0,0,0,10"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="📋 SETUP PARAMETRI SALVATO" 
+                                   Style="{StaticResource SectionHeader}" Foreground="#4CAF50"/>
+                        
+                        <TextBlock Text="Verranno esportati i seguenti parametri di progetto:" 
+                                   Margin="0,0,0,5" FontSize="11"/>
+                        
+                        <ListBox x:Name="lst_json_params" 
+                                 MinHeight="40" MaxHeight="120"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 FontSize="11" Margin="0,5,0,5"
+                                 IsEnabled="False"
+                                 Background="#F9FFF9"/>
+                        
+                        <CheckBox x:Name="chk_modify_setup" 
+                                  Content="Modifica setup parametri" 
+                                  IsChecked="False" Margin="0,5"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION 3: Additional Parameters (tabular, hidden if JSON has params) -->
+                <Border x:Name="pnl_params_section" BorderBrush="#CCCCCC" BorderThickness="1"
+                        CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="🔧 PARAMETRI AGGIUNTIVI" Style="{StaticResource SectionHeader}"/>
+
+                        <TextBlock Text="Inserisci i nomi dei parametri di progetto aggiuntivi da esportare:"
+                                   Margin="0,0,0,5" FontSize="11" Foreground="Gray"/>
+                        
+                        <!-- Header row -->
+                        <Grid Margin="0,5,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="30"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Parametro" 
+                                       FontWeight="Bold" FontSize="11"/>
+                        </Grid>
+                        
+                        <!-- Dynamic rows container -->
+                        <StackPanel x:Name="pnl_param_rows" Margin="0,2,0,5"/>
+                        
+                        <!-- Add button -->
+                        <Button x:Name="btn_param_add" Content="＋ Aggiungi parametro" 
+                                Height="26" Padding="10,3" HorizontalAlignment="Left"
+                                FontSize="11" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION 4: Validation Rules (user-defined allowed values) -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="✅ VALIDAZIONE PARAMETRI" Style="{StaticResource SectionHeader}"/>
+
+                        <!-- Pannello regole caricate dal JSON (inizialmente nascosto) -->
+                        <StackPanel x:Name="pnl_validation_json" Margin="0,5,0,5">
+                            <TextBlock Text="Regole di validazione caricate dal setup precedente:"
+                                       FontSize="11" Foreground="#4CAF50" Margin="0,0,0,5"/>
+                            <ListBox x:Name="lst_validation_loaded" MaxHeight="100"
+                                     IsEnabled="False" FontSize="11"
+                                     BorderBrush="#E0E0E0" Background="#F9FFF9"/>
+                            <CheckBox x:Name="chk_modify_validation"
+                                      Content="Modifica regole di validazione"
+                                      IsChecked="False" Margin="0,5,0,0"/>
+                        </StackPanel>
+
+                        <CheckBox x:Name="chk_validation"
+                                  Content="Definisci regole di validazione per parametri aggiuntivi"
+                                  IsChecked="False" Margin="0,5"/>
+
+                        <!-- Pannello tabella editabile (inizialmente nascosto) -->
+                        <StackPanel x:Name="pnl_validation_edit" Margin="20,5,0,0">
+                            <TextBlock Text="Per ogni parametro definisci i valori ammessi tramite il tasto ✎. Il binding (istanza/tipo) viene rilevato automaticamente."
+                                       Margin="0,0,0,5" FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+
+                            <!-- Header row -->
+                            <Grid Margin="0,5,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="1.4*"/>
+                                    <ColumnDefinition Width="30"/>
+                                    <ColumnDefinition Width="30"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Parametro"
+                                           FontWeight="Bold" FontSize="11"/>
+                                <TextBlock Grid.Column="2" Text="Valori Ammessi"
+                                           FontWeight="Bold" FontSize="11"/>
+                            </Grid>
+
+                            <!-- Dynamic rows container -->
+                            <StackPanel x:Name="pnl_validation_rows" Margin="0,2,0,5"/>
+
+                            <!-- Add button -->
+                            <Button x:Name="btn_validation_add" Content="＋ Aggiungi regola"
+                                    Height="26" Padding="10,3" HorizontalAlignment="Left"
+                                    FontSize="11" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION 5: Naming Convention Info (read-only) -->
+                <Border BorderBrush="#1976D2" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📏 NAMING CONVENTION (Validazione Automatica)" 
+                                   Style="{StaticResource SectionHeader}" Foreground="#1976D2"/>
+                        
+                        <TextBlock Text="Le seguenti regole di naming convention vengono applicate automaticamente su tutte le famiglie e tipi:" 
+                                   Margin="0,0,0,8" FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+                        
+                        <StackPanel Margin="5,0,0,0">
+                            <TextBlock FontSize="11" Margin="0,2" TextWrapping="Wrap">
+                                <Run FontWeight="Bold" Text="FamilyName: "/>
+                                <Run Text="deve iniziare con "/>
+                                <Run FontWeight="Bold" Foreground="#D32F2F" Text="e_"/>
+                                <Run Text=", seguito da codice maiuscolo (punti come separatore), underscore e nome descrittivo"/>
+                            </TextBlock>
+                            <TextBlock FontSize="10" Foreground="#666" Margin="15,0,0,4" FontStyle="Italic"
+                                       Text="Esempio: e_STR.FND_Fondazione Platea"/>
+                            
+                            <TextBlock FontSize="11" Margin="0,2" TextWrapping="Wrap">
+                                <Run FontWeight="Bold" Text="Type Mark: "/>
+                                <Run Text="codice maiuscolo (punti come separatore), suffisso opzionale minuscolo e numero da 1 a 3 cifre"/>
+                            </TextBlock>
+                            <TextBlock FontSize="10" Foreground="#666" Margin="15,0,0,4" FontStyle="Italic"
+                                       Text="Esempio: STR.FND.a01"/>
+                            
+                            <TextBlock FontSize="11" Margin="0,2" TextWrapping="Wrap">
+                                <Run FontWeight="Bold" Text="Type Name: "/>
+                                <Run Text="deve iniziare con il valore del Type Mark, seguito da "/>
+                                <Run FontWeight="Bold" Foreground="#D32F2F" Text=" - "/>
+                                <Run Text="e un nome descrittivo alfanumerico"/>
+                            </TextBlock>
+                            <TextBlock FontSize="10" Foreground="#666" Margin="15,0,0,4" FontStyle="Italic"
+                                       Text="Esempio: STR.FND.a01 - Platea H30"/>
+                        </StackPanel>
+                        
+                        <TextBlock Text="Risultati in: TAB_DataValidation_Families (FamilyName) e TAB_DataValidation_Types (Type Mark, Type Name)" 
+                                   FontSize="10" FontStyle="Italic" Foreground="#999" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- SECTION: Info summary -->
+                <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1" 
+                        CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="ℹ️ INFORMAZIONI" 
+                                   Style="{StaticResource SectionHeader}" Foreground="Gray"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                            <Run Text="Lo script elaborerà i file selezionati e genererà i CSV nella sottocartella CurrentData."/>
+                            <LineBreak/>
+                            <Run Text="I dati precedenti verranno archiviati automaticamente in _Old."/>
+                            <LineBreak/>
+                            <Run Text="I file verranno aperti con workset chiusi per velocizzare il processo."/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button x:Name="btn_cancel" Content="Annulla" Width="100" Height="30" 
+                    Margin="0,0,10,0"/>
+            <Button x:Name="btn_run" Content="▶ Avvia" Width="120" Height="30" 
+                    IsDefault="True"
+                    Background="#2D5A8A" Foreground="White" FontWeight="Bold"/>
+        </StackPanel>
+    </Grid>
+</Window>
