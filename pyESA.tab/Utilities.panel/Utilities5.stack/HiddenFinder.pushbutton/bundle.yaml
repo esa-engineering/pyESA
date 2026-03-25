@@ -1,0 +1,26 @@
+title: 
+  Hidden
+
+  Finder
+
+tooltip: >-
+  Mostra tutti gli elementi nascosti manualmente nella vista corrente
+  tramite "Hide in View > Elements" e permette di gestirli.
+
+  COME FUNZIONA:
+  1. Attivare una vista grafica (pianta, sezione, 3D, ecc.)
+  2. Premere il pulsante: lo script analizza la vista e individua
+     gli elementi nascosti per-elemento (esclude quelli nascosti
+     per categoria o tramite filtri)
+  3. Se trovati, attiva automaticamente la modalita'
+     "Reveal Hidden Elements" per visualizzarli
+  4. L'interfaccia mostra l'elenco con Categoria, Famiglia, Tipo e ID
+  5. Selezionando una o piu' righe (Ctrl+Click / Shift+Click)
+     gli elementi corrispondenti vengono selezionati nel modello
+  6. Il pulsante "Unhide Selected" rimuove il nascondi dalla vista
+     per gli elementi selezionati
+  7. Alla chiusura la modalita' "Reveal Hidden Elements"
+     viene disattivata automaticamente
+author: "pyESA"
+
+context: zero-doc
