@@ -1,0 +1,6 @@
+title: "DWG Manage"
+tooltip: >-
+  Gestione DWG Importati - Elenca tutti i DWG importati nel modello
+  con dettagli su workset, livello, offset e creatore.
+  Permette la selezione e l'eliminazione multipla dei DWG.
+author: "pyESA"
