@@ -27,6 +27,14 @@ doc = uidoc.Document
 active_view = doc.ActiveView
 
 
+def get_id_value(eid):
+    """Return the integer value of an ElementId (works in Revit 2022-2026+)."""
+    try:
+        return eid.Value
+    except AttributeError:
+        return eid.IntegerValue
+
+
 def get_element_info(elem):
     """Return (category, family, type) strings for an element."""
     cat_name = "Unknown"
@@ -86,7 +94,7 @@ def collect_hidden_elements():
                 continue
 
             cat_name, family_name, type_name = get_element_info(elem)
-            id_str = str(elem.Id.IntegerValue)
+            id_str = str(get_id_value(elem.Id))
 
             d = Dictionary[str, object]()
             d["Category"] = cat_name
