@@ -199,8 +199,8 @@ class HiddenElementsForm(Window):
                 self.lst_elements.Items.Add(item)
 
             count = len(self._hidden_items)
-            self.lbl_count.Text = "Elementi nascosti: {0}".format(count)
-            self.lbl_view_name.Text = "Vista corrente: {0}".format(
+            self.lbl_count.Text = "Hidden Elements: {0}".format(count)
+            self.lbl_view_name.Text = "Current View: {0}".format(
                 active_view.Name
             )
         finally:
