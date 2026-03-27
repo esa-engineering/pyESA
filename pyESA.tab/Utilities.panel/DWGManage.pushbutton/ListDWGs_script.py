@@ -116,7 +116,7 @@ def collect_dwg_rows():
 
 
 class DwgManagerForm(Window):
-    """WPF window for managing imported DWGs."""
+    """Modal WPF window for managing imported DWGs."""
 
     def __init__(self):
         self._collection = ObservableCollection[object]()
@@ -152,14 +152,13 @@ class DwgManagerForm(Window):
         # Populate data
         self._load_data()
 
-        # Bind
+        # Bind events
         self.dg_dwgs.ItemsSource = self._collection
         self.dg_dwgs.SelectionChanged += self._on_selection_changed
         self.btn_delete.Click += self._on_delete_click
         self.btn_close.Click += self._on_close_click
 
     def _load_data(self):
-        """Load DWG data into the ObservableCollection."""
         rows = collect_dwg_rows()
         self._collection.Clear()
         for row in rows:
@@ -167,9 +166,9 @@ class DwgManagerForm(Window):
 
         count = len(rows)
         if count == 0:
-            self.lbl_status.Text = "Nessun DWG importato trovato nel modello"
+            self.lbl_status.Text = "No imported DWGs found in the model"
         else:
-            self.lbl_status.Text = "Trovati {} DWG importati".format(count)
+            self.lbl_status.Text = "Found {} imported DWG(s)".format(count)
 
     def _on_selection_changed(self, sender, args):
         """Sync DataGrid selection to Revit selection."""
@@ -195,14 +194,11 @@ class DwgManagerForm(Window):
 
         count = len(selected_items)
         result = MessageBox.Show(
-            "Eliminare {} DWG selezionat{}?\n\n"
-            "Questa operazione non puo' essere annullata.".format(
-                count, "o" if count == 1 else "i"
-            ),
-            "Conferma eliminazione",
+            "Delete {} selected DWG(s)?\n\n"
+            "This operation cannot be undone.".format(count),
+            "Confirm deletion",
             MessageBoxButton.YesNo
         )
-
         if result != MessageBoxResult.Yes:
             return
 
@@ -210,7 +206,7 @@ class DwgManagerForm(Window):
             ElementId(int(row.ElementId)) for row in selected_items
         ]
 
-        t = Transaction(doc, "Elimina DWG importati")
+        t = Transaction(doc, "Delete imported DWGs")
         t.Start()
         try:
             for eid in ids_to_delete:
@@ -220,8 +216,8 @@ class DwgManagerForm(Window):
             if t.HasStarted():
                 t.RollBack()
             MessageBox.Show(
-                "Errore durante l'eliminazione:\n{}".format(ex),
-                "Errore"
+                "Error during deletion:\n{}".format(ex),
+                "Error"
             )
             return
 
@@ -230,7 +226,7 @@ class DwgManagerForm(Window):
             self._collection.Remove(row)
 
         remaining = self._collection.Count
-        self.lbl_status.Text = "Eliminati {} DWG. Rimangono {} DWG importati".format(
+        self.lbl_status.Text = "Deleted {} DWG(s). {} imported DWG(s) remaining".format(
             count, remaining
         )
 
@@ -241,9 +237,9 @@ class DwgManagerForm(Window):
 # --- Entry point ---
 try:
     if doc is None:
-        TaskDialog.Show("DWG Manage", "Nessun documento aperto.")
+        TaskDialog.Show("DWG Manage", "No document is open.")
     else:
         form = DwgManagerForm()
         form.ShowDialog()
 except Exception as ex:
-    TaskDialog.Show("DWG Manage - Errore", str(ex))
+    TaskDialog.Show("DWG Manage - Error", str(ex))
