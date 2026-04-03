@@ -1898,7 +1898,7 @@ def compute_health_checks(file_info):
     
     # HC09 — Views without naming chapter (max 3pt)
     v = _int('Views_VC(N)')
-    _add_binary('HC09', 'Views without "e_IDA_ViewChapter"', v, v == 0, 3)
+    _add_binary('HC09', 'Views without "u_OTH_ViewChapter1"', v, v == 0, 3)
     
     # HC10 — Views not on sheet (max 5pt, 5 fasce)
     v = _int('Views_OnSheet(N)')
@@ -1917,7 +1917,7 @@ def compute_health_checks(file_info):
     
     # HC11 — Sheets without naming chapter (max 3pt)
     v = _int('Sheets_VC1(N)')
-    _add_binary('HC11', 'Sheets without e_IDA_ViewChapter1', v, v == 0, 3)
+    _add_binary('HC11', 'Sheets without u_OTH_ViewChapter1', v, v == 0, 3)
     
     # HC12 — View Template with unproper name (max 4pt)
     v = _int('ViewTemplates_CompliantName(N)')
