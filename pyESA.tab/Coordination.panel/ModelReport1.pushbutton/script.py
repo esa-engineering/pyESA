@@ -210,8 +210,8 @@ class CSVWriter:
         'TAB_Materials': ['MaterialKey', 'MaterialID', 'FileName', 'MaterialName', 'MaterialClass', 'MaterialCategory', 
                           'MaterialDescription', 'MaterialComments', 'MaterialKeywords', 
                           'MaterialManufacturer', 'MaterialModel', 'MaterialAssetName', 'IsUsed'],
-        'TAB_Levels': ['LevelKey', 'LevelID', 'FileName', 'LevelName', 'LevelType', 'LevelOffset', 'IsMonitor', 
-                       'MonitorFileName', 'MonitorLevel', 'IsPinned', 'ScopeBox', 'Workset'],
+        'TAB_Levels': ['LevelKey', 'LevelID', 'FileName', 'LevelName', 'LevelType', 'LevelOffset', 'IsMonitor',
+                       'MonitorFileName', 'MonitorLevel', 'IsPinned', 'ScopeBox', 'WorksetKey'],
         'TAB_ScopeBoxes': ['ScopeBoxKey', 'ScopeBoxID', 'FileName', 'ScopeBoxName', 'Workset', 'IsPinned'],
         'TAB_Grids': ['GridKey', 'GridID', 'FileName', 'GridName', 'GridType', 'IsPinned', 'IsMonitored', 
                       'MonitorFileName', 'MonitorGrid', 'ScopeBox', 'Workset'],
@@ -230,7 +230,7 @@ class CSVWriter:
                         ],
         'TAB_Instances': [
                         'ElementKey', 'ElementID', 'FileName', 'TypeKey',
-                        'WorksetKey', 'WorksetName', 'PhaseCreation', 'PhaseDemolished',
+                        'WorksetKey', 'PhaseCreation', 'PhaseDemolished',
                         'Export to IFC As', 'IFC Predefined Type',
                         'ClassificationCode', 'ClassificationCode(2)', 'ClassificationCode(3)',
                         ],
@@ -3506,19 +3506,17 @@ def extract_levels(processor):
                 except:
                     scope_box_name = ""
                 
-                # Workset del livello (solo se workshared)
-                workset_name = ""
+                # WorksetKey del livello (solo se workshared)
+                workset_key = ""
                 if processor.is_workshared:
                     try:
                         ws_param = level.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM)
                         if ws_param and ws_param.HasValue:
                             ws_id = ws_param.AsInteger()
-                            workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(ws_id))
-                            if workset:
-                                workset_name = workset.Name
+                            workset_key = "{} : {}".format(processor.file_name, ws_id)
                     except:
-                        workset_name = ""
-                
+                        workset_key = ""
+
                 levels.append({
                     'LevelKey': "{} : {}".format(processor.file_name, level_id),
                     'LevelID': level_id,
@@ -3531,7 +3529,7 @@ def extract_levels(processor):
                     'MonitorLevel': monitor_level_name,
                     'IsPinned': is_pinned,
                     'ScopeBox': scope_box_name,
-                    'Workset': workset_name
+                    'WorksetKey': workset_key
                 })
                 
             except Exception as e:
@@ -4863,7 +4861,6 @@ def extract_families_types_instances(processor, custom_instance_params=None, cus
                             'FileName': processor.file_name,
                             'TypeKey': type_key_ref,
                             'WorksetKey': workset_key,
-                            'WorksetName': workset_name,
                             'PhaseCreation': phase_creation,
                             'PhaseDemolished': phase_demolished,
                             'Export to IFC As': ifc_export_as,
