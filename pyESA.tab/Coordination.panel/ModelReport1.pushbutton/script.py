@@ -101,6 +101,23 @@ EXTRACTION_DATE = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 # ==============================================================================
+# COMPATIBILITY HELPERS
+# ==============================================================================
+
+def get_id(eid):
+    """Return the integer value of an ElementId.
+
+    Revit 2024 deprecated IntegerValue (Int32) in favour of Value (Int64).
+    Revit 2026 removed IntegerValue entirely.
+    This helper works across all versions.
+    """
+    try:
+        return eid.Value          # Revit 2024+
+    except AttributeError:
+        return eid.IntegerValue   # Revit <= 2023
+
+
+# ==============================================================================
 # CLASSI HELPER
 # ==============================================================================
 
@@ -210,8 +227,8 @@ class CSVWriter:
         'TAB_Materials': ['MaterialKey', 'MaterialID', 'FileName', 'MaterialName', 'MaterialClass', 'MaterialCategory', 
                           'MaterialDescription', 'MaterialComments', 'MaterialKeywords', 
                           'MaterialManufacturer', 'MaterialModel', 'MaterialAssetName', 'IsUsed'],
-        'TAB_Levels': ['LevelKey', 'LevelID', 'FileName', 'LevelName', 'LevelType', 'LevelOffset', 'IsMonitor', 
-                       'MonitorFileName', 'MonitorLevel', 'IsPinned', 'ScopeBox', 'Workset'],
+        'TAB_Levels': ['LevelKey', 'LevelID', 'FileName', 'LevelName', 'LevelType', 'LevelOffset', 'IsMonitor',
+                       'MonitorFileName', 'MonitorLevel', 'IsPinned', 'ScopeBox', 'WorksetKey'],
         'TAB_ScopeBoxes': ['ScopeBoxKey', 'ScopeBoxID', 'FileName', 'ScopeBoxName', 'Workset', 'IsPinned'],
         'TAB_Grids': ['GridKey', 'GridID', 'FileName', 'GridName', 'GridType', 'IsPinned', 'IsMonitored', 
                       'MonitorFileName', 'MonitorGrid', 'ScopeBox', 'Workset'],
@@ -230,7 +247,7 @@ class CSVWriter:
                         ],
         'TAB_Instances': [
                         'ElementKey', 'ElementID', 'FileName', 'TypeKey',
-                        'WorksetKey', 'WorksetName', 'PhaseCreation', 'PhaseDemolished',
+                        'WorksetKey', 'PhaseCreation', 'PhaseDemolished',
                         'Export to IFC As', 'IFC Predefined Type',
                         'ClassificationCode', 'ClassificationCode(2)', 'ClassificationCode(3)',
                         ],
@@ -2209,7 +2226,7 @@ def extract_links(processor):
                     ws_param = link_instance.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM)
                     if ws_param and ws_param.HasValue:
                         ws_id = ws_param.AsInteger()
-                        workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(ws_id))
+                        workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(int(ws_id)))
                         if workset:
                             instance_workset = workset.Name
                 except:
@@ -2222,7 +2239,7 @@ def extract_links(processor):
                     ws_param = link_type.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM)
                     if ws_param and ws_param.HasValue:
                         ws_id = ws_param.AsInteger()
-                        workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(ws_id))
+                        workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(int(ws_id)))
                         if workset:
                             type_workset = workset.Name
                 except:
@@ -2286,8 +2303,8 @@ def extract_links(processor):
             last_saved_date = _get_file_last_modified_date(link_path)
             
             links.append({
-                'LinkKey': "{} : {}".format(processor.file_name, link_instance.Id.IntegerValue),
-                'LinkID': link_instance.Id.IntegerValue,
+                'LinkKey': "{} : {}".format(processor.file_name, get_id(link_instance.Id)),
+                'LinkID': get_id(link_instance.Id),
                 'FileName': processor.file_name,
                 'LinkName': link_file_name,
                 'LinkDiscipline': '',  # Compilata dopo, nel main, con _resolve_discipline
@@ -2365,7 +2382,7 @@ def extract_links(processor):
                         ws_param = cad_instance.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM)
                         if ws_param and ws_param.HasValue:
                             ws_id = ws_param.AsInteger()
-                            workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(ws_id))
+                            workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(int(ws_id)))
                             if workset:
                                 instance_workset = workset.Name
                     except:
@@ -2378,7 +2395,7 @@ def extract_links(processor):
                         ws_param = cad_type.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM)
                         if ws_param and ws_param.HasValue:
                             ws_id = ws_param.AsInteger()
-                            workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(ws_id))
+                            workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(int(ws_id)))
                             if workset:
                                 type_workset = workset.Name
                     except:
@@ -2388,8 +2405,8 @@ def extract_links(processor):
                 last_saved_date = _get_file_last_modified_date(link_path)
                 
                 links.append({
-                    'LinkKey': "{} : {}".format(processor.file_name, cad_instance.Id.IntegerValue),
-                    'LinkID': cad_instance.Id.IntegerValue,
+                    'LinkKey': "{} : {}".format(processor.file_name, get_id(cad_instance.Id)),
+                    'LinkID': get_id(cad_instance.Id),
                     'FileName': processor.file_name,
                     'LinkName': cad_file_name,
                     'LinkDiscipline': '',  # Compilata dopo, nel main, con _resolve_discipline
@@ -2438,7 +2455,7 @@ def extract_views(processor):
             if template_id and template_id != ElementId.InvalidElementId:
                 template = doc.GetElement(template_id)
                 template_name = template.Name if template else "None"
-                template_id_str = template_id.IntegerValue
+                template_id_str = get_id(template_id)
             else:
                 template_name = "None"
                 template_id_str = "None"
@@ -2551,9 +2568,9 @@ def extract_views(processor):
                     hidden_count = "ND"
 
             views.append({
-                'ViewID': view.Id.IntegerValue,
+                'ViewID': get_id(view.Id),
                 'FileName': processor.file_name,
-                'ViewKey': "{} : {}".format(processor.file_name, view.Id.IntegerValue),
+                'ViewKey': "{} : {}".format(processor.file_name, get_id(view.Id)),
                 'ViewName': view.Name,
                 'ViewType': view_type,
                 'ViewTemplateID': template_id_str,
@@ -2707,7 +2724,7 @@ def extract_warnings(processor, severity_lookup=None):
                         'WarningDescValidation': match_type,
                         'WarningFailureGUID': failure_guid,
                         'WarningType': _categorize_warning(description),
-                        'ElementID': elem_id.IntegerValue
+                        'ElementID': get_id(elem_id)
                     })
             else:
                 # Warning senza elementi specifici
@@ -2824,8 +2841,8 @@ def _extract_param_value(param):
         # ElementId (per parametri che referenziano altri elementi)
         elif storage_type == DB.StorageType.ElementId:
             elem_id = param.AsElementId()
-            if elem_id and elem_id.IntegerValue != -1:
-                return str(elem_id.IntegerValue)
+            if elem_id and get_id(elem_id) != -1:
+                return str(get_id(elem_id))
             return ""
         else:
             return ""
@@ -2925,8 +2942,8 @@ def extract_worksets(processor):
                 is_open = "NO"
             
             worksets.append({
-                'WorksetKey': "{} : {}".format(processor.file_name, ws.Id.IntegerValue),
-                'WorksetID': ws.Id.IntegerValue,
+                'WorksetKey': "{} : {}".format(processor.file_name, get_id(ws.Id)),
+                'WorksetID': get_id(ws.Id),
                 'FileName': processor.file_name,
                 'WorksetName': ws.Name,
                 'IsVisibleInAllViews': "YES" if ws.IsVisibleByDefault else "NO",
@@ -2981,8 +2998,8 @@ def extract_sheets(processor):
                 view_chapter_2 = ""
             
             sheets.append({
-                'SheetKey': "{} : {}".format(processor.file_name, sheet.Id.IntegerValue),
-                'SheetID': sheet.Id.IntegerValue,
+                'SheetKey': "{} : {}".format(processor.file_name, get_id(sheet.Id)),
+                'SheetID': get_id(sheet.Id),
                 'FileName': processor.file_name,
                 'SheetNumber': sheet.SheetNumber,
                 'SheetName': sheet.Name,
@@ -3012,17 +3029,17 @@ def extract_view_templates(processor):
         if not view.IsTemplate:
             template_id = view.ViewTemplateId
             if template_id and template_id != ElementId.InvalidElementId:
-                used_template_ids.add(template_id.IntegerValue)
-    
+                used_template_ids.add(get_id(template_id))
+
     # Estrai i template
     for view in all_views:
         try:
             if view.IsTemplate:
-                is_used = "YES" if view.Id.IntegerValue in used_template_ids else "NO"
-                
+                is_used = "YES" if get_id(view.Id) in used_template_ids else "NO"
+
                 template_data = {}
-                template_data['ViewTemplateKey'] = "{} : {}".format(processor.file_name, view.Id.IntegerValue)
-                template_data['ViewTemplateID'] = view.Id.IntegerValue
+                template_data['ViewTemplateKey'] = "{} : {}".format(processor.file_name, get_id(view.Id))
+                template_data['ViewTemplateID'] = get_id(view.Id)
                 template_data['FileName'] = processor.file_name
                 template_data['TemplateName'] = view.Name
                 template_data['ViewType'] = view.ViewType.ToString()
@@ -3046,7 +3063,7 @@ def extract_scope_boxes(processor):
         for sb in sb_collector:
             try:
                 # ScopeBox ID
-                sb_id = sb.Id.IntegerValue
+                sb_id = get_id(sb.Id)
                 
                 # ScopeBox Name
                 sb_name = sb.Name if sb.Name else ""
@@ -3058,7 +3075,7 @@ def extract_scope_boxes(processor):
                         ws_param = sb.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM)
                         if ws_param and ws_param.HasValue:
                             ws_id = ws_param.AsInteger()
-                            workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(ws_id))
+                            workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(int(ws_id)))
                             if workset:
                                 workset_name = workset.Name
                     except:
@@ -3100,7 +3117,7 @@ def extract_grids(processor):
         for grid in grid_collector:
             try:
                 # GridID
-                grid_id = grid.Id.IntegerValue
+                grid_id = get_id(grid.Id)
                 
                 # GridName
                 grid_name = grid.Name if grid.Name else ""
@@ -3188,7 +3205,7 @@ def extract_grids(processor):
                         ws_param = grid.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM)
                         if ws_param and ws_param.HasValue:
                             ws_id = ws_param.AsInteger()
-                            workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(ws_id))
+                            workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(int(ws_id)))
                             if workset:
                                 workset_name = workset.Name
                     except:
@@ -3236,16 +3253,16 @@ def extract_materials(processor):
             try:
                 mat_ids = elem.GetMaterialIds(False)
                 for mid in mat_ids:
-                    used_material_ids.add(mid.IntegerValue)
+                    used_material_ids.add(get_id(mid))
             except:
                 pass
     except:
         pass
-    
+
     # Estrai i materiali
     for mat in all_materials:
         try:
-            is_used = "YES" if mat.Id.IntegerValue in used_material_ids else "NO"
+            is_used = "YES" if get_id(mat.Id) in used_material_ids else "NO"
             
             # Material Class
             mat_class = ""
@@ -3322,8 +3339,8 @@ def extract_materials(processor):
                 mat_asset_name = ""
             
             materials.append({
-                'MaterialKey': "{} : {}".format(processor.file_name, mat.Id.IntegerValue),
-                'MaterialID': mat.Id.IntegerValue,
+                'MaterialKey': "{} : {}".format(processor.file_name, get_id(mat.Id)),
+                'MaterialID': get_id(mat.Id),
                 'FileName': processor.file_name,
                 'MaterialName': mat.Name,
                 'MaterialClass': mat_class,
@@ -3368,7 +3385,7 @@ def extract_levels(processor):
         for level in all_levels:
             try:
                 # LevelID
-                level_id = level.Id.IntegerValue
+                level_id = get_id(level.Id)
                 
                 # Level Name
                 level_name = level.Name if level.Name else ""
@@ -3506,19 +3523,17 @@ def extract_levels(processor):
                 except:
                     scope_box_name = ""
                 
-                # Workset del livello (solo se workshared)
-                workset_name = ""
+                # WorksetKey del livello (solo se workshared)
+                workset_key = ""
                 if processor.is_workshared:
                     try:
                         ws_param = level.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM)
                         if ws_param and ws_param.HasValue:
                             ws_id = ws_param.AsInteger()
-                            workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(ws_id))
-                            if workset:
-                                workset_name = workset.Name
+                            workset_key = "{} : {}".format(processor.file_name, ws_id)
                     except:
-                        workset_name = ""
-                
+                        workset_key = ""
+
                 levels.append({
                     'LevelKey': "{} : {}".format(processor.file_name, level_id),
                     'LevelID': level_id,
@@ -3531,7 +3546,7 @@ def extract_levels(processor):
                     'MonitorLevel': monitor_level_name,
                     'IsPinned': is_pinned,
                     'ScopeBox': scope_box_name,
-                    'Workset': workset_name
+                    'WorksetKey': workset_key
                 })
                 
             except Exception as e:
@@ -3569,20 +3584,20 @@ def extract_filters(processor):
                 try:
                     filter_ids = view.GetFilters()
                     for fid in filter_ids:
-                        used_filter_ids.add(fid.IntegerValue)
+                        used_filter_ids.add(get_id(fid))
                 except:
                     pass
         except Exception as e:
             LOGGER.warning("Errore raccolta filtri usati: {}".format(str(e)))
-        
+
         # Estrai i filtri
         for flt in all_filters:
             try:
-                is_used = "YES" if flt.Id.IntegerValue in used_filter_ids else "NO"
-                
+                is_used = "YES" if get_id(flt.Id) in used_filter_ids else "NO"
+
                 filters.append({
-                    'FilterKey': "{} : {}".format(processor.file_name, flt.Id.IntegerValue),
-                    'FilterID': flt.Id.IntegerValue,
+                    'FilterKey': "{} : {}".format(processor.file_name, get_id(flt.Id)),
+                    'FilterID': get_id(flt.Id),
                     'FileName': processor.file_name,
                     'FilterName': flt.Name if flt.Name else "Unnamed",
                     'IsUsed': is_used
@@ -3620,7 +3635,7 @@ def extract_rooms(processor):
         for room in room_collector:
             try:
                 # RoomID
-                room_id = room.Id.IntegerValue
+                room_id = get_id(room.Id)
                 
                 # RoomName
                 room_name = ""
@@ -3776,7 +3791,7 @@ def extract_rooms(processor):
                         if ws_param and ws_param.HasValue:
                             workset_id = ws_param.AsInteger()
                             try:
-                                workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(workset_id))
+                                workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(int(workset_id)))
                                 if workset:
                                     workset_name = workset.Name
                             except:
@@ -3836,7 +3851,7 @@ def extract_spaces(processor):
         for space in space_collector:
             try:
                 # SpaceID
-                space_id = space.Id.IntegerValue
+                space_id = get_id(space.Id)
                 
                 # SpaceName
                 space_name = ""
@@ -3989,7 +4004,7 @@ def extract_spaces(processor):
                         if ws_param and ws_param.HasValue:
                             workset_id = ws_param.AsInteger()
                             try:
-                                workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(workset_id))
+                                workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(int(workset_id)))
                                 if workset:
                                     workset_name = workset.Name
                             except:
@@ -4048,7 +4063,7 @@ def extract_areas(processor):
         for area in area_collector:
             try:
                 # AreaID
-                area_id = area.Id.IntegerValue
+                area_id = get_id(area.Id)
                 
                 # AreaName
                 area_name = ""
@@ -4136,7 +4151,7 @@ def extract_areas(processor):
                         if ws_param and ws_param.HasValue:
                             workset_id = ws_param.AsInteger()
                             try:
-                                workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(workset_id))
+                                workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(int(workset_id)))
                                 if workset:
                                     workset_name = workset.Name
                             except:
@@ -4276,13 +4291,13 @@ def extract_tags(processor):
                             pass
 
                         # TagID
-                        tag_id = tag.Id.IntegerValue
+                        tag_id = get_id(tag.Id)
 
                         # ViewID
                         view_id = ""
                         try:
                             if hasattr(tag, 'OwnerViewId'):
-                                view_id = tag.OwnerViewId.IntegerValue
+                                view_id = get_id(tag.OwnerViewId)
                         except:
                             pass
                         
@@ -4602,21 +4617,21 @@ def extract_families_types_instances(processor, custom_instance_params=None, cus
                         if not elem_type:
                             continue
                         
-                        type_id_int = type_id.IntegerValue
-                        
+                        type_id_int = get_id(type_id)
+
                         # === FAMIGLIA ===
                         family_name = ""
                         family_id = 0
                         is_in_place = "NO"
                         is_system = "YES"
-                        
+
                         # Prova prima: FamilyInstance → loadable family
                         if isinstance(elem, FamilyInstance):
                             try:
                                 fam = elem.Symbol.Family
                                 if fam:
                                     family_name = fam.Name or ""
-                                    family_id = fam.Id.IntegerValue
+                                    family_id = get_id(fam.Id)
                                     is_in_place = "YES" if fam.IsInPlace else "NO"
                                     is_system = "NO"
                             except:
@@ -4783,7 +4798,7 @@ def extract_families_types_instances(processor, custom_instance_params=None, cus
                                 if ws_param and ws_param.HasValue:
                                     workset_id = ws_param.AsInteger()
                                     try:
-                                        workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(workset_id))
+                                        workset = doc.GetWorksetTable().GetWorkset(DB.WorksetId(int(workset_id)))
                                         workset_name = workset.Name
                                         workset_key = "{} : {}".format(processor.file_name, workset_id)
                                     except:
@@ -4858,12 +4873,11 @@ def extract_families_types_instances(processor, custom_instance_params=None, cus
                             pass
                         
                         instance_data = {
-                            'ElementKey': "{} : {}".format(processor.file_name, elem.Id.IntegerValue),
-                            'ElementID': elem.Id.IntegerValue,
+                            'ElementKey': "{} : {}".format(processor.file_name, get_id(elem.Id)),
+                            'ElementID': get_id(elem.Id),
                             'FileName': processor.file_name,
                             'TypeKey': type_key_ref,
                             'WorksetKey': workset_key,
-                            'WorksetName': workset_name,
                             'PhaseCreation': phase_creation,
                             'PhaseDemolished': phase_demolished,
                             'Export to IFC As': ifc_export_as,
@@ -4906,29 +4920,29 @@ def extract_families_types_instances(processor, custom_instance_params=None, cus
                 
                 for elem_type in type_collector:
                     try:
-                        type_id_int = elem_type.Id.IntegerValue
-                        
+                        type_id_int = get_id(elem_type.Id)
+
                         # Se il tipo è già stato tracciato dal loop istanze, salta
                         if type_id_int in types_dict:
                             continue
-                        
+
                         # Categoria
                         category_name = "Unknown"
                         if elem_type.Category:
                             category_name = elem_type.Category.Name
-                        
+
                         # === FAMIGLIA ===
                         family_name = ""
                         family_id = 0
                         is_in_place = "NO"
                         is_system = "YES"
-                        
+
                         # Per FamilySymbol (tipi caricabili)
                         try:
                             if hasattr(elem_type, 'Family') and elem_type.Family:
                                 fam = elem_type.Family
                                 family_name = fam.Name or ""
-                                family_id = fam.Id.IntegerValue
+                                family_id = get_id(fam.Id)
                                 is_in_place = "YES" if fam.IsInPlace else "NO"
                                 is_system = "NO"
                         except:
@@ -5128,7 +5142,7 @@ def extract_parameters(processor):
             for inst in all_instances:
                 try:
                     fam = inst.Symbol.Family
-                    fam_id = fam.Id.IntegerValue
+                    fam_id = get_id(fam.Id)
                     if fam_id not in instance_by_family:
                         instance_by_family[fam_id] = inst
                 except:
@@ -5141,7 +5155,7 @@ def extract_parameters(processor):
 
         for fam in all_families:
             try:
-                family_id = fam.Id.IntegerValue
+                family_id = get_id(fam.Id)
                 family_key = "{} : {}".format(processor.file_name, family_id)
 
                 type_ids = list(fam.GetFamilySymbolIds())
@@ -5154,14 +5168,14 @@ def extract_parameters(processor):
 
                 # Recupera istanza di riferimento per questa famiglia
                 inst = instance_by_family.get(family_id)
-                instance_id = inst.Id.IntegerValue if inst is not None else ""
+                instance_id = get_id(inst.Id) if inst is not None else ""
 
                 # --- Parametri di TIPO (dal FamilySymbol) ---
                 type_param_names = set()
                 for param in first_type.GetOrderedParameters():
                     try:
                         # Escludi parametri built-in (hanno Id negativo)
-                        if param.Id.IntegerValue < 0:
+                        if get_id(param.Id) < 0:
                             continue
                         param_name = param.Definition.Name
                         is_shared = "YES" if param.IsShared else "NO"
@@ -5189,7 +5203,7 @@ def extract_parameters(processor):
                 if inst is not None:
                     for param in inst.GetOrderedParameters():
                         try:
-                            if param.Id.IntegerValue < 0:
+                            if get_id(param.Id) < 0:
                                 continue
                             param_name = param.Definition.Name
                             if param_name in type_param_names:
@@ -5272,7 +5286,7 @@ def extract_object_styles(processor):
             for inst in all_instances:
                 try:
                     fam = inst.Symbol.Family
-                    fam_id = fam.Id.IntegerValue
+                    fam_id = get_id(fam.Id)
                     if fam_id not in instance_by_family:
                         instance_by_family[fam_id] = inst
                 except:
@@ -5288,7 +5302,7 @@ def extract_object_styles(processor):
 
         for fam in all_families:
             try:
-                family_id = fam.Id.IntegerValue
+                family_id = get_id(fam.Id)
                 family_key = "{} : {}".format(processor.file_name, family_id)
 
                 inst = instance_by_family.get(family_id)
@@ -5419,10 +5433,10 @@ def _get_unused_families(doc):
             try:
                 type_id = inst.GetTypeId()
                 if type_id and type_id != ElementId.InvalidElementId:
-                    used_type_ids.add(type_id.IntegerValue)
+                    used_type_ids.add(get_id(type_id))
             except:
                 pass
-        
+
         # Verifica le famiglie caricabili (Family class)
         families = FilteredElementCollector(doc).OfClass(Family).ToElements()
         
@@ -5453,7 +5467,7 @@ def _get_unused_families(doc):
                 
                 # Verifica se almeno un tipo della famiglia è usato
                 for symbol_id in family_symbol_ids:
-                    if symbol_id.IntegerValue in used_type_ids:
+                    if get_id(symbol_id) in used_type_ids:
                         has_instances = True
                         break
                 
@@ -5469,7 +5483,7 @@ def _get_unused_families(doc):
                     except:
                         pass
                     
-                    unused.append((family.Id.IntegerValue, family_name, revit_category))
+                    unused.append((get_id(family.Id), family_name, revit_category))
             except:
                 pass
     except:
@@ -5534,10 +5548,10 @@ def _get_unused_types(doc):
             try:
                 type_id = inst.GetTypeId()
                 if type_id and type_id != ElementId.InvalidElementId:
-                    used_type_ids.add(type_id.IntegerValue)
+                    used_type_ids.add(get_id(type_id))
             except:
                 pass
-        
+
         for t in types:
             try:
                 # Verifica se il tipo è tra quelli ammessi
@@ -5550,7 +5564,7 @@ def _get_unused_types(doc):
                 if not is_allowed:
                     continue
                 
-                if t.Id.IntegerValue not in used_type_ids:
+                if get_id(t.Id) not in used_type_ids:
                     # Costruisci "Family : Type" name
                     type_name = ""
                     
@@ -5635,7 +5649,7 @@ def _get_unused_types(doc):
                     except:
                         pass
                     
-                    unused.append((t.Id.IntegerValue, type_name, revit_category))
+                    unused.append((get_id(t.Id), type_name, revit_category))
             except:
                 pass
                 
@@ -5661,15 +5675,15 @@ def _get_unused_materials(doc):
             try:
                 mat_ids = elem.GetMaterialIds(False)
                 for mid in mat_ids:
-                    used_material_ids.add(mid.IntegerValue)
+                    used_material_ids.add(get_id(mid))
             except:
                 pass
-        
+
         for mat in materials:
             try:
-                if mat.Id.IntegerValue not in used_material_ids:
+                if get_id(mat.Id) not in used_material_ids:
                     mat_name = mat.Name if mat.Name else ""
-                    unused.append((mat.Id.IntegerValue, mat_name))
+                    unused.append((get_id(mat.Id), mat_name))
             except:
                 pass
                 
@@ -5691,11 +5705,11 @@ def _get_unused_view_templates(doc):
         for view in all_views:
             try:
                 if view.IsTemplate:
-                    templates[view.Id.IntegerValue] = view
+                    templates[get_id(view.Id)] = view
                 else:
                     template_id = view.ViewTemplateId
                     if template_id and template_id != ElementId.InvalidElementId:
-                        used_template_ids.add(template_id.IntegerValue)
+                        used_template_ids.add(get_id(template_id))
             except:
                 pass
         
@@ -5724,15 +5738,15 @@ def _get_unused_filters(doc):
             try:
                 filter_ids = view.GetFilters()
                 for fid in filter_ids:
-                    used_filter_ids.add(fid.IntegerValue)
+                    used_filter_ids.add(get_id(fid))
             except:
                 pass
-        
+
         for flt in all_filters:
             try:
-                if flt.Id.IntegerValue not in used_filter_ids:
+                if get_id(flt.Id) not in used_filter_ids:
                     filter_name = flt.Name if flt.Name else ""
-                    unused.append((flt.Id.IntegerValue, filter_name))
+                    unused.append((get_id(flt.Id), filter_name))
             except:
                 pass
                 
@@ -5757,7 +5771,7 @@ def _get_unused_model_groups(doc):
             try:
                 type_id = grp.GetTypeId()
                 if type_id and type_id != ElementId.InvalidElementId:
-                    used_group_type_ids.add(type_id.IntegerValue)
+                    used_group_type_ids.add(get_id(type_id))
             except:
                 pass
         
@@ -5772,15 +5786,15 @@ def _get_unused_model_groups(doc):
                     cat = gt.Category
                     if cat:
                         # OST_IOSModelGroups = BuiltInCategory per Model Groups
-                        if cat.Id.IntegerValue == int(BuiltInCategory.OST_IOSModelGroups):
+                        if get_id(cat.Id) == int(BuiltInCategory.OST_IOSModelGroups):
                             is_model_group = True
                 except:
                     # Fallback: se non riesci a determinare, includi comunque
                     is_model_group = True
-                
-                if is_model_group and gt.Id.IntegerValue not in used_group_type_ids:
+
+                if is_model_group and get_id(gt.Id) not in used_group_type_ids:
                     group_name = gt.Name if gt.Name else ""
-                    unused.append((gt.Id.IntegerValue, group_name))
+                    unused.append((get_id(gt.Id), group_name))
             except:
                 pass
                 
