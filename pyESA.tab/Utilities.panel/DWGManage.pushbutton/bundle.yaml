@@ -1,0 +1,6 @@
+title: "DWG Manage"
+tooltip: >-
+  Imported DWG Manager - Lists all imported DWGs in the model
+  with details on workset, level, offset and creator.
+  Allows multi-selection, view navigation and deletion of DWGs.
+author: "pyESA"

@@ -1,0 +1,25 @@
+title: 
+  Hidden
+
+  Finder
+
+tooltip: >-
+  Shows all manually hidden elements in the current view
+  using "Hide in View > Elements" and allows you to manage them.
+
+  HOW IT WORKS:
+   1. Activate a graphical view (plan, section, 3D, etc.)
+   2. Press the button: the script analyzes the view and identifies
+      hidden elements (excludes those hidden
+      by category or via filters)
+   3. If found, it automatically activates the
+      "Reveal Hidden Elements" mode to display them.
+   4. The interface displays the list with Category, Family, Type, and ID.
+   5. Selecting one or more rows (Ctrl+Click / Shift+Click)
+      selects the corresponding elements in the model.
+   6. The "Unhide Selected" button removes the hide from view
+      for the selected elements.
+   7. When closing, the "Reveal Hidden Elements" mode
+      is automatically deactivated.
+
+author: "pyESA"

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/tommasol/**)",
+      "Bash(find /c/Users/tommasol/AppData/Roaming/pyRevit-Master -name *.cs -type f)"
+    ]
+  }
+}
