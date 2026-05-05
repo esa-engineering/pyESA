@@ -26,6 +26,12 @@ SQFEET_TO_SQMETERS = 0.09290304
 CUBICFEET_TO_CUBICMETERS = 0.028316846592
 
 
+def get_element_id_value(eid):
+    if hasattr(eid, "Value"):
+        return eid.Value       # Revit 2024+
+    return eid.IntegerValue    # Revit <= 2023
+
+
 def safe_get_builtin(name):
     """Gets a BuiltInParameter safely, returns None if it doesn't exist."""
     try:
@@ -448,7 +454,7 @@ def get_model_categories(doc, excluded_categories):
             
             # Exclude categories in the exclusion list
             try:
-                bic = System.Enum.ToObject(BuiltInCategory, cat.Id.IntegerValue)
+                bic = System.Enum.ToObject(BuiltInCategory, get_element_id_value(cat.Id))
                 if bic in excluded_categories:
                     continue
             except:
@@ -624,7 +630,7 @@ def main():
                         pass
                     
                     # Basic data
-                    elem_id = elem.Id.IntegerValue
+                    elem_id = get_element_id_value(elem.Id)
                     category_name = cat.Name
                     elem_name = get_element_name(elem)
                     
@@ -699,7 +705,7 @@ def main():
                         pass
                     
                     # Basic data
-                    elem_id = elem.Id.IntegerValue
+                    elem_id = get_element_id_value(elem.Id)
                     category_name = "Assemblies"
                     elem_name = get_element_name(elem)
                     

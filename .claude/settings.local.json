@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Get-ChildItem -Path pyESA.tab -Recurse -Directory)",
+      "Bash(Select-Object -First 20 FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\" -Recurse -Force | Where-Object { $_.Extension -eq \".py\" -or $_.PSIsContainer } | Select-Object FullName, PSIsContainer | Format-Table -AutoSize -Wrap)",
+      "Bash(dir *)"
+    ]
+  }
+}
