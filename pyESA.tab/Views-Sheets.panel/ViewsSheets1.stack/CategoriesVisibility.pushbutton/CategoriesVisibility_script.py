@@ -5,7 +5,7 @@ and SubCategories on the Active View
 ---
 SHIFT-CLICK to apply the visibility to a list of views"""
 
-__author__ = "bimdifferent"
+__author__ = "Antonio Miano"
 
 # REFERENCES
 import pyrevit
@@ -27,7 +27,21 @@ for cat in doc.Settings.Categories:
 
 ## Collect view/views
 if __shiftclick__:
-	selected_views = l_tolist(forms.select_views())
+	viewtemplates = revit.query.get_all_view_templates(doc=doc)
+	viewtemplates.sort(key=lambda x:x.Name)
+	views = revit.query.get_all_views(doc=doc)
+	views.sort(key=lambda x:x.Name)
+	
+	options = {'ViewTemplates': viewtemplates, 'Views': views}
+
+	selected_views = forms.SelectFromList.show(
+		options,
+		multiselect=True,
+		name_attr='Name',
+		group_selector_title='ViewTemplates | Views',
+		button_name='Select'
+	)	
+
 else:
 	selected_views = l_tolist(doc.ActiveView)
 
