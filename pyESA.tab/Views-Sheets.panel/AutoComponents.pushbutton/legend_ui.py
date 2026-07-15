@@ -154,20 +154,31 @@ COMPOUND_CATEGORIES = [
 
 # Loadable family categories - NO dimensions or material tags
 LOADABLE_CATEGORIES = [
-    (DB.BuiltInCategory.OST_Furniture, "Furniture"),
+    (DB.BuiltInCategory.OST_AudioVisualDevices, "Audio Visual Devices"),
     (DB.BuiltInCategory.OST_Casework, "Casework"),
-    (DB.BuiltInCategory.OST_GenericModel, "Generic Models"),
+    (DB.BuiltInCategory.OST_CommunicationDevices, "Communication Devices"),
+    (DB.BuiltInCategory.OST_DataDevices, "Data Devices"),
     (DB.BuiltInCategory.OST_Doors, "Doors"),
-    (DB.BuiltInCategory.OST_Windows, "Windows"),
-    (DB.BuiltInCategory.OST_PlumbingFixtures, "Plumbing Fixtures"),
-    (DB.BuiltInCategory.OST_LightingFixtures, "Lighting Fixtures"),
-    (DB.BuiltInCategory.OST_ElectricalFixtures, "Electrical Fixtures"),
+    (DB.BuiltInCategory.OST_DuctAccessory, "Duct Accessories"),
     (DB.BuiltInCategory.OST_ElectricalEquipment, "Electrical Equipment"),
-    (DB.BuiltInCategory.OST_MechanicalEquipment, "Mechanical Equipment"),
-    (DB.BuiltInCategory.OST_SpecialityEquipment, "Specialty Equipment"),
+    (DB.BuiltInCategory.OST_ElectricalFixtures, "Electrical Fixtures"),
     (DB.BuiltInCategory.OST_Entourage, "Entourage"),
+    (DB.BuiltInCategory.OST_FireAlarmDevices, "Fire Alarm Devices"),
+    (DB.BuiltInCategory.OST_Furniture, "Furniture"),
+    (DB.BuiltInCategory.OST_GenericModel, "Generic Models"),
+    (DB.BuiltInCategory.OST_LightingDevices, "Lighting Devices"),
+    (DB.BuiltInCategory.OST_LightingFixtures, "Lighting Fixtures"),
+    (DB.BuiltInCategory.OST_MechanicalEquipment, "Mechanical Equipment"),
+    (DB.BuiltInCategory.OST_NurseCallDevices, "Nurse Call Devices"),
+    (DB.BuiltInCategory.OST_PipeAccessory, "Pipe Accessories"),
     (DB.BuiltInCategory.OST_Planting, "Planting"),
-    (DB.BuiltInCategory.OST_Site, "Site")
+    (DB.BuiltInCategory.OST_PlumbingFixtures, "Plumbing Fixtures"),
+    (DB.BuiltInCategory.OST_SecurityDevices, "Security Devices"),
+    (DB.BuiltInCategory.OST_Site, "Site"),
+    (DB.BuiltInCategory.OST_SpecialityEquipment, "Specialty Equipment"),
+    (DB.BuiltInCategory.OST_Sprinklers, "Sprinklers"),
+    (DB.BuiltInCategory.OST_TelephoneDevices, "Telephone Devices"),
+    (DB.BuiltInCategory.OST_Windows, "Windows")
 ]
 
 # Combined list for UI

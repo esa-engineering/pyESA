@@ -1,0 +1,18 @@
+title:
+  PointCloud
+
+  Analysis
+tooltip:
+  Compare a linked point cloud with selected model faces.
+
+  For each face a sampling grid is built and the average signed
+  distance between the cloud points and the surface is computed,
+  then displayed as a colored Analysis Visualization map
+  on the active view.
+
+  Positive values = cloud in front of the surface,
+  negative values = cloud behind the surface.
+
+  Note - the sampling grid is uniform on planar faces only.
+author:
+  Antonio Miano
