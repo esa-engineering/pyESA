@@ -1,4 +1,6 @@
-title: "DWG Manage"
+title:
+  DWG
+  Manage
 tooltip: >-
   Imported DWG Manager - Lists all imported DWGs in the model
   with details on workset, level, offset and creator.
