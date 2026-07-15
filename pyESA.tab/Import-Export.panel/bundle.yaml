@@ -5,4 +5,5 @@ layout:
   - IfcExport
   - QuantityTakeoff
   - DwgToRevit
+  - DWGManage
   - ExportSchedules
