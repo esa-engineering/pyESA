@@ -15,6 +15,8 @@ __author__ = "Antonio Miano"
 
 import os
 import math
+import codecs
+import datetime
 import clr
 
 clr.AddReference('RevitAPI')
@@ -96,7 +98,8 @@ GRADIENTS = [
 ]
 GRADIENT_MAP = dict(GRADIENTS)
 DEFAULT_GRADIENT = GRADIENTS[0][0]
-HISTOGRAM_BINS = 20
+HISTOGRAM_MIN_BINS = 5
+HISTOGRAM_MAX_BINS = 30
 
 
 # ---------------------------------------------------------------- units
@@ -332,9 +335,11 @@ def quality_settings(quality, grid):
 
 def analyze_face(pcl, total_transform, to_cloud, face, grid, offset,
                  avg_dist, max_points):
-    """Sample the face on a UV grid and return per-cell UVs, average
-    signed distances (internal units) and cloud point counts."""
+    """Sample the face on a UV grid and return per-cell UVs, centers
+    (model XYZ), average signed distances (internal units) and cloud
+    point counts."""
     uvs = []
+    centers = []
     values = []
     counts = []
     cells_total = 0
@@ -368,12 +373,13 @@ def analyze_face(pcl, total_transform, to_cloud, face, grid, offset,
 
             if distances:
                 uvs.append(uvp)
+                centers.append(face.Evaluate(uvp))
                 values.append(sum(distances) / len(distances))
                 counts.append(len(distances))
             else:
                 cells_empty += 1
 
-    return uvs, values, counts, cells_total, cells_empty
+    return uvs, centers, values, counts, cells_total, cells_empty
 
 
 # ---------------------------------------------------------------- AVF display
@@ -478,6 +484,25 @@ def gradient_hex(stops, t):
     return '#{0:02x}{1:02x}{2:02x}'.format(rgb[0], rgb[1], rgb[2])
 
 
+def histogram_bins(values, lo, hi):
+    """Number of histogram bins via the Freedman-Diaconis rule
+    (Sturges as fallback when the IQR is degenerate), clamped so the
+    bar labels stay readable."""
+    n = len(values)
+    if n < 2:
+        return HISTOGRAM_MIN_BINS
+    ordered = sorted(values)
+    q1 = ordered[int(round(0.25 * (n - 1)))]
+    q3 = ordered[int(round(0.75 * (n - 1)))]
+    iqr = q3 - q1
+    if iqr > 1e-12:
+        bin_width = 2.0 * iqr / (n ** (1.0 / 3.0))
+        bins = int(math.ceil((hi - lo) / bin_width))
+    else:
+        bins = int(math.ceil(math.log(n, 2))) + 1
+    return max(HISTOGRAM_MIN_BINS, min(HISTOGRAM_MAX_BINS, bins))
+
+
 def print_histogram(output, values, counts, stops, unit):
     """Bar chart in the pyRevit output window: deviation bins on the
     x axis, number of cloud points per bin on the y axis (each cell
@@ -489,16 +514,17 @@ def print_histogram(output, values, counts, stops, unit):
     hi = max(values)
     if hi - lo < 1e-9:
         hi = lo + 1e-9
-    width = (hi - lo) / HISTOGRAM_BINS
+    n_bins = histogram_bins(values, lo, hi)
+    width = (hi - lo) / n_bins
 
-    point_bins = [0] * HISTOGRAM_BINS
-    cell_bins = [0] * HISTOGRAM_BINS
+    point_bins = [0] * n_bins
+    cell_bins = [0] * n_bins
     for value, n_points in zip(values, counts):
         idx = int((value - lo) / width)
         if idx < 0:
             idx = 0
-        elif idx >= HISTOGRAM_BINS:
-            idx = HISTOGRAM_BINS - 1
+        elif idx >= n_bins:
+            idx = n_bins - 1
         point_bins[idx] += n_points
         cell_bins[idx] += 1
 
@@ -508,7 +534,7 @@ def print_histogram(output, values, counts, stops, unit):
     plot_height = 420
     label_height = 22
     max_bar_height = plot_height - label_height
-    bar_width = 100.0 / HISTOGRAM_BINS
+    bar_width = 100.0 / n_bins
 
     bars = []
     for i, n_points in enumerate(point_bins):
@@ -558,6 +584,55 @@ def print_histogram(output, values, counts, stops, unit):
             lo=lo,
             hi=hi,
             mid=(lo + hi) * 0.5)
+    output.print_html(html)
+
+
+# ---------------------------------------------------------------- CSV export
+
+def get_id_value(eid):
+    """Return the integer value of an ElementId (works in Revit 2022-2026+)."""
+    try:
+        return eid.Value
+    except AttributeError:
+        return eid.IntegerValue
+
+
+def export_csv(rows, unit):
+    """Write the analyzed cells to a CSV file in the temp folder and
+    return its path. Semicolon separator and decimal comma (Italian
+    Excel conventions)."""
+    stamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    folder = os.environ.get('TEMP') or os.path.expanduser('~')
+    path = os.path.join(folder, 'PointCloudAnalysis_{0}.csv'.format(stamp))
+
+    def num(value):
+        return '{0:.4f}'.format(value).replace('.', ',')
+
+    lines = ['ElementId;Face;Cell X [{0}];Cell Y [{0}];Cell Z [{0}];'
+             'Avg deviation [{0}];Cloud points'.format(unit)]
+    for row in rows:
+        lines.append('{0};{1};{2};{3};{4};{5};{6}'.format(
+            row[0], row[1], num(row[2]), num(row[3]), num(row[4]),
+            num(row[5]), row[6]))
+
+    stream = codecs.open(path, 'w', 'utf-8-sig')
+    try:
+        stream.write('\r\n'.join(lines))
+    finally:
+        stream.close()
+    return path
+
+
+def print_csv_button(output, path):
+    html = (
+        '<div style="margin-top:15px;">'
+        '<a href="file:///{href}" style="display:inline-block;'
+        'background:#2D5A8A;color:#ffffff;font-weight:bold;'
+        'font-size:17px;padding:10px 20px;border-radius:4px;'
+        'text-decoration:none;">Open CSV (analyzed cells)</a>'
+        '<p style="font-size:14px;color:#666;margin-top:6px;">'
+        'File saved to: {path}</p>'
+        '</div>').format(href=path.replace('\\', '/'), path=path)
     output.print_html(html)
 
 
@@ -654,6 +729,7 @@ def main():
     face_results = []
     all_values = []
     all_counts = []
+    csv_rows = []
     total_cells = 0
     empty_cells = 0
     with forms.ProgressBar(title="Analyzing face {value} of {max_value}",
@@ -662,7 +738,7 @@ def main():
             if progress.cancelled:
                 script.exit()
             progress.update_progress(i + 1, len(faces))
-            uvs, values, counts, n_cells, n_empty = analyze_face(
+            uvs, centers, values, counts, n_cells, n_empty = analyze_face(
                 pcl, total_transform, to_cloud, face,
                 grid, offset, avg_dist, max_points)
             total_cells += n_cells
@@ -672,6 +748,15 @@ def main():
                 all_values.extend(display_values)
                 all_counts.extend(counts)
                 face_results.append((reference, uvs, display_values))
+                elem_id = get_id_value(reference.ElementId)
+                for center, value, count in zip(
+                        centers, display_values, counts):
+                    csv_rows.append((
+                        elem_id, i + 1,
+                        from_internal(center.X),
+                        from_internal(center.Y),
+                        from_internal(center.Z),
+                        value, count))
 
     if not face_results:
         forms.alert(
@@ -698,6 +783,12 @@ def main():
         sum(all_values) / len(all_values)))
 
     print_histogram(output, all_values, all_counts, stops, unit)
+
+    try:
+        csv_path = export_csv(csv_rows, unit)
+        print_csv_button(output, csv_path)
+    except Exception as ex:
+        print("CSV export failed: {0}".format(ex))
 
 
 main()
