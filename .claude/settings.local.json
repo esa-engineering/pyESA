@@ -6,7 +6,15 @@
       "Bash(Get-ChildItem -Path pyESA.tab -Recurse -Directory)",
       "Bash(Select-Object -First 20 FullName)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\" -Recurse -Force | Where-Object { $_.Extension -eq \".py\" -or $_.PSIsContainer } | Select-Object FullName, PSIsContainer | Format-Table -AutoSize -Wrap)",
-      "Bash(dir *)"
+      "Bash(dir *)",
+      "PowerShell(Get-ChildItem *)",
+      "Bash(curl -s \"https://api.github.com/search/code?q=repo:pyrevitlabs/pyRevit+renderer_Navigating\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/pyrevitlabs/pyRevit/develop/dev/pyRevitLabs.PyRevit.Runtime/ScriptConsole.cs\" -o /dev/null -w \"%{http_code}\\\\n\")",
+      "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities5.stack\\\\PointCloudAnalysis.pushbutton\\\\PointCloudAnalysis_script.py', encoding='utf-8'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "PowerShell(Out-Null *)",
+      "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities5.stack\\\\PointCloudAnalysis.pushbutton\\\\PointCloudAnalysis_script.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py syntax OK'\\)\")",
+      "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities5.stack\\\\PointCloudAnalysis.pushbutton\\\\PointCloudAnalysis_script.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py syntax OK'\\)\"; python -c \"print\\('{0:.{prec}f}'.format\\(12.3456, prec=0\\)\\); print\\('{0:.{prec}f}'.format\\(0.01234, prec=3\\)\\)\")",
+      "PowerShell(python -c \"import ast,math; ast.parse\\(open\\(r'C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities5.stack\\\\PointCloudAnalysis.pushbutton\\\\PointCloudAnalysis_script.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py syntax OK'\\); f=lambda mm: max\\(0,int\\(math.ceil\\(-math.log10\\(mm\\)-1e-9\\)\\)\\); print\\('mm exact:',f\\(1.0\\),'mm noisy:',f\\(0.9999999998\\),'cm:',f\\(0.1\\),'m:',f\\(0.001\\),'feet:',f\\(0.0032808398950131233\\)\\)\")"
     ]
   }
 }

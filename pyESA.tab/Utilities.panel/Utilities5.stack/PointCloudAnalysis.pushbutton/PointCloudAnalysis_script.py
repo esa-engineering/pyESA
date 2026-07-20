@@ -79,13 +79,16 @@ STYLE_NAME = "ESA PointCloud Deviation"
 QUALITY_ORDER = ['fast', 'medium', 'high', 'all']
 QUALITY_POINTS = {'fast': 10, 'medium': 200, 'high': 1000}
 # 'all': no practical cap and a tiny average spacing, so GetPoints
-# effectively returns every cloud point inside the cell box
-ALL_POINTS_CAP = 1000000
+# effectively returns every cloud point inside the cell box.
+# Revit's numPoints check rejects 1000000 despite the documented range,
+# so stay one below it.
+ALL_POINTS_CAP = 999999
 ALL_AVG_DIST_M = 0.0001
 
 # Defaults in meters, converted to document units for the form
 DEFAULT_GRID_M = 0.3
 DEFAULT_OFFSET_M = 0.1
+DEFAULT_TOLERANCE_M = 0.02
 DEFAULT_QUALITY = 'high'
 
 # Color gradients: name -> RGB stops from scale min to scale max
@@ -169,8 +172,10 @@ class AnalysisParamsForm(Window):
         self.lbl_units = root.FindName('lbl_units')
         self.txt_grid = root.FindName('txt_grid')
         self.txt_offset = root.FindName('txt_offset')
+        self.txt_tolerance = root.FindName('txt_tolerance')
         self.cmb_quality = root.FindName('cmb_quality')
         self.cmb_gradient = root.FindName('cmb_gradient')
+        self.chk_csv = root.FindName('chk_csv')
         self.btn_ok = root.FindName('btn_ok')
         self.btn_cancel = root.FindName('btn_cancel')
 
@@ -180,6 +185,7 @@ class AnalysisParamsForm(Window):
 
         self.txt_grid.Text = "{0:g}".format(from_internal(meters_to_internal(DEFAULT_GRID_M)))
         self.txt_offset.Text = "{0:g}".format(from_internal(meters_to_internal(DEFAULT_OFFSET_M)))
+        self.txt_tolerance.Text = "{0:g}".format(from_internal(meters_to_internal(DEFAULT_TOLERANCE_M)))
 
         for quality in QUALITY_ORDER:
             self.cmb_quality.Items.Add(quality)
@@ -205,15 +211,19 @@ class AnalysisParamsForm(Window):
     def OnOk(self, sender, args):
         grid = self._parse_positive(self.txt_grid.Text)
         offset = self._parse_positive(self.txt_offset.Text)
-        if grid is None or offset is None:
-            forms.alert("Grid spacing and offset must be positive numbers.",
+        tolerance = self._parse_positive(self.txt_tolerance.Text)
+        if grid is None or offset is None or tolerance is None:
+            forms.alert("Grid spacing, offset and tolerance must be "
+                        "positive numbers.",
                         title="PointCloud Analysis")
             return
         self.result = {
             'grid': to_internal(grid),
             'offset': to_internal(offset),
+            'tolerance': to_internal(tolerance),
             'quality': self.cmb_quality.SelectedItem,
             'gradient': self.cmb_gradient.SelectedItem,
+            'export_csv': bool(self.chk_csv.IsChecked),
         }
         self.Close()
 
@@ -334,16 +344,17 @@ def quality_settings(quality, grid):
 
 
 def analyze_face(pcl, total_transform, to_cloud, face, grid, offset,
-                 avg_dist, max_points):
+                 avg_dist, max_points, tolerance):
     """Sample the face on a UV grid and return per-cell UVs, centers
-    (model XYZ), average signed distances (internal units) and cloud
-    point counts."""
+    (model XYZ), average signed distances (internal units), cloud
+    point counts and the number of points within +/-tolerance."""
     uvs = []
     centers = []
     values = []
     counts = []
     cells_total = 0
     cells_empty = 0
+    points_within = 0
 
     bb = face.GetBoundingBox()
     for u_par in frange_centers(bb.Min.U, bb.Max.U, grid):
@@ -376,10 +387,13 @@ def analyze_face(pcl, total_transform, to_cloud, face, grid, offset,
                 centers.append(face.Evaluate(uvp))
                 values.append(sum(distances) / len(distances))
                 counts.append(len(distances))
+                points_within += sum(
+                    1 for d in distances if abs(d) <= tolerance)
             else:
                 cells_empty += 1
 
-    return uvs, centers, values, counts, cells_total, cells_empty
+    return (uvs, centers, values, counts, cells_total, cells_empty,
+            points_within)
 
 
 # ---------------------------------------------------------------- AVF display
@@ -532,11 +546,19 @@ def print_histogram(output, values, counts, stops, unit):
     if peak == 0:
         return
     plot_height = 420
-    label_height = 22
+    label_height = 28
     max_bar_height = plot_height - label_height
     bar_width = 100.0 / n_bins
 
+    # X labels rounded to 1 mm regardless of the document length unit.
+    # The epsilon absorbs float noise in the unit conversion (e.g.
+    # 0.999999...: without it, ceil() would add a spurious decimal).
+    mm_display = from_internal(meters_to_internal(0.001))
+    axis_decimals = max(
+        0, int(math.ceil(-math.log10(mm_display) - 1e-9)))
+
     bars = []
+    axis_labels = []
     for i, n_points in enumerate(point_bins):
         bin_lo = lo + width * i
         bin_hi = bin_lo + width
@@ -545,45 +567,58 @@ def print_histogram(output, values, counts, stops, unit):
         if n_points > 0 and height < 3:
             height = 3
         color = gradient_hex(stops, (center - lo) / (hi - lo))
-        label = '{0}'.format(n_points) if n_points > 0 else '&nbsp;'
+        cells_label = ('{0}'.format(cell_bins[i])
+                       if n_points > 0 else '&nbsp;')
+        points_label = ('<div style="font-size:9pt;line-height:26px;'
+                        'padding-top:3px;font-style:italic;'
+                        'text-align:center;'
+                        'white-space:nowrap;overflow:hidden;">{0}p</div>'
+                        .format(n_points)) if n_points > 0 else ''
         tooltip = "{0:.3f} .. {1:.3f} {2}: {3} point(s) in {4} cell(s)".format(
             bin_lo, bin_hi, unit, n_points, cell_bins[i])
+        # The border keeps white bars of the Blue > White > Red gradient
+        # visible on the white background; empty bins get no border.
+        border = 'border:1px solid #999;' if n_points > 0 else ''
         bars.append(
             '<div title="{0}" style="display:inline-block;'
             'vertical-align:bottom;width:{1:.2f}%;margin:0;padding:0;">'
-            '<div style="font-size:15px;line-height:{2}px;'
-            'text-align:center;color:#444;white-space:nowrap;'
+            '<div style="font-size:9pt;line-height:{2}px;'
+            'text-align:center;white-space:nowrap;'
             'overflow:visible;">{3}</div>'
-            '<div style="height:{4}px;background:{5};'
-            'margin:0 1px;"></div>'
+            '<div style="height:{4}px;background:{5};{6}'
+            'margin:0 1px;overflow:hidden;">{7}</div>'
             '</div>'.format(
-                tooltip, bar_width, label_height, label, height, color))
+                tooltip, bar_width, label_height, cells_label,
+                height, color, border, points_label))
+        axis_labels.append(
+            '<div title="{0}" style="display:inline-block;'
+            'width:{1:.2f}%;font-size:9pt;line-height:16px;'
+            'text-align:center;white-space:nowrap;overflow:hidden;">'
+            '{2:.{prec}f}</div>'.format(
+                tooltip, bar_width, center, prec=axis_decimals))
 
     html = (
         '<div style="margin-top:15px;">'
-        '<p style="font-weight:bold;font-size:21px;margin-bottom:12px;">'
+        '<p style="font-weight:bold;margin-bottom:12px;">'
         'Deviation distribution [{unit}] - {total_pts} cloud points '
         'in {total_cells} cells</p>'
         '<div style="height:{plot_h}px;font-size:0;line-height:0;'
         'border-bottom:2px solid #999;border-left:2px solid #999;">'
         '{bars}</div>'
-        '<div style="font-size:19px;color:#666;overflow:hidden;">'
-        '<span style="float:left;">{lo:.3f}</span>'
-        '<span style="float:right;">{hi:.3f}</span>'
-        '<span style="display:block;text-align:center;">{mid:.3f}</span>'
-        '</div>'
-        '<p style="font-size:17px;color:#666;margin-top:8px;">'
-        'Average deviation [{unit}] on the x axis, number of cloud '
-        'points on the y axis. Hover the bars for bin details.</p>'
+        '<div style="font-size:0;line-height:0;margin-top:2px;">'
+        '{axis_labels}</div>'
+        '<p style="margin-top:8px;">'
+        'X axis: average deviation [{unit}] at the center of each bar '
+        'interval, rounded to 1 mm. Above each bar: cells in that '
+        'interval; at the top of the bar, in italic: cloud points (p). '
+        'Hover the bars for details.</p>'
         '</div>').format(
             unit=unit,
             total_pts=sum(point_bins),
             total_cells=len(values),
             plot_h=plot_height,
             bars=''.join(bars),
-            lo=lo,
-            hi=hi,
-            mid=(lo + hi) * 0.5)
+            axis_labels=''.join(axis_labels))
     output.print_html(html)
 
 
@@ -621,19 +656,6 @@ def export_csv(rows, unit):
     finally:
         stream.close()
     return path
-
-
-def print_csv_button(output, path):
-    html = (
-        '<div style="margin-top:15px;">'
-        '<a href="file:///{href}" style="display:inline-block;'
-        'background:#2D5A8A;color:#ffffff;font-weight:bold;'
-        'font-size:17px;padding:10px 20px;border-radius:4px;'
-        'text-decoration:none;">Open CSV (analyzed cells)</a>'
-        '<p style="font-size:14px;color:#666;margin-top:6px;">'
-        'File saved to: {path}</p>'
-        '</div>').format(href=path.replace('\\', '/'), path=path)
-    output.print_html(html)
 
 
 # ---------------------------------------------------------------- main
@@ -732,17 +754,20 @@ def main():
     csv_rows = []
     total_cells = 0
     empty_cells = 0
+    within_total = 0
     with forms.ProgressBar(title="Analyzing face {value} of {max_value}",
                            cancellable=True) as progress:
         for i, (reference, face) in enumerate(faces):
             if progress.cancelled:
                 script.exit()
             progress.update_progress(i + 1, len(faces))
-            uvs, centers, values, counts, n_cells, n_empty = analyze_face(
+            (uvs, centers, values, counts, n_cells, n_empty,
+             n_within) = analyze_face(
                 pcl, total_transform, to_cloud, face,
-                grid, offset, avg_dist, max_points)
+                grid, offset, avg_dist, max_points, params['tolerance'])
             total_cells += n_cells
             empty_cells += n_empty
+            within_total += n_within
             if uvs:
                 display_values = [from_internal(v) for v in values]
                 all_values.extend(display_values)
@@ -782,13 +807,31 @@ def main():
         unit, min(all_values), max(all_values),
         sum(all_values) / len(all_values)))
 
+    tol_display = from_internal(params['tolerance'])
+    total_points = sum(all_counts)
+    print("Points within tolerance +/-{0:g} [{1}]: {2:.1f}% "
+          "({3} of {4})".format(
+              tol_display, unit,
+              100.0 * within_total / total_points,
+              within_total, total_points))
+
     print_histogram(output, all_values, all_counts, stops, unit)
 
-    try:
-        csv_path = export_csv(csv_rows, unit)
-        print_csv_button(output, csv_path)
-    except Exception as ex:
-        print("CSV export failed: {0}".format(ex))
+    if params['export_csv']:
+        try:
+            csv_path = export_csv(csv_rows, unit)
+        except Exception as ex:
+            print("CSV export failed: {0}".format(ex))
+            csv_path = None
+        if csv_path:
+            print("")
+            print("CSV (analyzed cells) saved to: {0}".format(csv_path))
+            # The IE-based output window silently blocks clicks on file://
+            # links, so the CSV is opened directly instead of via a link.
+            try:
+                os.startfile(csv_path)
+            except Exception as ex:
+                print("Could not open the CSV automatically: {0}".format(ex))
 
 
 main()
