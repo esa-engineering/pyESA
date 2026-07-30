@@ -152,6 +152,19 @@ def f_get_workset(item):
 	else:
 		return item_workset
 
+PSEUDO_TARGET_BICS = [BIC.OST_Walls, BIC.OST_Ceilings, BIC.OST_Roofs]
+PSEUDO_TARGET_IDS = [int(bic) for bic in PSEUDO_TARGET_BICS]
+
+def f_get_kind(item):
+	item_kind = None
+	try:
+		if item.Category.Id.IntegerValue in PSEUDO_TARGET_IDS:
+			item_type = item.Document.GetElement(item.GetTypeId())
+			item_kind = u"pseudo|{}|{}".format(item.Category.Id.IntegerValue, item_type.FamilyName)
+		return item_kind
+	except:
+		return item_kind
+
 
 #INPUTS
 ##Collect Categories
@@ -164,6 +177,28 @@ for cat in categories:
 	 ):
 		 filtered_categories.append(cat)
 filtered_categories.sort(key=lambda x:x.Name)
+
+##Collect Pseudo-Categories (system families of Walls, Ceilings, Roofs)
+class PseudoCategory(object):
+	def __init__(self, name, token):
+		self.Name = name
+		self.Id = token
+
+pseudo_categories = []
+for bic in PSEUDO_TARGET_BICS:
+	bic_category = DB.Category.GetCategory(doc, bic)
+	if bic_category == None:
+		continue
+	bic_types = collector(doc).OfCategory(bic).WhereElementIsElementType().ToElements()
+	family_names = sorted(set([bic_type.FamilyName for bic_type in bic_types if bic_type.FamilyName]))
+	for family_name in family_names:
+		pseudo_name = u"{}: {}".format(bic_category.Name, family_name)
+		pseudo_token = u"pseudo|{}|{}".format(bic_category.Id.IntegerValue, family_name)
+		pseudo_categories.append(PseudoCategory(pseudo_name, pseudo_token))
+
+##Merged list used only for the dialog: pseudo entries must not reach the ElementMulticategoryFilter
+dialog_categories = filtered_categories + pseudo_categories
+dialog_categories.sort(key=lambda x:x.Name)
 
 ##Collect Levels
 levels = list(collector(doc).OfClass(DB.Level).ToElements())
@@ -186,7 +221,7 @@ else:
 
 ##Prepare Form
 options = {
-	'Categories': filtered_categories,
+	'Categories': dialog_categories,
 	'Levels': levels,
 	'Loadable Families': families,
 	'Materials': materials,
@@ -226,7 +261,8 @@ instances_dict = {instance.Id: f_flatten((
 	f_get_level(instance),
 	f_get_family(instance),
 	f_get_materials_02(instance),
-	f_get_workset(instance)
+	f_get_workset(instance),
+	f_get_kind(instance)
 )) for instance in instances}
 
 ##Filter the instances according to criteria
