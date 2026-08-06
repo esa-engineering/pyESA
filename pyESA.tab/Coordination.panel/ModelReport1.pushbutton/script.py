@@ -252,7 +252,8 @@ class CSVWriter:
                         'ClassificationCode', 'ClassificationCode(2)', 'ClassificationCode(3)',
                         ],
         'TAB_PurgeableElements': ['PurgeableElementKey', 'PurgeableElementID', 'FileName', 'Category', 'PurgeableElementName', 'RevitCategory'],
-        'TAB_Parameters': ['FamilyKey', 'FamilyID', 'FileName', 'InstanceID', 'ParameterName', 'IsShared', 'TypeOrInstance', 'Param_GUID'],
+        'TAB_FamilyParameters': ['FamilyKey', 'FamilyID', 'FileName', 'InstanceID', 'ParameterName', 'IsShared', 'TypeOrInstance', 'Param_GUID'],
+        'TAB_ProjectParameters': ['FileName', 'ParameterName', 'Param_GUID', 'IsShared', 'ParamType', 'TypeOrInstances', 'GroupUnder', 'AlignedByGroup'],
         'TAB_ObjectStyle': ['FileName', 'FamilyKey', 'ObjectStyle'],
         'TAB_Rooms': ['RoomKey', 'RoomID', 'FileName', 'RoomName', 'RoomNumber', 'Level', 'Area_sqm', 
                       'Perimeter_m', 'Height_m', 'Volume_mc', 'AreaString', 'IsPlaced', 'IsEnclosed', 'IsRedundant', 'Phase', 'Workset'],
@@ -5118,21 +5119,25 @@ def extract_families_types_instances(processor, custom_instance_params=None, cus
 
 
 
-def extract_parameters(processor):
-    """Estrae i parametri definiti nei file .rfa per ogni famiglia caricabile (TAB_Parameters).
+def extract_parameters(processor, project_param_names=None):
+    """Estrae i parametri definiti nei file .rfa per ogni famiglia caricabile (TAB_FamilyParameters).
 
     Per ogni famiglia caricabile nel modello, elenca tutti i parametri di famiglia
     (non built-in), indicando se sono Shared o di Famiglia, se sono di Type o Instance,
-    e il GUID per i parametri shared.
+    e il GUID per i parametri shared. I parametri di progetto (project_param_names) vengono
+    esclusi perché già esportati in TAB_ProjectParameters.
 
     Args:
         processor: FileProcessor con il documento aperto
+        project_param_names: set di nomi di parametri di progetto da escludere
 
     Returns:
         Lista di dizionari con i dati dei parametri per famiglia
     """
     doc = processor.doc
     params_data = []
+    if project_param_names is None:
+        project_param_names = set()
 
     try:
         # Raccogli una istanza per famiglia (per ispezionare i parametri di istanza)
@@ -5178,6 +5183,8 @@ def extract_parameters(processor):
                         if get_id(param.Id) < 0:
                             continue
                         param_name = param.Definition.Name
+                        if param_name in project_param_names:
+                            continue  # parametro di progetto, già in TAB_ProjectParameters
                         is_shared = "YES" if param.IsShared else "NO"
                         param_guid = ""
                         if is_shared == "YES":
@@ -5208,6 +5215,8 @@ def extract_parameters(processor):
                             param_name = param.Definition.Name
                             if param_name in type_param_names:
                                 continue  # gia' contato come Type
+                            if param_name in project_param_names:
+                                continue  # parametro di progetto, già in TAB_ProjectParameters
                             is_shared = "YES" if param.IsShared else "NO"
                             param_guid = ""
                             if is_shared == "YES":
@@ -5261,6 +5270,142 @@ def _collect_graphics_styles(doc, geo_element, subcats):
                             pass
         except:
             continue
+
+
+def extract_project_parameters(processor):
+    """Estrae i parametri di progetto del documento (TAB_ProjectParameters).
+
+    Itera il BindingMap del documento per elencare tutti i parametri di progetto
+    (shared e non-shared), con gruppo di proprieta', tipo disciplinare,
+    binding Type/Instance e VariesAcrossGroups.
+
+    Args:
+        processor: FileProcessor con il documento aperto
+
+    Returns:
+        Lista di dizionari con i dati dei parametri di progetto
+    """
+    doc = processor.doc
+    proj_params_data = []
+
+    def _get_group_name(definition):
+        """Restituisce il nome del gruppo di proprieta' della definizione."""
+        try:
+            # Revit 2022+: GetGroupTypeId() restituisce un ForgeTypeId
+            group_id = definition.GetGroupTypeId()
+            # LabelUtils.GetLabelForGroup traduce il ForgeTypeId in stringa leggibile
+            from Autodesk.Revit.DB import LabelUtils
+            return LabelUtils.GetLabelForGroup(group_id)
+        except AttributeError:
+            pass
+        try:
+            # Revit <= 2021: ParameterGroup enum
+            return DB.LabelUtils.GetLabelFor(definition.ParameterGroup)
+        except:
+            pass
+        return ""
+
+    def _get_param_type_name(definition):
+        """Restituisce il tipo disciplinare del parametro (es. Length, Area, Text...)."""
+        try:
+            # Revit 2022+: GetDataType() restituisce un ForgeTypeId
+            data_type = definition.GetDataType()
+            from Autodesk.Revit.DB import LabelUtils
+            return LabelUtils.GetLabelForSpec(data_type)
+        except AttributeError:
+            pass
+        try:
+            # Revit <= 2021: ParameterType enum
+            return str(definition.ParameterType)
+        except:
+            pass
+        return ""
+
+    try:
+        # Pre-costruisce un dizionario nome -> GUID per tutti i SharedParameterElement
+        # del documento. Questo e' l'unico modo affidabile per distinguere shared
+        # da non-shared senza dipendere dal casting del tipo Definition in IronPython.
+        shared_params_by_name = {}
+        try:
+            from Autodesk.Revit.DB import SharedParameterElement
+            shared_elems = (
+                DB.FilteredElementCollector(doc)
+                .OfClass(SharedParameterElement)
+                .ToElements()
+            )
+            for sp in shared_elems:
+                try:
+                    guid_str = str(sp.GuidValue)
+                    name = sp.GetDefinition().Name
+                    shared_params_by_name[name] = guid_str
+                except:
+                    pass
+        except:
+            pass
+
+        binding_map = doc.ParameterBindings
+        it = binding_map.ForwardIterator()
+        it.Reset()
+
+        while it.MoveNext():
+            try:
+                definition = it.Key
+                binding = it.Current
+
+                param_name = definition.Name
+
+                # IsShared e Param_GUID: lookup nel dizionario pre-costruito
+                if param_name in shared_params_by_name:
+                    is_shared = "YES"
+                    param_guid = shared_params_by_name[param_name]
+                else:
+                    is_shared = "NO"
+                    param_guid = ""
+
+                # ParamType (tipo disciplinare)
+                param_type = _get_param_type_name(definition)
+
+                # TypeOrInstances
+                if isinstance(binding, InstanceBinding):
+                    type_or_instances = "Instances"
+                elif isinstance(binding, TypeBinding):
+                    type_or_instances = "Type"
+                else:
+                    type_or_instances = ""
+
+                # GroupUnder (gruppo di proprieta')
+                group_under = _get_group_name(definition)
+
+                # AlignedByGroup (VariesAcrossGroups)
+                aligned_by_group = ""
+                try:
+                    varies = definition.VariesAcrossGroups
+                    aligned_by_group = "Instances" if varies else "Type"
+                except:
+                    pass
+
+                proj_params_data.append({
+                    'FileName': processor.file_name,
+                    'ParameterName': param_name,
+                    'Param_GUID': param_guid,
+                    'IsShared': is_shared,
+                    'ParamType': param_type,
+                    'TypeOrInstances': type_or_instances,
+                    'GroupUnder': group_under,
+                    'AlignedByGroup': aligned_by_group,
+                })
+
+            except:
+                continue
+
+        proj_params_data.sort(key=lambda x: x.get('ParameterName', ''))
+        OUTPUT.print_md("      ✓ {} parametri di progetto estratti".format(len(proj_params_data)))
+
+    except Exception as e:
+        OUTPUT.print_md("      ⚠️ Errore estrazione parametri di progetto: {}".format(str(e)))
+        LOGGER.error("Errore extract_project_parameters: {}".format(str(e)))
+
+    return proj_params_data
 
 
 def extract_object_styles(processor):
@@ -6028,8 +6173,14 @@ def main():
                     families_data, types_data, instances_data = extract_families_types_instances(
                         processor, custom_instance_params, custom_type_params)
                     
+                    OUTPUT.print_md("   ⏳ Estrazione parametri di progetto...")
+                    project_parameters_data = extract_project_parameters(processor)
+                    project_param_names = set(
+                        r['ParameterName'] for r in project_parameters_data
+                    )
+
                     OUTPUT.print_md("   ⏳ Estrazione parametri per famiglia...")
-                    parameters_data = extract_parameters(processor)
+                    parameters_data = extract_parameters(processor, project_param_names)
 
                     OUTPUT.print_md("   ⏳ Estrazione object style per famiglia...")
                     object_styles_data = extract_object_styles(processor)
@@ -6088,7 +6239,8 @@ def main():
                     csv_writer.add_rows('TAB_Types', types_data)
                     csv_writer.add_rows('TAB_Instances', instances_data)
                     csv_writer.add_rows('TAB_PurgeableElements', purgeable_data)
-                    csv_writer.add_rows('TAB_Parameters', parameters_data)
+                    csv_writer.add_rows('TAB_FamilyParameters', parameters_data)
+                    csv_writer.add_rows('TAB_ProjectParameters', project_parameters_data)
                     csv_writer.add_rows('TAB_ObjectStyle', object_styles_data)
                     csv_writer.add_rows('TAB_HealthChecks', health_checks_data)
                     
