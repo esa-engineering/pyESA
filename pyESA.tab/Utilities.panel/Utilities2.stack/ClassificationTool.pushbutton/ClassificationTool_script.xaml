@@ -124,6 +124,7 @@
                             <TextBlock Text="Syntax:" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="cmbSyntax" Grid.Column="1" Style="{StaticResource ComboStyle}">
                                 <ComboBoxItem Content="Composed - [Classification]Code:Description" IsSelected="True"/>
+                                <ComboBoxItem Content="Composed - Code:Description"/>
                                 <ComboBoxItem Content="Code"/>
                                 <ComboBoxItem Content="Description"/>
                             </ComboBox>

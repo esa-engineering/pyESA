@@ -1,0 +1,117 @@
+﻿3.1;;;Struttura portante
+3.1;3.1.1;;Struttura di fondazione
+3.1;3.1.1;3.1.1.1;Strutture di fondazione dirette
+3.1;3.1.1;3.1.1.2;Strutture di fondazione indirette
+3.1;3.1.2;;Struttura di elevazione
+3.1;3.1.2;3.1.2.1;Strutture di elevazione verticali
+3.1;3.1.2;3.1.2.2;Strutture di elevazioni orizzontali ed inclinate
+3.1;3.1.2;3.1.2.3;Strutture di elevazione spaziali
+3.1;3.1.3;;Struttura di contenimento
+3.1;3.1.3;3.1.3.1;Strutture di contenimento verticali
+3.1;3.1.3;3.1.3.2;Strutture di contenimento orizzontali
+3.2;;;Chiusura
+3.2;3.2.1;;Chiusura verticale
+3.2;3.2.1;3.2.1.1;Pareti perimetrali verticali
+3.2;3.2.1;3.2.1.2;Infissi esterni verticali
+3.2;3.2.2;;Chiusura orizzontale inferiore
+3.2;3.2.2;3.2.2.1;Solai a terra
+3.2;3.2.2;3.2.2.2;Infissi orizzontali
+3.2;3.2.3;;Chiusura orizzontale su spazi esterni
+3.2;3.2.3;3.2.3.1;Solai su spazi aperti
+3.2;3.2.4;;Chiusura superiore
+3.2;3.2.4;3.2.4.1;Coperture
+3.2;3.2.4;3.2.4.2;Infissi esterni orizzontali
+3.3;;;Partizione interna
+3.3;3.3.1;;Partizione interna verticale
+3.3;3.3.1;3.3.1.1;Pareti interne verticali
+3.3;3.3.1;3.3.1.2;Infissi interni verticali
+3.3;3.3.1;3.3.1.3;Elementi di protezione
+3.3;3.3.2;;Partizione interna orizzontale
+3.3;3.3.2;3.3.2.1;Solai
+3.3;3.3.2;3.3.2.2;Soppalchi
+3.3;3.3.2;3.3.2.3;Infissi interni orizzontali
+3.3;3.3.3;;Partizione interna inclinata
+3.3;3.3.3;3.3.3.1;Scale interne
+3.3;3.3.3;3.3.3.2;Rampe interne
+3.4;;;Partizione esterna
+3.4;3.4.1;;Partizione esterna verticale
+3.4;3.4.1;3.4.1.1;Elementi di protezione
+3.4;3.4.1;3.4.1.2;Elementi di separazione
+3.4;3.4.2;;Partizione esterna orizzontale
+3.4;3.4.2;3.4.2.1;Balconi e logge
+3.4;3.4.2;3.4.2.2;Passerelle
+3.4;3.4.3;;Partizione esterna inclinata
+3.4;3.4.3;3.4.3.1;Scale esterne
+3.4;3.4.3;3.4.3.2;Rampe esterne
+3.5;;;Impianto di fornitura servizi
+3.5;3.5.1;;Impianto di climatizzazione
+3.5;3.5.1;3.5.1.1;Alimentazione
+3.5;3.5.1;3.5.1.2;Gruppi termici
+3.5;3.5.1;3.5.1.3;Centrali di trattamento fluidi
+3.5;3.5.1;3.5.1.4;Reti di distribuzioni e terminali
+3.5;3.5.1;3.5.1.5;Reti di scarico condensa
+3.5;3.5.1;3.5.1.6;Canne di esalazione
+3.5;3.5.2;;Impianto idrosanitario
+3.5;3.5.2;3.5.2.1;Allacciamenti
+3.5;3.5.2;3.5.2.2;Macchine idrauliche
+3.5;3.5.2;3.5.2.3;Accumuli
+3.5;3.5.2;3.5.2.4;Riscaldatori
+3.5;3.5.2;3.5.2.5;Reti di distribuzione acqua fredda e terminali
+3.5;3.5.2;3.5.2.6;Reti di distribuzione acqua calda e terminali
+3.5;3.5.2;3.5.2.7;Reti di ricircolo dell'acqua calda
+3.5;3.5.2;3.5.2.8;Apparecchi sanitari
+3.5;3.5.3;;Impianto di smaltimento liquidi
+3.5;3.5.3;3.5.3.1;Reti di scarico acque fecali
+3.5;3.5.3;3.5.3.2;Reti di scarico acque domestiche
+3.5;3.5.3;3.5.3.3;Reti di scarico acque meteoriche
+3.5;3.5.3;3.5.3.4;Reti di ventilazione secondaria
+3.5;3.5.4;;Impianto di smaltimento aeriformi
+3.5;3.5.4;3.5.4.1;Alimentazione
+3.5;3.5.4;3.5.4.2;Macchine
+3.5;3.5.4;3.5.4.3;Reti di canalizzazione
+3.5;3.5.5;;Impianto di smaltimento solidi
+3.5;3.5.5;3.5.5.1;Canne di caduta
+3.5;3.5.5;3.5.5.2;Canne di esalazione
+3.5;3.5.6;;Impianto di distribuzione gas
+3.5;3.5.6;3.5.6.1;Allacciamenti
+3.5;3.5.6;3.5.6.2;Reti di distribuzione e terminali
+3.5;3.5.7;;Impianto elettrico
+3.5;3.5.7;3.5.7.1;Alimentazione
+3.5;3.5.7;3.5.7.2;Allacciamenti
+3.5;3.5.7;3.5.7.3;Apparecchiature elettriche
+3.5;3.5.7;3.5.7.4;Reti di distribuzione e terminali
+3.5;3.5.8;;Impianto di telecomunicazioni
+3.5;3.5.8;3.5.8.1;Alimentazione
+3.5;3.5.8;3.5.8.2;Allacciamenti
+3.5;3.5.8;3.5.8.3;Reti di distribuzione e terminali
+3.5;3.5.9;;Impianto fisso di trasporto
+3.5;3.5.9;3.5.9.1;Alimentazione
+3.5;3.5.9;3.5.9.2;Macchine
+3.5;3.5.9;3.5.9.3;Parti mobili
+3.6;;;Impianto di sicurezza
+3.6;3.6.1;;Impianto antincendio
+3.6;3.6.1;3.6.1.1;Allacciamenti
+3.6;3.6.1;3.6.1.2;Rilevatori e trasduttori
+3.6;3.6.1;3.6.1.3;Reti di distribuzione e terminali
+3.6;3.6.1;3.6.1.4;Allarmi
+3.6;3.6.2;;Impianto di messa a terra
+3.6;3.6.2;3.6.2.1;Reti di raccolta
+3.6;3.6.2;3.6.2.2;Dispersori
+3.6;3.6.3;;Impianto parafulmine
+3.6;3.6.3;3.6.3.1;Elementi di captazione
+3.6;3.6.3;3.6.3.2;Rete
+3.6;3.6.3;3.6.3.3;Dispersori
+3.6;3.6.4;;Impianto antifurto ed antiintrusione
+3.6;3.6.4;3.6.4.1;Alimentazione
+3.6;3.6.4;3.6.4.2;Rivelatori e trasduttori
+3.6;3.6.4;3.6.4.3;Rete
+3.6;3.6.4;3.6.4.4;Allarmi
+3.7;;;Attrezzatura interna
+3.7;3.7.1;;Arredo domestico
+3.7;3.7.1;3.7.1.1;Pareti contenitore
+3.7;3.7.2;;Blocco servizi
+3.8;;;Attrezzatura esterna
+3.8;3.8.1;;Arredi esterni collettivi
+3.8;3.8.2;;Allestimenti esterni
+3.8;3.8.2;3.8.2.1;Recinzioni
+3.8;3.8.2;3.8.2.2;Pavimentazione esterna
