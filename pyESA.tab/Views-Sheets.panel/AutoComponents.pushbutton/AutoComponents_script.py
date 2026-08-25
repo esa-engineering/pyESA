@@ -13,7 +13,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from pyrevit import forms, revit, DB
+from pyrevit import forms, revit, DB, UI
 
 import esa_legend
 from legend_ui import show_config_form, LegendConfig
@@ -21,12 +21,50 @@ from legend_ui import show_config_form, LegendConfig
 doc = revit.doc
 
 
+class LegendComponentSelectionFilter(UI.Selection.ISelectionFilter):
+    """Allow only Legend Components whose represented type has the category."""
+    def __init__(self, expected_category_id):
+        self.expected_category_id = expected_category_id
+
+    def AllowElement(self, element):
+        try:
+            legend_param = element.get_Parameter(
+                DB.BuiltInParameter.LEGEND_COMPONENT)
+            if not legend_param:
+                return False
+
+            type_id = legend_param.AsElementId()
+            if type_id == DB.ElementId.InvalidElementId:
+                return False
+
+            element_type = doc.GetElement(type_id)
+            return bool(element_type and element_type.Category and
+                        element_type.Category.Id == self.expected_category_id)
+        except:
+            return False
+
+    def AllowReference(self, reference, point):
+        return False
+
+
 def select_legend_component(category):
+    expected_category = DB.Category.GetCategory(doc, category)
+    if not expected_category:
+        return None
+
     with forms.WarningBar(title='SELECT A LEGEND COMPONENT (category: {})'.format(
-            DB.Category.GetCategory(doc, category).Name)):
-        
-        legend = revit.pick_element()
-        
+            expected_category.Name)):
+        try:
+            reference = revit.uidoc.Selection.PickObject(
+                UI.Selection.ObjectType.Element,
+                LegendComponentSelectionFilter(expected_category.Id),
+                'Select a Legend Component'
+            )
+            legend = doc.GetElement(reference)
+        except:
+            # Includes the normal Esc/cancel selection case.
+            return None
+
         if not legend:
             return None
             

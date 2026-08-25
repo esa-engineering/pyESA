@@ -150,30 +150,43 @@ def _tag_distribution(layer_widths):
     return positions
 
 
+def _get_reversed_compound_layers(legend_component, doc):
+    """Return reversed compound layers as ``(width, material_id)`` pairs.
+
+    Unlike :func:`get_layers`, this retains zero-width membrane layers so
+    callers that need one annotation slot per compound layer can use it.
+    """
+    layers = []
+
+    try:
+        type_id = legend_component.get_Parameter(
+            DB.BuiltInParameter.LEGEND_COMPONENT).AsElementId()
+        element_type = doc.GetElement(type_id)
+        compound = element_type.GetCompoundStructure() if element_type else None
+        if compound:
+            for layer in reversed(compound.GetLayers()):
+                layers.append((layer.Width, layer.MaterialId))
+    except:
+        pass
+
+    return layers
+
+
 def get_layers(legend_component, doc):
     """
-    Estrae le informazioni sugli strati da un componente legenda compound.
-    
-    Args:
-        legend_component (DB.Element): Il componente legenda
-        doc (DB.Document): Il documento Revit
-        
-    Returns:
-        tuple: (all_widths: list, material_ids: list)
+    Estrae gli strati fisici da un componente legenda compound.
+
+    Gli strati a spessore zero (membrane) restano esclusi per mantenere la
+    compatibilita' con quote e chiamanti esistenti.
     """
-    type_id = legend_component.get_Parameter(DB.BuiltInParameter.LEGEND_COMPONENT).AsElementId()
-    element_type = doc.GetElement(type_id)
-    
     all_width = []
     materials_id = []
-    
-    if element_type and element_type.GetCompoundStructure():
-        compound = element_type.GetCompoundStructure()
-        for layer in reversed(compound.GetLayers()):
-            if layer.Width:
-                all_width.append(layer.Width)
-                materials_id.append(layer.MaterialId)
-                
+
+    for width, material_id in _get_reversed_compound_layers(legend_component, doc):
+        if width > 0:
+            all_width.append(width)
+            materials_id.append(material_id)
+
     return all_width, materials_id
 
 
@@ -196,63 +209,176 @@ def get_layer_count(legend_component, doc):
 # MATERIAL TAGS
 # =============================================================================
 
+def _get_default_text_note_type_id(doc):
+    """Get the document default TextNoteType ID, if one is available."""
+    try:
+        type_id = doc.GetDefaultElementTypeId(DB.ElementTypeGroup.TextNoteType)
+        if type_id and type_id != DB.ElementId.InvalidElementId:
+            return type_id
+    except:
+        pass
+    return None
+
+
+def _get_membrane_text_note_type_id(doc):
+    """Use the preferred membrane note type, or the project default."""
+    preferred_name = 'e_TX_Calibri_1.8_Black'
+    try:
+        text_note_types = DB.FilteredElementCollector(doc).OfClass(DB.TextNoteType)
+        for text_note_type in text_note_types:
+            # SYMBOL_NAME_PARAM is the language-independent Type Name
+            # parameter and is more reliable than Element.Name in IronPython.
+            name_param = text_note_type.get_Parameter(
+                DB.BuiltInParameter.SYMBOL_NAME_PARAM)
+            type_name = name_param.AsString() if name_param else text_note_type.Name
+            if type_name and type_name.strip().lower() == preferred_name.lower():
+                return text_note_type.Id
+    except:
+        pass
+    return _get_default_text_note_type_id(doc)
+
+
+def _get_material_comments(material_id, doc):
+    """Return Material Comments through its language-independent parameter."""
+    try:
+        material = doc.GetElement(material_id)
+        comments_param = material.get_Parameter(
+            DB.BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS) if material else None
+        return comments_param.AsString() if comments_param else ''
+    except:
+        return ''
+
+
+def _add_text_note_leader(text_note, leader_end, leader_elbow):
+    """Add a left TextNote leader using the Material Tag leader geometry."""
+    try:
+        # Create a left line leader, then set its elbow to reproduce the
+        # two-segment Material Tag leader route.
+        leader = text_note.AddLeader(
+            DB.TextNoteLeaderTypes.TNLT_STRAIGHT_L)
+        leader.End = leader_end
+        leader.Elbow = leader_elbow
+    except:
+        pass
+
+
+def _center_text_note_on_tag_slot(text_note, view, doc, tag_head_pt):
+    """Align a TextNote's visible center with a Material Tag spacing slot."""
+    try:
+        doc.Regenerate()
+        text_bb = text_note.get_BoundingBox(view)
+        if not text_bb:
+            return
+
+        # TextNote.Create positions the note from its upper-left corner, while
+        # a tag slot is defined by its TagHeadPosition. Centering the note on
+        # the slot keeps the visible gap to the adjacent tags equal to the
+        # spacing value supplied in the UI.
+        text_center_y = (text_bb.Min.Y + text_bb.Max.Y) / 2.0
+        move_y = tag_head_pt.Y - text_center_y
+        if move_y:
+            DB.ElementTransformUtils.MoveElement(
+                doc, text_note.Id, DB.XYZ(0, move_y, 0))
+    except:
+        pass
+
+
 def create_material_tags(legend_component, tag_type_id, view, doc, is_horizontal=True,
                          tag_offset=0.1, tag_spacing=0.065):
     """
-    Place one material tag per layer on the compound legend component.
-    Tags are created from TOP to BOTTOM.
+    Place one annotation slot per compound layer from TOP to BOTTOM.
+
+    Physical layers receive Material Tags. Zero-width membrane layers receive
+    a text placeholder in the equivalent tag-head position instead.
     """
+    # Do not create membrane placeholders when Material Tags are disabled.
     if not tag_type_id or tag_type_id == DB.ElementId.InvalidElementId:
         return []
-        
+
     ref = DB.Reference(legend_component)
     bb = legend_component.get_BoundingBox(view)
-    
+
     if not bb:
         return []
-        
-    layer_widths, _ = get_layers(legend_component, doc)
-    if not layer_widths:
+
+    # Keep every layer here: a membrane needs a row in the tag list even
+    # though dimensions must continue to use only positive-width layers.
+    layers = _get_reversed_compound_layers(legend_component, doc)
+    if not layers:
         return []
-    
+
+    layer_widths = [layer[0] for layer in layers]
     pts = []
     pt = bb.Max
-    
+
+    # A zero-width layer's distribution position is its boundary (the sum of
+    # preceding widths). It nevertheless gets its own spacing slot below.
     for n, y in enumerate(_tag_distribution(layer_widths)):
         if is_horizontal:
-            new_pt = pt.Add(DB.XYZ(-(bb.Max.X - bb.Min.X) + ((n + 1) * tag_spacing), -(bb.Max.Y - bb.Min.Y) + y, bb.Min.Z))
-            pts.append(new_pt)
+            new_pt = pt.Add(DB.XYZ(-(bb.Max.X - bb.Min.X) + ((n + 1) * tag_spacing),
+                                   -(bb.Max.Y - bb.Min.Y) + y, bb.Min.Z))
         else:
-            new_pt = pt.Add(DB.XYZ(-(bb.Max.X - bb.Min.X) + y, -(n + 1) * tag_spacing, bb.Min.Z))
-            pts.append(new_pt)
-    
+            new_pt = pt.Add(DB.XYZ(-(bb.Max.X - bb.Min.X) + y,
+                                   -(n + 1) * tag_spacing, bb.Min.Z))
+        pts.append(new_pt)
+
     if is_horizontal:
-        Xs = [p.X for p in pts]
-        for i, x in enumerate(Xs[::-1]):
+        xs = [point.X for point in pts]
+        for i, x in enumerate(xs[::-1]):
             pts[i] = DB.XYZ(x, pts[i].Y, pts[i].Z)
-    
+
+    text_note_type_id = None
     created_tags = []
-    for n, pt in enumerate(pts):
+    for n, (width, material_id) in enumerate(layers):
+        pt = pts[n]
+        if is_horizontal:
+            tag_head_pt = DB.XYZ(bb.Max.X + tag_offset,
+                                 bb.Max.Y + (n + 1) * tag_spacing, pt.Z)
+            leader_elbow_pt = DB.XYZ(
+                pt.X, bb.Max.Y + (n + 1) * tag_spacing, pt.Z)
+        else:
+            tag_head_pt = DB.XYZ(bb.Max.X + tag_offset, pt.Y, pt.Z)
+            leader_elbow_pt = DB.XYZ(bb.Max.X, pt.Y, pt.Z)
+
+        if width <= 0:
+            # TextNote has no leader; placing it at the tag head keeps it in
+            # the Material Tag column while the boundary point remains the
+            # layer's logical position.
+            comments = _get_material_comments(material_id, doc)
+            if not comments:
+                continue
+
+            if text_note_type_id is None:
+                text_note_type_id = _get_membrane_text_note_type_id(doc)
+            if text_note_type_id:
+                try:
+                    placeholder = DB.TextNote.Create(
+                        doc, view.Id, tag_head_pt, comments,
+                        text_note_type_id)
+                    _center_text_note_on_tag_slot(
+                        placeholder, view, doc, tag_head_pt)
+                    _add_text_note_leader(placeholder, pt, leader_elbow_pt)
+                    created_tags.append(placeholder)
+                except:
+                    pass
+            continue
+
         try:
             new_tag = DB.IndependentTag.Create(
                 doc, tag_type_id, view.Id, ref,
                 True, DB.TagOrientation.Horizontal, pt
             )
-            
+
             new_tag.LeaderEndCondition = DB.LeaderEndCondition.Free
             new_tag.SetLeaderEnd(ref, pt)
-            
-            if is_horizontal:
-                new_tag.SetLeaderElbow(ref, DB.XYZ(pt.X, bb.Max.Y + (n + 1) * tag_spacing, pt.Z))
-                new_tag.TagHeadPosition = DB.XYZ(bb.Max.X + tag_offset, bb.Max.Y + (n + 1) * tag_spacing, pt.Z)
-            else:
-                new_tag.SetLeaderElbow(ref, DB.XYZ(bb.Max.X, pt.Y, pt.Z))
-                new_tag.TagHeadPosition = DB.XYZ(bb.Max.X + tag_offset, pt.Y, pt.Z)
-                
+
+            new_tag.SetLeaderElbow(ref, leader_elbow_pt)
+            new_tag.TagHeadPosition = tag_head_pt
+
             created_tags.append(new_tag)
         except:
             pass
-            
+
     return created_tags
 
 
