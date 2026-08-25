@@ -22,7 +22,7 @@ selection = revit.get_selection()
 SCRIPT_DIR = os.path.dirname(__file__)
 
 # Syntax options
-SYNTAX_COMPOSED, SYNTAX_CODE, SYNTAX_DESCRIPTION = 0, 1, 2
+SYNTAX_COMPOSED, SYNTAX_COMPOSED_SIMPLE, SYNTAX_CODE, SYNTAX_DESCRIPTION = 0, 1, 2, 3
 
 
 class TreeNode:
@@ -265,6 +265,8 @@ def build_value(node, csv_name, syntax):
         return code
     if syntax == SYNTAX_DESCRIPTION:
         return desc
+    if syntax == SYNTAX_COMPOSED_SIMPLE:
+        return "{}:{}".format(code, desc) if desc else code
     # SYNTAX_COMPOSED
     prefix = "[{}]".format(csv_name.split('_')[0])
     return "{}{}:{}".format(prefix, code, desc) if desc else "{}{}".format(prefix, code)
