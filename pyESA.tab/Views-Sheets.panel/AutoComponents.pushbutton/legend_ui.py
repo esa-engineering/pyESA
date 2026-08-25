@@ -12,13 +12,22 @@ clr.AddReference('PresentationFramework')
 clr.AddReference('PresentationCore')
 clr.AddReference('WindowsBase')
 
-from System.Windows import Window, MessageBox, Visibility
-from System.Windows.Controls import CheckBox, StackPanel as WpfStackPanel
+from System.Windows import Window, MessageBox, Visibility, FontWeights, Thickness
+from System.Windows.Controls import CheckBox, StackPanel as WpfStackPanel, TextBlock
 from System.Windows.Markup import XamlReader
+from System.Windows.Media import SolidColorBrush, Color
 from System.IO import FileStream, FileMode
 
-from pyrevit import DB, revit
+from pyrevit import DB, revit, script
 import math
+
+
+# Section name in pyRevit_config.ini used to remember the last-used settings
+CONFIG_SECTION = 'ESA_AutoComponents'
+
+# Brush for highlighting types that are in use in the selected document
+USED_HIGHLIGHT_BRUSH = SolidColorBrush(Color.FromRgb(215, 235, 215))
+USED_HIGHLIGHT_BRUSH.Freeze()
 
 
 # =============================================================================
@@ -60,6 +69,23 @@ def get_symbol_name(symbol):
         return str(symbol.Id.IntegerValue)
 
 
+def build_type_display_name(element_type):
+    """
+    Costruisce il nome visualizzato di un ElementType per la lista tipi.
+    Deve restare identico per il documento corrente e per i link, perché
+    il match dei tipi usati nei link avviene su questa stringa.
+    """
+    if hasattr(element_type, 'FamilyName') and element_type.FamilyName:
+        param_name = element_type.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
+        if param_name and param_name.AsString():
+            return '{}: {}'.format(element_type.FamilyName, param_name.AsString())
+        return element_type.FamilyName
+    name_param = element_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME)
+    if name_param:
+        return name_param.AsString()
+    return None
+
+
 # =============================================================================
 # DATA CLASSES
 # =============================================================================
@@ -71,7 +97,8 @@ class TypeItem(object):
         self._name = name
         self._type_id = type_id
         self._is_selected = is_selected
-        
+        self._is_used = False
+
     @property
     def Name(self):
         return self._name
@@ -87,6 +114,14 @@ class TypeItem(object):
     @IsSelected.setter
     def IsSelected(self, value):
         self._is_selected = value
+
+    @property
+    def IsUsed(self):
+        return self._is_used
+
+    @IsUsed.setter
+    def IsUsed(self, value):
+        self._is_used = value
 
 
 class LegendConfig(object):
@@ -216,20 +251,28 @@ class LegendConfigForm(Window):
         # Data for filtered list with checkboxes
         self._all_type_items = []      # All TypeItem objects for current category
         self._filtered_type_items = [] # Filtered TypeItem objects (after search)
-        
+
+        # Data for "Used types" document selection
+        self._used_docs = []           # List of (display_name, Document)
+        self._used_types_cache = {}    # (display_name, category_enum) -> set of ids/names
+
         # Carica XAML
         self._load_xaml()
-        
+
         # Inizializza dati
         self._init_categories()
+        self._init_used_docs()
         self._init_dimension_types()
         self._init_tag_types()
-        
+
         # Aggiorna UI iniziale
         self._update_types_list()
         self._update_rows_label()
         self._update_compound_options()
-        
+
+        # Ripristina le ultime impostazioni salvate
+        self._restore_settings()
+
     def _load_xaml(self):
         """Carica e parsa il file XAML."""
         script_dir = os.path.dirname(__file__)
@@ -256,10 +299,12 @@ class LegendConfigForm(Window):
     def _find_controls(self, root):
         """Find all necessary controls in the XAML."""
         self.cbo_category = root.FindName('cbo_category')
+        self.cbo_used_doc = root.FindName('cbo_used_doc')
         self.lst_types = root.FindName('lst_types')
         self.txt_search = root.FindName('txt_search')
         self.btn_clear_search = root.FindName('btn_clear_search')
         self.thumb_resize = root.FindName('thumb_resize')
+        self.btn_select_used = root.FindName('btn_select_used')
         self.btn_select_all = root.FindName('btn_select_all')
         self.btn_deselect_all = root.FindName('btn_deselect_all')
         self.cbo_sort_param = root.FindName('cbo_sort_param')
@@ -287,9 +332,11 @@ class LegendConfigForm(Window):
     def _wire_events(self):
         """Collega gli eventi ai metodi handler."""
         self.cbo_category.SelectionChanged += self.OnCategoryChanged
+        self.cbo_used_doc.SelectionChanged += self.OnUsedDocChanged
         self.txt_search.TextChanged += self.OnSearchTextChanged
         self.btn_clear_search.Click += self.OnClearSearch
         self.thumb_resize.DragDelta += self.OnResizeList
+        self.btn_select_used.Click += self.OnSelectUsed
         self.btn_select_all.Click += self.OnSelectAll
         self.btn_deselect_all.Click += self.OnDeselectAll
         self.txt_columns.TextChanged += self.OnGridParameterChanged
@@ -337,20 +384,8 @@ class LegendConfigForm(Window):
                             if element_type.Kind != DB.WallKind.Basic:
                                 continue
                     
-                    # Get name - try FamilyName: TypeName format for loadable families
-                    if hasattr(element_type, 'FamilyName') and element_type.FamilyName:
-                        param_name = element_type.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
-                        if param_name and param_name.AsString():
-                            type_name = '{}: {}'.format(element_type.FamilyName, param_name.AsString())
-                        else:
-                            type_name = element_type.FamilyName
-                    else:
-                        name_param = element_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME)
-                        if name_param:
-                            type_name = name_param.AsString()
-                        else:
-                            type_name = None
-                    
+                    type_name = build_type_display_name(element_type)
+
                     if type_name:
                         types_dict[type_name] = element_type.Id
                             
@@ -358,7 +393,89 @@ class LegendConfigForm(Window):
             pass
             
         self._types_data[category_enum] = types_dict
-        
+
+    def _init_used_docs(self):
+        """Popola la ComboBox dei documenti per l'evidenziazione dei tipi usati."""
+        self._used_docs = [("Current Document", self.doc)]
+        seen_titles = set()
+        try:
+            collector = DB.FilteredElementCollector(self.doc)\
+                         .OfClass(DB.RevitLinkInstance)
+            for link in collector:
+                link_doc = link.GetLinkDocument()
+                if link_doc is None:
+                    continue  # link scaricato
+                title = link_doc.Title
+                if title in seen_titles:
+                    continue  # più istanze dello stesso link
+                seen_titles.add(title)
+                self._used_docs.append((link.Name.split(" : ")[0], link_doc))
+        except Exception:
+            pass
+
+        self.cbo_used_doc.Items.Clear()
+        for name, _link_doc in self._used_docs:
+            self.cbo_used_doc.Items.Add(name)
+        self.cbo_used_doc.SelectedIndex = 0
+
+    def _compute_used_types(self, target_doc, category_enum, is_link):
+        """
+        Restituisce l'insieme dei tipi con almeno un'istanza nel documento:
+        set di ElementId per il documento corrente, set di nomi
+        ("Famiglia: Tipo") per i documenti linkati.
+        """
+        type_ids = set()
+        try:
+            collector = DB.FilteredElementCollector(target_doc)\
+                         .OfCategory(category_enum)\
+                         .WhereElementIsNotElementType()
+            for inst in collector:
+                tid = inst.GetTypeId()
+                if tid and tid != DB.ElementId.InvalidElementId:
+                    type_ids.add(tid)
+        except Exception:
+            return set()
+
+        if not is_link:
+            return type_ids
+
+        names = set()
+        for tid in type_ids:
+            try:
+                element_type = target_doc.GetElement(tid)
+                if element_type is not None:
+                    name = build_type_display_name(element_type)
+                    if name:
+                        names.add(name)
+            except Exception:
+                continue
+        return names
+
+    def _refresh_used_highlight(self):
+        """Ricalcola i flag IsUsed per il documento selezionato e ridisegna la lista."""
+        if not self._used_docs or self.cbo_used_doc is None:
+            return  # combo non ancora inizializzata (cascata eventi in __init__)
+
+        idx = self.cbo_used_doc.SelectedIndex
+        cat_enum, _is_compound = self._get_selected_category()
+        if idx < 0 or cat_enum is None:
+            for item in self._all_type_items:
+                item.IsUsed = False
+            self._populate_listbox()
+            return
+
+        doc_name, target_doc = self._used_docs[idx]
+        is_link = idx > 0
+        key = (doc_name, cat_enum)
+        if key not in self._used_types_cache:
+            self._used_types_cache[key] = self._compute_used_types(
+                target_doc, cat_enum, is_link)
+        used = self._used_types_cache[key]
+
+        for item in self._all_type_items:
+            item.IsUsed = (item.Name in used) if is_link else (item.TypeId in used)
+        self._populate_listbox()
+
     def _init_dimension_types(self):
         """Carica tutti gli stili di quota disponibili."""
         self._dim_types = {}
@@ -486,13 +603,20 @@ class LegendConfigForm(Window):
             
         self._update_sort_parameters(cat_enum, types_dict)
         self._update_rows_label()
-    
+        self._refresh_used_highlight()
+
     def _populate_listbox(self):
         """Populate the ListBox with filtered items as checkboxes."""
         self.lst_types.Items.Clear()
         for item in self._filtered_type_items:
             cb = CheckBox()
-            cb.Content = item.Name
+            tb = TextBlock()
+            tb.Text = item.Name
+            if item.IsUsed:
+                tb.FontWeight = FontWeights.Bold
+                tb.Background = USED_HIGHLIGHT_BRUSH
+                tb.Padding = Thickness(2, 0, 2, 0)
+            cb.Content = tb
             cb.IsChecked = item.IsSelected
             cb.Tag = item  # Store reference to TypeItem
             cb.Checked += self.OnCheckboxChanged
@@ -672,7 +796,144 @@ class LegendConfigForm(Window):
             
         self.config.calculate_internal_units(self.doc)
         self.config.calculate_rows(len(self.config.selected_types))
-            
+
+    # =========================================================================
+    # SETTINGS PERSISTENCE (pyRevit user config)
+    # =========================================================================
+
+    def _category_index_from_name(self, cat_name):
+        """Mappa il nome categoria all'indice del combo (None se non trovato)."""
+        if not cat_name:
+            return None
+        for i, (_cat_enum, name) in enumerate(COMPOUND_CATEGORIES):
+            if name == cat_name:
+                return i
+        for j, (_cat_enum, name) in enumerate(LOADABLE_CATEGORIES):
+            if name == cat_name:
+                # +1 per la riga separatore
+                return len(COMPOUND_CATEGORIES) + 1 + j
+        return None
+
+    def _select_combo_item_by_text(self, combo, text):
+        """Seleziona l'item del combo con testo uguale a text (no-op se assente)."""
+        if text is None:
+            return
+        for i in range(combo.Items.Count):
+            if str(combo.Items[i]) == str(text):
+                combo.SelectedIndex = i
+                return
+
+    def _save_settings(self):
+        """Salva le impostazioni correnti nella config utente di pyRevit."""
+        try:
+            cfg = script.get_config(CONFIG_SECTION)
+            _cat_enum, is_compound = self._get_selected_category()
+
+            cfg.last_category = str(self.cbo_category.SelectedItem)
+            if self.cbo_used_doc.SelectedIndex >= 0:
+                cfg.last_used_doc = str(self.cbo_used_doc.SelectedItem)
+            if self.cbo_sort_param.SelectedIndex >= 0:
+                cfg.last_sort_param = str(self.cbo_sort_param.SelectedItem)
+            cfg.last_columns = self.txt_columns.Text
+            cfg.last_offset_x = self.txt_offset_x.Text
+            cfg.last_offset_y = self.txt_offset_y.Text
+            cfg.last_orientation = self.cbo_orientation.SelectedIndex
+
+            # Dimensions/Tags solo per categorie compound: per le loadable i
+            # check sono forzati a False da _update_compound_options e
+            # sovrascriverebbero le preferenze reali dell'utente
+            if is_compound:
+                cfg.last_insert_dimensions = bool(self.chk_dimensions.IsChecked)
+                if self.cbo_dim_style.SelectedIndex >= 0:
+                    cfg.last_dim_style = str(self.cbo_dim_style.SelectedItem)
+                cfg.last_dim_offset = self.txt_dim_offset.Text
+                cfg.last_dim_position = self.cbo_dim_position.SelectedIndex
+                cfg.last_insert_tags = bool(self.chk_tags.IsChecked)
+                if self.cbo_tag_type.SelectedIndex >= 0:
+                    cfg.last_tag_type = str(self.cbo_tag_type.SelectedItem)
+                cfg.last_tag_offset = self.txt_tag_offset.Text
+                cfg.last_tag_spacing = self.txt_tag_spacing.Text
+
+            script.save_config()
+        except Exception:
+            pass
+
+    def _restore_settings(self):
+        """Ripristina le ultime impostazioni salvate (fallback silenzioso ai default)."""
+        try:
+            cfg = script.get_config(CONFIG_SECTION)
+        except Exception:
+            return
+
+        # Categoria per prima: il cambio resetta sort, ricerca e highlight
+        try:
+            idx = self._category_index_from_name(cfg.get_option('last_category', None))
+            if idx is not None and idx != self.cbo_category.SelectedIndex:
+                self.cbo_category.SelectedIndex = idx
+        except Exception:
+            pass
+
+        try:
+            doc_name = cfg.get_option('last_used_doc', None)
+            if doc_name:
+                for i, (name, _link_doc) in enumerate(self._used_docs):
+                    if name == doc_name:
+                        self.cbo_used_doc.SelectedIndex = i
+                        break
+        except Exception:
+            pass
+
+        try:
+            self._select_combo_item_by_text(
+                self.cbo_sort_param, cfg.get_option('last_sort_param', None))
+        except Exception:
+            pass
+
+        try:
+            for key, txt in (('last_columns', self.txt_columns),
+                             ('last_offset_x', self.txt_offset_x),
+                             ('last_offset_y', self.txt_offset_y)):
+                value = cfg.get_option(key, None)
+                if value:
+                    txt.Text = str(value)
+        except Exception:
+            pass
+
+        try:
+            orientation = cfg.get_option('last_orientation', None)
+            if orientation is not None and int(orientation) in (0, 1):
+                self.cbo_orientation.SelectedIndex = int(orientation)
+        except Exception:
+            pass
+
+        try:
+            _cat_enum, is_compound = self._get_selected_category()
+            if is_compound:
+                insert_dims = cfg.get_option('last_insert_dimensions', None)
+                if insert_dims is not None:
+                    self.chk_dimensions.IsChecked = bool(insert_dims)
+                self._select_combo_item_by_text(
+                    self.cbo_dim_style, cfg.get_option('last_dim_style', None))
+                value = cfg.get_option('last_dim_offset', None)
+                if value:
+                    self.txt_dim_offset.Text = str(value)
+                dim_pos = cfg.get_option('last_dim_position', None)
+                if dim_pos is not None and int(dim_pos) in (0, 1):
+                    self.cbo_dim_position.SelectedIndex = int(dim_pos)
+                insert_tags = cfg.get_option('last_insert_tags', None)
+                if insert_tags is not None:
+                    self.chk_tags.IsChecked = bool(insert_tags)
+                self._select_combo_item_by_text(
+                    self.cbo_tag_type, cfg.get_option('last_tag_type', None))
+                value = cfg.get_option('last_tag_offset', None)
+                if value:
+                    self.txt_tag_offset.Text = str(value)
+                value = cfg.get_option('last_tag_spacing', None)
+                if value:
+                    self.txt_tag_spacing.Text = str(value)
+        except Exception:
+            pass
+
     # =========================================================================
     # EVENT HANDLERS
     # =========================================================================
@@ -689,7 +950,22 @@ class LegendConfigForm(Window):
             
         self._update_types_list()
         self._update_compound_options()
-        
+
+    def OnUsedDocChanged(self, sender, args):
+        """Handler per cambio documento 'Used types'."""
+        self._refresh_used_highlight()
+
+    def OnSelectUsed(self, sender, args):
+        """Handler per seleziona i tipi in uso (solo filtrati visibili)."""
+        for item in self._filtered_type_items:
+            if item.IsUsed:
+                item.IsSelected = True
+        # Update checkboxes in UI
+        for cb in self.lst_types.Items:
+            if hasattr(cb, 'IsChecked') and cb.Tag is not None and cb.Tag.IsUsed:
+                cb.IsChecked = True
+        self._update_rows_label()
+
     def OnTypesSelectionChanged(self, sender, args):
         """Handler per cambio selezione tipi."""
         self._update_rows_label()
@@ -765,7 +1041,8 @@ class LegendConfigForm(Window):
             return
             
         self._build_config()
-        
+        self._save_settings()
+
         self.result = True
         self.Close()
         
