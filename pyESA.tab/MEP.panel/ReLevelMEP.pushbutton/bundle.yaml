@@ -1,0 +1,6 @@
+title: "ReLevel\nMEP"
+tooltip: >
+  Reassigns the reference level to MEP elements whilst keeping their absolute elevation in the model unchanged.
+  Source of elements: manual selection or active view.
+  Target level: selected manually or calculated for each element as the first level below the insertion point.
+author: ESA Engineering
