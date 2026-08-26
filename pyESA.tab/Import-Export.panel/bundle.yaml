@@ -7,3 +7,4 @@ layout:
   - DwgToRevit
   - DWGManage
   - ExportSchedules
+  - AddParamsToSchedules

@@ -1,0 +1,17 @@
+title: |-
+  Add Parameters
+  to Schedule
+
+tooltip: >
+  Aggiunge uno o più parametri di progetto/condivisi come campi
+  in una o più schedule selezionate.
+  I parametri non disponibili per la categoria della singola schedule
+  vengono saltati e riportati nel report finale.
+
+author: ESA Engineering
+
+min_revit_version: 2019
+
+# Opzionale: su pyRevit 4.8+ puoi decommentare la riga seguente per disabilitare
+# il pulsante nell'editor di famiglie. Lo script fa comunque il controllo da codice.
+# context: doc-project
