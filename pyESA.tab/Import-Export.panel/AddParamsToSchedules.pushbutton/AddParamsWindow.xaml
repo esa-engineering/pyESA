@@ -83,7 +83,9 @@
 
         <!-- riga con checkbox: nome + info -->
         <DataTemplate x:Key="CheckItemTemplate">
-            <CheckBox IsChecked="{Binding checked, Mode=OneWay}"
+            <!-- IsChecked non e' in binding: viene impostato da item_loaded, cosi'
+                 lo stato non dipende da INotifyPropertyChanged. -->
+            <CheckBox Loaded="item_loaded"
                       Checked="item_checked"
                       Unchecked="item_unchecked"
                       Margin="2,3,2,3"
@@ -104,7 +106,11 @@
             <Setter Property="ItemTemplate" Value="{StaticResource CheckItemTemplate}"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <!-- Virtualizzazione attiva (l'elenco dei nativi puo' contare migliaia di
+                 voci) in modalita' Standard: i container non vengono riciclati, quindi
+                 item_loaded rientra a ogni realizzazione e ripristina lo stato. -->
             <Setter Property="VirtualizingStackPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingStackPanel.VirtualizationMode" Value="Standard"/>
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ListBoxItem">
@@ -196,30 +202,55 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Text="2. Parametri di progetto / condivisi"
+                    <TextBlock Grid.Row="0" Text="2. Parametri"
                                Style="{StaticResource PanelTitleStyle}"/>
 
-                    <TextBox Grid.Row="1" x:Name="params_filter" Height="26"
+                    <!-- sorgente dei parametri + filtro di disponibilita' -->
+                    <StackPanel Grid.Row="1" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="src_all" GroupName="ParamSource"
+                                         Content="Tutti" IsChecked="True" FontSize="11"
+                                         VerticalContentAlignment="Center" Margin="0,0,10,0"
+                                         Checked="params_source_changed"/>
+                            <RadioButton x:Name="src_project" GroupName="ParamSource"
+                                         Content="Progetto e condivisi" FontSize="11"
+                                         VerticalContentAlignment="Center" Margin="0,0,10,0"
+                                         Checked="params_source_changed"/>
+                            <RadioButton x:Name="src_native" GroupName="ParamSource"
+                                         Content="Nativi Revit" FontSize="11"
+                                         VerticalContentAlignment="Center"
+                                         Checked="params_source_changed"/>
+                        </StackPanel>
+                        <CheckBox x:Name="only_common" Margin="0,6,0,0" FontSize="11"
+                                  Content="Solo parametri disponibili in tutte le schedule selezionate"
+                                  VerticalContentAlignment="Center"
+                                  Checked="params_source_changed"
+                                  Unchecked="params_source_changed"/>
+                    </StackPanel>
+
+                    <TextBox Grid.Row="2" x:Name="params_filter" Height="26"
                              VerticalContentAlignment="Center" Padding="6,0,6,0"
                              TextChanged="params_filter_changed"
-                             ToolTip="Filtra per nome, tipo o disciplina"/>
+                             ToolTip="Filtra per nome, tipo o sorgente"/>
 
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,6">
-                        <Button Content="Seleziona tutti" Style="{StaticResource LinkButtonStyle}"
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,6,0,6">
+                        <Button Content="Seleziona i mostrati" Style="{StaticResource LinkButtonStyle}"
                                 Click="params_check_all"/>
                         <TextBlock Text="|" Foreground="{StaticResource BorderBrush2}" Margin="4,0"/>
                         <Button Content="Deseleziona tutti" Style="{StaticResource LinkButtonStyle}"
                                 Click="params_uncheck_all"/>
                     </StackPanel>
 
-                    <ListBox Grid.Row="3" x:Name="params_list" Style="{StaticResource CheckListStyle}"/>
+                    <ListBox Grid.Row="4" x:Name="params_list" Style="{StaticResource CheckListStyle}"/>
 
-                    <TextBlock Grid.Row="4" x:Name="params_count" Margin="0,6,0,0"
-                               Style="{StaticResource SubtleTextStyle}"/>
+                    <TextBlock Grid.Row="5" x:Name="params_count" Margin="0,6,0,0"
+                               Style="{StaticResource SubtleTextStyle}"
+                               TextWrapping="Wrap"/>
                 </Grid>
             </Border>
         </Grid>
