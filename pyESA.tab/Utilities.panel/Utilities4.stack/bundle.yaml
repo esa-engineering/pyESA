@@ -1,4 +1,4 @@
 layout:
   - HiddenFinder
   - FilteredSelection
-  - TagInViews
+  - Tag
