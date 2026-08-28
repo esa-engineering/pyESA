@@ -1,0 +1,212 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Delete Duplicate Tags"
+        Height="800" Width="720"
+        MinHeight="640" MinWidth="620"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False"
+        SnapsToDevicePixels="True">
+
+    <Window.Resources>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Padding" Value="8"/>
+        </Style>
+        <Style TargetType="TextBlock" x:Key="Hint">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#666666"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+        <Style TargetType="Button" x:Key="Small">
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- intestazione -->
+            <RowDefinition Height="*" MinHeight="140"/>
+            <!-- viste -->
+            <RowDefinition Height="Auto"/>
+            <!-- criteri -->
+            <RowDefinition Height="*" MinHeight="140"/>
+            <!-- risultati -->
+            <RowDefinition Height="Auto"/>
+            <!-- pulsanti -->
+        </Grid.RowDefinitions>
+
+        <!-- ============ INTESTAZIONE ============ -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="Delete Duplicate Tags"
+                       FontSize="16" FontWeight="SemiBold"/>
+            <TextBlock x:Name="header_hint"
+                       Style="{StaticResource Hint}"
+                       Text="Cerca i tag duplicati nelle viste selezionate."/>
+        </StackPanel>
+
+        <!-- ============ VISTE ============ -->
+        <GroupBox Grid.Row="1" Header="Viste da analizzare">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Filtro:"
+                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Grid.Column="1" x:Name="views_filter"
+                             TextChanged="filter_changed"/>
+                </Grid>
+
+                <Border Grid.Row="1" BorderBrush="#ABADB3" BorderThickness="1">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Padding="4">
+                        <StackPanel x:Name="views_panel"/>
+                    </ScrollViewer>
+                </Border>
+
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0">
+                    <Button x:Name="btn_all" Style="{StaticResource Small}"
+                            Content="Tutte" Click="select_all_click"/>
+                    <Button x:Name="btn_none" Style="{StaticResource Small}"
+                            Content="Nessuna" Click="select_none_click"/>
+                    <Button x:Name="btn_filtered" Style="{StaticResource Small}"
+                            Content="Solo filtrate" Click="select_filtered_click"/>
+                    <TextBlock x:Name="views_count"
+                               VerticalAlignment="Center" Margin="10,0,0,0"
+                               Foreground="#666666"/>
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+
+        <!-- ============ CRITERI ============ -->
+        <GroupBox Grid.Row="2" Header="Criterio di duplicazione">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                    <RadioButton x:Name="crit_same_type"
+                                 GroupName="criterio"
+                                 IsChecked="True"
+                                 Margin="0,0,0,4"
+                                 Checked="criteria_changed"
+                                 Content="Stesso elemento taggato E stesso tipo di tag"/>
+                    <RadioButton x:Name="crit_any_type"
+                                 GroupName="criterio"
+                                 Checked="criteria_changed"
+                                 Content="Stesso elemento taggato, qualsiasi tipo di tag"/>
+                    <TextBlock Style="{StaticResource Hint}"
+                               Text="Il secondo criterio e' piu aggressivo: due tag di famiglie diverse sullo stesso elemento (per esempio codice e dimensione) vengono trattati come duplicati."/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Width="270">
+                    <CheckBox x:Name="opt_linked"
+                              IsChecked="True" Margin="0,0,0,4"
+                              Click="criteria_changed"
+                              Content="Includi i tag di elementi linkati"/>
+                    <CheckBox x:Name="opt_pinned"
+                              IsChecked="False" Margin="0,0,0,4"
+                              Click="criteria_changed"
+                              Content="Includi i tag bloccati (pin)"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <CheckBox x:Name="opt_position"
+                                  IsChecked="False"
+                                  VerticalAlignment="Center"
+                                  Click="criteria_changed"
+                                  Content="Solo se sovrapposti entro"/>
+                        <TextBox x:Name="tol_input"
+                                 Width="46" Text="5"
+                                 Margin="6,0,0,0"
+                                 HorizontalContentAlignment="Right"
+                                 VerticalContentAlignment="Center"
+                                 TextChanged="criteria_changed"/>
+                        <TextBlock Text=" mm" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Tag da mantenere:"
+                                   VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <ComboBox x:Name="keep_combo" Width="130"
+                                  SelectionChanged="criteria_changed"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+
+        <!-- ============ RISULTATI ============ -->
+        <GroupBox Grid.Row="3" Header="Duplicati trovati">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" x:Name="results_summary"
+                           TextWrapping="Wrap" Margin="0,0,0,6"
+                           Text="Nessuna analisi eseguita. Seleziona le viste e premi Analizza."/>
+
+                <Border Grid.Row="1" BorderBrush="#ABADB3" BorderThickness="1">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  Padding="4">
+                        <StackPanel x:Name="results_panel"/>
+                    </ScrollViewer>
+                </Border>
+
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0">
+                    <Button x:Name="btn_res_all" Style="{StaticResource Small}"
+                            Content="Tutti" IsEnabled="False"
+                            Click="results_all_click"/>
+                    <Button x:Name="btn_res_none" Style="{StaticResource Small}"
+                            Content="Nessuno" IsEnabled="False"
+                            Click="results_none_click"/>
+                    <TextBlock x:Name="results_count"
+                               VerticalAlignment="Center" Margin="10,0,0,0"
+                               Foreground="#666666"/>
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+
+        <!-- ============ PULSANTI ============ -->
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" x:Name="footer_hint"
+                       VerticalAlignment="Center"
+                       Style="{StaticResource Hint}"
+                       Text="L'analisi non modifica il modello. Il report completo viene stampato alla chiusura della finestra."/>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Button x:Name="btn_analyse" Content="Analizza"
+                        Width="100" Height="28" Margin="0,0,8,0"
+                        IsDefault="True"
+                        Click="analizza_click"/>
+                <Button x:Name="btn_delete" Content="Elimina selezionati"
+                        Width="150" Height="28" Margin="0,0,8,0"
+                        IsEnabled="False"
+                        Click="elimina_click"/>
+                <Button x:Name="btn_close" Content="Chiudi"
+                        Width="90" Height="28" IsCancel="True"
+                        Click="chiudi_click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

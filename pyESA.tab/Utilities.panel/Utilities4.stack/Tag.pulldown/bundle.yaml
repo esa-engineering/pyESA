@@ -2,3 +2,4 @@ layout:
   - TagElementsInMultipleViews
   - TagInViews
   - TagLinkedRooms_new
+  - DeleteDuplicates
