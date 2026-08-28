@@ -1,6 +1,5 @@
 title: |-
-  Add Parameters
-  to Schedules
+  Add Parameters to Schedules
 
 tooltip: >
   Adds one or more project/shared/native parameters as fields in one or more selected schedules.
