@@ -3,7 +3,7 @@
 
 Names can be loaded from an Excel file (.xlsx, first column),
 from a text file (comma / semicolon / newline separated) or typed
-manually in the input box.
+manually in a table of rows, one workset per row.
 """
 
 __title__ = "Workset\nCreate"
@@ -293,6 +293,7 @@ class WorksetCreateForm(Window):
     def __init__(self):
         self._rows = []
         self._sheets = []
+        self._manual_rows = []   # list of (TextBox, Button) for the manual tab
         self._load_xaml()
 
     # -- xaml ---------------------------------------------------------------
@@ -321,6 +322,7 @@ class WorksetCreateForm(Window):
         self._find_controls(root)
         self._wire_events()
         self._refresh_header()
+        self._add_manual_row()
 
     def _find_controls(self, root):
         self.lbl_model_name = root.FindName('lbl_model_name')
@@ -338,7 +340,9 @@ class WorksetCreateForm(Window):
         self.btn_browse_txt = root.FindName('btn_browse_txt')
         self.btn_load_txt = root.FindName('btn_load_txt')
 
-        self.txt_manual = root.FindName('txt_manual')
+        self.pnl_manual_rows = root.FindName('pnl_manual_rows')
+        self.btn_manual_add = root.FindName('btn_manual_add')
+        self.btn_manual_clear_rows = root.FindName('btn_manual_clear_rows')
         self.btn_load_manual = root.FindName('btn_load_manual')
 
         self.btn_clear = root.FindName('btn_clear')
@@ -350,6 +354,8 @@ class WorksetCreateForm(Window):
         self.btn_load_excel.Click += self.OnLoadExcel
         self.btn_browse_txt.Click += self.OnBrowseTxt
         self.btn_load_txt.Click += self.OnLoadTxt
+        self.btn_manual_add.Click += self.OnManualAdd
+        self.btn_manual_clear_rows.Click += self.OnManualClearRows
         self.btn_load_manual.Click += self.OnLoadManual
         self.btn_clear.Click += self.OnClear
         self.btn_create.Click += self.OnCreate
@@ -369,6 +375,89 @@ class WorksetCreateForm(Window):
 
     def _warn(self, message):
         TaskDialog.Show(DIALOG_TITLE, message)
+
+    # -- manual rows --------------------------------------------------------
+
+    def _add_manual_row(self, name="", focus=False):
+        """Add one row to the manual table: TextBox + delete button."""
+        from System.Windows.Controls import (
+            Grid, ColumnDefinition, TextBox, Button
+        )
+        from System.Windows import GridLength, GridUnitType, Thickness
+        from System.Windows.Input import Key
+
+        row_grid = Grid()
+        row_grid.Margin = Thickness(0, 1, 0, 1)
+
+        col1 = ColumnDefinition()
+        col1.Width = GridLength(1, GridUnitType.Star)
+        col2 = ColumnDefinition()
+        col2.Width = GridLength(30, GridUnitType.Pixel)
+        row_grid.ColumnDefinitions.Add(col1)
+        row_grid.ColumnDefinitions.Add(col2)
+
+        txt_name = TextBox()
+        txt_name.FontSize = 11
+        txt_name.Padding = Thickness(3, 2, 3, 2)
+        txt_name.Text = name
+        txt_name.SetValue(Grid.ColumnProperty, 0)
+
+        btn_del = Button()
+        btn_del.Content = "✕"
+        btn_del.Width = 24
+        btn_del.Height = 24
+        btn_del.FontSize = 11
+        btn_del.ToolTip = "Remove this workset"
+        btn_del.SetValue(Grid.ColumnProperty, 1)
+
+        row_grid.Children.Add(txt_name)
+        row_grid.Children.Add(btn_del)
+
+        self.pnl_manual_rows.Children.Add(row_grid)
+        row_tuple = (txt_name, btn_del)
+        self._manual_rows.append(row_tuple)
+
+        def on_delete(sender, args, grid=row_grid, tup=row_tuple):
+            self.pnl_manual_rows.Children.Remove(grid)
+            if tup in self._manual_rows:
+                self._manual_rows.remove(tup)
+            if not self._manual_rows:
+                self._add_manual_row()
+        btn_del.Click += on_delete
+
+        # Enter on the last row appends a new empty one
+        def on_key_down(sender, args, tup=row_tuple):
+            if args.Key != Key.Return:
+                return
+            args.Handled = True
+            if tup in self._manual_rows \
+                    and self._manual_rows.index(tup) == len(self._manual_rows) - 1:
+                self._add_manual_row(focus=True)
+        txt_name.KeyDown += on_key_down
+
+        if focus:
+            txt_name.Focus()
+
+    def _get_manual_names(self):
+        """Read the manual table; a row may still hold separated names."""
+        names = []
+        for txt_name, _btn_del in self._manual_rows:
+            raw = txt_name.Text if txt_name.Text else ''
+            for part in split_names(raw):
+                if part:
+                    names.append(part)
+        return names
+
+    def _populate_manual_rows(self, name_list):
+        """Rebuild the manual table from a list of names."""
+        self.pnl_manual_rows.Children.Clear()
+        self._manual_rows = []
+
+        for name in name_list:
+            self._add_manual_row(name)
+
+        if not name_list:
+            self._add_manual_row()
 
     def _build_rows(self, raw_names):
         """Turn raw strings into preview rows with a status."""
@@ -508,8 +597,17 @@ class WorksetCreateForm(Window):
             return
         self._set_rows(values, "Text file")
 
+    def OnManualAdd(self, sender, args):
+        self._add_manual_row(focus=True)
+
+    def OnManualClearRows(self, sender, args):
+        self._populate_manual_rows([])
+
     def OnLoadManual(self, sender, args):
-        values = split_names(self.txt_manual.Text)
+        values = self._get_manual_names()
+        if not values:
+            self._warn("Type at least one workset name.")
+            return
         self._set_rows(values, "Manual input")
 
     def OnClear(self, sender, args):
