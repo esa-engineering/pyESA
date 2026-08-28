@@ -1,0 +1,27 @@
+title:
+  Workset
+
+  Create
+
+tooltip: >-
+  Creates user worksets in the current workshared model.
+
+  INPUT MODES:
+   1. Excel (.xlsx / .xlsm): names read from the first column (A)
+      of the selected sheet, with optional header skip.
+   2. Text file (.txt / .csv): names separated by comma, semicolon
+      or line break.
+   3. Manual input: names typed directly in the window.
+
+  HOW IT WORKS:
+   - Load a list: the preview shows each name with its status
+     (NEW, already existing, duplicated in the list, invalid name).
+   - "Create Worksets" creates only the entries flagged as NEW;
+     existing and duplicated names are skipped and reported.
+   - Everything runs in a single transaction and a final report
+     lists what was created and what was not.
+
+  NOTE - the model must already be workshared: if it is not,
+  the tool warns and stops without enabling worksharing.
+
+author: "pyESA"
