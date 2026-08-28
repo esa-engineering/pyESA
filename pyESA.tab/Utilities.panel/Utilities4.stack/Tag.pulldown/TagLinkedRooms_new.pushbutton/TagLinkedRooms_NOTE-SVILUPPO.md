@@ -6,7 +6,8 @@ Registro della sessione di analisi, riprogettazione e debug dello script
 | | |
 |---|---|
 | **Script** | `pyESA.tab/Utilities.panel/Utilities4.stack/Tag.pulldown/TagLinkedRooms_new.pushbutton/TagLinkedRooms_script.py` |
-| **Versioni** | da 3.0 a 4.1 |
+| **Grafica** | `TagLinkedRoomsUI.xaml` (stessa cartella) |
+| **Versioni** | da 3.0 a 5.0 |
 | **Date** | 27-28 agosto 2026 |
 | **Ambiente di test** | Revit 2026.4, pyRevit 5.3.1.25308 |
 | **Autori script** | Tommaso Lorenzi, Andrea Patti |
@@ -665,21 +666,56 @@ legittimi.
 | `HUGE_Z` | 3280 ft (~1 km) | sostituto finito di un view range illimitato |
 | `MAX_SEGMENT_TESTS` | 40000 | valvola sul test segmento-segmento |
 | `PREVIEW_ROW_LIMIT` | 250 | righe di dettaglio in anteprima |
-| `LEVEL_BAND_METERS` | 2.0 | altezza della fascia sopra il livello della vista |
+| `LEVEL_BAND_METERS` | 2.0 | altezza della fascia: da v5.0 è solo il valore precompilato nella finestra, il valore effettivo arriva dall'input |
+| `XAML_FILE_NAME` | `TagLinkedRoomsUI.xaml` | grafica, cercata con `script.get_bundle_file` e in fallback accanto allo script |
 
-### Opzioni
+### Comportamenti fissi (da v5.0 non più opzionali)
 
-| opzione | default | effetto |
-|---|:---:|---|
-| Limita alle rooms dentro la crop region / scope box | on | attiva il test XY |
-| Allinea i tag alla rotazione della vista | on | rotazione differita a fine vista |
-| Salta le rooms che hanno già un tag nella vista | on | dedup su `(link_id, room_id)` |
-| Crea i tag senza leader | on | `HasLeader = False` |
-| Richiedi che il cut plane attraversi la room | off | solo modo geometrico, più restrittivo |
-| Riposiziona i tag nella porzione visibile | on | `pick_insertion_point` cerca un punto in room ∩ crop |
-| Considera solo i primi 2.0 m sopra il livello | on | fascia verticale |
-| Forza il modo geometrico | off | diagnostica e confronto fra strategie |
-| Solo anteprima | off | dry-run, nessuna modifica |
+| comportamento | effetto |
+|---|---|
+| Limite alla crop region / scope box | attiva il test XY |
+| Salta le rooms già taggate | dedup su `(link_id, room_id)` |
+| Tag senza leader | `HasLeader = False` |
+| Riposiziona nella porzione visibile | `pick_insertion_point` cerca un punto in room ∩ crop |
+| Fascia verticale | sempre applicata, altezza da input |
+
+### Controlli nella finestra XAML
+
+| controllo | `x:Name` | note |
+|---|---|---|
+| Sorgente rooms | `source_combo` | al cambio ricalcola la disponibilità di L1 |
+| Info volumi | `source_info` | dichiara il motivo se L1 non è applicabile |
+| Strategia L1 / L2 | `strategy_solid`, `strategy_geo` | gruppo disabilitato se L1 non applicabile |
+| Tipo di Room Tag | `tag_combo` | |
+| Altezza fascia | `band_input` | metri, virgola o punto, 0 = intero view range |
+| Viste | `views_panel` | checkbox generate in codice, con filtro testuale |
+| Solo anteprima | `dryrun_check` | non spuntata di default |
+| Diagnostica avanzata | `diag_check` | non spuntata: attiva il report dettagliato al posto di quello base |
+
+### I due report (v5.1)
+
+Sono **alternativi**: chi chiede il dettaglio non vuole anche il riassunto.
+
+| | report base (default) | report dettagliato (`diag_check`) |
+|---|---|---|
+| intestazione | modello, tag, strategia, fascia | come base, più volumi, transform del link, istanze, modo |
+| per vista | individuate, taggate, già taggate, errori | strategia, view range, quote livelli, fascia, limite XY, campioni degli esclusi con confronto fra le fonti |
+| totali | rooms nel modello, individuate, taggate, già taggate, scartate senza punto, tag fuori crop, errori, viste saltate | come base, più conteggi per causa di esclusione e dettaglio room per room |
+| avvisi | **sempre** | **sempre** |
+| errori di creazione | **sempre** | **sempre** |
+
+Il report base viene emesso in tutti e tre gli esiti: dopo la creazione, in modo
+anteprima, e quando non c'è nulla da creare. Quest'ultimo caso è quello che
+conta: un avviso che rimanda a un pannello di output vuoto è esattamente il
+difetto che ha reso lunga la diagnosi delle sezioni 7 e 8.
+
+### Rimosse in v5.0
+
+| funzione | motivo |
+|---|---|
+| Allinea i tag alla rotazione della vista | non richiesta; rimossi `get_view_rotation`, la coda di rotazione e `ElementTransformUtils` |
+| Richiedi che il cut plane attraversi la room | non richiesta |
+| Forza il modo geometrico | non richiesta; il dispatcher ora sceglie in base a sorgente e scelta utente |
 
 ### Strategie
 

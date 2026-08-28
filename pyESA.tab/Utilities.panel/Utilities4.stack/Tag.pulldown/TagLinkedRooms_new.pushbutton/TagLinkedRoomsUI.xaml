@@ -1,0 +1,174 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Linked Room Tag in Multiple Views"
+        Height="720" Width="640"
+        MinHeight="580" MinWidth="540"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False"
+        SnapsToDevicePixels="True">
+
+    <Window.Resources>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Padding" Value="8"/>
+        </Style>
+        <Style TargetType="TextBlock" x:Key="Hint">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#666666"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+        <Style TargetType="Button" x:Key="Small">
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- sorgente -->
+            <RowDefinition Height="Auto"/>
+            <!-- strategia -->
+            <RowDefinition Height="Auto"/>
+            <!-- tag e fascia -->
+            <RowDefinition Height="Auto"/>
+            <!-- viste -->
+            <RowDefinition Height="*"/>
+            <!-- anteprima + pulsanti -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ============ INTESTAZIONE ============ -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="Linked Room Tag in Multiple Views"
+                       FontSize="16" FontWeight="SemiBold"/>
+            <TextBlock x:Name="header_hint"
+                       Style="{StaticResource Hint}"
+                       Text="Tagga le rooms visibili nelle viste selezionate."/>
+        </StackPanel>
+
+        <!-- ============ SORGENTE ROOMS ============ -->
+        <GroupBox Grid.Row="1" Header="Modello che contiene le rooms">
+            <StackPanel>
+                <ComboBox x:Name="source_combo"
+                          SelectionChanged="source_changed"/>
+                <TextBlock x:Name="source_info"
+                           Style="{StaticResource Hint}"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- ============ STRATEGIA ROOMS LINKATE ============ -->
+        <GroupBox Grid.Row="2" x:Name="strategy_group"
+                  Header="Strategia di identificazione (rooms linkate)">
+            <StackPanel>
+                <RadioButton x:Name="strategy_solid"
+                             GroupName="strategy"
+                             Content="Filtro a solido (L1) - piu preciso, piu lento"
+                             Margin="0,0,0,4"/>
+                <RadioButton x:Name="strategy_geo"
+                             GroupName="strategy"
+                             Content="Modo geometrico (L2) - piu rapido, approssimato"/>
+                <TextBlock x:Name="strategy_info"
+                           Style="{StaticResource Hint}"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- ============ TAG E FASCIA VERTICALE ============ -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="200"/>
+            </Grid.ColumnDefinitions>
+
+            <GroupBox Grid.Column="0" Header="Tipo di Room Tag" Margin="0,0,10,10">
+                <ComboBox x:Name="tag_combo"/>
+            </GroupBox>
+
+            <GroupBox Grid.Column="1" Header="Fascia verticale">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox x:Name="band_input"
+                                 Width="60" Text="2.00"
+                                 HorizontalContentAlignment="Right"
+                                 VerticalContentAlignment="Center"/>
+                        <TextBlock Text=" m sopra il livello"
+                                   VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource Hint}"
+                               Text="0 = usa l'intero view range della vista."/>
+                </StackPanel>
+            </GroupBox>
+        </Grid>
+
+        <!-- ============ VISTE ============ -->
+        <GroupBox Grid.Row="4" Header="Viste da taggare">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Filtro:"
+                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Grid.Column="1" x:Name="views_filter"
+                             TextChanged="filter_changed"/>
+                </Grid>
+
+                <Border Grid.Row="1" BorderBrush="#ABADB3" BorderThickness="1">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Padding="4">
+                        <StackPanel x:Name="views_panel"/>
+                    </ScrollViewer>
+                </Border>
+
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0">
+                    <Button x:Name="btn_all" Style="{StaticResource Small}"
+                            Content="Tutte" Click="select_all_click"/>
+                    <Button x:Name="btn_none" Style="{StaticResource Small}"
+                            Content="Nessuna" Click="select_none_click"/>
+                    <Button x:Name="btn_visible" Style="{StaticResource Small}"
+                            Content="Solo filtrate" Click="select_filtered_click"/>
+                    <TextBlock x:Name="views_count"
+                               VerticalAlignment="Center" Margin="10,0,0,0"
+                               Foreground="#666666"/>
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+
+        <!-- ============ ANTEPRIMA E PULSANTI ============ -->
+        <Grid Grid.Row="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <CheckBox x:Name="dryrun_check"
+                          IsChecked="False" Margin="0,0,0,4"
+                          Content="Solo anteprima: analizza senza creare i tag"/>
+                <CheckBox x:Name="diag_check"
+                          IsChecked="False"
+                          Content="Diagnostica avanzata: report dettagliato nell'output"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Button x:Name="btn_cancel" Content="Annulla"
+                        Width="90" Height="28" Margin="0,0,8,0"
+                        Click="annulla_click"/>
+                <Button x:Name="btn_ok" Content="Procedi"
+                        Width="110" Height="28" IsDefault="True"
+                        Click="procedi_click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,61 +1,34 @@
 # -*- coding: utf-8 -*-
 # Intestazione dello script con metadati
 __title__   = "Linked Room Tag\nin Multiple Views"
-__doc__     = """Version = 4.1
+__doc__     = """Version = 5.1
 Date    = 27.08.2026
 ________________________________________________________________
-Tagga automaticamente le rooms visibili nelle viste selezionate,
-con il tag scelto, prendendo le rooms dal modello corrente oppure
-da un modello linkato selezionato dall'utente.
-
-NOVITA' v4.0 - riscrittura dell'identificazione delle rooms:
-
-1. DELEGA A REVIT invece di replicarne il motore di visibilita.
-   Tre strategie in cascata, con degradazione dichiarata:
-   - L0 "visibilita Revit" (rooms dell'host): collector view-scoped.
-     Revit applica crop, view range, fase, filtri, design option ed
-     elementi nascosti. La categoria Rooms viene riattivata in una
-     transazione di sola analisi che viene poi annullata.
-   - L1 "filtro a solido" (rooms linkate): il volume visibile della
-     vista viene estruso, portato in coordinate del link e usato come
-     ElementIntersectsSolidFilter. Richiede i volumi calcolati nel
-     modello linkato (rilevato a runtime).
-   - L2 "geometrico" (fallback): test di sovrapposizione AREA contro
-     AREA fra il contorno della room e la crop region, non piu il
-     solo punto di inserimento.
-   Quando L1 e' effettivamente disponibile la scelta fra L1 e L2 viene
-   proposta all'utente con un dialogo dedicato; quando non lo e', il
-   motivo viene dichiarato nel report invece di essere taciuto.
-
-2. SOVRAPPOSIZIONE PARZIALE. Una room a cavallo del bordo della crop
-   viene riconosciuta come visibile e il tag viene posizionato nella
-   porzione effettivamente visibile.
-
-3. PLAN THEN APPLY. L'identificazione non modifica il modello e
-   produce un piano ispezionabile. L'anteprima mostra cosa verra
-   creato prima di crearlo. Esiste un modo di sola anteprima.
-
-4. DIAGNOSTICA AZIONABILE. Strategia usata per vista, motivo delle
-   esclusioni, avvisi espliciti dove prima si degradava in silenzio.
-
-NOVITA' v4.1:
-- Quote dei livelli lette come ProjectElevation (coordinate interne) e non
-  come Elevation, che con 'Elevation Base' sul Survey Point restituisce
-  l'altitudine sul livello del mare e non e' confrontabile con la geometria.
-  Aggiunto un controllo di coerenza fra quote dei livelli e geometria.
-- FASCIA VERTICALE opzionale: il test verticale puo' essere limitato ai primi
-  LEVEL_BAND_METERS metri sopra il livello della vista, intersecati col view
-  range, per non intercettare le rooms del piano superiore.
+Automatically tag the rooms visible in the selected views
+with the chosen tag, taking the rooms from the current model or
+from a linked model selected by the user.
 ________________________________________________________________
-Author(s): Tommaso Lorenzi, Andrea Patti
+Author(s): Andrea Patti
 """
 
 # -------------------------------
 # SEZIONE IMPORT MODULI
 # -------------------------------
-import math
+import os.path as op
+
+import clr
+# Gli assembly WPF servono per costruire in codice le checkbox delle viste.
+# Referenziati esplicitamente per non dipendere dall'ordine di import ne da
+# cosa il motore IronPython di pyRevit ha gia caricato.
+for _asm in ("WindowsBase", "PresentationCore", "PresentationFramework"):
+    try:
+        clr.AddReference(_asm)
+    except Exception:
+        pass
 
 from System.Collections.Generic import List
+from System.Windows import Thickness, Visibility
+from System.Windows import Controls
 
 from pyrevit import revit, script, DB, forms
 from Autodesk.Revit.DB import (
@@ -66,7 +39,6 @@ from Autodesk.Revit.DB import (
     BuiltInParameter,
     LinkElementId,
     ElementId,
-    ElementTransformUtils,
     Line,
     UV,
     XYZ,
@@ -102,27 +74,27 @@ LEVEL_BAND_FT = LEVEL_BAND_METERS / 0.3048
 
 HOST_LABEL = "<< Modello corrente >>"
 
-# Etichette opzioni (selezionate = attive)
-OPT_CROP    = "Limita alle rooms dentro la crop region / scope box"
-OPT_ROTATE  = "Allinea i tag alla rotazione della vista (scope box)"
-OPT_SKIPDUP = "Salta le rooms che hanno gia un tag nella vista"
-OPT_NOLEAD  = "Crea i tag senza leader"
-OPT_CUT     = "Richiedi che il cut plane attraversi la room (solo modo geometrico)"
-OPT_MOVEPT  = "Riposiziona i tag nella porzione visibile della room"
-OPT_BAND    = ("Considera solo i primi {:.1f} m sopra il livello della vista "
-               "(esclude le rooms del piano superiore)".format(LEVEL_BAND_METERS))
-OPT_FORCEGEO = "Forza il modo geometrico (diagnostica e confronto)"
-OPT_DRYRUN  = "Solo anteprima: analizza senza creare i tag"
+# Grafica della finestra di setup, nella stessa cartella dello script.
+XAML_FILE_NAME = "TagLinkedRoomsUI.xaml"
 
-ALL_OPTIONS = [OPT_CROP, OPT_ROTATE, OPT_SKIPDUP, OPT_NOLEAD,
-               OPT_CUT, OPT_MOVEPT, OPT_BAND, OPT_FORCEGEO, OPT_DRYRUN]
-DEFAULT_OPTIONS = [OPT_CROP, OPT_ROTATE, OPT_SKIPDUP, OPT_NOLEAD,
-                   OPT_MOVEPT, OPT_BAND]
-
-# Scelta della strategia per le rooms linkate, proposta solo quando il filtro
-# a solido (L1) e' effettivamente disponibile.
-L1_CHOICE_SOLID = "Filtro a solido (L1) - piu preciso, piu lento"
-L1_CHOICE_GEO   = "Modo geometrico (L2) - piu rapido, approssimato"
+# -------------------------------------------------------------------------
+# COMPORTAMENTI FISSI
+# -------------------------------------------------------------------------
+# Queste funzioni non sono piu opzionali: sono sempre attive. Restano come
+# costanti nominate perche il codice a valle resti leggibile e perche
+# riportarle a opzione, se un giorno servisse, sia un intervento localizzato.
+#
+# opt_crop      limita le rooms alla crop region / scope box della vista
+# opt_skip_dup  salta le rooms che hanno gia un tag nella vista
+# opt_no_leader crea i tag senza leader
+# opt_move_pt   riposiziona il tag nella porzione visibile della room
+#
+# La fascia verticale e' sempre attiva, ma la sua altezza arriva dall'input
+# della finestra: 0 significa nessuna fascia, si usa l'intero view range.
+opt_crop = True
+opt_skip_dup = True
+opt_no_leader = True
+opt_move_pt = True
 
 # Avvisi raccolti durante l'analisi e stampati in coda al report
 WARNINGS = []
@@ -649,21 +621,6 @@ def build_view_xy_polygon(view):
             pass
 
     return None, "nessun limite XY"
-
-
-def get_view_rotation(view):
-    """Angolo (radianti) fra l'asse X del modello e la direzione 'destra'
-    della vista, misurato attorno alla direzione di vista.
-    Diverso da 0 quando la pianta e' ruotata da uno scope box."""
-    try:
-        angle = XYZ.BasisX.AngleOnPlaneTo(view.RightDirection, view.ViewDirection)
-    except Exception:
-        return 0.0
-    while angle > math.pi:
-        angle -= 2.0 * math.pi
-    while angle < -math.pi:
-        angle += 2.0 * math.pi
-    return angle
 
 
 # -------------------------------
@@ -1198,10 +1155,6 @@ def strategy_revit_visibility(view, ctx):
     probe = ctx["probe"].get(get_element_id_value(view.Id))
     if probe is None or not probe.get("cat_ok", False):
         return None
-    if not ctx["opt_crop"] and not probe.get("crop_ok", False):
-        # L'utente ha chiesto di ignorare la crop ma non abbiamo potuto
-        # disattivarla: Revit la applicherebbe comunque.
-        return None
 
     try:
         rooms = FilteredElementCollector(doc, view.Id)\
@@ -1247,10 +1200,6 @@ def strategy_solid_filter(view, ctx):
         # L'utente ha scelto il modo geometrico pur avendo L1 disponibile.
         return None
     if not ctx["volumes_ok"]:
-        return None
-    if not ctx["opt_crop"]:
-        # Senza limite XY non esiste un volume finito sensato da estrudere:
-        # il solo test utile e' quello verticale, che fa il modo geometrico.
         return None
 
     xy_polygon = ctx["view_info"][get_element_id_value(view.Id)]["xy_polygon"]
@@ -1315,7 +1264,7 @@ def strategy_geometric(view, ctx):
     vid = get_element_id_value(view.Id)
     info = ctx["view_info"][vid]
     view_range = info["view_range"]
-    xy_polygon = info["xy_polygon"] if ctx["opt_crop"] else None
+    xy_polygon = info["xy_polygon"]
 
     stats = {"out_z": 0, "out_xy": 0, "out_phase": 0, "no_geo": 0,
              "out_band": 0,
@@ -1329,7 +1278,6 @@ def strategy_geometric(view, ctx):
     low, top = get_vertical_limits(view_range, ctx["opt_band"])
     raw_low = view_range["low"]
     raw_top = view_range["top"]
-    cut = view_range["cut"]
 
     result = []
     for room in ctx["placed_rooms"]:
@@ -1375,12 +1323,6 @@ def strategy_geometric(view, ctx):
                 _sample_z("fuori dal view range")
             continue
 
-        if ctx["opt_cut"] and cut is not None:
-            if not (geo["z_min"] - Z_TOL <= cut <= geo["z_max"] + Z_TOL):
-                stats["out_z"] += 1
-                _sample_z("il cut plane ({:.2f}) non la attraversa".format(cut))
-                continue
-
         # Test orizzontale: area contro area, con fallback sul punto se il
         # contorno della room non e' leggibile.
         if xy_polygon is not None:
@@ -1409,37 +1351,32 @@ def resolve_visible_rooms(view, ctx):
 
     Restituisce (rooms, nome_strategia, nota, stats).
     """
-    if not ctx["force_geo"]:
-        primary = None
-        primary_name = None
-        if ctx["source_is_host"]:
-            primary = strategy_revit_visibility(view, ctx)
-            primary_name = "visibilita Revit"
-        else:
-            primary = strategy_solid_filter(view, ctx)
-            primary_name = "filtro a solido"
+    if ctx["source_is_host"]:
+        primary = strategy_revit_visibility(view, ctx)
+        primary_name = "visibilita Revit"
+    else:
+        primary = strategy_solid_filter(view, ctx)
+        primary_name = "filtro a solido"
 
-        if primary is not None:
-            rooms, note = primary
-            if rooms:
-                return rooms, primary_name, note, {}
-            geo_rooms, geo_stats = strategy_geometric(view, ctx)
-            if geo_rooms:
-                warn("Vista '{}': la strategia '{}' ha restituito 0 rooms mentre "
-                     "il modo geometrico ne trova {}. Uso il modo geometrico e "
-                     "segnalo la discrepanza.".format(
-                         view.Name, primary_name, len(geo_rooms)))
-                return geo_rooms, "geometrico (fallback)", \
-                       "discrepanza con '{}'".format(primary_name), geo_stats
-            return [], primary_name, note, {}
+    if primary is not None:
+        rooms, note = primary
+        if rooms:
+            return rooms, primary_name, note, {}
+        geo_rooms, geo_stats = strategy_geometric(view, ctx)
+        if geo_rooms:
+            warn("Vista '{}': la strategia '{}' ha restituito 0 rooms mentre "
+                 "il modo geometrico ne trova {}. Uso il modo geometrico e "
+                 "segnalo la discrepanza.".format(
+                     view.Name, primary_name, len(geo_rooms)))
+            return geo_rooms, "geometrico (fallback)", \
+                   "discrepanza con '{}'".format(primary_name), geo_stats
+        return [], primary_name, note, {}
 
     geo_rooms, geo_stats = strategy_geometric(view, ctx)
     if geo_rooms is None:
         return [], "nessuna", "view range non leggibile", geo_stats
 
-    if ctx["force_geo"]:
-        reason = "modo geometrico forzato dalle opzioni"
-    elif not ctx["source_is_host"] and not ctx["use_solid_filter"]:
+    if not ctx["source_is_host"] and not ctx["use_solid_filter"]:
         reason = "modo geometrico scelto dall'utente"
     else:
         reason = "strategia primaria non applicabile"
@@ -1449,13 +1386,17 @@ def resolve_visible_rooms(view, ctx):
 # -------------------------------
 # SEZIONE PREPARAZIONE VISTE PER L'ANALISI
 # -------------------------------
-def prepare_view_for_probe(view, opt_crop):
+def prepare_view_for_probe(view):
     """Rende la vista interrogabile dal collector view-scoped.
+
+    Riattiva la categoria Rooms, che nelle viste dove si taggano le rooms e'
+    quasi sempre spenta: un collector view-scoped su categoria nascosta
+    restituisce zero elementi.
 
     Va chiamata dentro la transazione di sola analisi, che viene poi
     annullata: nessuna di queste modifiche sopravvive.
     """
-    info = {"cat_ok": True, "crop_ok": True, "notes": []}
+    info = {"cat_ok": True, "notes": []}
 
     if ROOMS_CAT_ID is None:
         info["cat_ok"] = False
@@ -1474,23 +1415,14 @@ def prepare_view_for_probe(view, opt_crop):
         info["cat_ok"] = False
         info["notes"].append("V/G non modificabile ({})".format(err))
 
-    if not opt_crop:
-        try:
-            if view.CropBoxActive:
-                view.CropBoxActive = False
-                info["notes"].append("crop disattivata temporaneamente")
-        except Exception as err:
-            info["crop_ok"] = False
-            info["notes"].append("crop non disattivabile ({})".format(err))
-
     return info
 
 
 # =========================================================================
-# FASE 0 - DIALOGHI DI SETUP
+# FASE 0 - RACCOLTA DATI E FINESTRA DI SETUP
 # =========================================================================
 
-# --- Modello che contiene le rooms ---
+# --- Sorgenti disponibili: modello corrente e link caricati ---
 link_instances = FilteredElementCollector(doc).OfClass(RevitLinkInstance).ToElements()
 loaded_links = [lk for lk in link_instances if lk.GetLinkDocument() is not None]
 
@@ -1503,62 +1435,17 @@ for link in loaded_links:
 
 source_labels = [HOST_LABEL] + sorted([k for k in source_dict.keys() if k != HOST_LABEL])
 
-selected_source = forms.SelectFromList.show(
-    source_labels,
-    multiselect=False,
-    button_name='Seleziona Modello',
-    title='Modello che contiene le Rooms'
-)
-
-if not selected_source:
-    script.exit()
-
-selected_link = source_dict[selected_source]
-if selected_link is None:
-    room_doc = doc
-    link_transform = DB.Transform.Identity
-    link_id_key = -1
-    source_is_host = True
-else:
-    room_doc = selected_link.GetLinkDocument()
-    link_transform = selected_link.GetTotalTransform()
-    link_id_key = get_element_id_value(selected_link.Id)
-    source_is_host = False
-
-# Prerequisito del filtro a solido: volumi calcolati nel documento sorgente.
-volumes_ok = False
-try:
-    volumes_ok = bool(DB.AreaVolumeSettings.GetAreaVolumeSettings(room_doc).ComputeVolumes)
-except Exception as err:
-    warn("Impostazione 'Area and Volume Computations' non leggibile in "
-         "'{}' ({}): il filtro a solido verra saltato.".format(selected_source, err))
-if not source_is_host and not volumes_ok:
-    warn("Nel modello '{}' i volumi delle rooms NON sono calcolati "
-         "(Area and Volume Computations su 'Areas only'). Il filtro a solido "
-         "non e' utilizzabile: uso il modo geometrico.".format(selected_source))
-
-# --- Viste ---
+# --- Viste candidate ---
 plan_types = (DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan)
-all_views = FilteredElementCollector(doc).OfClass(DB.ViewPlan).ToElements()
-plan_views = [v for v in all_views if not v.IsTemplate and v.ViewType in plan_types]
+all_plan_views = FilteredElementCollector(doc).OfClass(DB.ViewPlan).ToElements()
+plan_views = [v for v in all_plan_views if not v.IsTemplate and v.ViewType in plan_types]
 plan_views.sort(key=lambda v: v.Name)
 
 if not plan_views:
     forms.alert("Non ci sono piante (Floor Plan / Ceiling Plan) nel progetto.",
                 exitscript=True)
 
-views_selected = forms.SelectFromList.show(
-    plan_views,
-    multiselect=True,
-    name_attr='Name',
-    button_name='Seleziona Viste',
-    title='Viste da taggare'
-)
-
-if not views_selected:
-    script.exit()
-
-# --- Tipo di Room Tag ---
+# --- Tipi di Room Tag caricati ---
 room_tag_types = list(FilteredElementCollector(doc)
                       .OfClass(DB.FamilySymbol)
                       .OfCategory(BuiltInCategory.OST_RoomTags))
@@ -1577,105 +1464,269 @@ for tt in room_tag_types:
         full_name = "{} [id {}]".format(full_name, get_element_id_value(tt.Id))
     tag_dict[full_name] = tt
 
-selected_tag_name = forms.SelectFromList.show(
-    sorted(tag_dict.keys()),
-    multiselect=False,
-    button_name='Seleziona Room Tag',
-    title='Tipo di Room Tag'
-)
+tag_labels = sorted(tag_dict.keys())
 
-if not selected_tag_name:
+
+def source_volumes_ok(label):
+    """I volumi delle rooms sono calcolati nel documento della sorgente?
+    Prerequisito del filtro a solido, va verificato sul documento giusto."""
+    link = source_dict.get(label)
+    document = doc if link is None else link.GetLinkDocument()
+    if document is None:
+        return False, "documento del link non disponibile"
+    try:
+        computed = bool(
+            DB.AreaVolumeSettings.GetAreaVolumeSettings(document).ComputeVolumes)
+    except Exception as err:
+        return False, "impostazione non leggibile ({})".format(err)
+    if computed:
+        return True, "volumi delle rooms calcolati"
+    return False, ("volumi delle rooms NON calcolati "
+                   "(Area and Volume Computations su 'Areas only')")
+
+
+class TagRoomsWindow(forms.WPFWindow):
+    """Finestra unica di setup, grafica definita in TagLinkedRoomsUI.xaml.
+
+    Sostituisce i quattro dialoghi pyRevit precedenti. La disponibilita del
+    filtro a solido dipende dalla sorgente scelta, quindi i radio button
+    della strategia vengono abilitati o disabilitati quando la combo cambia,
+    con il motivo scritto accanto invece di essere taciuto.
+    """
+
+    # Attributo di classe: gli handler XAML possono scattare durante il
+    # popolamento iniziale, prima che __init__ abbia finito.
+    _ready = False
+
+    def __init__(self, xaml_path):
+        forms.WPFWindow.__init__(self, xaml_path)
+
+        self.result = None
+        self.view_checks = []
+
+        self.header_hint.Text = (
+            "Tagga le rooms visibili nelle viste selezionate. "
+            "L'analisi non modifica il modello: i tag vengono creati solo "
+            "dopo la conferma.")
+
+        for label in source_labels:
+            self.source_combo.Items.Add(label)
+        self.source_combo.SelectedIndex = 0
+
+        for label in tag_labels:
+            self.tag_combo.Items.Add(label)
+        self.tag_combo.SelectedIndex = 0
+
+        self.band_input.Text = "{:.2f}".format(LEVEL_BAND_METERS)
+
+        for view in plan_views:
+            check = Controls.CheckBox()
+            check.Content = "{}  [{}]".format(
+                view.Name,
+                "Ceiling" if view.ViewType == DB.ViewType.CeilingPlan else "Floor")
+            check.Tag = view
+            check.Margin = Thickness(2, 2, 2, 2)
+            check.Checked += self.view_toggled
+            check.Unchecked += self.view_toggled
+            self.views_panel.Children.Add(check)
+            self.view_checks.append(check)
+
+        self._ready = True
+        self.refresh_strategy()
+        self.refresh_count()
+
+    # ------------- helper -------------
+    def selected_source_label(self):
+        item = self.source_combo.SelectedItem
+        return str(item) if item is not None else None
+
+    def refresh_strategy(self):
+        """Abilita la scelta della strategia solo quando L1 e' applicabile."""
+        label = self.selected_source_label()
+        if label is None:
+            return
+
+        is_host = (source_dict.get(label) is None)
+        volumes, reason = source_volumes_ok(label)
+        self.source_info.Text = reason
+
+        if is_host:
+            self.strategy_group.IsEnabled = False
+            self.strategy_solid.IsChecked = False
+            self.strategy_geo.IsChecked = False
+            self.strategy_info.Text = (
+                "Rooms del modello corrente: viene usata la visibilita di "
+                "Revit (L0), che applica crop, view range, fase e filtri.")
+            return
+
+        if not volumes:
+            self.strategy_group.IsEnabled = False
+            self.strategy_solid.IsChecked = False
+            self.strategy_geo.IsChecked = True
+            self.strategy_info.Text = (
+                "Filtro a solido non disponibile: senza volumi calcolati le "
+                "rooms non hanno geometria 3D. Viene usato il modo geometrico.")
+            return
+
+        self.strategy_group.IsEnabled = True
+        self.strategy_info.Text = (
+            "Se su una vista la strategia scelta non e' applicabile, lo "
+            "script ripiega automaticamente e lo dichiara nel report.")
+        if not self.strategy_solid.IsChecked and not self.strategy_geo.IsChecked:
+            self.strategy_solid.IsChecked = True
+
+    def refresh_count(self):
+        n = len([c for c in self.view_checks if c.IsChecked])
+        self.views_count.Text = "{} di {} viste selezionate".format(
+            n, len(self.view_checks))
+
+    def parse_band(self):
+        """Altezza fascia in metri. Accetta virgola o punto come separatore.
+        Restituisce (valore, messaggio_errore)."""
+        raw = (self.band_input.Text or "").strip().replace(",", ".")
+        if not raw:
+            return None, "Inserisci l'altezza della fascia verticale."
+        try:
+            value = float(raw)
+        except ValueError:
+            return None, "L'altezza della fascia non e' un numero valido."
+        if value < 0:
+            return None, "L'altezza della fascia non puo essere negativa."
+        if value > 100.0:
+            return None, "L'altezza della fascia sembra fuori scala (> 100 m)."
+        return value, None
+
+    # ------------- handler XAML -------------
+    def source_changed(self, sender, args):
+        if self._ready:
+            self.refresh_strategy()
+
+    def view_toggled(self, sender, args):
+        if self._ready:
+            self.refresh_count()
+
+    def filter_changed(self, sender, args):
+        if not self._ready:
+            return
+        needle = (self.views_filter.Text or "").strip().lower()
+        for check in self.view_checks:
+            visible = (not needle) or (needle in str(check.Content).lower())
+            check.Visibility = Visibility.Visible if visible else Visibility.Collapsed
+
+    def select_all_click(self, sender, args):
+        for check in self.view_checks:
+            check.IsChecked = True
+
+    def select_none_click(self, sender, args):
+        for check in self.view_checks:
+            check.IsChecked = False
+
+    def select_filtered_click(self, sender, args):
+        """Seleziona solo le viste che passano il filtro corrente."""
+        for check in self.view_checks:
+            check.IsChecked = (check.Visibility == Visibility.Visible)
+
+    def annulla_click(self, sender, args):
+        self.result = None
+        self.Close()
+
+    def procedi_click(self, sender, args):
+        views = [c.Tag for c in self.view_checks if c.IsChecked]
+        if not views:
+            forms.alert("Seleziona almeno una vista.", title="Nessuna vista")
+            return
+
+        band, band_error = self.parse_band()
+        if band_error:
+            forms.alert(band_error, title="Fascia verticale")
+            return
+
+        label = self.selected_source_label()
+        volumes, _ = source_volumes_ok(label)
+        is_host = (source_dict.get(label) is None)
+
+        self.result = {
+            "source_label": label,
+            "views": views,
+            "tag_label": str(self.tag_combo.SelectedItem),
+            "band_meters": band,
+            "dry_run": bool(self.dryrun_check.IsChecked),
+            "verbose": bool(self.diag_check.IsChecked),
+            "use_solid_filter": bool(self.strategy_solid.IsChecked),
+            "volumes_ok": volumes,
+            "source_is_host": is_host,
+        }
+        self.Close()
+
+
+xaml_path = None
+try:
+    xaml_path = script.get_bundle_file(XAML_FILE_NAME)
+except Exception:
+    pass
+if not xaml_path:
+    xaml_path = op.join(op.dirname(__file__), XAML_FILE_NAME)
+
+if not op.isfile(xaml_path):
+    forms.alert("File grafica non trovato:\n\n{}\n\nDeve stare nella stessa "
+                "cartella dello script.".format(xaml_path),
+                title="Grafica mancante", exitscript=True)
+
+setup_window = TagRoomsWindow(xaml_path)
+setup_window.show_dialog()
+setup = setup_window.result
+
+if not setup:
     script.exit()
 
+# --- Traduzione delle scelte nelle variabili usate dal resto dello script ---
+selected_source = setup["source_label"]
+views_selected = setup["views"]
+selected_tag_name = setup["tag_label"]
 tag_type = tag_dict[selected_tag_name]
+dry_run = setup["dry_run"]
+# verbose = diagnostica avanzata. Il report base e quello dettagliato sono
+# alternativi: chi chiede il dettaglio non vuole anche il riassunto.
+verbose = setup["verbose"]
+volumes_ok = setup["volumes_ok"]
+source_is_host = setup["source_is_host"]
 
-# --- Opzioni ---
-selected_options = forms.SelectFromList.show(
-    ALL_OPTIONS,
-    multiselect=True,
-    button_name='Conferma Opzioni',
-    title='Opzioni (le voci selezionate sono attive)'
-)
+selected_link = source_dict[selected_source]
+if selected_link is None:
+    room_doc = doc
+    link_transform = DB.Transform.Identity
+    link_id_key = -1
+else:
+    room_doc = selected_link.GetLinkDocument()
+    link_transform = selected_link.GetTotalTransform()
+    link_id_key = get_element_id_value(selected_link.Id)
 
-if not selected_options:
-    # Annullamento o nessuna voce selezionata: usiamo i default dichiarati.
-    selected_options = DEFAULT_OPTIONS
+# Altezza della fascia verticale, da input. 0 = nessuna fascia, si usa
+# l'intero view range della vista.
+LEVEL_BAND_METERS = setup["band_meters"]
+LEVEL_BAND_FT = LEVEL_BAND_METERS / 0.3048
+opt_band = LEVEL_BAND_FT > 1e-9
 
-opt_crop     = OPT_CROP in selected_options
-opt_rotate   = OPT_ROTATE in selected_options
-opt_skip_dup = OPT_SKIPDUP in selected_options
-opt_no_leader = OPT_NOLEAD in selected_options
-opt_cut      = OPT_CUT in selected_options
-opt_move_pt  = OPT_MOVEPT in selected_options
-opt_band     = OPT_BAND in selected_options
-force_geo    = OPT_FORCEGEO in selected_options
-dry_run      = OPT_DRYRUN in selected_options
-
-# --- Scelta della strategia quando il filtro a solido e' disponibile ---
-# L1 e' proponibile solo se: la sorgente e' un link (per l'host vince L0), i
-# volumi delle rooms sono calcolati nel modello sorgente, il limite XY e'
-# attivo (senza crop non esiste un volume finito da estrudere) e l'utente non
-# ha gia forzato il modo geometrico dalle opzioni.
-l1_available = (not source_is_host) and volumes_ok and opt_crop and not force_geo
-use_solid_filter = True
-l1_choice_note = ""
-
-L1_CHOICE_MESSAGE = (
-    "Per le rooms del modello linkato sono disponibili due strategie di "
-    "identificazione. Quale vuoi usare?\n\n"
-    "FILTRO A SOLIDO (L1)\n"
-    "Il volume visibile della vista viene estruso e confrontato col volume "
-    "reale delle rooms. Test esatto: gestisce sovrapposizioni parziali, "
-    "rooms concave e crop ruotate. Costa una passata geometrica per vista, "
-    "quindi e' piu lento su molte viste.\n\n"
-    "MODO GEOMETRICO (L2)\n"
-    "Confronto area contro area fra il contorno della room e la crop, con "
-    "test verticale sui parametri della room. Solo aritmetica, quindi molto "
-    "piu rapido, ma approssima l'estensione verticale e ignora fasi, "
-    "filtri e design option.\n\n"
-    "In entrambi i casi, se su una vista la strategia scelta non e' "
-    "applicabile lo script ripiega automaticamente e lo dichiara nel report."
-)
-
-
-def ask_link_strategy():
-    """Chiede all'utente quale strategia usare per le rooms linkate.
-    Restituisce l'etichetta scelta, o None se l'utente annulla.
-
-    forms.alert con 'options' non e' disponibile in tutte le versioni di
-    pyRevit: in quel caso ripieghiamo su CommandSwitchWindow, stampando la
-    spiegazione nel pannello di output visto che quel widget non la ospita.
-    """
-    try:
-        return forms.alert(
-            L1_CHOICE_MESSAGE,
-            title="Strategia di identificazione delle rooms linkate",
-            options=[L1_CHOICE_SOLID, L1_CHOICE_GEO])
-    except Exception:
-        print(L1_CHOICE_MESSAGE)
-        return forms.CommandSwitchWindow.show(
-            [L1_CHOICE_SOLID, L1_CHOICE_GEO],
-            message="Strategia per le rooms linkate (dettagli nell'output)")
-
-
+# Il filtro a solido richiede sorgente linkata, volumi calcolati e la scelta
+# dell'utente. Il motivo di un'eventuale indisponibilita viene dichiarato.
+l1_available = (not source_is_host) and volumes_ok
 if l1_available:
-    choice = ask_link_strategy()
-
-    if not choice:
-        print("Scelta della strategia annullata: nessuna modifica applicata.")
-        script.exit()
-
-    use_solid_filter = (choice == L1_CHOICE_SOLID)
-    l1_choice_note = choice
-elif not source_is_host and not force_geo:
-    # L1 non e' proponibile: spieghiamo perche invece di sceglierlo in silenzio.
-    if not volumes_ok:
+    use_solid_filter = setup["use_solid_filter"]
+    l1_choice_note = ("filtro a solido (L1), scelto dall'utente"
+                      if use_solid_filter
+                      else "modo geometrico (L2), scelto dall'utente")
+else:
+    use_solid_filter = False
+    if source_is_host:
+        l1_choice_note = "non applicabile: sorgente = modello corrente"
+    elif not volumes_ok:
         l1_choice_note = "L2 obbligato: volumi non calcolati nel modello linkato"
-    elif not opt_crop:
-        l1_choice_note = "L2 obbligato: limite XY disattivato dalle opzioni"
+        warn("Nel modello '{}' i volumi delle rooms NON sono calcolati "
+             "(Area and Volume Computations su 'Areas only'). Il filtro a "
+             "solido non e' utilizzabile: uso il modo geometrico."
+             .format(selected_source))
     else:
         l1_choice_note = "L2 obbligato"
-    use_solid_filter = False
 
 
 # =========================================================================
@@ -1724,7 +1775,6 @@ for view in views_selected:
         "xy_polygon": xy_polygon,
         "xy_desc": xy_desc,
         "view_range": get_view_range_info(view, host_levels),
-        "rotation": get_view_rotation(view),
     }
 
 ctx = {
@@ -1736,30 +1786,31 @@ ctx = {
     "placed_rooms": placed_rooms,
     "view_info": view_info,
     "probe": {},
-    "opt_crop": opt_crop,
-    "opt_cut": opt_cut,
     "opt_band": opt_band,
-    "force_geo": force_geo,
     "use_solid_filter": use_solid_filter,
 }
 
-print("=" * 80)
-print("**ANALISI** (nessuna modifica al modello in questa fase)")
-print("=" * 80)
-print("SORGENTE ROOMS : {}".format(selected_source))
-print("ROOMS          : {} totali, {} posizionate".format(len(all_rooms), len(placed_rooms)))
-print("VOLUMI ROOMS   : {}".format("calcolati" if volumes_ok else "NON calcolati"))
-print("TAG            : {}".format(selected_tag_name))
-print("VISTE          : {}".format(len(views_selected)))
-print("OPZIONI        : crop={} | rotazione={} | salta dup={} | senza leader={}".format(
-    opt_crop, opt_rotate, opt_skip_dup, opt_no_leader))
-print("                 cut plane={} | riposiziona={} | forza geometrico={} | solo anteprima={}".format(
-    opt_cut, opt_move_pt, force_geo, dry_run))
-print("FASCIA VERTICALE: {}".format(
-    "primi {:.1f} m sopra il livello della vista ({:.2f} piedi)".format(
-        LEVEL_BAND_METERS, LEVEL_BAND_FT)
-    if opt_band else "disattivata, uso l'intero view range"))
-if not source_is_host:
+if verbose:
+    print("=" * 80)
+    print("**ANALISI** (nessuna modifica al modello in questa fase)")
+    print("=" * 80)
+    print("SORGENTE ROOMS : {}".format(selected_source))
+    print("ROOMS          : {} totali, {} posizionate".format(
+        len(all_rooms), len(placed_rooms)))
+    print("VOLUMI ROOMS   : {}".format("calcolati" if volumes_ok else "NON calcolati"))
+    print("TAG            : {}".format(selected_tag_name))
+    print("VISTE          : {}".format(len(views_selected)))
+    print("FISSI          : crop/scope box, salta duplicati, senza leader, "
+          "riposiziona nella porzione visibile")
+    print("FASCIA         : {}".format(
+        "primi {:.2f} m sopra il livello della vista ({:.2f} piedi)".format(
+            LEVEL_BAND_METERS, LEVEL_BAND_FT)
+        if opt_band else "disattivata (0 m), uso l'intero view range"))
+    print("MODO           : {}".format(
+        "SOLO ANTEPRIMA, nessun tag verra creato" if dry_run
+        else "analisi + creazione dei tag dopo conferma"))
+
+if verbose and not source_is_host:
     if l1_available:
         print("STRATEGIA LINK : scelta dall'utente -> {}".format(l1_choice_note))
     else:
@@ -1770,9 +1821,12 @@ if not source_is_host:
               "traslazione Z = {:.2f} piedi".format(org.X, org.Y, org.Z, org.Z))
     except Exception:
         pass
-    # Se lo stesso documento e' linkato piu volte, la Transform usata potrebbe
-    # essere quella dell'istanza sbagliata: e' una causa possibile di uno
-    # scostamento sistematico di quota.
+
+# Se lo stesso documento e' linkato piu volte, la Transform usata potrebbe
+# essere quella dell'istanza sbagliata: e' una causa possibile di uno
+# scostamento sistematico di quota. Il controllo gira sempre, perche produce
+# un avviso; il dettaglio delle istanze solo in diagnostica avanzata.
+if not source_is_host:
     try:
         siblings = []
         for lk in loaded_links:
@@ -1784,38 +1838,41 @@ if not source_is_host:
                 except Exception:
                     pass
                 siblings.append((get_element_id_value(lk.Id), z))
-        print("ISTANZA USATA  : id {} | istanze dello stesso documento: {}".format(
-            get_element_id_value(selected_link.Id), len(siblings)))
+        if verbose:
+            print("ISTANZA USATA  : id {} | istanze dello stesso documento: {}".format(
+                get_element_id_value(selected_link.Id), len(siblings)))
         if len(siblings) > 1:
-            for sid, sz in siblings:
-                print("                 id {} -> Z = {:.2f}".format(sid, sz))
+            if verbose:
+                for sid, sz in siblings:
+                    print("                 id {} -> Z = {:.2f}".format(sid, sz))
             warn("Il documento '{}' e' linkato {} volte. Se la vista mostra una "
                  "istanza diversa da quella selezionata, le quote calcolate "
                  "saranno sistematicamente sbagliate: seleziona l'istanza con "
                  "l'id corretto.".format(selected_source, len(siblings)))
     except Exception:
         pass
-print("=" * 80)
+
+if verbose:
+    print("=" * 80)
 
 plan = []            # elementi da creare
 view_reports = []    # una riga per vista
 views_skipped = []
 
-# La transazione di analisi serve SOLO alla strategia L0, per rendere le viste
-# interrogabili dal collector view-scoped (riattivare la categoria Rooms ed
-# eventualmente disattivare la crop). Viene sempre annullata: nessuna modifica
-# sopravvive e non entra nell'undo stack.
-# Se la sorgente e' un link, o se il modo geometrico e' forzato, l'analisi non
-# apre nessuna transazione: e' lettura pura.
-NEED_PROBE = (not force_geo) and source_is_host
-probe_t = Transaction(doc, "Analisi visibilita rooms (annullata)") if NEED_PROBE else None
+# La transazione di analisi serve SOLO alla strategia L0, per riattivare la
+# categoria Rooms nelle viste e rendere interrogabile il collector view-scoped.
+# Viene sempre annullata: nessuna modifica sopravvive e non entra nell'undo
+# stack. Se la sorgente e' un link, l'analisi non apre nessuna transazione:
+# e' lettura pura.
+probe_t = Transaction(doc, "Analisi visibilita rooms (annullata)") \
+    if source_is_host else None
 
 try:
     if probe_t is not None:
         probe_t.Start()
         for view in views_selected:
             ctx["probe"][get_element_id_value(view.Id)] = \
-                prepare_view_for_probe(view, opt_crop)
+                prepare_view_for_probe(view)
         doc.Regenerate()
 
     with forms.ProgressBar(title='Analisi viste... ({value} di {max_value})',
@@ -1832,59 +1889,60 @@ try:
             if info["view_range"] is None:
                 views_skipped.append(view.Name)
                 view_reports.append({
-                    "name": view.Name, "strategy": "-", "planned": 0,
-                    "dup": 0, "excluded": 0, "no_point": 0,
+                    "name": view.Name, "view_id": vid, "strategy": "-",
+                    "found": 0, "planned": 0, "dup": 0, "excluded": 0,
+                    "no_point": 0, "outside": 0,
                     "note": "view range non leggibile, vista saltata"})
                 continue
 
             rooms, strategy, note, stats = resolve_visible_rooms(view, ctx)
 
-            # Diagnostica per vista. Serve a distinguere 'la room non e'
-            # davvero in questa vista' da 'il test verticale sbaglia': senza
-            # questi numeri l'esclusione non e' interpretabile.
-            print("")
-            print("**VISTA: {}** (strategia: {})".format(view.Name, strategy))
-            print("  View range -> {}".format(format_range(info["view_range"])))
-            gen_lvl = info["view_range"].get("gen_level")
-            if gen_lvl is not None:
-                try:
-                    print("  Livello vista -> '{}': Elevation={:.2f} | "
-                          "ProjectElevation={:.2f} | uso {:.2f} (interna)".format(
-                              gen_lvl.Name, gen_lvl.Elevation,
-                              gen_lvl.ProjectElevation,
-                              level_internal_elevation(gen_lvl)))
-                except Exception:
-                    pass
-            if opt_band:
-                b_low, b_top = get_vertical_limits(info["view_range"], True)
-                print("  Fascia     -> da {:.2f} a {:.2f} "
-                      "(primi {:.1f} m sopra il livello, intersecati col view range)".format(
-                          b_low, b_top, LEVEL_BAND_METERS))
-            print("  Limite XY  -> {}".format(
-                info["xy_desc"] if opt_crop else "disattivato dalle opzioni"))
-            if stats and stats.get("z_seen_min") is not None:
-                print("  Rooms      -> estensione verticale da {:.2f} a {:.2f} "
-                      "(coordinate host)".format(
-                          stats["z_seen_min"], stats["z_seen_max"]))
-            def _fmt(v):
-                return "n/d" if v is None else "{:.2f}".format(v)
+            # Diagnostica per vista, solo in modo avanzato. Serve a distinguere
+            # 'la room non e' davvero in questa vista' da 'il test verticale
+            # sbaglia': senza questi numeri l'esclusione non e' interpretabile.
+            if verbose:
+                print("")
+                print("**VISTA: {}** (strategia: {})".format(view.Name, strategy))
+                print("  View range -> {}".format(format_range(info["view_range"])))
+                gen_lvl = info["view_range"].get("gen_level")
+                if gen_lvl is not None:
+                    try:
+                        print("  Livello vista -> '{}': Elevation={:.2f} | "
+                              "ProjectElevation={:.2f} | uso {:.2f} (interna)".format(
+                                  gen_lvl.Name, gen_lvl.Elevation,
+                                  gen_lvl.ProjectElevation,
+                                  level_internal_elevation(gen_lvl)))
+                    except Exception:
+                        pass
+                if opt_band:
+                    b_low, b_top = get_vertical_limits(info["view_range"], True)
+                    print("  Fascia     -> da {:.2f} a {:.2f} (primi {:.2f} m "
+                          "sopra il livello, intersecati col view range)".format(
+                              b_low, b_top, LEVEL_BAND_METERS))
+                print("  Limite XY  -> {}".format(info["xy_desc"]))
+                if stats and stats.get("z_seen_min") is not None:
+                    print("  Rooms      -> estensione verticale da {:.2f} a {:.2f} "
+                          "(coordinate host)".format(
+                              stats["z_seen_min"], stats["z_seen_max"]))
 
-            for s in (stats.get("samples") if stats else None) or []:
-                print("    [escluso] room {}: z da {:.2f} a {:.2f} ({}) -> {}".format(
-                    s["id"], s["z_min"], s["z_max"], s.get("z_source"), s["why"]))
-                # Confronto fra le fonti: e' cio che permette di capire se
-                # sbaglia la ricostruzione, il bounding box o la Transform.
-                print("        bbox host {} .. {} | parametri host {} .. {} | "
-                      "livello link {} | punto ins. link {} -> host {}".format(
-                          _fmt(s["z_min"]) if s.get("z_source") == "bounding box" else "n/d",
-                          _fmt(s["z_max"]) if s.get("z_source") == "bounding box" else "n/d",
-                          _fmt(s.get("z_min_param")), _fmt(s.get("z_max_param")),
-                          _fmt(s.get("base_elev_link")),
-                          _fmt(s.get("loc_z_link")), _fmt(s.get("loc_z_host"))))
+                def _fmt(v):
+                    return "n/d" if v is None else "{:.2f}".format(v)
 
-            existing_keys = collect_existing_tag_keys(view) if opt_skip_dup else set()
-            rotation = info["rotation"]
-            xy_polygon = info["xy_polygon"] if opt_crop else None
+                for s in (stats.get("samples") if stats else None) or []:
+                    print("    [escluso] room {}: z da {:.2f} a {:.2f} ({}) -> {}".format(
+                        s["id"], s["z_min"], s["z_max"], s.get("z_source"), s["why"]))
+                    # Confronto fra le fonti: e' cio che permette di capire se
+                    # sbaglia la ricostruzione, il bounding box o la Transform.
+                    print("        bbox host {} .. {} | parametri host {} .. {} | "
+                          "livello link {} | punto ins. link {} -> host {}".format(
+                              _fmt(s["z_min"]) if s.get("z_source") == "bounding box" else "n/d",
+                              _fmt(s["z_max"]) if s.get("z_source") == "bounding box" else "n/d",
+                              _fmt(s.get("z_min_param")), _fmt(s.get("z_max_param")),
+                              _fmt(s.get("base_elev_link")),
+                              _fmt(s.get("loc_z_link")), _fmt(s.get("loc_z_host"))))
+
+            existing_keys = collect_existing_tag_keys(view)
+            xy_polygon = info["xy_polygon"]
 
             planned = 0
             dup = 0
@@ -1893,12 +1951,12 @@ try:
 
             for room in rooms:
                 key = (link_id_key, get_element_id_value(room.Id))
-                if opt_skip_dup and key in existing_keys:
+                if key in existing_keys:
                     dup += 1
                     continue
 
                 geo = get_room_geo(room, ctx)
-                point, in_crop = pick_insertion_point(geo, xy_polygon, opt_move_pt)
+                point, in_crop = pick_insertion_point(geo, xy_polygon, True)
                 if point is None:
                     no_point += 1
                     continue
@@ -1911,7 +1969,6 @@ try:
                     "room": room,
                     "room_id": get_element_id_value(room.Id),
                     "point": point,
-                    "rotation": rotation if opt_rotate else 0.0,
                     "in_crop": in_crop,
                 })
                 existing_keys.add(key)
@@ -1940,11 +1997,14 @@ try:
 
             view_reports.append({
                 "name": view.Name,
+                "view_id": vid,
                 "strategy": strategy,
+                "found": len(rooms),
                 "planned": planned,
                 "dup": dup,
                 "excluded": excluded,
                 "no_point": no_point,
+                "outside": outside,
                 "note": " | ".join(note_parts),
             })
 finally:
@@ -1955,96 +2015,175 @@ finally:
 # =========================================================================
 # FASE 2 - ANTEPRIMA
 # =========================================================================
-print("")
-print("### Riepilogo per vista")
-print("")
-header = "| Vista | Strategia | Da creare | Gia taggate | Escluse | Note |"
-print(header)
-print("|---|---|---:|---:|---:|---|")
-for r in view_reports:
-    print("| {} | {} | {} | {} | {} | {} |".format(
-        r["name"], r["strategy"], r["planned"], r["dup"], r["excluded"],
-        r["note"] or ""))
-
 total_planned = len(plan)
+total_found = sum(r["found"] for r in view_reports)
 total_dup = sum(r["dup"] for r in view_reports)
 total_no_point = sum(r["no_point"] for r in view_reports)
 total_outside = sum(1 for p in plan if not p["in_crop"])
 
-print("")
-print("**Tag da creare: {}**".format(total_planned))
-if total_dup:
-    print("Rooms gia taggate e saltate: {}".format(total_dup))
-if total_no_point:
-    print("Rooms scartate per punto di inserimento non determinabile: {}".format(total_no_point))
-if total_outside:
-    print("Tag il cui punto cade fuori dalla crop (verranno creati ma non "
-          "visibili nella vista): {}".format(total_outside))
+# La quota di base a 0.0 e' un avviso, va emesso in ogni modo: il conteggio
+# per fonte invece e' diagnostica.
+if "fallback 0.0" in BASE_ELEV_METHODS:
+    warn("Per {} rooms non e' stato possibile risolvere ne il livello ne il "
+         "punto di inserimento: la quota di base e' stata assunta a 0.0, "
+         "quindi il test verticale su quelle rooms non e' attendibile."
+         .format(BASE_ELEV_METHODS["fallback 0.0"]))
 
-if plan:
-    print("")
-    print("### Dettaglio")
-    print("")
-    shown = plan[:PREVIEW_ROW_LIMIT]
-    print("| Vista | Room Id | Nome room | X | Y | Visibile |")
-    print("|---|---|---|---:|---:|---|")
-    for p in shown:
-        try:
-            room_name = p["room"].get_Parameter(BuiltInParameter.ROOM_NAME).AsString() or ""
-        except Exception:
-            room_name = ""
-        # Le rooms linkate non sono selezionabili dall'host: nessun linkify.
-        id_cell = str(p["room_id"])
-        if source_is_host:
-            try:
-                id_cell = output.linkify(p["room"].Id)
-            except Exception:
-                pass
-        print("| {} | {} | {} | {:.2f} | {:.2f} | {} |".format(
-            p["view_name"], id_cell, room_name,
-            p["point"][0], p["point"][1],
-            "si" if p["in_crop"] else "NO"))
-    if len(plan) > PREVIEW_ROW_LIMIT:
+
+def print_warnings():
+    """Gli avvisi si vedono in entrambi i report: sono la sola cosa che
+    distingue 'nessun tag da creare perche non serviva' da 'nessun tag da
+    creare perche qualcosa non ha funzionato'."""
+    if WARNINGS:
         print("")
-        print("_Mostrate {} righe su {}: {} righe non elencate._".format(
-            len(shown), len(plan), len(plan) - len(shown)))
+        print("### Avvisi")
+        print("")
+        for w in WARNINGS:
+            print("- {}".format(w))
 
-if BASE_ELEV_METHODS or Z_SOURCE_COUNTS:
-    print("")
-    print("### Diagnostica estensione verticale delle rooms")
-    print("")
-    for method in sorted(BASE_ELEV_METHODS.keys()):
-        print("- quota di base risolta con {}: {} rooms".format(
-            method, BASE_ELEV_METHODS[method]))
-    for src in sorted(Z_SOURCE_COUNTS.keys()):
-        print("- estensione verticale da {}: {} rooms".format(
-            src, Z_SOURCE_COUNTS[src]))
-    if "fallback 0.0" in BASE_ELEV_METHODS:
-        warn("Per {} rooms non e' stato possibile risolvere ne il livello ne il "
-             "punto di inserimento: la quota di base e' stata assunta a 0.0, "
-             "quindi il test verticale su quelle rooms non e' attendibile."
-             .format(BASE_ELEV_METHODS["fallback 0.0"]))
 
-if WARNINGS:
+def print_basic_report(created=None, errors=None):
+    """Report base: le informazioni necessarie a capire cosa e' stato fatto.
+    Non viene stampato quando e' attiva la diagnostica avanzata, che le
+    contiene tutte in forma piu estesa."""
+    print("=" * 80)
+    print("**LINKED ROOM TAG - REPORT**")
+    print("=" * 80)
+    print("Modello rooms      : {}".format(selected_source))
+    print("Tipo di tag        : {}".format(selected_tag_name))
+    print("Strategia          : {}".format(", ".join(
+        sorted(set(r["strategy"] for r in view_reports if r["strategy"] != "-")))
+        or "nessuna"))
+    print("Fascia verticale   : {}".format(
+        "primi {:.2f} m sopra il livello della vista".format(LEVEL_BAND_METERS)
+        if opt_band else "disattivata, intero view range"))
     print("")
-    print("### Avvisi")
+    print("Viste selezionate  : {}".format(len(views_selected)))
     print("")
-    for w in WARNINGS:
-        print("- {}".format(w))
+    if created is None:
+        print("| Vista | Rooms individuate | Da taggare | Gia taggate |")
+        print("|---|---:|---:|---:|")
+        for r in view_reports:
+            print("| {} | {} | {} | {} |".format(
+                r["name"], r["found"], r["planned"], r["dup"]))
+    else:
+        print("| Vista | Rooms individuate | Tag creati | Gia taggate | Errori |")
+        print("|---|---:|---:|---:|---:|")
+        for r in view_reports:
+            print("| {} | {} | {} | {} | {} |".format(
+                r["name"], r["found"],
+                created_by_view.get(r["view_id"], 0),
+                r["dup"],
+                errors_by_view.get(r["view_id"], 0)))
+    print("")
+    print("Rooms nel modello  : {} ({} posizionate)".format(
+        len(all_rooms), len(placed_rooms)))
+    print("Rooms individuate  : {}".format(total_found))
+    if created is None:
+        print("Rooms da taggare   : {}".format(total_planned))
+    else:
+        print("Rooms taggate      : {} su {} pianificate".format(
+            created, total_planned))
+    print("Rooms gia taggate  : {}".format(total_dup))
+    if total_no_point:
+        print("Rooms scartate     : {} senza punto di inserimento valido".format(
+            total_no_point))
+    if total_outside:
+        print("Tag fuori crop     : {} (creati ma non visibili nella vista)".format(
+            total_outside))
+    if errors is not None:
+        print("Errori di creazione: {}".format(errors))
+    if views_skipped:
+        print("Viste saltate      : {} ({})".format(
+            len(views_skipped), ", ".join(views_skipped)))
+    print("=" * 80)
+    print_warnings()
 
-if views_skipped:
+
+if verbose:
     print("")
-    print("Viste saltate: {}".format(", ".join(views_skipped)))
+    print("### Riepilogo per vista")
+    print("")
+    print("| Vista | Strategia | Individuate | Da creare | Gia taggate | Escluse | Note |")
+    print("|---|---|---:|---:|---:|---:|---|")
+    for r in view_reports:
+        print("| {} | {} | {} | {} | {} | {} | {} |".format(
+            r["name"], r["strategy"], r["found"], r["planned"], r["dup"],
+            r["excluded"], r["note"] or ""))
+
+    print("")
+    print("**Tag da creare: {}**".format(total_planned))
+    if total_dup:
+        print("Rooms gia taggate e saltate: {}".format(total_dup))
+    if total_no_point:
+        print("Rooms scartate per punto di inserimento non determinabile: {}".format(
+            total_no_point))
+    if total_outside:
+        print("Tag il cui punto cade fuori dalla crop (verranno creati ma non "
+              "visibili nella vista): {}".format(total_outside))
+
+    if plan:
+        print("")
+        print("### Dettaglio")
+        print("")
+        shown = plan[:PREVIEW_ROW_LIMIT]
+        print("| Vista | Room Id | Nome room | X | Y | Visibile |")
+        print("|---|---|---|---:|---:|---|")
+        for p in shown:
+            try:
+                room_name = p["room"].get_Parameter(
+                    BuiltInParameter.ROOM_NAME).AsString() or ""
+            except Exception:
+                room_name = ""
+            # Le rooms linkate non sono selezionabili dall'host: nessun linkify.
+            id_cell = str(p["room_id"])
+            if source_is_host:
+                try:
+                    id_cell = output.linkify(p["room"].Id)
+                except Exception:
+                    pass
+            print("| {} | {} | {} | {:.2f} | {:.2f} | {} |".format(
+                p["view_name"], id_cell, room_name,
+                p["point"][0], p["point"][1],
+                "si" if p["in_crop"] else "NO"))
+        if len(plan) > PREVIEW_ROW_LIMIT:
+            print("")
+            print("_Mostrate {} righe su {}: {} righe non elencate._".format(
+                len(shown), len(plan), len(plan) - len(shown)))
+
+    if BASE_ELEV_METHODS or Z_SOURCE_COUNTS:
+        print("")
+        print("### Diagnostica estensione verticale delle rooms")
+        print("")
+        for method in sorted(BASE_ELEV_METHODS.keys()):
+            print("- quota di base risolta con {}: {} rooms".format(
+                method, BASE_ELEV_METHODS[method]))
+        for src in sorted(Z_SOURCE_COUNTS.keys()):
+            print("- estensione verticale da {}: {} rooms".format(
+                src, Z_SOURCE_COUNTS[src]))
+
+    print_warnings()
+
+    if views_skipped:
+        print("")
+        print("Viste saltate: {}".format(", ".join(views_skipped)))
 
 if not plan:
+    # Anche senza niente da fare il report va emesso: un avviso che rimanda a
+    # un pannello vuoto e' proprio il caso da evitare.
+    if not verbose:
+        print_basic_report()
     forms.alert("L'analisi non ha prodotto nessun tag da creare.\n\n"
-                "Controlla il riepilogo e gli avvisi nel pannello di output.",
+                "Controlla il report e gli avvisi nel pannello di output.",
                 title="Niente da fare", exitscript=True)
 
 if dry_run:
+    # Nessuna creazione: il report base va emesso qui, con i dati dell'analisi.
+    if not verbose:
+        print_basic_report()
     forms.alert("Modo 'solo anteprima' attivo.\n\n"
                 "{} tag sarebbero stati creati. Nessuna modifica applicata.\n"
-                "Il dettaglio e' nel pannello di output.".format(total_planned),
+                "Il report e' nel pannello di output.".format(total_planned),
                 title="Anteprima - nessuna modifica")
     script.exit()
 
@@ -2053,7 +2192,13 @@ confirm_msg = "Creo {} tag su {} viste?".format(
 if total_outside:
     confirm_msg += "\n\nAttenzione: {} tag cadranno fuori dalla crop region " \
                    "e non saranno visibili.".format(total_outside)
-confirm_msg += "\n\nIl dettaglio completo e' nel pannello di output."
+if WARNINGS:
+    confirm_msg += "\n\n{} avvisi da leggere nel pannello di output.".format(
+        len(WARNINGS))
+if verbose:
+    confirm_msg += "\n\nIl dettaglio completo e' nel pannello di output."
+else:
+    confirm_msg += "\n\nIl report verra scritto nel pannello di output."
 
 if not forms.alert(confirm_msg, title="Conferma creazione", yes=True, no=True):
     print("")
@@ -2066,10 +2211,11 @@ if not forms.alert(confirm_msg, title="Conferma creazione", yes=True, no=True):
 # =========================================================================
 created = 0
 errors = 0
-rotated = 0
+created_by_view = {}
+errors_by_view = {}
 
-# Raggruppiamo per vista, cosi la rotazione richiede un solo Regenerate
-# per vista invece di uno per tag.
+# Raggruppiamo per vista: il piano e' costruito vista per vista, quindi le
+# righe consecutive appartengono alla stessa vista.
 plan_by_view = []
 current_view = None
 current_items = None
@@ -2091,8 +2237,7 @@ try:
                            cancellable=True) as pb:
         step = 0
         for view, items in plan_by_view:
-            tags_to_rotate = []
-
+            view_key = get_element_id_value(view.Id)
             for p in items:
                 if pb.cancelled:
                     t.RollBack()
@@ -2114,63 +2259,52 @@ try:
 
                     if new_tag is None:
                         errors += 1
+                        errors_by_view[view_key] = errors_by_view.get(view_key, 0) + 1
                         continue
 
                     if new_tag.GetTypeId() != tag_type.Id:
                         new_tag.ChangeTypeId(tag_type.Id)
 
-                    if opt_no_leader:
-                        try:
-                            new_tag.HasLeader = False
-                        except Exception:
-                            pass
-
-                    if abs(p["rotation"]) > 1e-9:
-                        tags_to_rotate.append((new_tag.Id, p["point"], p["rotation"]))
+                    try:
+                        new_tag.HasLeader = False
+                    except Exception:
+                        pass
 
                     created += 1
+                    created_by_view[view_key] = created_by_view.get(view_key, 0) + 1
 
                 except Exception as err:
                     errors += 1
+                    errors_by_view[view_key] = errors_by_view.get(view_key, 0) + 1
+                    # Gli errori di creazione si stampano sempre: sono la
+                    # ragione per cui il conteggio finale non torna.
                     print("  [!] Vista '{}', room {}: {}".format(
                         view.Name, p["room_id"], err))
-
-            if tags_to_rotate:
-                doc.Regenerate()
-                axis_dir = view.ViewDirection
-                for tag_id, base_xy, angle in tags_to_rotate:
-                    try:
-                        base_point = XYZ(base_xy[0], base_xy[1], 0.0)
-                        axis = Line.CreateBound(base_point, base_point + axis_dir)
-                        ElementTransformUtils.RotateElement(doc, tag_id, axis, angle)
-                        rotated += 1
-                    except Exception as err:
-                        print("  [!] Rotazione tag {} non applicata: {}".format(
-                            get_element_id_value(tag_id), err))
 
     t.Commit()
 
     print("")
-    print("=" * 80)
-    print("RIEPILOGO FINALE")
-    print("=" * 80)
-    print("Tag pianificati       : {}".format(total_planned))
-    print("Tag creati            : {}".format(created))
-    print("Tag ruotati           : {}".format(rotated))
-    print("Errori in creazione   : {}".format(errors))
-    print("Rooms gia taggate     : {}".format(total_dup))
-    print("Viste elaborate       : {}".format(len(plan_by_view)))
-    if views_skipped:
-        print("Viste saltate         : {}".format(", ".join(views_skipped)))
+    if verbose:
+        print("=" * 80)
+        print("RIEPILOGO FINALE")
+        print("=" * 80)
+        print("Tag pianificati       : {}".format(total_planned))
+        print("Tag creati            : {}".format(created))
+        print("Errori in creazione   : {}".format(errors))
+        print("Rooms gia taggate     : {}".format(total_dup))
+        print("Viste elaborate       : {}".format(len(plan_by_view)))
+        if views_skipped:
+            print("Viste saltate         : {}".format(", ".join(views_skipped)))
+    else:
+        print_basic_report(created=created, errors=errors)
 
     forms.alert(
         "Operazione completata.\n\n"
         "Tag creati: {} su {} pianificati\n"
-        "Tag ruotati: {}\n"
         "Rooms gia taggate: {}\n"
         "Errori: {}\n"
         "Viste elaborate: {}".format(
-            created, total_planned, rotated, total_dup, errors, len(plan_by_view)),
+            created, total_planned, total_dup, errors, len(plan_by_view)),
         title="Linked Room Tag - Completato")
 
 except Exception as err:
