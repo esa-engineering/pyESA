@@ -259,7 +259,7 @@ class ClassificationWriterWindow(Window):
 
 
 def build_value(node, csv_name, syntax):
-    code = "_".join(node.full_code_parts)
+    code = node.code if csv_name == "UNI-8290" else "_".join(node.full_code_parts)
     desc = node.title or ""
     if syntax == SYNTAX_CODE:
         return code
