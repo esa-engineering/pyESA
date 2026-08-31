@@ -31,7 +31,9 @@
       "Bash(python -c ' *)",
       "Bash(py -c ' *)",
       "Bash(py -c \"import io,sys; src=io.open\\(sys.argv[1],encoding='utf-8'\\).read\\(\\); compile\\(src, sys.argv[1], 'exec'\\); print\\('SYNTAX OK'\\)\" ModelGroupToElements_script.py)",
-      "PowerShell(& \"C:\\\\Users\\\\andreapa\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\9f582e6d-a5a9-4fb0-908e-5e341d1f8629\\\\scratchpad\\\\make_icons.ps1\" \"c:\\\\Users\\\\andreapa\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities7.stack\\\\ModelGroupToElements.pushbutton\")"
+      "PowerShell(& \"C:\\\\Users\\\\andreapa\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\9f582e6d-a5a9-4fb0-908e-5e341d1f8629\\\\scratchpad\\\\make_icons.ps1\" \"c:\\\\Users\\\\andreapa\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities7.stack\\\\ModelGroupToElements.pushbutton\")",
+      "Bash(ls \"C:/Users/andreapa/.claude/projects/c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension/memory/\")",
+      "Read(//c/Users/andreapa/.claude/projects/c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension/memory/**)"
     ]
   }
 }
