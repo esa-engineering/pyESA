@@ -62,7 +62,8 @@ Inside a `.pushbutton` folder:
   `RenameFilters&Views_bundle.yaml`); pyRevit does not read those, so those buttons fall
   back to the folder name for their title. If you touch one of those tools, renaming the
   file to `bundle.yaml` is the fix.
-- `icon.png` + `icon.dark.png` — light/dark theme icons (96×96).
+- `icon.png` + `icon.dark.png` — light/dark theme icons (96×96). **Mandatory: every button
+  ships both files** (see "Icons" below).
 - Optional `README.md` per tool, and data files (`.csv`, `.xlsx`, `.txt`) read via
   `script.get_bundle_file("name.csv")`.
 
@@ -74,6 +75,31 @@ Folders named `_old` / `_Old` and files suffixed `_BK01`, `_v1`, `_script BK02`,
 `- Copia` are dead backups kept in-tree. pyRevit ignores `_old` (no recognized suffix) but
 **does** load stray `*_script.py` siblings in a live button folder, so don't leave a
 second `_script.py` variant next to an active one.
+
+## Icons
+
+**Every button must ship two icons, one per Revit theme.** A button with only `icon.png`
+turns into a dark smudge on the dark ribbon, so the pair is not optional:
+
+| File | Theme | Artwork |
+| --- | --- | --- |
+| `icon.png` | light | black / dark-grey strokes on transparent background |
+| `icon.dark.png` | dark | white / light-grey strokes on transparent background |
+
+Rules:
+
+- 96×96 PNG, 32-bit with alpha, **transparent** background (never a white plate).
+- Monochrome, not coloured: one hue is off-brand here and colour never reads on both
+  themes. Keep a grey ramp so fills stay distinguishable from outlines — roughly grey
+  20…140 for `icon.png` and the reversed ramp, 248…138, for `icon.dark.png` (the darkest
+  element of the light icon becomes the lightest element of the dark one).
+- The two files are the same drawing, only re-inked. Don't redraw the shape per theme.
+- Bold, simple shapes with strokes around 3.5 px in the 96 px grid: the ribbon also renders
+  the icon at 32 px and 16 px, so check legibility at those sizes before committing.
+- Converting an existing coloured icon: map luminance to the grey ramp above and keep the
+  alpha channel, rather than desaturating (a flat desaturation collapses light fills and
+  dark outlines into the same mid-grey).
+- `icon.small.png` is **not** a name pyRevit reads — it is inert. Don't add new ones.
 
 ## Script conventions
 
