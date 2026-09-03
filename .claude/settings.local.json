@@ -14,7 +14,24 @@
       "PowerShell(Out-Null *)",
       "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities5.stack\\\\PointCloudAnalysis.pushbutton\\\\PointCloudAnalysis_script.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py syntax OK'\\)\")",
       "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities5.stack\\\\PointCloudAnalysis.pushbutton\\\\PointCloudAnalysis_script.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py syntax OK'\\)\"; python -c \"print\\('{0:.{prec}f}'.format\\(12.3456, prec=0\\)\\); print\\('{0:.{prec}f}'.format\\(0.01234, prec=3\\)\\)\")",
-      "PowerShell(python -c \"import ast,math; ast.parse\\(open\\(r'C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities5.stack\\\\PointCloudAnalysis.pushbutton\\\\PointCloudAnalysis_script.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py syntax OK'\\); f=lambda mm: max\\(0,int\\(math.ceil\\(-math.log10\\(mm\\)-1e-9\\)\\)\\); print\\('mm exact:',f\\(1.0\\),'mm noisy:',f\\(0.9999999998\\),'cm:',f\\(0.1\\),'m:',f\\(0.001\\),'feet:',f\\(0.0032808398950131233\\)\\)\")"
+      "PowerShell(python -c \"import ast,math; ast.parse\\(open\\(r'C:\\\\Users\\\\antoniom\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities5.stack\\\\PointCloudAnalysis.pushbutton\\\\PointCloudAnalysis_script.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py syntax OK'\\); f=lambda mm: max\\(0,int\\(math.ceil\\(-math.log10\\(mm\\)-1e-9\\)\\)\\); print\\('mm exact:',f\\(1.0\\),'mm noisy:',f\\(0.9999999998\\),'cm:',f\\(0.1\\),'m:',f\\(0.001\\),'feet:',f\\(0.0032808398950131233\\)\\)\")",
+      "PowerShell(py -c \"import io,sys; src=io.open\\(sys.argv[1],encoding='utf-8'\\).read\\(\\); compile\\(src, sys.argv[1], 'exec'\\); print\\('SYNTAX OK -', len\\(src.splitlines\\(\\)\\), 'righe'\\)\" $f)",
+      "Bash(grep -v -E \"\\\\.\\(png|ico\\)$\")",
+      "Bash(py -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(py -c \"import PIL; print\\('PIL', PIL.__version__\\)\")",
+      "PowerShell(py -c \"import io,sys; src=io.open\\(sys.argv[1],encoding='utf-8'\\).read\\(\\); compile\\(src, sys.argv[1], 'exec'\\); print\\('SYNTAX OK'\\)\" \"pyESA.tab\\\\Utilities.panel\\\\Utilities4.stack\\\\Tag.pulldown\\\\DeleteDuplicates.pushbutton\\\\DeleteDuplicates_script.py\")",
+      "PowerShell(py -c \"import xml.dom.minidom,sys; xml.dom.minidom.parse\\(sys.argv[1]\\); print\\('XAML WELL-FORMED'\\)\" \"pyESA.tab\\\\Utilities.panel\\\\Utilities4.stack\\\\Tag.pulldown\\\\DeleteDuplicates.pushbutton\\\\DeleteDuplicatesUI.xaml\")",
+      "PowerShell(py \"C:\\\\Users\\\\andreapa\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\ab85b1eb-3320-4325-9f1c-c70d4a985bde\\\\scratchpad\\\\make_icons.py\" \"pyESA.tab/Utilities.panel/Utilities4.stack/Tag.pulldown/DeleteDuplicates.pushbutton\")",
+      "Bash(py -c \"import PIL; print\\(PIL.__version__\\)\")",
+      "Bash(py --version)",
+      "Read(//c/Users/andreapa/AppData/Roaming/pyRevit-Master/pyrevitlib/pyrevit/coreutils/**)",
+      "Read(//c/Program Files/pyRevit-Master/pyrevitlib/pyrevit/coreutils/**)",
+      "Read(//c/Users/andreapa/AppData/Roaming/**)",
+      "Read(//c/Program Files/**)",
+      "Bash(python -c ' *)",
+      "Bash(py -c ' *)",
+      "Bash(py -c \"import io,sys; src=io.open\\(sys.argv[1],encoding='utf-8'\\).read\\(\\); compile\\(src, sys.argv[1], 'exec'\\); print\\('SYNTAX OK'\\)\" ModelGroupToElements_script.py)",
+      "PowerShell(& \"C:\\\\Users\\\\andreapa\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\9f582e6d-a5a9-4fb0-908e-5e341d1f8629\\\\scratchpad\\\\make_icons.ps1\" \"c:\\\\Users\\\\andreapa\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities7.stack\\\\ModelGroupToElements.pushbutton\")"
     ]
   }
 }

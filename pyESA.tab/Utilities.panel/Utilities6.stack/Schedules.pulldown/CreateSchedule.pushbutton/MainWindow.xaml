@@ -1,0 +1,241 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Crea Abachi - Selezione manuale"
+        Height="700" Width="1000"
+        MinHeight="520" MinWidth="820"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="False"
+        ResizeMode="CanResizeWithGrip"
+        SnapsToDevicePixels="True"
+        Background="#FFF4F5F7">
+
+    <Window.Resources>
+
+        <SolidColorBrush x:Key="AccentBrush" Color="#FF2D3E50"/>
+        <SolidColorBrush x:Key="SubtleBrush" Color="#FF7A8794"/>
+        <SolidColorBrush x:Key="LineBrush" Color="#FFD8DDE3"/>
+
+        <Style x:Key="H2" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource SubtleBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="10"/>
+        </Style>
+
+        <Style x:Key="MiniBtn" TargetType="Button">
+            <Setter Property="Padding" Value="8,2"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="MinWidth" Value="70"/>
+        </Style>
+
+        <Style x:Key="MainBtn" TargetType="Button">
+            <Setter Property="Padding" Value="18,7"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+            <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <!-- Riga della lista categorie -->
+        <DataTemplate x:Key="CatTemplate">
+            <CheckBox Margin="2,2,2,2"
+                      IsChecked="{Binding checked, Mode=TwoWay}"
+                      Click="on_cat_click"
+                      ToolTip="{Binding tooltip}">
+                <TextBlock Text="{Binding name}" TextTrimming="CharacterEllipsis"/>
+            </CheckBox>
+        </DataTemplate>
+
+        <!-- Riga della lista parametri -->
+        <DataTemplate x:Key="ParamTemplate">
+            <Grid Margin="2,2,2,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <CheckBox Grid.Column="0"
+                          IsChecked="{Binding checked, Mode=TwoWay}"
+                          Click="on_param_click"
+                          ToolTip="{Binding tooltip}">
+                    <TextBlock Text="{Binding name}" TextTrimming="CharacterEllipsis"/>
+                </CheckBox>
+
+                <Border Grid.Column="1" Margin="6,0,6,0" Padding="5,0"
+                        CornerRadius="2" Background="#FFEDF1F5" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding origin}" FontSize="10"
+                               Foreground="{StaticResource SubtleBrush}"/>
+                </Border>
+
+                <TextBlock Grid.Column="2" Text="{Binding coverage}" FontSize="10"
+                           MinWidth="46" TextAlignment="Right"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource SubtleBrush}"/>
+            </Grid>
+        </DataTemplate>
+
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Intestazione -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="Creazione abachi - selezione manuale"
+                       FontSize="17" FontWeight="Bold"
+                       Foreground="{StaticResource AccentBrush}"/>
+            <TextBlock Style="{StaticResource Hint}"
+                       Text="Seleziona le categorie e i parametri da inserire. Viene creato un abaco per ogni categoria. I parametri non disponibili per una categoria vengono elencati nel report finale."/>
+        </StackPanel>
+
+        <!-- Prefisso -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="260"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Prefisso nome abaco:"
+                           VerticalAlignment="Center" Margin="0,0,8,0"
+                           FontWeight="SemiBold"/>
+                <TextBox Grid.Column="1" x:Name="prefix_tb" Height="24"
+                         VerticalContentAlignment="Center"
+                         TextChanged="on_prefix_changed"/>
+                <TextBlock Grid.Column="2" x:Name="preview_tb" Margin="12,0,0,0"
+                           VerticalAlignment="Center"
+                           Style="{StaticResource Hint}"/>
+            </Grid>
+        </Border>
+
+        <!-- Due colonne -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="4*" MinWidth="240"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="6*" MinWidth="320"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- CATEGORIE -->
+            <Border Grid.Column="0" Style="{StaticResource Card}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Style="{StaticResource H2}"
+                               x:Name="cat_header_tb" Text="1. Categorie"/>
+
+                    <TextBox Grid.Row="1" x:Name="cat_search_tb" Height="24" Margin="0,0,0,6"
+                             VerticalContentAlignment="Center"
+                             TextChanged="on_cat_search"
+                             ToolTip="Filtra le categorie"/>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,6">
+                        <Button Style="{StaticResource MiniBtn}" Content="Seleziona tutto"
+                                Click="on_cat_select_all"/>
+                        <Button Style="{StaticResource MiniBtn}" Content="Deseleziona"
+                                Click="on_cat_clear"/>
+                    </StackPanel>
+
+                    <ListBox Grid.Row="3" x:Name="cat_lb"
+                             ItemTemplate="{StaticResource CatTemplate}"
+                             HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             BorderBrush="{StaticResource LineBrush}"/>
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Stretch"
+                          Background="Transparent"/>
+
+            <!-- PARAMETRI -->
+            <Border Grid.Column="2" Style="{StaticResource Card}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Style="{StaticResource H2}"
+                               x:Name="param_header_tb" Text="2. Parametri"/>
+
+                    <TextBox Grid.Row="1" x:Name="param_search_tb" Height="24" Margin="0,0,0,6"
+                             VerticalContentAlignment="Center"
+                             TextChanged="on_param_search"
+                             ToolTip="Filtra i parametri"/>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,6">
+                        <Button Style="{StaticResource MiniBtn}" Content="Seleziona tutto"
+                                Click="on_param_select_all"/>
+                        <Button Style="{StaticResource MiniBtn}" Content="Deseleziona"
+                                Click="on_param_clear"/>
+                        <CheckBox x:Name="only_common_cb" VerticalAlignment="Center"
+                                  Margin="10,0,0,0" Click="on_only_common"
+                                  Content="Solo parametri comuni a tutte le categorie"
+                                  FontSize="11"/>
+                    </StackPanel>
+
+                    <ListBox Grid.Row="3" x:Name="param_lb"
+                             ItemTemplate="{StaticResource ParamTemplate}"
+                             HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             BorderBrush="{StaticResource LineBrush}"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Ordine campi -->
+        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,10,0,0">
+            <StackPanel>
+                <TextBlock Text="Ordine delle colonne (segue l'ordine di selezione)"
+                           FontSize="11" FontWeight="SemiBold"
+                           Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock x:Name="order_tb" Style="{StaticResource Hint}"
+                           MaxHeight="46" Text="Nessun parametro selezionato."/>
+            </StackPanel>
+        </Border>
+
+        <!-- Footer -->
+        <Grid Grid.Row="4" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" x:Name="status_tb" VerticalAlignment="Center"
+                       Style="{StaticResource Hint}"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Style="{StaticResource MainBtn}" Content="Annulla"
+                        Click="on_cancel" IsCancel="True"/>
+                <Button Style="{StaticResource MainBtn}" Content="Crea abachi"
+                        Click="on_create" IsDefault="True" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

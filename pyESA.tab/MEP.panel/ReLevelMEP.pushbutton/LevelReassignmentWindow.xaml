@@ -1,0 +1,169 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Riassegnazione livello elementi MEP"
+        Width="580"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="#FFF4F4F4"
+        FontFamily="Segoe UI"
+        FontSize="12">
+
+    <Window.Resources>
+
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Padding" Value="10,6,10,10"/>
+            <Setter Property="BorderBrush" Value="#FFD0D0D0"/>
+            <Setter Property="Background" Value="White"/>
+        </Style>
+
+        <Style TargetType="RadioButton">
+            <Setter Property="Margin" Value="0,5,0,2"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="HintStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FF707070"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="21,0,0,4"/>
+        </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="110"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+
+    </Window.Resources>
+
+    <StackPanel Margin="14">
+
+        <TextBlock TextWrapping="Wrap"
+                   Margin="0,0,0,14"
+                   Foreground="#FF404040">
+            Riassegna il livello di riferimento agli elementi MEP mantenendo
+            invariata la loro quota assoluta nel modello.
+        </TextBlock>
+
+        <!-- ============ 1. Fonte degli elementi ============ -->
+        <GroupBox>
+            <GroupBox.Header>
+                <TextBlock Text="1. Elementi da elaborare" Style="{StaticResource SectionTitleStyle}"/>
+            </GroupBox.Header>
+            <StackPanel>
+
+                <RadioButton x:Name="rb_source_selection"
+                             GroupName="source"
+                             Content="Elementi selezionati in Revit"/>
+                <TextBlock x:Name="tb_selection_info"
+                           Style="{StaticResource HintStyle}"
+                           Text="-"/>
+
+                <RadioButton x:Name="rb_source_view"
+                             GroupName="source"
+                             Content="Elementi MEP della vista attiva"/>
+                <TextBlock x:Name="tb_view_info"
+                           Style="{StaticResource HintStyle}"
+                           Text="-"/>
+
+            </StackPanel>
+        </GroupBox>
+
+        <!-- ============ 2. Livello di destinazione ============ -->
+        <GroupBox>
+            <GroupBox.Header>
+                <TextBlock Text="2. Livello di destinazione" Style="{StaticResource SectionTitleStyle}"/>
+            </GroupBox.Header>
+            <StackPanel>
+
+                <RadioButton x:Name="rb_level_manual"
+                             GroupName="level"
+                             Content="Livello scelto manualmente (lo stesso per tutti gli elementi)"/>
+                <ComboBox x:Name="cb_levels"
+                          Margin="21,4,0,8"
+                          Height="24"
+                          IsEnabled="{Binding IsChecked, ElementName=rb_level_manual}"/>
+
+                <RadioButton x:Name="rb_level_auto"
+                             GroupName="level"
+                             Content="Livello automatico (calcolato per ogni singolo elemento)"/>
+                <TextBlock Style="{StaticResource HintStyle}"
+                           Text="Per ogni elemento viene cercato il primo livello di progetto immediatamente sottostante il suo punto di inserimento (punto medio della linea per gli elementi lineari)."/>
+
+                <StackPanel Margin="21,2,0,0"
+                            IsEnabled="{Binding IsChecked, ElementName=rb_level_auto}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Spessore pacchetto di finitura:"
+                                   VerticalAlignment="Center"/>
+                        <TextBox x:Name="tb_thickness"
+                                 Width="70"
+                                 Height="22"
+                                 Margin="8,0,6,0"
+                                 VerticalContentAlignment="Center"
+                                 TextAlignment="Right"
+                                 Text="0"/>
+                        <TextBlock Text="mm" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Foreground="#FF707070"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"
+                               Text="Valore sottratto alla quota del livello prima del confronto, per attribuire correttamente gli elementi appoggiati sopra un pavimento finito. Lasciare 0 se non applicabile."/>
+                </StackPanel>
+
+            </StackPanel>
+        </GroupBox>
+
+        <!-- ============ 3. Opzioni ============ -->
+        <GroupBox>
+            <GroupBox.Header>
+                <TextBlock Text="3. Opzioni" Style="{StaticResource SectionTitleStyle}"/>
+            </GroupBox.Header>
+            <StackPanel>
+                <CheckBox x:Name="chk_dryrun"
+                          Margin="0,2,0,2"
+                          Content="Simulazione: calcola il risultato senza modificare il modello"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- ============ Avvertenze ============ -->
+        <Border Background="#FFFFF8E1"
+                BorderBrush="#FFE6C86E"
+                BorderThickness="1"
+                Padding="10,8,10,8"
+                Margin="0,0,0,14">
+            <StackPanel>
+                <TextBlock Text="Avvertenze"
+                           FontWeight="SemiBold"
+                           Foreground="#FF6B5200"
+                           Margin="0,0,0,4"/>
+                <TextBlock TextWrapping="Wrap"
+                           FontSize="11"
+                           Foreground="#FF6B5200"
+                           Text="Gli elementi non basati su livello (host based, workplane based, famiglie in place) vengono ignorati e riportati nel resoconto finale. Con il livello automatico, prestare particolare attenzione in presenza di doppi volumi, mezzanini o piani sfalzati."/>
+            </StackPanel>
+        </Border>
+
+        <!-- ============ Pulsanti ============ -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="btn_cancel"
+                    Content="Annulla"
+                    Style="{StaticResource ActionButtonStyle}"
+                    IsCancel="True"
+                    Click="on_cancel"/>
+            <Button x:Name="btn_run"
+                    Content="Esegui"
+                    Style="{StaticResource ActionButtonStyle}"
+                    IsDefault="True"
+                    Click="on_run"/>
+        </StackPanel>
+
+    </StackPanel>
+</Window>

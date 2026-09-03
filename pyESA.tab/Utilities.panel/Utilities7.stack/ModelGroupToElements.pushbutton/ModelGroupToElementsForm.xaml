@@ -1,0 +1,260 @@
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Model Group Params To Elements"
+    Height="760" Width="960"
+    MinHeight="640" MinWidth="820"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="CanResizeWithGrip"
+    ShowInTaskbar="True">
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ================= HEADER ================= -->
+        <Border Grid.Row="0"
+                BorderBrush="#CCCCCC" BorderThickness="1"
+                CornerRadius="5" Padding="10">
+            <StackPanel>
+                <TextBlock Text="MODEL GROUP PARAMS TO ELEMENTS"
+                           FontWeight="Bold" FontSize="12"
+                           Foreground="#2D5A8A"/>
+                <TextBlock x:Name="lbl_model_name"
+                           Text="Model: -"
+                           FontSize="11" Foreground="Gray"
+                           Margin="0,3,0,0"/>
+                <TextBlock x:Name="lbl_scope_info"
+                           Text="Model groups in scope: 0"
+                           FontSize="11" Foreground="Gray"
+                           Margin="0,2,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ================= SCOPE + OPTIONS ================= -->
+        <Border Grid.Row="1"
+                BorderBrush="#CCCCCC" BorderThickness="1"
+                CornerRadius="5" Padding="10"
+                Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="0,0,20,0">
+                    <TextBlock Text="Scope" FontWeight="Bold" FontSize="11"
+                               Margin="0,0,0,4"/>
+                    <RadioButton x:Name="rad_scope_all"
+                                 Content="All model groups in the model"
+                                 GroupName="scope"
+                                 IsChecked="True"
+                                 FontSize="11" Margin="0,2,0,0"/>
+                    <RadioButton x:Name="rad_scope_selection"
+                                 Content="Model groups in the current selection"
+                                 GroupName="scope"
+                                 FontSize="11" Margin="0,4,0,0"/>
+                    <Button x:Name="btn_refresh"
+                            Content="Refresh"
+                            Width="110" Height="24"
+                            HorizontalAlignment="Left"
+                            Margin="0,8,0,0"
+                            FontSize="11"
+                            ToolTip="Read the model groups again with the current scope"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Options" FontWeight="Bold" FontSize="11"
+                               Margin="0,0,0,4"/>
+                    <CheckBox x:Name="chk_include_type_params"
+                              Content="Also list the parameters of the group TYPE"
+                              IsChecked="True"
+                              FontSize="11" Margin="0,2,0,0"/>
+                    <CheckBox x:Name="chk_include_nested"
+                              Content="Include the elements of nested groups"
+                              IsChecked="True"
+                              FontSize="11" Margin="0,4,0,0"/>
+                    <CheckBox x:Name="chk_skip_empty"
+                              Content="Skip empty source values (do not overwrite with blanks)"
+                              IsChecked="True"
+                              FontSize="11" Margin="0,4,0,0"/>
+                    <CheckBox x:Name="chk_skip_conflicts"
+                              Content="Skip group types whose instances hold different values"
+                              IsChecked="True"
+                              FontSize="11" Margin="0,4,0,0"
+                              ToolTip="Elements inside a group are shared by every instance of that group type: writing different values would leave only the last one."/>
+                    <CheckBox x:Name="chk_allow_unit_mismatch"
+                              Content="Allow transfer between different data types / units"
+                              FontSize="11" Margin="0,4,0,0"
+                              ToolTip="Numeric values are copied as internal units, a Length written into a Number keeps the raw internal value."/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ================= PARAMETERS + GROUP TYPES ================= -->
+        <Grid Grid.Row="2" Margin="0,10,0,0" Height="210">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Parameters -->
+            <Border Grid.Column="0"
+                    BorderBrush="#CCCCCC" BorderThickness="1"
+                    CornerRadius="5" Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="Group parameters to transfer"
+                               FontWeight="Bold" FontSize="11"/>
+                    <TextBox Grid.Row="1"
+                             x:Name="txt_param_filter"
+                             Height="22" Margin="0,6,0,6"
+                             FontSize="11"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Type to filter the list"/>
+                    <ScrollViewer Grid.Row="2"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="pnl_params"/>
+                    </ScrollViewer>
+                    <StackPanel Grid.Row="3" Orientation="Horizontal"
+                                Margin="0,6,0,0">
+                        <Button x:Name="btn_params_all"
+                                Content="Select all" Height="22" Padding="8,1"
+                                FontSize="11" Margin="0,0,6,0"/>
+                        <Button x:Name="btn_params_none"
+                                Content="Clear" Height="22" Padding="8,1"
+                                FontSize="11"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Group types -->
+            <Border Grid.Column="2"
+                    BorderBrush="#CCCCCC" BorderThickness="1"
+                    CornerRadius="5" Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="Model group types to process"
+                               FontWeight="Bold" FontSize="11"/>
+                    <TextBox Grid.Row="1"
+                             x:Name="txt_group_filter"
+                             Height="22" Margin="0,6,0,6"
+                             FontSize="11"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Type to filter the list"/>
+                    <ScrollViewer Grid.Row="2"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="pnl_grouptypes"/>
+                    </ScrollViewer>
+                    <StackPanel Grid.Row="3" Orientation="Horizontal"
+                                Margin="0,6,0,0">
+                        <Button x:Name="btn_groups_all"
+                                Content="Select all" Height="22" Padding="8,1"
+                                FontSize="11" Margin="0,0,6,0"/>
+                        <Button x:Name="btn_groups_none"
+                                Content="Clear" Height="22" Padding="8,1"
+                                FontSize="11"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ================= PREVIEW ================= -->
+        <ListView Grid.Row="3"
+                  x:Name="lst_preview"
+                  Margin="0,10,0,0"
+                  FontSize="11"
+                  SelectionMode="Extended">
+            <ListView.Resources>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#2D5A8A"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#2D5A8A"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="White"/>
+            </ListView.Resources>
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding [State]}" Value="OK">
+                            <Setter Property="Foreground" Value="#1B7A3D"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding [State]}" Value="WARN">
+                            <Setter Property="Foreground" Value="#B26A00"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding [State]}" Value="ERROR">
+                            <Setter Property="Foreground" Value="#D32F2F"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Parameter"
+                                    Width="230"
+                                    DisplayMemberBinding="{Binding [Parameter]}"/>
+                    <GridViewColumn Header="Category"
+                                    Width="200"
+                                    DisplayMemberBinding="{Binding [Category]}"/>
+                    <GridViewColumn Header="Elements"
+                                    Width="70"
+                                    DisplayMemberBinding="{Binding [Count]}"/>
+                    <GridViewColumn Header="Status"
+                                    Width="400"
+                                    DisplayMemberBinding="{Binding [Status]}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <!-- ================= SUMMARY ================= -->
+        <TextBlock Grid.Row="4"
+                   x:Name="lbl_summary"
+                   Text="Select the parameters, then run Analyze."
+                   FontSize="11" FontWeight="Bold"
+                   Foreground="#2D5A8A"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"/>
+
+        <!-- ================= FOOTER ================= -->
+        <StackPanel Grid.Row="5"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,10,0,0">
+            <Button x:Name="btn_analyze"
+                    Content="Analyze"
+                    Width="120" Height="30"
+                    Margin="0,0,10,0"
+                    ToolTip="Dry run: check the parameters against the categories found inside the groups"/>
+            <Button x:Name="btn_transfer"
+                    Content="Transfer values"
+                    Background="#2D5A8A" Foreground="White"
+                    FontWeight="Bold"
+                    Width="160" Height="30"
+                    Margin="0,0,10,0"
+                    IsEnabled="False"/>
+            <Button x:Name="btn_close"
+                    Content="Close"
+                    Width="100" Height="30"
+                    FontSize="11"/>
+        </StackPanel>
+    </Grid>
+</Window>

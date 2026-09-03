@@ -1,0 +1,31 @@
+title:
+  Group Params
+
+  To Elements
+
+tooltip: >-
+  Copies the values of the selected model group parameters onto the
+  elements contained in the groups.
+
+  HOW IT WORKS:
+   1. Choose the scope: every model group of the model, or only the
+      model groups currently selected.
+   2. Tick the group parameters to transfer (instance parameters of
+      the group and, optionally, parameters of the group type) and
+      the group types to process.
+   3. "Analyze" runs a dry run: for every category found inside the
+      groups it checks that the parameter is bound to that category,
+      is writable and has a compatible data type. Nothing is changed.
+   4. "Transfer values" writes only the rows flagged as ready, in a
+      single transaction, and prints the full report.
+
+  REPORTED ISSUES:
+   - parameter not bound to the category of a member element;
+   - parameter available only as a TYPE parameter of the element;
+   - read-only parameter, storage type or unit mismatch;
+   - parameter missing or empty on the group instance;
+   - group types whose instances hold different values (elements
+     belong to the group definition, so the value would be shared
+     by every instance of that type).
+
+author: "Andrea Patti"

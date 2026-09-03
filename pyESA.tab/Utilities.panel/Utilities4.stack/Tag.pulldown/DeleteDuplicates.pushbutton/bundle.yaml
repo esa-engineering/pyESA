@@ -1,0 +1,14 @@
+title: |-
+  Delete
+  Duplicate Tags
+
+tooltip: >
+  Analyse the selected views, report the duplicated tags
+  (more than one tag on the same element in the same view)
+  and delete the ones confirmed by the user.
+
+  CLICK: the active view is preselected
+
+  SHIFT + CLICK: every view containing tags is preselected
+
+author: Andrea Patti

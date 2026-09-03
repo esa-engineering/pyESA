@@ -1,0 +1,15 @@
+title:
+  en_us: Create Schedule
+  it_it: Crea Abachi
+
+tooltip: >
+  Create multiple schedules, one for each selected category.
+
+  CLICK: manual selection of categories and parameters (native, project-specific,
+  shared). Parameters not available for a category are shown in the final report.
+
+  SHIFT + CLICK: uses an existing schedule as a template and replicates its fields,
+  sorting/grouping and formatting across the selected categories.
+
+  In both modes, the schedule name consists of a prefix
+  entered by the user + the name of the Revit category.
