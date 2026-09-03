@@ -13,7 +13,4 @@ tooltip: |
   The Source_Document column tells which model each row comes from
   (element IDs are unique only within their own document).
 
-  Extra parameters holding a Length, Area, Volume or Angle are converted
-  to metric units (m, m2, m3, degrees); unitless ones are exported as-is.
-
-author: Claude.ai (Antonio Miano)
+author: Claude + Antonio Miano
