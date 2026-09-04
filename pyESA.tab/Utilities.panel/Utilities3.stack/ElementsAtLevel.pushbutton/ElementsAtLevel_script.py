@@ -85,6 +85,17 @@ def format_elevation(value_feet):
     return u'{:+.0f} mm'.format(value_feet * FEET_TO_MM)
 
 
+def separator():
+    """rpw Separator e' l'unico controllo senza __init__ proprio: i kwargs finiscono
+    a object.__new__ e sollevano TypeError. I valori si impostano dopo la costruzione,
+    altrimenti restano i default di rpw (300 x 25): 300 e' piu' largo di FORM_WIDTH e
+    la finestra, che usa SizeToContent, si allargherebbe sul separatore."""
+    control = Separator()
+    control.Width = FORM_WIDTH
+    control.Height = 5
+    return control
+
+
 # ------------------------------------------------------------ regole livelli
 
 def P(level_bip, offset_bips, mode='first'):
@@ -451,14 +462,14 @@ components = [
     Label('Livello di base / riferimento', Width=FORM_WIDTH),
     CheckBox('ckb_base', 'Applica il livello di base', default=True, Width=FORM_WIDTH),
     ComboBox('cmb_base', levels_dict, sort=False, Width=FORM_WIDTH),
-    Separator(Width=FORM_WIDTH),
+    separator(),
     Label('Livello superiore (solo elementi a doppio livello)', Width=FORM_WIDTH),
     CheckBox('ckb_top', 'Applica il livello superiore', default=False, Width=FORM_WIDTH),
     ComboBox('cmb_top', levels_dict, sort=False, Width=FORM_WIDTH),
-    Separator(Width=FORM_WIDTH),
+    separator(),
     CheckBox('ckb_keep', 'Mantieni gli elementi nella posizione attuale',
              default=True, Width=FORM_WIDTH, ToolTip=KEEP_TOOLTIP),
-    Separator(Width=FORM_WIDTH),
+    separator(),
     Button('OK', Width=FORM_WIDTH),
 ]
 flex_form = FlexForm('Elements at Level  -  {} elementi'.format(len(elements)), components)
