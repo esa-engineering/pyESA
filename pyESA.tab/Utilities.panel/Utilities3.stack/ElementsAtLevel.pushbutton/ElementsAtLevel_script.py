@@ -4,8 +4,9 @@ __title__ = "Elements\nat Level"
 __doc__ = """Version = 2.0
 Date    = 04.09.2026
 _____________________________________________________________________
-Riassegna il livello di host degli elementi selezionati mantenendone
-la quota assoluta (l'offset viene ricalcolato).
+Riassegna il livello di host degli elementi selezionati lasciandoli
+nella posizione attuale (l'offset viene ricalcolato). Togliendo la
+spunta all'opzione, gli elementi si spostano insieme al nuovo livello.
 
 La selezione e' libera: non si sceglie piu' una categoria, e' lo script
 che riconosce la categoria di ogni elemento e applica il metodo giusto.
@@ -33,6 +34,8 @@ BIP = DB.BuiltInParameter
 
 MAX_SKIPPED_ROWS = 200
 FEET_TO_MM = 304.8
+# La finestra rpw usa SizeToContent: si dimensiona sul controllo piu' largo.
+FORM_WIDTH = 270
 
 
 # ---------------------------------------------------------------- helpers
@@ -440,18 +443,23 @@ elements = collect_elements()
 if not elements:
     script.exit()
 
+KEEP_TOOLTIP = (u"Spuntato: l'offset viene ricalcolato, gli elementi non si muovono.\n"
+                u"Non spuntato: l'offset resta invariato e gli elementi si spostano "
+                u"insieme al nuovo livello.")
+
 components = [
-    Label('Livello di base / riferimento'),
-    CheckBox('ckb_base', 'Applica il livello di base', default=True),
-    ComboBox('cmb_base', levels_dict, sort=False, Width=340),
-    Separator(),
-    Label('Livello superiore (solo elementi a doppio livello)'),
-    CheckBox('ckb_top', 'Applica il livello superiore', default=False),
-    ComboBox('cmb_top', levels_dict, sort=False, Width=340),
-    Separator(),
-    CheckBox('ckb_keep', 'Mantieni la quota assoluta (ricalcola gli offset)', default=True),
-    Separator(),
-    Button('OK'),
+    Label('Livello di base / riferimento', Width=FORM_WIDTH),
+    CheckBox('ckb_base', 'Applica il livello di base', default=True, Width=FORM_WIDTH),
+    ComboBox('cmb_base', levels_dict, sort=False, Width=FORM_WIDTH),
+    Separator(Width=FORM_WIDTH),
+    Label('Livello superiore (solo elementi a doppio livello)', Width=FORM_WIDTH),
+    CheckBox('ckb_top', 'Applica il livello superiore', default=False, Width=FORM_WIDTH),
+    ComboBox('cmb_top', levels_dict, sort=False, Width=FORM_WIDTH),
+    Separator(Width=FORM_WIDTH),
+    CheckBox('ckb_keep', 'Mantieni gli elementi nella posizione attuale',
+             default=True, Width=FORM_WIDTH, ToolTip=KEEP_TOOLTIP),
+    Separator(Width=FORM_WIDTH),
+    Button('OK', Width=FORM_WIDTH),
 ]
 flex_form = FlexForm('Elements at Level  -  {} elementi'.format(len(elements)), components)
 flex_form.show()
@@ -534,7 +542,7 @@ output.print_md(u'# Elements at Level')
 output.print_md(u'Elementi elaborati: **{}**{}  \n'
                 u'Livello di base: **{}**  \n'
                 u'Livello superiore: **{}**  \n'
-                u'Quota assoluta mantenuta: **{}**'.format(
+                u'Elementi lasciati nella posizione attuale: **{}**'.format(
                     len(elements),
                     u' (di cui {} ricondotti al proprio host)'.format(redirected) if redirected else u'',
                     base_level.Name if do_base else u'non applicato',
