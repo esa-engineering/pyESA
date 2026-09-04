@@ -1,0 +1,16 @@
+title:
+  Elements
+
+  in Room
+tooltip: >
+  Writes on a text parameter of the elements the value of a parameter read from the
+  room that contains them, so that objects can be grouped by their actual spatial
+  location. Doors and windows use From Room / To Room, family instances use the Room
+  Calculation Point when the family has one, walls and room separators use the room
+  boundaries, everything else is tested against the computed room volume. When an
+  element belongs to more than one room the values are joined with a separator.
+
+  CLICK - analyse and write.
+
+  SHIFT + CLICK - preview only, the model is not modified.
+author: Antonio Miano
