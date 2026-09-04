@@ -4,15 +4,15 @@ __title__ = "Elements\nat Level"
 __doc__ = """Version = 2.0
 Date    = 04.09.2026
 _____________________________________________________________________
-Riassegna il livello di host degli elementi selezionati lasciandoli
-nella posizione attuale (l'offset viene ricalcolato). Togliendo la
-spunta all'opzione, gli elementi si spostano insieme al nuovo livello.
+Reassigns the host level of the selected elements while keeping them
+in their current position (the offset is recalculated). Clearing the
+option makes the elements move together with the new level.
 
-La selezione e' libera: non si sceglie piu' una categoria, e' lo script
-che riconosce la categoria di ogni elemento e applica il metodo giusto.
-Per gli elementi a doppio livello (muri, pilastri, scale, coperture) si
-possono assegnare livello di base e livello superiore in una sola
-operazione, anche a due livelli diversi.
+The selection is free: you no longer pick a category, the script
+recognises the category of each element and applies the right method.
+For dual-level elements (walls, columns, stairs, roofs) base level and
+top level can be assigned in a single run, even to two different
+levels.
 _____________________________________________________________________
 Author(s): bimdifferent, ESA Engineering
 """
@@ -278,10 +278,10 @@ def collect_elements():
     if elements:
         return elements
 
-    with forms.WarningBar(title='Seleziona gli elementi da riassegnare, poi premi Finish'):
+    with forms.WarningBar(title='Select the elements to reassign, then press Finish'):
         try:
             references = list(uidoc.Selection.PickObjects(
-                UI.Selection.ObjectType.Element, 'Seleziona gli elementi'))
+                UI.Selection.ObjectType.Element, 'Select the elements'))
         except Exception:
             references = []
     if not references:
@@ -358,18 +358,18 @@ def resolve_by_name(element, slot):
 def apply_wall_top_unconnected(element, level_param, offset_params, target_level, keep):
     """Muro con top 'Unconnected': la quota del top si ricava da base + altezza."""
     if keep and not offset_params:
-        return SKIPPED, u'offset superiore non scrivibile'
+        return SKIPPED, u'top offset is not writable'
     base_param = find_param(element, ['WALL_BASE_CONSTRAINT'], writable=False)
     base_level = None
     if base_param is not None:
         base_level = doc.GetElement(base_param.AsElementId())
     if keep and base_level is None:
-        return SKIPPED, u'livello di base non risolvibile'
+        return SKIPPED, u'base level cannot be resolved'
     if keep:
         base_offset = find_param(element, ['WALL_BASE_OFFSET'], writable=False)
         height = find_param(element, ['WALL_USER_HEIGHT_PARAM'], writable=False)
         if height is None:
-            return SKIPPED, u'altezza muro non leggibile'
+            return SKIPPED, u'wall height cannot be read'
         top_elevation = base_level.Elevation + height.AsDouble()
         if base_offset is not None:
             top_elevation += base_offset.AsDouble()
@@ -381,7 +381,7 @@ def apply_wall_top_unconnected(element, level_param, offset_params, target_level
 
 def apply_slot(element, slot, target_level, keep):
     """Applica un livello a uno slot dell'elemento. Ritorna (stato, motivo)."""
-    reason = u'parametro di livello assente o di sola lettura'
+    reason = u'level parameter missing or read-only'
     candidates = []
     for pair in slot['pairs']:
         level_param, offset_params = resolve_pair(element, pair, slot)
@@ -398,14 +398,14 @@ def apply_slot(element, slot, target_level, keep):
             if slot.get('special') == 'wall_top':
                 return apply_wall_top_unconnected(
                     element, level_param, offset_params, target_level, keep)
-            reason = u'livello corrente non assegnato'
+            reason = u'current level not assigned'
             continue
 
         if element_id_value(current_level.Id) == element_id_value(target_level.Id):
             return ALREADY, u''
 
         if keep and not offset_params:
-            reason = u'nessun parametro di offset scrivibile'
+            reason = u'no writable offset parameter'
             continue
 
         delta = current_level.Elevation - target_level.Elevation
@@ -441,7 +441,7 @@ levels = list(DB.FilteredElementCollector(doc)
               .WhereElementIsNotElementType()
               .ToElements())
 if not levels:
-    forms.alert(u'Il modello non contiene livelli.', title=u'Elements at Level', exitscript=True)
+    forms.alert(u'The model does not contain any level.', title=u'Elements at Level', exitscript=True)
 levels.sort(key=lambda lev: lev.Elevation)
 
 # I livelli in elenco vanno dal piu' alto al piu' basso: OrderedDict + sort=False
@@ -454,25 +454,25 @@ elements = collect_elements()
 if not elements:
     script.exit()
 
-KEEP_TOOLTIP = (u"Spuntato: l'offset viene ricalcolato, gli elementi non si muovono.\n"
-                u"Non spuntato: l'offset resta invariato e gli elementi si spostano "
-                u"insieme al nuovo livello.")
+KEEP_TOOLTIP = (u"Checked: the offset is recalculated, the elements do not move.\n"
+                u"Unchecked: the offset stays unchanged and the elements move "
+                u"together with the new level.")
 
 components = [
-    Label('Livello di base / riferimento', Width=FORM_WIDTH),
-    CheckBox('ckb_base', 'Applica il livello di base', default=True, Width=FORM_WIDTH),
+    Label('Base / reference level', Width=FORM_WIDTH),
+    CheckBox('ckb_base', 'Apply the base level', default=True, Width=FORM_WIDTH),
     ComboBox('cmb_base', levels_dict, sort=False, Width=FORM_WIDTH),
     separator(),
-    Label('Livello superiore (solo elementi a doppio livello)', Width=FORM_WIDTH),
-    CheckBox('ckb_top', 'Applica il livello superiore', default=False, Width=FORM_WIDTH),
+    Label('Top level (dual-level elements only)', Width=FORM_WIDTH),
+    CheckBox('ckb_top', 'Apply the top level', default=False, Width=FORM_WIDTH),
     ComboBox('cmb_top', levels_dict, sort=False, Width=FORM_WIDTH),
     separator(),
-    CheckBox('ckb_keep', 'Mantieni gli elementi nella posizione attuale',
+    CheckBox('ckb_keep', 'Keep the elements in their current position',
              default=True, Width=FORM_WIDTH, ToolTip=KEEP_TOOLTIP),
     separator(),
     Button('OK', Width=FORM_WIDTH),
 ]
-flex_form = FlexForm('Elements at Level  -  {} elementi'.format(len(elements)), components)
+flex_form = FlexForm('Elements at Level  -  {} elements'.format(len(elements)), components)
 flex_form.show()
 if not flex_form.values:
     script.exit()
@@ -484,7 +484,7 @@ base_level = flex_form.values['cmb_base']
 top_level = flex_form.values['cmb_top']
 
 if not do_base and not do_top:
-    forms.alert(u'Seleziona almeno uno fra livello di base e livello superiore.',
+    forms.alert(u'Select at least one between base level and top level.',
                 title=u'Elements at Level', exitscript=True)
 
 
@@ -525,7 +525,7 @@ with revit.Transaction('ElementsAtLevel'):
             try:
                 status, reason = apply_slot(element, slot, target_level, keep_elevation)
             except Exception as error:
-                status, reason = SKIPPED, u'errore Revit: {}'.format(error)
+                status, reason = SKIPPED, u'Revit error: {}'.format(error)
 
             if status == APPLIED:
                 touched = True
@@ -537,28 +537,28 @@ with revit.Transaction('ElementsAtLevel'):
 
         if touched:
             if reasons:
-                skipped.append((element, u'parziale - {}'.format(u'; '.join(reasons))))
+                skipped.append((element, u'partial - {}'.format(u'; '.join(reasons))))
             continue
         if already and not reasons:
             bump(name, 2)
             continue
         if not reasons:
-            reasons.append(u'nessun livello applicabile con le opzioni scelte')
+            reasons.append(u'no level applicable with the selected options')
         skipped.append((element, u'; '.join(reasons)))
 
 
 # ------------------------------------------------------------------ report
 
 output.print_md(u'# Elements at Level')
-output.print_md(u'Elementi elaborati: **{}**{}  \n'
-                u'Livello di base: **{}**  \n'
-                u'Livello superiore: **{}**  \n'
-                u'Elementi lasciati nella posizione attuale: **{}**'.format(
+output.print_md(u'Processed elements: **{}**{}  \n'
+                u'Base level: **{}**  \n'
+                u'Top level: **{}**  \n'
+                u'Elements kept in their current position: **{}**'.format(
                     len(elements),
-                    u' (di cui {} ricondotti al proprio host)'.format(redirected) if redirected else u'',
-                    base_level.Name if do_base else u'non applicato',
-                    top_level.Name if do_top else u'non applicato',
-                    u'si' if keep_elevation else u'no'))
+                    u' ({} of them redirected to their host)'.format(redirected) if redirected else u'',
+                    base_level.Name if do_base else u'not applied',
+                    top_level.Name if do_top else u'not applied',
+                    u'yes' if keep_elevation else u'no'))
 
 if stats:
     rows = []
@@ -567,20 +567,20 @@ if stats:
         rows.append([name, row[0], row[1], row[2]])
         for i in range(3):
             totals[i] += row[i]
-    rows.append([u'**Totale**', totals[0], totals[1], totals[2]])
+    rows.append([u'**Total**', totals[0], totals[1], totals[2]])
     output.print_table(table_data=rows, title='',
-                       columns=[u'Categoria', u'Livello base', u'Livello superiore',
-                                u'Gia\' corretti'])
+                       columns=[u'Category', u'Base level', u'Top level',
+                                u'Already correct'])
 else:
-    output.print_md(u'_Nessun elemento modificato._')
+    output.print_md(u'_No element modified._')
 
 if skipped:
-    output.print_md(u'## Elementi ignorati ({})'.format(len(skipped)))
+    output.print_md(u'## Skipped elements ({})'.format(len(skipped)))
     shown = skipped[:MAX_SKIPPED_ROWS]
     detail = [[output.linkify(element.Id), category_name(element), reason]
               for element, reason in shown]
     output.print_table(table_data=detail, title='',
-                       columns=[u'Elemento', u'Categoria', u'Motivo'])
+                       columns=[u'Element', u'Category', u'Reason'])
     remaining = len(skipped) - len(shown)
     if remaining > 0:
-        output.print_md(u'_...e altri {} elementi ignorati non elencati._'.format(remaining))
+        output.print_md(u'_...and {} more skipped elements not listed._'.format(remaining))
