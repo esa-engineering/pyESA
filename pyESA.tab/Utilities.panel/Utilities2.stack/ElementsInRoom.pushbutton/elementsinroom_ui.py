@@ -2,8 +2,13 @@
 """
 elementsinroom_ui.py - finestra XAML di configurazione per ElementsInRoom.
 
-Raccoglie in un solo passaggio fase, ambito delle room, categorie, parametri e
-tolleranze direzionali, e restituisce un DTO RunConfig allo script chiamante.
+Raccoglie in un solo passaggio fasi, ambito di room ed elementi, categorie,
+parametri e tolleranze direzionali, e restituisce un DTO RunConfig allo script
+chiamante.
+
+Le room possono venire dal documento corrente o da un RevitLinkInstance: in quel
+caso fasi e room sono lette dal documento del link (room_doc), mentre categorie,
+parametri di destinazione e fase degli elementi restano del documento corrente.
 """
 
 import os
@@ -76,16 +81,21 @@ def parse_number(text):
         return None
 
 
-def collect_rooms(doc, phase, only_active_view):
-    """Room posizionate della fase indicata, eventualmente ristrette alla vista attiva."""
+def collect_rooms(room_doc, phase, active_view_id):
+    """Room posizionate della fase indicata nel documento room_doc.
+
+    active_view_id, se dato, limita la raccolta alla vista: possibile solo quando
+    room_doc e' il documento corrente (un collector view-scoped non accetta la
+    vista di un altro documento).
+    """
     if phase is None:
         return []
     phase_id = element_id_value(phase.Id)
     try:
-        if only_active_view:
-            collector = DB.FilteredElementCollector(doc, doc.ActiveView.Id)
+        if active_view_id is not None:
+            collector = DB.FilteredElementCollector(room_doc, active_view_id)
         else:
-            collector = DB.FilteredElementCollector(doc)
+            collector = DB.FilteredElementCollector(room_doc)
         candidates = collector.OfCategory(BIC.OST_Rooms)\
             .WhereElementIsNotElementType()\
             .ToElements()
@@ -184,8 +194,13 @@ class RunConfig(object):
     """Configurazione completa di un run, cosi' come esce dalla finestra."""
 
     def __init__(self):
+        # Fase delle room (documento delle room) e fase degli elementi (documento corrente).
         self.phase = None
+        self.element_phase = None
         self.only_active_view = False
+        self.only_view_elements = False
+        self.room_doc = None
+        self.link_instance = None
         self.rooms = []
         self.categories = []
         self.source_name = None
@@ -210,12 +225,16 @@ class RunConfig(object):
 class ElementsInRoomForm(Window):
     """Finestra XAML unica di configurazione."""
 
-    def __init__(self, doc):
+    def __init__(self, doc, room_doc, link_instance):
         self.doc = doc
+        self.room_doc = room_doc
+        self.link_instance = link_instance
+        self.link_mode = link_instance is not None
         self.result = False
         self.config = RunConfig()
 
         self._phases = {}
+        self._element_phases = {}
         self._all_items = []
         self._filtered_items = []
         self._param_cache = {}
@@ -259,9 +278,12 @@ class ElementsInRoomForm(Window):
         self._wire_events()
 
     def _find_controls(self, root):
+        self.txt_room_source = root.FindName('txt_room_source')
         self.cbo_phase = root.FindName('cbo_phase')
+        self.cbo_element_phase = root.FindName('cbo_element_phase')
         self.rdo_scope_all = root.FindName('rdo_scope_all')
         self.rdo_scope_view = root.FindName('rdo_scope_view')
+        self.chk_elements_view = root.FindName('chk_elements_view')
         self.txt_room_count = root.FindName('txt_room_count')
 
         self.txt_search = root.FindName('txt_search')
@@ -286,7 +308,6 @@ class ElementsInRoomForm(Window):
         self.rdo_axes_local = root.FindName('rdo_axes_local')
         self.chk_retry_level = root.FindName('chk_retry_level')
 
-        self.txt_mode = root.FindName('txt_mode')
         self.btn_ok = root.FindName('btn_ok')
         self.btn_cancel = root.FindName('btn_cancel')
 
@@ -302,33 +323,60 @@ class ElementsInRoomForm(Window):
         self.btn_ok.Click += self.OnOK
         self.btn_cancel.Click += self.OnCancel
 
-    def _init_phases(self):
-        phases = [item for item in self.doc.Phases]
-        default_phase = phases[-1] if phases else None
+    def _active_view_phase_name(self):
         try:
             view_phase_param = self.doc.ActiveView.get_Parameter(BIP.VIEW_PHASE)
             if view_phase_param is not None:
                 view_phase = self.doc.GetElement(view_phase_param.AsElementId())
                 if view_phase is not None:
-                    default_phase = view_phase
+                    return view_phase.Name
         except Exception:
             pass
+        return None
 
-        self.cbo_phase.Items.Clear()
-        for phase in phases:
-            self._phases[phase.Name] = phase
-            self.cbo_phase.Items.Add(phase.Name)
-        if default_phase is not None:
-            self.cbo_phase.SelectedItem = default_phase.Name
-        elif self.cbo_phase.Items.Count:
-            self.cbo_phase.SelectedIndex = 0
+    @staticmethod
+    def _fill_phase_combo(combo, document, default_name):
+        """Riempie il combo con le fasi del documento; {nome: Phase}.
+
+        Default: la fase con il nome dato (quella della vista attiva, per nome
+        perche' in modalita' link le fasi sono di un altro documento), altrimenti
+        l'ultima della sequenza.
+        """
+        lookup = {}
+        combo.Items.Clear()
+        for phase in document.Phases:
+            lookup[phase.Name] = phase
+            combo.Items.Add(phase.Name)
+        if default_name in lookup:
+            combo.SelectedItem = default_name
+        elif combo.Items.Count:
+            combo.SelectedIndex = combo.Items.Count - 1
+        return lookup
+
+    def _init_phases(self):
+        view_phase_name = self._active_view_phase_name()
+        self._phases = self._fill_phase_combo(self.cbo_phase, self.room_doc, view_phase_name)
+        self._element_phases = self._fill_phase_combo(
+            self.cbo_element_phase, self.doc, view_phase_name)
 
     def _init_scope(self):
+        if self.link_mode:
+            self.txt_room_source.Text = u"Rooms from link: {}".format(self.link_instance.Name)
+        else:
+            self.txt_room_source.Text = u"Rooms from the current document."
+
         self.rdo_scope_all.IsChecked = True
+        self.chk_elements_view.IsChecked = False
         if not view_scope_supported(self.doc):
+            not_graphical = "The active view is not a graphical model view."
+            self.rdo_scope_view.IsEnabled = False
+            self.rdo_scope_view.ToolTip = not_graphical
+            self.chk_elements_view.IsEnabled = False
+            self.chk_elements_view.ToolTip = not_graphical
+        if self.link_mode:
             self.rdo_scope_view.IsEnabled = False
             self.rdo_scope_view.ToolTip = (
-                "The active view is not a graphical model view.")
+                "Not available when rooms come from a linked model.")
         self.chk_overwrite.IsChecked = True
         self.chk_retry_level.IsChecked = True
         self.rdo_axes_global.IsChecked = True
@@ -376,10 +424,15 @@ class ElementsInRoomForm(Window):
         name = self.cbo_phase.SelectedItem
         return self._phases.get(name) if name else None
 
+    def _current_element_phase(self):
+        name = self.cbo_element_phase.SelectedItem
+        return self._element_phases.get(name) if name else None
+
     def _refresh_rooms(self):
         phase = self._current_phase()
-        only_view = bool(self.rdo_scope_view.IsChecked)
-        self._rooms = collect_rooms(self.doc, phase, only_view)
+        only_view = bool(self.rdo_scope_view.IsChecked) and not self.link_mode
+        view_id = self.doc.ActiveView.Id if only_view else None
+        self._rooms = collect_rooms(self.room_doc, phase, view_id)
 
         if self._rooms:
             self.txt_room_count.Foreground = GRAY_BRUSH
@@ -411,7 +464,8 @@ class ElementsInRoomForm(Window):
     # -------------------------------------------------------- parametri target
 
     def _category_sample(self, category_id):
-        """Primi SAMPLE_PER_CATEGORY elementi della categoria, memorizzati.
+        """Parametri di testo scrivibili sui primi SAMPLE_PER_CATEGORY elementi
+        della categoria, memorizzati. None se la categoria non ha istanze.
 
         I FilteredElementCollector sono lazy: iterando e fermandosi al decimo
         elemento non si scandisce il modello intero.
@@ -432,7 +486,7 @@ class ElementsInRoomForm(Window):
         except Exception:
             sample = []
 
-        names = writable_text_param_names(sample)
+        names = writable_text_param_names(sample) if sample else None
         self._param_cache[key] = names
         return names
 
@@ -440,10 +494,16 @@ class ElementsInRoomForm(Window):
         previous = self.cbo_target.SelectedItem
         selected = self._selected_items()
 
-        names = set()
+        # Intersezione: il parametro deve esistere su tutte le categorie scelte.
+        # Una categoria senza istanze nel modello non ha nulla da scrivere e non
+        # svuota la lista.
+        names = None
         for item in selected:
-            names.update(self._category_sample(item.CategoryId))
-        names = sorted(names)
+            found = self._category_sample(item.CategoryId)
+            if found is None:
+                continue
+            names = set(found) if names is None else names & found
+        names = sorted(names or [])
 
         self.cbo_target.Items.Clear()
         for name in names:
@@ -458,8 +518,9 @@ class ElementsInRoomForm(Window):
             self.txt_target_hint.Text = "Select at least one category."
         elif not names:
             self.txt_target_hint.Text = (
-                "No writable text instance parameter on the selected categories: "
-                "a project or shared parameter of type Text is required.")
+                "No writable text instance parameter common to all the selected "
+                "categories: a project or shared parameter of type Text bound to "
+                "each of them is required.")
         else:
             self.txt_target_hint.Text = ""
 
@@ -524,7 +585,9 @@ class ElementsInRoomForm(Window):
 
     def _validate_input(self):
         if not self._current_phase():
-            return False, u"Select a phase."
+            return False, u"Select the room phase."
+        if not self._current_element_phase():
+            return False, u"Select the element phase."
         if not self._rooms:
             return False, u"No room available with the selected phase and scope."
         if not self._selected_items():
@@ -546,7 +609,11 @@ class ElementsInRoomForm(Window):
     def _build_config(self):
         config = self.config
         config.phase = self._current_phase()
-        config.only_active_view = bool(self.rdo_scope_view.IsChecked)
+        config.element_phase = self._current_element_phase()
+        config.only_active_view = bool(self.rdo_scope_view.IsChecked) and not self.link_mode
+        config.only_view_elements = bool(self.chk_elements_view.IsChecked)
+        config.room_doc = self.room_doc
+        config.link_instance = self.link_instance
         config.rooms = self._rooms
         config.categories = [item.Category for item in self._selected_items()]
         config.source_name = self.cbo_source.SelectedItem
@@ -567,7 +634,9 @@ class ElementsInRoomForm(Window):
         try:
             cfg = script.get_config(CONFIG_SECTION)
             cfg.last_phase = self.cbo_phase.SelectedItem
+            cfg.last_element_phase = self.cbo_element_phase.SelectedItem
             cfg.last_scope_view = bool(self.rdo_scope_view.IsChecked)
+            cfg.last_elements_view = bool(self.chk_elements_view.IsChecked)
             cfg.last_categories = [item.Name for item in self._selected_items()]
             cfg.last_source = self.cbo_source.SelectedItem
             cfg.last_target = self.cbo_target.SelectedItem
@@ -594,9 +663,14 @@ class ElementsInRoomForm(Window):
             phase_name = cfg.get_option('last_phase', None)
             if phase_name and phase_name in self._phases:
                 self.cbo_phase.SelectedItem = phase_name
+            element_phase_name = cfg.get_option('last_element_phase', None)
+            if element_phase_name and element_phase_name in self._element_phases:
+                self.cbo_element_phase.SelectedItem = element_phase_name
 
             if cfg.get_option('last_scope_view', False) and self.rdo_scope_view.IsEnabled:
                 self.rdo_scope_view.IsChecked = True
+            if cfg.get_option('last_elements_view', False) and self.chk_elements_view.IsEnabled:
+                self.chk_elements_view.IsChecked = True
 
             self.txt_separator.Text = cfg.get_option('last_separator', ';') or ';'
             self.chk_overwrite.IsChecked = bool(cfg.get_option('last_overwrite', True))
@@ -651,13 +725,13 @@ class ElementsInRoomForm(Window):
         self.Close()
 
 
-def show_config_form(doc, preview_only=False):
-    """Mostra la finestra e restituisce un RunConfig, oppure None se annullata."""
-    form = ElementsInRoomForm(doc)
-    if preview_only:
-        form.txt_mode.Text = u"Current run: PREVIEW (SHIFT + CLICK), the model is not modified."
-    else:
-        form.txt_mode.Text = u"Current run: WRITE to the model."
+def show_config_form(doc, room_doc=None, link_instance=None):
+    """Mostra la finestra e restituisce un RunConfig, oppure None se annullata.
+
+    room_doc: documento da cui leggere le room (il documento del link in modalita'
+    link); None equivale a doc. link_instance: RevitLinkInstance scelta, o None.
+    """
+    form = ElementsInRoomForm(doc, room_doc or doc, link_instance)
     form.ShowDialog()
 
     if form.result:

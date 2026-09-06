@@ -7,14 +7,17 @@ tooltip: >
   room that contains them, so that objects can be grouped by their actual spatial
   location. Doors and windows use From Room / To Room, family instances use the Room
   Calculation Point when the family has one, walls and room separators use the room
-  boundaries, everything else is tested against the computed room volume. When none
-  of those answers, an optional tolerance (X, Y, Z up, Z down, in centimetres) probes
-  the element point again a few centimetres away, either along the project axes or
-  along the object's own axes. Rooms can be taken from the whole project or from the
-  active view only. When an element belongs to more than one room the values are
-  joined with a separator.
+  boundaries, everything else is tested against the computed room volume. Doors and
+  walls that get no answer are probed on both sides; when nothing answers, an optional
+  tolerance (X, Y, Z up, Z down, in centimetres) probes the element point again a few
+  centimetres away, either along the project axes or along the object's own axes.
+  Rooms and elements can each be limited to the active view. Only elements that exist
+  in the chosen element phase are processed. The parameter to write is chosen among
+  the text parameters common to all the selected categories. When an element belongs
+  to more than one room the values are joined with a separator.
 
-  CLICK - analyse and write.
+  CLICK - rooms from the current document.
 
-  SHIFT + CLICK - preview only, the model is not modified.
+  SHIFT + CLICK - choose a loaded Revit link and read its rooms (the link transform
+  is applied).
 author: Antonio Miano
