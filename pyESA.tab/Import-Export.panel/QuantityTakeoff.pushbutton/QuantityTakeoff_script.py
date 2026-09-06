@@ -762,12 +762,40 @@ def extract_geometric_data(element, entry):
     return data
 
 
+# Sezione di configurazione pyRevit dove viene ricordato l'ultimo input
+CONFIG_SECTION = "ESA_QuantityTakeoff"
+
+
+def load_last_extra_params():
+    """Ultima lista di parametri extra digitata dall'utente ("" se assente)."""
+    try:
+        cfg = script.get_config(CONFIG_SECTION)
+        value = cfg.get_option("last_extra_params", "")
+        return value if isinstance(value, basestring) else ""
+    except Exception:
+        return ""
+
+
+def save_last_extra_params(extra_params):
+    """Salva la lista di parametri extra per il prossimo utilizzo del comando."""
+    try:
+        cfg = script.get_config(CONFIG_SECTION)
+        cfg.last_extra_params = "; ".join(extra_params)
+        script.save_config()
+    except Exception:
+        pass
+
+
 def get_extra_params_from_user():
-    """Shows a dialog to get extra parameters from user using rpw TextBox."""
+    """Shows a dialog to get extra parameters from user using rpw TextBox.
+
+    Il campo e' precompilato con la lista usata l'ultima volta.
+    """
+    default = load_last_extra_params()
     try:
         from rpw.ui.forms import TextInput
         result = TextInput("Extra Parameters",
-                          default="",
+                          default=default,
                           description='Add extra parameters to extract separated by ";"')
         return result if result else ""
     except ImportError:
@@ -775,7 +803,7 @@ def get_extra_params_from_user():
         return forms.ask_for_string(
             prompt='Add extra parameters to extract separated by ";"',
             title="Extra Parameters",
-            default=""
+            default=default
         )
 
 
@@ -1092,6 +1120,7 @@ def ask_export_settings(doc):
 
     extra_params = [p.strip() for p in extra_params_input.split(";")
                     if p.strip()] if extra_params_input else []
+    save_last_extra_params(extra_params)
 
     # Destination folder
     output_folder = forms.pick_folder(title="Select destination folder")

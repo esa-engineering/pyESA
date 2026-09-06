@@ -26,7 +26,8 @@ first method that answers wins:
                            of the element's level
 
 Rooms can come from the current document (CLICK) or from a loaded
-Revit link (SHIFT + CLICK, the link instance is chosen first). With a
+Revit link (SHIFT + CLICK, the link instance is picked in the model
+first, or taken from the current selection). With a
 link the transform of the instance is applied to every probe, methods
 a) and c) are unavailable (the API only knows the rooms of the current
 document) and a*) / c*) take their place.
@@ -39,7 +40,7 @@ When an element belongs to more than one room the values are joined
 with the given separator.
 
 CLICK: rooms from the current document.
-SHIFT + CLICK: rooms from a linked model.
+SHIFT + CLICK: rooms from a linked model, picked in the model.
 _____________________________________________________________________
 Author(s): Claude + Antonio Miano
 """
@@ -50,7 +51,7 @@ from collections import OrderedDict
 
 from System.Collections.Generic import List
 
-from pyrevit import revit, script, DB, forms
+from pyrevit import revit, script, DB, UI, forms
 
 from elementsinroom_ui import show_config_form
 
@@ -278,16 +279,39 @@ if doc.IsFamilyDocument:
 link_mode = bool(__shiftclick__)  # noqa: F821
 link_instance = None
 
+class LinkInstanceFilter(UI.Selection.ISelectionFilter):
+    """Filtro di selezione: accetta solo istanze di link Revit."""
+
+    def AllowElement(self, element):
+        return isinstance(element, DB.RevitLinkInstance)
+
+    def AllowReference(self, reference, point):
+        return False
+
+
+def pick_link_instance():
+    """Istanza di link scelta con un click nel modello (o gia' selezionata).
+
+    Ritorna None se l'utente annulla con Esc."""
+    try:
+        for eid in uidoc.Selection.GetElementIds():
+            preselected = doc.GetElement(eid)
+            if isinstance(preselected, DB.RevitLinkInstance):
+                return preselected
+    except Exception:
+        pass
+    with forms.WarningBar(title="Pick the Revit link whose rooms to use (Esc to cancel)"):
+        try:
+            reference = uidoc.Selection.PickObject(
+                UI.Selection.ObjectType.Element, LinkInstanceFilter(),
+                "Pick a Revit link instance")
+        except Exception:
+            return None
+    return doc.GetElement(reference.ElementId) if reference is not None else None
+
+
 if link_mode:
-    links = [lk for lk in DB.FilteredElementCollector(doc).OfClass(DB.RevitLinkInstance)
-             if lk.GetLinkDocument() is not None]
-    if not links:
-        forms.alert("No loaded Revit link in this model.",
-                    title="ElementsInRoom", exitscript=True)
-    links.sort(key=lambda lk: lk.Name)
-    link_instance = forms.SelectFromList.show(
-        links, name_attr="Name", multiselect=False,
-        title="Rooms from link", button_name="Select")
+    link_instance = pick_link_instance()
     if link_instance is None:
         script.exit()
 

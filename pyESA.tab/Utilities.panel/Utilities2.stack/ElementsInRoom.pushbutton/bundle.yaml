@@ -18,6 +18,6 @@ tooltip: >
 
   CLICK - rooms from the current document.
 
-  SHIFT + CLICK - choose a loaded Revit link and read its rooms (the link transform
-  is applied).
+  SHIFT + CLICK - pick a loaded Revit link in the model (or select it before running)
+  and read its rooms (the link transform is applied).
 author: Antonio Miano
