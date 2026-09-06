@@ -137,6 +137,8 @@
                                ToolTip="Drag to resize list"/>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                            <Button x:Name="btn_select_visible" Content="Visible in Current View" Padding="10,3" Margin="0,0,5,0"
+                                    ToolTip="Select only the categories that have elements visible in the active view"/>
                             <Button x:Name="btn_select_all" Content="Select All" Padding="10,3" Margin="0,0,5,0"/>
                             <Button x:Name="btn_select_none" Content="Deselect All" Padding="10,3" Margin="0,0,5,0"/>
                         </StackPanel>

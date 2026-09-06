@@ -150,6 +150,21 @@ def model_categories(doc):
     return found
 
 
+def category_has_visible_elements(doc, view_id, category_id):
+    """True se nella vista c'e' almeno un'istanza della categoria.
+
+    FirstElement ferma il collector al primo risultato: costo trascurabile
+    anche su molte categorie.
+    """
+    try:
+        return DB.FilteredElementCollector(doc, view_id)\
+            .OfCategoryId(category_id)\
+            .WhereElementIsNotElementType()\
+            .FirstElement() is not None
+    except Exception:
+        return False
+
+
 def room_param_names(rooms):
     """Nomi dei parametri leggibili su un campione di room."""
     names = set()
@@ -290,6 +305,7 @@ class ElementsInRoomForm(Window):
         self.btn_clear_search = root.FindName('btn_clear_search')
         self.lst_categories = root.FindName('lst_categories')
         self.thumb_resize = root.FindName('thumb_resize')
+        self.btn_select_visible = root.FindName('btn_select_visible')
         self.btn_select_all = root.FindName('btn_select_all')
         self.btn_select_none = root.FindName('btn_select_none')
         self.txt_category_count = root.FindName('txt_category_count')
@@ -317,6 +333,7 @@ class ElementsInRoomForm(Window):
         self.rdo_scope_view.Checked += self.OnScopeChanged
         self.txt_search.TextChanged += self.OnSearchTextChanged
         self.btn_clear_search.Click += self.OnClearSearch
+        self.btn_select_visible.Click += self.OnSelectVisible
         self.btn_select_all.Click += self.OnSelectAll
         self.btn_select_none.Click += self.OnSelectNone
         self.thumb_resize.DragDelta += self.OnResizeList
@@ -373,6 +390,8 @@ class ElementsInRoomForm(Window):
             self.rdo_scope_view.ToolTip = not_graphical
             self.chk_elements_view.IsEnabled = False
             self.chk_elements_view.ToolTip = not_graphical
+            self.btn_select_visible.IsEnabled = False
+            self.btn_select_visible.ToolTip = not_graphical
         if self.link_mode:
             self.rdo_scope_view.IsEnabled = False
             self.rdo_scope_view.ToolTip = (
@@ -549,26 +568,37 @@ class ElementsInRoomForm(Window):
         self._refresh_target_params()
         self._update_category_count()
 
-    def _set_all(self, value):
-        # Le spunte si aggiornano sotto _loading: altrimenti ogni CheckBox
-        # farebbe scattare un ricalcolo dei parametri di destinazione.
+    def _set_selection(self, items, chooser):
+        """Applica chooser(item) -> bool come spunta a ogni item indicato.
+
+        Le spunte si aggiornano sotto _loading: altrimenti ogni CheckBox
+        farebbe scattare un ricalcolo dei parametri di destinazione.
+        """
         self._loading = True
         try:
-            for item in self._filtered_items:
-                item.IsSelected = value
+            for item in items:
+                item.IsSelected = bool(chooser(item))
             for checkbox in self.lst_categories.Items:
-                if hasattr(checkbox, 'IsChecked'):
-                    checkbox.IsChecked = value
+                if hasattr(checkbox, 'IsChecked') and checkbox.Tag is not None:
+                    checkbox.IsChecked = checkbox.Tag.IsSelected
         finally:
             self._loading = False
         self._refresh_target_params()
         self._update_category_count()
 
     def OnSelectAll(self, sender, args):
-        self._set_all(True)
+        self._set_selection(self._filtered_items, lambda item: True)
 
     def OnSelectNone(self, sender, args):
-        self._set_all(False)
+        self._set_selection(self._filtered_items, lambda item: False)
+
+    def OnSelectVisible(self, sender, args):
+        # Su tutte le categorie, non solo quelle filtrate dalla ricerca: la
+        # selezione finale deve rispecchiare la vista, non il testo cercato.
+        view_id = self.doc.ActiveView.Id
+        self._set_selection(
+            self._all_items,
+            lambda item: category_has_visible_elements(self.doc, view_id, item.CategoryId))
 
     def OnResizeList(self, sender, args):
         new_height = self.lst_categories.Height + args.VerticalChange
