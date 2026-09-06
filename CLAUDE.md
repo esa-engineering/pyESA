@@ -147,6 +147,36 @@ Note: `forms.alert(..., options=[...])` is not available in every pyRevit versio
 codebase isolates such calls with a `forms.CommandSwitchWindow.show` fallback
 (see `ask_link_strategy()` in `TagLinkedRooms_script.py`).
 
+### House style for new XAML windows
+
+New dialogs use approach 2 (raw `XamlReader.Load` from a `<Tool>_ui.py` module beside the
+script) and follow the look of `AutoComponents.pushbutton/legend_form.xaml` and
+`ElementsInRoom.pushbutton/ElementsInRoom_form.xaml` — copy from either rather than
+inventing a new one:
+
+- Default WPF chrome. **No** `Background`, `FontFamily`, `SizeToContent` or ControlTemplates
+  on the `Window`; `WindowStartupLocation="CenterScreen"`, `ResizeMode="CanResizeWithGrip"`.
+- `Window.Resources` carries the same five named styles — `SectionHeader` (bold 12pt,
+  `Foreground="#2D5A8A"`), `FieldLabel`, `InputField` (`Width="70"`, left-aligned),
+  `ComboStyle`, `UnitLabel` (gray 11pt) — plus `HintText` for gray 11pt wrapping notes.
+- Root `Grid Margin="15"` with rows `Auto / * / Auto`: centred emoji + title TextBlock,
+  a `ScrollViewer` holding the sections, then the button row.
+- One section per `Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
+  Padding="10" Margin="0,0,0,10"`, opened by a `SectionHeader` TextBlock reading
+  `emoji + ALL CAPS TITLE`. Informational panels use `BorderBrush="#E8E8E8"
+  Background="#F8F8F8"` and gray text.
+- Label/field rows are a 2-column `Grid` (fixed-width label column, `*` control column,
+  `Margin="0,5"`); sub-options indent with `Margin="20,5,0,0"`.
+- Bottom row right-aligned: Cancel (plain) then OK (`Width="100" Height="30"
+  IsDefault="True" Background="#2D5A8A" Foreground="White"`).
+- Multi-select lists are a plain `ListBox` filled in code with `CheckBox` objects carrying
+  the model item in `.Tag` (no `DataTemplate`, no binding), preceded by a `🔍` search row
+  and followed by a `Thumb` resize grip and Select All / Deselect All buttons.
+- Numeric input is validated all-at-once in `OnOK` via a `(bool, message)` helper, showing
+  `MessageBox.Show(...)` and leaving the window open — never with input masks.
+- Persist the last-used settings with `script.get_config('ESA_<ToolName>')` /
+  `script.save_config()`, wrapped in silent `try/except`.
+
 ## Reporting
 
 User-facing results go to the pyRevit output panel, not to `print`:
@@ -182,9 +212,17 @@ against geometry.
 
 ## Language
 
-Button titles and tooltips are English, sometimes with `it_it:` localization keys in
-`bundle.yaml`. Code comments and per-tool `README.md` files are mostly Italian. Match the
-file you are editing.
+**Everything the user sees is in English — no exceptions.** Button titles and tooltips,
+`bundle.yaml` (with `it_it:` localization keys where a translation is wanted), `__title__`
+and `__doc__`, every XAML label / ToolTip / button caption, every `forms.alert` and
+`MessageBox` text, `forms.ProgressBar` titles, and the whole `output.print_md` /
+`print_table` report, column headers and status labels included. Constants whose *value* is
+a displayed label get English names too (`TO_WRITE = "TO WRITE"`, not
+`DA_SCRIVERE = "DA SCRIVERE"`).
+
+Code comments, docstrings and per-tool `README.md` files are mostly Italian — keep writing
+those in Italian, matching the file you are editing. The split is: **English out, Italian
+in.** Older tools still carry Italian UI strings; translate them when you touch them.
 
 ## Development notes worth reading
 

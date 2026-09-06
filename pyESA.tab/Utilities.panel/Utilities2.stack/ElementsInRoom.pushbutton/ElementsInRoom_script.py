@@ -1,27 +1,33 @@
 # -*- coding: utf-8 -*-
 __title__ = "Elements\nin Room"
 
-__doc__ = """Version = 1.0
-Date    = 04.09.2026
+__doc__ = """Version = 2.0
+Date    = 06.09.2026
 _____________________________________________________________________
-Scrive su un parametro testuale degli elementi il valore di un
-parametro letto dalla room che li contiene, per ottenere un
-raggruppamento basato sulla collocazione spaziale reale.
+Writes on a text parameter of the elements the value of a parameter
+read from the room that contains them, so that objects can be grouped
+by their actual spatial location.
 
-L'appartenenza non e' calcolata con bounding box ne' con intersezioni
-fra solidi: sono le API di Revit a rispondere, sul volume computato.
+Membership is computed neither with bounding boxes nor with solid
+intersections: the Revit API answers, on the computed volume.
 
-  a) porte e finestre  -> From Room + To Room (fino a due room)
-  b) family instance   -> Room (usa il Room Calculation Point se la
-                          famiglia ce l'ha, altrimenti la Location)
-  c) muri, separatori  -> le room di cui l'elemento e' delimitazione
-  d) tutto il resto    -> la room che contiene il punto dell'elemento
+  a) doors and windows -> From Room + To Room (up to two rooms)
+  b) family instance   -> Room (uses the Room Calculation Point when
+                          the family has one, otherwise the Location)
+  c) walls, separators -> the rooms the element bounds
+  d) everything else   -> the room containing the element point
+  e) recovery          -> when a/b/c/d give no answer, the point is
+                          probed again offset by the given tolerances
+                          (X, Y, Z+, Z-), along the global axes or the
+                          object's own axes
 
-Se un elemento appartiene a piu' room, i valori vengono concatenati
-con il separatore indicato.
+Rooms can be taken from the whole project or from the active view only.
 
-CLICK: analizza e scrive.
-SHIFT + CLICK: solo anteprima, il modello non viene modificato.
+When an element belongs to more than one room the values are joined
+with the given separator.
+
+CLICK: analyse and write.
+SHIFT + CLICK: preview only, the model is not modified.
 _____________________________________________________________________
 Author(s): Claude + Antonio Miano
 """
@@ -34,7 +40,7 @@ from System.Collections.Generic import List
 
 from pyrevit import revit, script, DB, forms
 
-from rpw.ui.forms import CheckBox, FlexForm, Label, Separator, Button, ComboBox, TextBox
+from elementsinroom_ui import show_config_form
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -45,26 +51,29 @@ BIP = DB.BuiltInParameter
 ST = DB.StorageType
 
 MAX_SKIPPED_ROWS = 200
-SAMPLE_PER_CATEGORY = 10
-FORM_WIDTH = 340
 # Rialzo usato nel secondo tentativo del metodo (d): un metro sopra il livello.
 LEVEL_RETRY_OFFSET_FT = 3.28084
 
-# Stati del piano.
-DA_SCRIVERE = "DA SCRIVERE"
-SCRITTO = "SCRITTO"
-GIA_UGUALE = "GIA' CORRETTO"
-GIA_COMPILATO = "GIA' COMPILATO"
-SENZA_ROOM = "NESSUNA ROOM"
-NO_PARAM = "PARAM NON SCRIVIBILE"
-ERRORE = "ERRORE"
+# Sonde del metodo (e): asse della tolleranza e verso lungo quell'asse.
+TOLERANCE_PROBES = (("x", 1), ("x", -1), ("y", 1), ("y", -1),
+                    ("zup", 1), ("zdown", -1))
+
+# Stati del piano. I valori finiscono nelle tabelle del report: sono in inglese.
+TO_WRITE = "TO WRITE"
+WRITTEN = "WRITTEN"
+ALREADY_OK = "ALREADY CORRECT"
+ALREADY_FILLED = "ALREADY FILLED"
+NO_ROOM = "NO ROOM"
+NO_PARAM = "PARAM NOT WRITABLE"
+FAILED = "ERROR"
 
 METHOD_LABELS = {
     "a": "a - From/To Room",
     "b": "b - Room (calc. point)",
-    "c": "c - delimitazione",
-    "d": "d - punto nel volume",
-    "d+": "d - punto a quota livello",
+    "c": "c - bounding element",
+    "d": "d - point in volume",
+    "e": "e - tolerance",
+    "d+": "d - point at level elevation",
 }
 
 
@@ -140,7 +149,7 @@ def category_name(element):
             return element.Category.Name
     except Exception:
         pass
-    return "(senza categoria)"
+    return "(no category)"
 
 
 def element_point(element):
@@ -162,6 +171,30 @@ def element_point(element):
     except Exception:
         pass
     return None
+
+
+GLOBAL_AXES = (DB.XYZ.BasisX, DB.XYZ.BasisY, DB.XYZ.BasisZ)
+
+
+def element_axes(element):
+    """(BasisX, BasisY, BasisZ) propri dell'elemento, assi globali se non ne ha.
+
+    Costo trascurabile: e' una lettura di Transform o della tangente della curva
+    di posizione, non rigenera geometria.
+    """
+    try:
+        if isinstance(element, DB.FamilyInstance):
+            transform = element.GetTotalTransform()
+            return transform.BasisX, transform.BasisY, transform.BasisZ
+        location = element.Location
+        if isinstance(location, DB.LocationCurve):
+            tangent = location.Curve.ComputeDerivatives(0.5, True).BasisX.Normalize()
+            side = tangent.CrossProduct(DB.XYZ.BasisZ)
+            if side.GetLength() > 1e-9:
+                return tangent, side.Normalize(), DB.XYZ.BasisZ
+    except Exception:
+        pass
+    return GLOBAL_AXES
 
 
 LEVEL_BIPS = ("FAMILY_LEVEL_PARAM", "SCHEDULE_LEVEL_PARAM",
@@ -208,7 +241,7 @@ def room_at_point(point, run_phase):
 # ---------------------------------------------------------------- guard iniziali
 
 if doc.IsFamilyDocument:
-    forms.alert("Comando non disponibile in un documento di famiglia.", exitscript=True)
+    forms.alert("This command is not available in a family document.", exitscript=True)
 
 try:
     volumes_on = DB.AreaVolumeSettings.GetAreaVolumeSettings(doc).ComputeVolumes
@@ -217,92 +250,30 @@ except Exception:
 
 if not volumes_on:
     forms.alert(
-        "I volumi delle room non sono calcolati in questo modello.\n\n"
-        "Senza volumi l'appartenenza verticale non e' attendibile.\n"
-        "Attiva Area and Volume Computations -> Areas and Volumes, poi rilancia.",
+        "Room volumes are not computed in this model.\n\n"
+        "Without volumes, vertical membership is not reliable.\n"
+        "Turn on Area and Volume Computations -> Areas and Volumes, then run again.",
         title="ElementsInRoom", exitscript=True)
 
 
-# ---------------------------------------------------------------- fase
+# ---------------------------------------------------------------- configurazione
 
-phases = [item for item in doc.Phases]
-if not phases:
-    forms.alert("Il modello non ha fasi.", exitscript=True)
+preview_only = bool(__shiftclick__)  # noqa: F821
 
-default_phase = phases[-1]
-try:
-    view_phase_param = doc.ActiveView.get_Parameter(BIP.VIEW_PHASE)
-    if view_phase_param is not None:
-        view_phase = doc.GetElement(view_phase_param.AsElementId())
-        if view_phase is not None:
-            default_phase = view_phase
-except Exception:
-    pass
-
-phase_dict = OrderedDict()
-for item in phases:
-    phase_dict[item.Name] = item
-
-phase_form = FlexForm("Elements in Room  -  fase", [
-    Label("Fase delle room da usare"),
-    ComboBox("phase", phase_dict, default=default_phase.Name, sort=False,
-             Width=FORM_WIDTH),
-    Separator(),
-    Button("OK"),
-])
-phase_form.show()
-if not phase_form.values:
+config = show_config_form(doc, preview_only)
+if config is None:
     script.exit()
-phase = phase_form.values["phase"]
 
-
-# ---------------------------------------------------------------- room della fase
-
-phase_id = element_id_value(phase.Id)
-
-all_rooms = DB.FilteredElementCollector(doc)\
-    .OfCategory(BIC.OST_Rooms)\
-    .WhereElementIsNotElementType()\
-    .ToElements()
-
-rooms = []
-for room in all_rooms:
-    try:
-        if room.Area <= 0 or room.Location is None:
-            continue
-        room_phase = room.get_Parameter(BIP.ROOM_PHASE)
-        if room_phase is not None and element_id_value(room_phase.AsElementId()) != phase_id:
-            continue
-    except Exception:
-        continue
-    rooms.append(room)
-
-if not rooms:
-    forms.alert("Nessuna room posizionata nella fase '{}'.".format(phase.Name),
-                title="ElementsInRoom", exitscript=True)
-
-
-# ---------------------------------------------------------------- categorie
-
-model_categories = []
-for category in doc.Settings.Categories:
-    try:
-        if category.CategoryType != DB.CategoryType.Model:
-            continue
-        if element_id_value(category.Id) == int(BIC.OST_Rooms):
-            continue
-        if not category.AllowsBoundParameters:
-            continue
-    except Exception:
-        continue
-    model_categories.append(category)
-model_categories.sort(key=lambda c: c.Name)
-
-selected_categories = forms.SelectFromList.show(
-    model_categories, multiselect=True, name_attr="Name",
-    title="Categorie da elaborare", button_name="Continua")
-if not selected_categories:
-    script.exit()
+phase = config.phase
+rooms = config.rooms
+selected_categories = config.categories
+source_name = config.source_name
+target_name = config.target_name
+separator = config.separator or ";"
+overwrite = config.overwrite
+retry_at_level = config.retry_at_level
+local_axes = config.local_axes
+tolerances = config.tol_ft
 
 category_ids = List[DB.ElementId]()
 for category in selected_categories:
@@ -314,86 +285,8 @@ elements = DB.FilteredElementCollector(doc)\
     .ToElements()
 
 if not elements:
-    forms.alert("Nessun elemento nelle categorie selezionate.",
+    forms.alert("No element found in the selected categories.",
                 title="ElementsInRoom", exitscript=True)
-
-
-# ---------------------------------------------------------------- form parametri
-
-def room_param_names(sample):
-    names = set()
-    for room in sample:
-        for param in room.Parameters:
-            try:
-                names.add(param.Definition.Name)
-            except Exception:
-                pass
-    return sorted(names)
-
-
-def writable_text_param_names(sample_by_category):
-    """Parametri istanza di testo scrivibili, unione su un campione per categoria.
-
-    L'intersezione svuoterebbe la lista appena le categorie sono eterogenee: si fa
-    l'unione e gli elementi privi del parametro finiscono nella tabella dei non
-    scritti con il motivo esplicito.
-    """
-    names = set()
-    for sample in sample_by_category.values():
-        for element in sample:
-            for param in element.Parameters:
-                try:
-                    if param.IsReadOnly or param.StorageType != ST.String:
-                        continue
-                    names.add(param.Definition.Name)
-                except Exception:
-                    pass
-    return sorted(names)
-
-
-samples = OrderedDict()
-for element in elements:
-    bucket = samples.setdefault(category_name(element), [])
-    if len(bucket) < SAMPLE_PER_CATEGORY:
-        bucket.append(element)
-
-source_names = room_param_names(rooms[:SAMPLE_PER_CATEGORY])
-target_names = writable_text_param_names(samples)
-
-if not source_names:
-    forms.alert("Nessun parametro leggibile sulle room.", exitscript=True)
-if not target_names:
-    forms.alert("Nessun parametro istanza di testo scrivibile sulle categorie scelte.\n"
-                "Serve un parametro di progetto o condiviso di tipo Testo.",
-                title="ElementsInRoom", exitscript=True)
-
-default_source = "Name" if "Name" in source_names else source_names[0]
-
-main_form = FlexForm("Elements in Room  -  {} elementi".format(len(elements)), [
-    Label("Parametro della room da leggere"),
-    ComboBox("source", source_names, default=default_source, Width=FORM_WIDTH),
-    Separator(),
-    Label("Parametro degli oggetti su cui scrivere"),
-    ComboBox("target", target_names, default=target_names[0], Width=FORM_WIDTH),
-    Separator(),
-    Label("Separatore per gli elementi appartenenti a piu' room"),
-    TextBox("sep", Text=";", Width=FORM_WIDTH),
-    Separator(),
-    CheckBox("overwrite", "Sovrascrivi i valori gia' compilati", default=True),
-    CheckBox("retry", "Se il punto non cade in nessuna room, riprova a quota livello",
-             default=True),
-    Separator(),
-    Button("OK"),
-])
-main_form.show()
-if not main_form.values:
-    script.exit()
-
-source_name = main_form.values["source"]
-target_name = main_form.values["target"]
-separator = main_form.values["sep"] or ";"
-overwrite = main_form.values["overwrite"]
-retry_at_level = main_form.values["retry"]
 
 
 # ---------------------------------------------------------------- indice room
@@ -464,6 +357,30 @@ def resolve_rooms(element):
         if key in room_value:
             return "d", [key]
 
+    # (e) recupero: il punto e' fuori dal solido per pochi centimetri. Si sonda
+    # spostato delle tolleranze indicate; tutte le room raggiunte si concatenano,
+    # come gia' fanno (a) per From/To Room e (c) per i muri di delimitazione.
+    if point is not None and any(value > 0 for value in tolerances.values()):
+        if local_axes:
+            basis_x, basis_y, basis_z = element_axes(element)
+        else:
+            basis_x, basis_y, basis_z = GLOBAL_AXES
+        vectors = {"x": basis_x, "y": basis_y, "zup": basis_z, "zdown": basis_z}
+        found = []
+        for axis, sign in TOLERANCE_PROBES:
+            distance = tolerances[axis]
+            if distance <= 0:
+                continue
+            probe = point + vectors[axis].Multiply(sign * distance)
+            near = room_at_point(probe, phase)
+            if near is None:
+                continue
+            key = element_id_value(near.Id)
+            if key in room_value and key not in found:
+                found.append(key)
+        if found:
+            return "e", found
+
     # ponytail: un solo punto per elemento. Se servisse coprire tubi e canali che
     # attraversano piu' locali, qui si testano anche i due estremi della curva.
     if retry_at_level and point is not None:
@@ -483,7 +400,7 @@ def resolve_rooms(element):
 
 plan = []
 
-with forms.ProgressBar(title="Analisi ({value} di {max_value})", cancellable=True) as pb:
+with forms.ProgressBar(title="Analysing ({value} of {max_value})", cancellable=True) as pb:
     total = len(elements)
     for index, element in enumerate(elements):
         if pb.cancelled:
@@ -498,13 +415,13 @@ with forms.ProgressBar(title="Analisi ({value} di {max_value})", cancellable=Tru
         try:
             method, room_keys = resolve_rooms(element)
         except Exception as error:
-            item["status"] = ERRORE
-            item["reason"] = u"errore in analisi: {}".format(error)
+            item["status"] = FAILED
+            item["reason"] = u"analysis error: {}".format(error)
             continue
 
         if not room_keys:
-            item["status"] = SENZA_ROOM
-            item["reason"] = u"nessuna room trovata con i metodi a/b/c/d"
+            item["status"] = NO_ROOM
+            item["reason"] = u"no room found with methods a/b/c/d/e"
             continue
 
         item["method"] = method
@@ -513,78 +430,86 @@ with forms.ProgressBar(title="Analisi ({value} di {max_value})", cancellable=Tru
         item["value"] = new_value
 
         if not new_value:
-            item["status"] = SENZA_ROOM
-            item["reason"] = u"room trovata ma '{}' e' vuoto".format(source_name)
+            item["status"] = NO_ROOM
+            item["reason"] = u"room found but '{}' is empty".format(source_name)
             continue
 
         target = element.LookupParameter(target_name)
         if target is None:
             item["status"] = NO_PARAM
-            item["reason"] = u"parametro '{}' non presente".format(target_name)
+            item["reason"] = u"parameter '{}' not present".format(target_name)
             continue
         if target.IsReadOnly:
             item["status"] = NO_PARAM
-            item["reason"] = u"parametro '{}' in sola lettura".format(target_name)
+            item["reason"] = u"parameter '{}' is read-only".format(target_name)
             continue
         if target.StorageType != ST.String:
             item["status"] = NO_PARAM
-            item["reason"] = u"parametro '{}' non e' di tipo Testo".format(target_name)
+            item["reason"] = u"parameter '{}' is not of type Text".format(target_name)
             continue
 
         current = target.AsString()
         if current == new_value:
-            item["status"] = GIA_UGUALE
+            item["status"] = ALREADY_OK
             continue
         if current and current.strip() and not overwrite:
-            item["status"] = GIA_COMPILATO
-            item["reason"] = u"valore esistente '{}' mantenuto".format(current)
+            item["status"] = ALREADY_FILLED
+            item["reason"] = u"existing value '{}' kept".format(current)
             continue
 
-        item["status"] = DA_SCRIVERE
+        item["status"] = TO_WRITE
 
 
 # ---------------------------------------------------------------- scrittura
 
-preview_only = bool(__shiftclick__)  # noqa: F821
-
 if not preview_only:
     with revit.Transaction("ElementsInRoom"):
         for item in plan:
-            if item["status"] != DA_SCRIVERE:
+            if item["status"] != TO_WRITE:
                 continue
             try:
                 target = item["element"].LookupParameter(target_name)
                 if target is None or target.IsReadOnly:
                     item["status"] = NO_PARAM
-                    item["reason"] = u"parametro non piu' scrivibile"
+                    item["reason"] = u"parameter no longer writable"
                     continue
                 target.Set(item["value"])
-                item["status"] = SCRITTO
+                item["status"] = WRITTEN
             except Exception as error:
-                item["status"] = ERRORE
-                item["reason"] = u"errore Revit: {}".format(error)
+                item["status"] = FAILED
+                item["reason"] = u"Revit error: {}".format(error)
 
 
 # ---------------------------------------------------------------- report
 
 output.close_others()
 output.print_md("# Elements in Room")
+tolerance_text = "off"
+if config.has_tolerance:
+    tolerance_text = "X {} | Y {} | Z+ {} | Z- {} cm, {} axes".format(
+        config.tol_cm["x"], config.tol_cm["y"],
+        config.tol_cm["zup"], config.tol_cm["zdown"],
+        "object" if local_axes else "global")
+
 output.print_md(
-    "- Modalita': **{}**\n"
-    "- Fase: **{}**\n"
-    "- Categorie: **{}**\n"
-    "- Room nella fase: **{}** (senza valore in '{}': {})\n"
-    "- Parametro room -> oggetti: **{}** -> **{}**\n"
-    "- Separatore: `{}` | sovrascrivi: **{}** | riprova a quota livello: **{}**".format(
-        "ANTEPRIMA (nessuna modifica)" if preview_only else "scrittura",
+    "- Mode: **{}**\n"
+    "- Phase: **{}**\n"
+    "- Categories: **{}**\n"
+    "- Rooms ({}): **{}** (with no value in '{}': {})\n"
+    "- Room parameter -> elements: **{}** -> **{}**\n"
+    "- Separator: `{}` | overwrite: **{}** | retry at level elevation: **{}**\n"
+    "- Tolerance: **{}**".format(
+        "PREVIEW (no changes)" if preview_only else "write",
         phase.Name,
         ", ".join(sorted(set(c.Name for c in selected_categories))),
+        "active view only" if config.only_active_view else "whole project",
         len(rooms), source_name, rooms_without_value,
         source_name, target_name,
-        separator, "si" if overwrite else "no", "si" if retry_at_level else "no"))
+        separator, "yes" if overwrite else "no", "yes" if retry_at_level else "no",
+        tolerance_text))
 
-STATUS_ORDER = [DA_SCRIVERE, SCRITTO, GIA_UGUALE, GIA_COMPILATO,
-                SENZA_ROOM, NO_PARAM, ERRORE]
+STATUS_ORDER = [TO_WRITE, WRITTEN, ALREADY_OK, ALREADY_FILLED,
+                NO_ROOM, NO_PARAM, FAILED]
 
 per_category = OrderedDict()
 multi_room = []
@@ -595,53 +520,53 @@ for item in plan:
     counts[item["status"]] = counts.get(item["status"], 0) + 1
     if len(item["rooms"]) > 1:
         multi_room.append(item)
-    if item["status"] in (SENZA_ROOM, NO_PARAM, ERRORE, GIA_COMPILATO):
+    if item["status"] in (NO_ROOM, NO_PARAM, FAILED, ALREADY_FILLED):
         skipped.append(item)
 
 rows = []
 for name in sorted(per_category):
     counts = per_category[name]
     rows.append([name] + [counts.get(status, 0) for status in STATUS_ORDER])
-totals = ["**Totale**"]
+totals = ["**Total**"]
 for status in STATUS_ORDER:
     totals.append(sum(counts.get(status, 0) for counts in per_category.values()))
 rows.append(totals)
 
-output.print_md("## Esito per categoria")
-output.print_table(table_data=rows, title="", columns=["Categoria"] + STATUS_ORDER)
+output.print_md("## Result by category")
+output.print_table(table_data=rows, title="", columns=["Category"] + STATUS_ORDER)
 
 method_counts = OrderedDict()
 for item in plan:
     if item["method"]:
         method_counts[item["method"]] = method_counts.get(item["method"], 0) + 1
 if method_counts:
-    output.print_md("## Metodo di risoluzione")
+    output.print_md("## Resolution method")
     output.print_table(
         table_data=[[METHOD_LABELS.get(key, key), value]
                     for key, value in method_counts.items()],
-        title="", columns=["Metodo", "Elementi"])
+        title="", columns=["Method", "Elements"])
 
 if multi_room:
-    output.print_md("## Elementi in piu' room ({})".format(len(multi_room)))
+    output.print_md("## Elements in more than one room ({})".format(len(multi_room)))
     table = [[output.linkify(item["element"].Id), item["category"],
               METHOD_LABELS.get(item["method"], item["method"]),
               len(item["rooms"]), item["value"]]
              for item in multi_room[:MAX_SKIPPED_ROWS]]
     output.print_table(table_data=table, title="",
-                       columns=["Elemento", "Categoria", "Metodo", "Room", "Valore"])
+                       columns=["Element", "Category", "Method", "Rooms", "Value"])
     if len(multi_room) > MAX_SKIPPED_ROWS:
-        output.print_md("_...e altri {}._".format(len(multi_room) - MAX_SKIPPED_ROWS))
+        output.print_md("_...and {} more._".format(len(multi_room) - MAX_SKIPPED_ROWS))
 
 if skipped:
-    output.print_md("## Non scritti ({})".format(len(skipped)))
+    output.print_md("## Not written ({})".format(len(skipped)))
     table = [[output.linkify(item["element"].Id), item["category"],
               item["status"], item["reason"]]
              for item in skipped[:MAX_SKIPPED_ROWS]]
     output.print_table(table_data=table, title="",
-                       columns=["Elemento", "Categoria", "Stato", "Motivo"])
+                       columns=["Element", "Category", "Status", "Reason"])
     if len(skipped) > MAX_SKIPPED_ROWS:
-        output.print_md("_...e altri {}._".format(len(skipped) - MAX_SKIPPED_ROWS))
+        output.print_md("_...and {} more._".format(len(skipped) - MAX_SKIPPED_ROWS))
 
 if preview_only:
-    output.print_md("---\n**Anteprima**: nessun parametro e' stato modificato. "
-                    "Rilancia con un CLICK normale per scrivere.")
+    output.print_md("---\n**Preview**: no parameter was modified. "
+                    "Run again with a normal CLICK to write.")
