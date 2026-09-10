@@ -21,6 +21,8 @@ element selection, pick the levels in a section / elevation / 3D view
 and enter an offset (mm, + or -) for each of them. The selected
 elements hosted on the moved levels get their offset recalculated and
 stay where they are; every other element follows its level.
+A selection made before launching the command is used as is: the
+levels it contains are the levels to move, the rest are the elements.
 _____________________________________________________________________
 Author(s): bimdifferent, ESA Engineering
 """
@@ -275,7 +277,8 @@ def host_of(element):
     return None
 
 
-def collect_elements():
+def preselected_elements():
+    """Elementi (non tipi) gia' selezionati prima del lancio del comando."""
     elements = []
     try:
         pre_ids = list(uidoc.Selection.GetElementIds())
@@ -285,9 +288,12 @@ def collect_elements():
         element = doc.GetElement(eid)
         if element is not None and not isinstance(element, DB.ElementType):
             elements.append(element)
-    if elements:
-        return elements
+    return elements
 
+
+def pick_elements():
+    """Selezione a video degli elementi. Esce se l'utente annulla."""
+    elements = []
     with forms.WarningBar(title='Select the elements to reassign, then press Finish'):
         try:
             references = list(uidoc.Selection.PickObjects(
@@ -601,11 +607,23 @@ def ask_level_offsets(picked_levels, usage, n_elements):
         forms.alert(error, title=u'Elements at Level')
 
 
-def run_move_levels(elements):
+def run_move_levels(preselected):
     """Modalita' SHIFT + CLICK: sposta i livelli scelti e compensa gli offset degli
-    elementi selezionati perche' restino fermi. Il resto del modello segue i livelli."""
+    elementi selezionati perche' restino fermi. Il resto del modello segue i livelli.
+
+    La preselezione vale per entrambi: i livelli che contiene sono i livelli da
+    spostare, il resto sono gli elementi. Cio' che manca viene chiesto a video.
+    """
+    picked_levels = [element for element in preselected if isinstance(element, DB.Level)]
+    elements = [element for element in preselected if not isinstance(element, DB.Level)]
+    if not elements:
+        elements = pick_elements()
     elements, redirected = resolve_targets(elements)
-    picked_levels = pick_levels()
+
+    if picked_levels:
+        picked_levels.sort(key=lambda lev: lev.Elevation, reverse=True)
+    else:
+        picked_levels = pick_levels()
 
     # Dry run, prima di toccare il modello: livello attuale di ogni slot.
     found_slots = []    # (elemento, [(ruolo, id livello, parametri offset)])
@@ -724,12 +742,14 @@ levels_dict = OrderedDict()
 for level in reversed(levels):
     levels_dict[u'{}   ({})'.format(level.Name, format_elevation(level.Elevation))] = level
 
-elements = collect_elements()
-if not elements:
-    script.exit()
+preselected = preselected_elements()
 
 if __shiftclick__:  # noqa: F821
-    run_move_levels(elements)
+    run_move_levels(preselected)
+    script.exit()
+
+elements = preselected or pick_elements()
+if not elements:
     script.exit()
 
 KEEP_TOOLTIP = (u"Checked: the offset is recalculated, the elements do not move.\n"

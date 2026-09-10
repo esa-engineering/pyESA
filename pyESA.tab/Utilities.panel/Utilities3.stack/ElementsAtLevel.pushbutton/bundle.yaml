@@ -25,7 +25,9 @@ tooltip:
 
   elements hosted on the moved levels stay in place, everything else follows
 
-  its level.
+  its level. A selection made before launching the command is used as is -
+
+  the levels it contains are the levels to move, the rest are the elements.
 
 
   Results are listed in the pyRevit output panel.
