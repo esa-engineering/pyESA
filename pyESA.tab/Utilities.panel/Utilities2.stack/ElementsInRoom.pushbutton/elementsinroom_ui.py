@@ -270,7 +270,9 @@ class ElementsInRoomForm(Window):
     # ------------------------------------------------------------------ setup
 
     def _load_xaml(self):
-        xaml_path = os.path.join(os.path.dirname(__file__), XAML_FILE_NAME)
+        xaml_path = script.get_bundle_file(XAML_FILE_NAME)
+        if not xaml_path or not os.path.exists(xaml_path):
+            xaml_path = os.path.join(os.path.dirname(__file__), XAML_FILE_NAME)
 
         Window.__init__(self)
 
