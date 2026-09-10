@@ -504,6 +504,34 @@ def print_skipped(skipped):
 LEVEL_PICK_VIEWS = (DB.ViewType.Section, DB.ViewType.Elevation, DB.ViewType.ThreeD)
 
 
+class FailureCollector(DB.IFailuresPreprocessor):
+    """Raccoglie i failure di Revit al commit.
+
+    Gli avvisi restano (Continue) e vengono elencati nel report; gli errori
+    mandano la transazione in rollback (ProceedWithRollBack) e il loro testo
+    finisce nel report invece di sparire in un rollback silenzioso.
+    """
+
+    def __init__(self):
+        self.warnings = []
+        self.errors = []
+
+    def PreprocessFailures(self, accessor):
+        for message in accessor.GetFailureMessages():
+            try:
+                text = message.GetDescriptionText()
+            except Exception:
+                text = u'(no description)'
+            if message.GetSeverity() == DB.FailureSeverity.Warning:
+                if text not in self.warnings:
+                    self.warnings.append(text)
+            elif text not in self.errors:
+                self.errors.append(text)
+        if self.errors:
+            return DB.FailureProcessingResult.ProceedWithRollBack
+        return DB.FailureProcessingResult.Continue
+
+
 class LevelSelectionFilter(UI.Selection.ISelectionFilter):
     """Filtro di selezione: accetta solo livelli."""
 
@@ -676,41 +704,86 @@ def run_move_levels(preselected):
         if not affected:
             bump(stats, name, 2)
 
-    # Prima i livelli, poi gli offset: se un livello non si sposta (vincoli,
-    # quote bloccate) la transazione va in rollback e nulla viene toccato.
+    # Transazione esplicita, non revit.Transaction: quella di pyRevit ignora lo
+    # stato del Commit, e con la gestione non modale dei failure un errore di
+    # Revit manda la transazione in rollback in silenzio (il livello "torna
+    # indietro" a comando finito). Qui gli errori vengono raccolti e riportati.
+    # Prima i livelli, poi gli offset. I livelli pinnati vengono sbloccati per
+    # lo spostamento e ripinnati nella stessa transazione.
+    failures = FailureCollector()
+    transaction = DB.Transaction(doc, 'ElementsAtLevel - Move Levels')
+    options = transaction.GetFailureHandlingOptions()
+    options.SetFailuresPreprocessor(failures)
+    options.SetForcedModalHandling(False)
+    transaction.SetFailureHandlingOptions(options)
+
+    unpinned = []
     failing_level = None
+    status = None
+    transaction.Start()
     try:
-        with revit.Transaction('ElementsAtLevel - Move Levels'):
-            for level, delta_ft, _, _ in moved.values():
-                failing_level = level
-                level.Elevation = level.Elevation + delta_ft
-            failing_level = None
-            for element, name, role, values in writes:
-                try:
-                    for param, value in values:
-                        param.Set(value)
-                    bump(stats, name, 0 if role == 'base' else 1)
-                except Exception as error:
-                    skipped.append((element, u'{}: Revit error: {}'.format(role, error)))
+        for level, delta_ft, _, _ in moved.values():
+            failing_level = level
+            if level.Pinned:
+                level.Pinned = False
+                unpinned.append(level)
+            level.Elevation = level.Elevation + delta_ft
+        failing_level = None
+        for element, name, role, values in writes:
+            try:
+                for param, value in values:
+                    param.Set(value)
+                bump(stats, name, 0 if role == 'base' else 1)
+            except Exception as error:
+                skipped.append((element, u'{}: Revit error: {}'.format(role, error)))
+        for level in unpinned:
+            level.Pinned = True
+        status = transaction.Commit()
     except Exception as error:
-        if failing_level is None:
-            raise
-        forms.alert(u"Level '{}' could not be moved: {}\n\nNothing was changed.".format(
-            failing_level.Name, error), title=u'Elements at Level', exitscript=True)
+        transaction.RollBack()
+        what = (u"Level '{}' could not be moved".format(failing_level.Name)
+                if failing_level is not None else u'Revit error')
+        forms.alert(u'{}: {}\n\nNothing was changed.'.format(what, error),
+                    title=u'Elements at Level', exitscript=True)
+    finally:
+        transaction.Dispose()
+
+    committed = status == DB.TransactionStatus.Committed and not failures.errors
 
     # Report
     output.print_md(u'# Elements at Level - Move Levels')
+    if not committed:
+        output.print_md(u'## Revit rejected the changes - nothing was modified')
+        output.print_md(u'Transaction status: **{}**'.format(status))
+        for text in failures.errors:
+            output.print_md(u'- {}'.format(text))
+        forms.alert(u'Revit rejected the changes and rolled back the transaction.\n'
+                    u'See the output panel for the Revit error messages.',
+                    title=u'Elements at Level')
+
     output.print_md(u'Processed elements: **{}**{}  \n'
                     u'Moved levels: **{}**'.format(
                         len(elements),
                         u' ({} of them redirected to their host)'.format(redirected) if redirected else u'',
-                        len(moved)))
+                        len(moved) if committed else 0))
 
+    # Quote rilette dal modello dopo il commit, non calcolate: cosi' il report
+    # dice la verita' anche se Revit ha annullato lo spostamento.
     level_rows = [[level.Name, format_elevation(old_elevation),
-                   format_elevation(old_elevation + delta_ft), format_elevation(delta_ft)]
+                   format_elevation(level.Elevation), format_elevation(delta_ft),
+                   u'yes' if level in unpinned else u'']
                   for level, delta_ft, _, old_elevation in moved.values()]
     output.print_table(table_data=level_rows, title='',
-                       columns=[u'Level', u'Old elevation', u'New elevation', u'Offset'])
+                       columns=[u'Level', u'Old elevation', u'Current elevation',
+                                u'Requested offset', u'Was pinned'])
+
+    if failures.warnings:
+        output.print_md(u'## Revit warnings ({})'.format(len(failures.warnings)))
+        for text in failures.warnings:
+            output.print_md(u'- {}'.format(text))
+
+    if not committed:
+        return
 
     rows = []
     totals = [0, 0, 0]
