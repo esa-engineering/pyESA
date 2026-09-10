@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 __title__ = "Elements\nat Level"
 
-__doc__ = """Version = 2.0
-Date    = 04.09.2026
+__doc__ = """Version = 2.1
+Date    = 10.09.2026
 _____________________________________________________________________
+CLICK
 Reassigns the host level of the selected elements while keeping them
 in their current position (the offset is recalculated). Clearing the
 option makes the elements move together with the new level.
@@ -13,6 +14,13 @@ recognises the category of each element and applies the right method.
 For dual-level elements (walls, columns, stairs, roofs) base level and
 top level can be assigned in a single run, even to two different
 levels.
+
+SHIFT + CLICK
+The elements keep their level: the levels are moved instead. After the
+element selection, pick the levels in a section / elevation / 3D view
+and enter an offset (mm, + or -) for each of them. The selected
+elements hosted on the moved levels get their offset recalculated and
+stay where they are; every other element follows its level.
 _____________________________________________________________________
 Author(s): bimdifferent, ESA Engineering
 """
@@ -23,7 +31,7 @@ from collections import OrderedDict
 
 from pyrevit import revit, script, DB, UI, forms
 
-from rpw.ui.forms import CheckBox, FlexForm, Label, Separator, Button, ComboBox
+from rpw.ui.forms import CheckBox, FlexForm, Label, Separator, Button, ComboBox, TextBox
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -35,7 +43,9 @@ BIP = DB.BuiltInParameter
 MAX_SKIPPED_ROWS = 200
 FEET_TO_MM = 304.8
 # La finestra rpw usa SizeToContent: si dimensiona sul controllo piu' largo.
+# Le Label WPF non vanno a capo: il testo oltre la larghezza viene tagliato.
 FORM_WIDTH = 270
+MOVE_FORM_WIDTH = 380   # form Move Levels: righe 'nome (quota) - n selected' piu' lunghe
 
 
 # ---------------------------------------------------------------- helpers
@@ -85,13 +95,13 @@ def format_elevation(value_feet):
     return u'{:+.0f} mm'.format(value_feet * FEET_TO_MM)
 
 
-def separator():
+def separator(width=FORM_WIDTH):
     """rpw Separator e' l'unico controllo senza __init__ proprio: i kwargs finiscono
     a object.__new__ e sollevano TypeError. I valori si impostano dopo la costruzione,
     altrimenti restano i default di rpw (300 x 25): 300 e' piu' largo di FORM_WIDTH e
     la finestra, che usa SizeToContent, si allargherebbe sul separatore."""
     control = Separator()
-    control.Width = FORM_WIDTH
+    control.Width = width
     control.Height = 5
     return control
 
@@ -321,10 +331,14 @@ ALREADY = 'already'
 SKIPPED = 'skipped'
 
 
-def resolve_pair(element, pair, slot):
-    """Parametro livello + parametri offset per una coppia di regole."""
+def resolve_pair(element, pair, slot, level_writable=True):
+    """Parametro livello + parametri offset per una coppia di regole.
+
+    level_writable=False accetta anche un parametro livello in sola lettura: serve
+    alla modalita' Move Levels, che il livello non lo scrive mai.
+    """
     level_bip, offset_bips, mode = pair
-    level_param = find_param(element, [level_bip])
+    level_param = find_param(element, [level_bip], writable=level_writable)
     if level_param is None or level_param.StorageType != DB.StorageType.ElementId:
         return None, []
     offset_params = []
@@ -341,11 +355,11 @@ def resolve_pair(element, pair, slot):
     return level_param, offset_params
 
 
-def resolve_by_name(element, slot):
+def resolve_by_name(element, slot, level_writable=True):
     """Ultima spiaggia: parametri cercati per nome (IT/EN)."""
     if not slot.get('lnames'):
         return None, []
-    level_param = find_param(element, [], slot['lnames'])
+    level_param = find_param(element, [], slot['lnames'], writable=level_writable)
     if level_param is None or level_param.StorageType != DB.StorageType.ElementId:
         return None, []
     offset_params = []
@@ -379,17 +393,39 @@ def apply_wall_top_unconnected(element, level_param, offset_params, target_level
     return APPLIED, u''
 
 
+def slot_candidates(element, slot, level_writable=True):
+    """Coppie (parametro livello, parametri offset) di uno slot, in ordine di regola."""
+    candidates = []
+    for pair in slot['pairs']:
+        level_param, offset_params = resolve_pair(element, pair, slot, level_writable)
+        if level_param is not None:
+            candidates.append((level_param, offset_params))
+    by_name = resolve_by_name(element, slot, level_writable)
+    if by_name[0] is not None:
+        candidates.append(by_name)
+    return candidates
+
+
+def current_slot_level(element, slot):
+    """Livello attuale di uno slot e relativi parametri offset, in sola lettura.
+
+    Vince il primo candidato con un livello assegnato, come in apply_slot: cosi'
+    un parametro offset condiviso da due coppie (INSTANCE_ELEVATION_PARAM compare
+    due volte in FAMILY_PAIRS) non viene compensato due volte.
+    Ritorna (Level, offset_params) oppure None (slot assente, livello non
+    assegnato, muro con top 'Unconnected').
+    """
+    for level_param, offset_params in slot_candidates(element, slot, level_writable=False):
+        level = doc.GetElement(level_param.AsElementId())
+        if isinstance(level, DB.Level):
+            return level, offset_params
+    return None
+
+
 def apply_slot(element, slot, target_level, keep):
     """Applica un livello a uno slot dell'elemento. Ritorna (stato, motivo)."""
     reason = u'level parameter missing or read-only'
-    candidates = []
-    for pair in slot['pairs']:
-        level_param, offset_params = resolve_pair(element, pair, slot)
-        if level_param is not None:
-            candidates.append((level_param, offset_params))
-    by_name = resolve_by_name(element, slot)
-    if by_name[0] is not None:
-        candidates.append(by_name)
+    candidates = slot_candidates(element, slot)
 
     for level_param, offset_params in candidates:
         current_level = doc.GetElement(level_param.AsElementId())
@@ -434,6 +470,244 @@ def category_name(element):
         return u'-'
 
 
+def bump(stats, name, index):
+    """Incrementa la colonna index della riga di categoria name."""
+    row = stats.get(name)
+    if row is None:
+        row = [0, 0, 0]
+        stats[name] = row
+    row[index] += 1
+
+
+def print_skipped(skipped):
+    if not skipped:
+        return
+    output.print_md(u'## Skipped elements ({})'.format(len(skipped)))
+    shown = skipped[:MAX_SKIPPED_ROWS]
+    detail = [[output.linkify(element.Id), category_name(element), reason]
+              for element, reason in shown]
+    output.print_table(table_data=detail, title='',
+                       columns=[u'Element', u'Category', u'Reason'])
+    remaining = len(skipped) - len(shown)
+    if remaining > 0:
+        output.print_md(u'_...and {} more skipped elements not listed._'.format(remaining))
+
+
+# ------------------------------------------------- SHIFT + CLICK: move levels
+
+LEVEL_PICK_VIEWS = (DB.ViewType.Section, DB.ViewType.Elevation, DB.ViewType.ThreeD)
+
+
+class LevelSelectionFilter(UI.Selection.ISelectionFilter):
+    """Filtro di selezione: accetta solo livelli."""
+
+    def AllowElement(self, element):
+        return isinstance(element, DB.Level)
+
+    def AllowReference(self, reference, point):
+        return False
+
+
+def pick_levels():
+    """Livelli scelti a video, dal piu' alto al piu' basso. Esce se l'utente annulla.
+
+    I livelli sono selezionabili solo in sezione, prospetto e 3D: in pianta il
+    filtro non accetterebbe mai nulla e l'utente resterebbe bloccato nel pick.
+    """
+    try:
+        view_type = doc.ActiveView.ViewType
+    except Exception:
+        view_type = None
+    if view_type not in LEVEL_PICK_VIEWS:
+        forms.alert(u'Levels can be picked only in a section, elevation or 3D view.',
+                    title=u'Elements at Level', exitscript=True)
+
+    with forms.WarningBar(title='Select the levels to move, then press Finish'):
+        try:
+            references = list(uidoc.Selection.PickObjects(
+                UI.Selection.ObjectType.Element, LevelSelectionFilter(),
+                'Select the levels to move'))
+        except Exception:
+            references = []
+
+    picked = OrderedDict()
+    for reference in references:
+        level = doc.GetElement(reference.ElementId)
+        if isinstance(level, DB.Level):
+            picked[element_id_value(level.Id)] = level
+    if not picked:
+        script.exit()
+    return sorted(picked.values(), key=lambda lev: lev.Elevation, reverse=True)
+
+
+def parse_mm(text):
+    """float da un testo utente (virgola ammessa, vuoto = 0); None se non e' un numero."""
+    cleaned = (text or u'').strip().replace(u',', u'.')
+    if not cleaned:
+        return 0.0
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def ask_level_offsets(picked_levels, usage, n_elements):
+    """FlexForm con un campo offset (mm) per ogni livello scelto.
+
+    Ritorna la lista [(Level, mm)] dei soli offset diversi da zero; esce se
+    l'utente annulla. FlexForm non ha un aggancio di validazione e non si puo'
+    riaprire una volta chiusa: in caso di errore si costruisce una nuova finestra
+    con i testi gia' digitati.
+    """
+    typed = [u'0'] * len(picked_levels)
+    while True:
+        components = [
+            Label('Offset per level in mm: + up, - down.', Width=MOVE_FORM_WIDTH),
+            Label('0 = level not moved.', Width=MOVE_FORM_WIDTH),
+            separator(MOVE_FORM_WIDTH),
+        ]
+        for index, level in enumerate(picked_levels):
+            count = usage.get(element_id_value(level.Id), 0)
+            hosted = u'{} selected'.format(count) if count else u'none selected'
+            components.append(Label(u'{}   ({})   -   {}'.format(
+                level.Name, format_elevation(level.Elevation), hosted),
+                Width=MOVE_FORM_WIDTH))
+            components.append(TextBox('lvl_{}'.format(index), default=typed[index],
+                                      Width=MOVE_FORM_WIDTH))
+        components.append(separator(MOVE_FORM_WIDTH))
+        components.append(Button('OK', Width=MOVE_FORM_WIDTH))
+
+        flex_form = FlexForm(u'Move Levels  -  {} levels, {} elements'.format(
+            len(picked_levels), n_elements), components)
+        flex_form.show()
+        if not flex_form.values:
+            script.exit()
+
+        typed = [flex_form.values['lvl_{}'.format(index)]
+                 for index in range(len(picked_levels))]
+        offsets = []
+        error = None
+        for level, text in zip(picked_levels, typed):
+            value = parse_mm(text)
+            if value is None:
+                error = u"The offset of level '{}' is not a number.".format(level.Name)
+                break
+            if value:
+                offsets.append((level, value))
+        if error is None and not offsets:
+            error = u'Enter a non-zero offset for at least one level.'
+        if error is None:
+            return offsets
+        forms.alert(error, title=u'Elements at Level')
+
+
+def run_move_levels(elements):
+    """Modalita' SHIFT + CLICK: sposta i livelli scelti e compensa gli offset degli
+    elementi selezionati perche' restino fermi. Il resto del modello segue i livelli."""
+    elements, redirected = resolve_targets(elements)
+    picked_levels = pick_levels()
+
+    # Dry run, prima di toccare il modello: livello attuale di ogni slot.
+    found_slots = []    # (elemento, [(ruolo, id livello, parametri offset)])
+    usage = {}          # id livello -> n. elementi selezionati ospitati
+    for element in elements:
+        slots_found = []
+        seen = set()
+        for slot in slots_for(element) or []:
+            try:
+                found = current_slot_level(element, slot)
+            except Exception:
+                found = None
+            if found is None:
+                continue
+            level, offset_params = found
+            lid = element_id_value(level.Id)
+            slots_found.append((slot['role'], lid, offset_params))
+            if lid not in seen:
+                seen.add(lid)
+                usage[lid] = usage.get(lid, 0) + 1
+        found_slots.append((element, slots_found))
+
+    offsets = ask_level_offsets(picked_levels, usage, len(elements))
+
+    moved = OrderedDict()   # id livello -> [Level, delta piedi, mm, quota iniziale]
+    for level, mm in offsets:
+        moved[element_id_value(level.Id)] = [level, mm / FEET_TO_MM, mm, level.Elevation]
+
+    stats = OrderedDict()   # categoria -> [base, top, non interessati]
+    skipped = []            # (elemento, motivo)
+    writes = []             # (elemento, categoria, ruolo, [(parametro, nuovo valore)])
+    for element, slots_found in found_slots:
+        name = category_name(element)
+        affected = False
+        for role, lid, offset_params in slots_found:
+            if lid not in moved:
+                continue
+            affected = True
+            if not offset_params:
+                skipped.append((element, u'{}: no writable offset parameter, '
+                                         u'the element will move with the level'.format(role)))
+                continue
+            delta_ft = moved[lid][1]
+            try:
+                values = [(param, param.AsDouble() - delta_ft) for param in offset_params]
+            except Exception as error:
+                skipped.append((element, u'{}: Revit error: {}'.format(role, error)))
+                continue
+            writes.append((element, name, role, values))
+        if not affected:
+            bump(stats, name, 2)
+
+    # Prima i livelli, poi gli offset: se un livello non si sposta (vincoli,
+    # quote bloccate) la transazione va in rollback e nulla viene toccato.
+    failing_level = None
+    try:
+        with revit.Transaction('ElementsAtLevel - Move Levels'):
+            for level, delta_ft, _, _ in moved.values():
+                failing_level = level
+                level.Elevation = level.Elevation + delta_ft
+            failing_level = None
+            for element, name, role, values in writes:
+                try:
+                    for param, value in values:
+                        param.Set(value)
+                    bump(stats, name, 0 if role == 'base' else 1)
+                except Exception as error:
+                    skipped.append((element, u'{}: Revit error: {}'.format(role, error)))
+    except Exception as error:
+        if failing_level is None:
+            raise
+        forms.alert(u"Level '{}' could not be moved: {}\n\nNothing was changed.".format(
+            failing_level.Name, error), title=u'Elements at Level', exitscript=True)
+
+    # Report
+    output.print_md(u'# Elements at Level - Move Levels')
+    output.print_md(u'Processed elements: **{}**{}  \n'
+                    u'Moved levels: **{}**'.format(
+                        len(elements),
+                        u' ({} of them redirected to their host)'.format(redirected) if redirected else u'',
+                        len(moved)))
+
+    level_rows = [[level.Name, format_elevation(old_elevation),
+                   format_elevation(old_elevation + delta_ft), format_elevation(delta_ft)]
+                  for level, delta_ft, _, old_elevation in moved.values()]
+    output.print_table(table_data=level_rows, title='',
+                       columns=[u'Level', u'Old elevation', u'New elevation', u'Offset'])
+
+    rows = []
+    totals = [0, 0, 0]
+    for name, row in stats.items():
+        rows.append([name, row[0], row[1], row[2]])
+        for i in range(3):
+            totals[i] += row[i]
+    rows.append([u'**Total**', totals[0], totals[1], totals[2]])
+    output.print_table(table_data=rows, title='',
+                       columns=[u'Category', u'Base offset recalculated',
+                                u'Top offset recalculated', u'Not affected'])
+
+    print_skipped(skipped)
+
+
 # ------------------------------------------------------------------- input
 
 levels = list(DB.FilteredElementCollector(doc)
@@ -452,6 +726,10 @@ for level in reversed(levels):
 
 elements = collect_elements()
 if not elements:
+    script.exit()
+
+if __shiftclick__:  # noqa: F821
+    run_move_levels(elements)
     script.exit()
 
 KEEP_TOOLTIP = (u"Checked: the offset is recalculated, the elements do not move.\n"
@@ -495,15 +773,6 @@ elements, redirected = resolve_targets(elements)
 stats = OrderedDict()   # categoria -> [base, top, gia' corretti]
 skipped = []            # (elemento, motivo)
 
-
-def bump(name, index):
-    row = stats.get(name)
-    if row is None:
-        row = [0, 0, 0]
-        stats[name] = row
-    row[index] += 1
-
-
 with revit.Transaction('ElementsAtLevel'):
     for element in elements:
         name = category_name(element)
@@ -529,7 +798,7 @@ with revit.Transaction('ElementsAtLevel'):
 
             if status == APPLIED:
                 touched = True
-                bump(name, 0 if slot['role'] == 'base' else 1)
+                bump(stats, name, 0 if slot['role'] == 'base' else 1)
             elif status == ALREADY:
                 already = True
             else:
@@ -540,7 +809,7 @@ with revit.Transaction('ElementsAtLevel'):
                 skipped.append((element, u'partial - {}'.format(u'; '.join(reasons))))
             continue
         if already and not reasons:
-            bump(name, 2)
+            bump(stats, name, 2)
             continue
         if not reasons:
             reasons.append(u'no level applicable with the selected options')
@@ -574,13 +843,4 @@ if stats:
 else:
     output.print_md(u'_No element modified._')
 
-if skipped:
-    output.print_md(u'## Skipped elements ({})'.format(len(skipped)))
-    shown = skipped[:MAX_SKIPPED_ROWS]
-    detail = [[output.linkify(element.Id), category_name(element), reason]
-              for element, reason in shown]
-    output.print_table(table_data=detail, title='',
-                       columns=[u'Element', u'Category', u'Reason'])
-    remaining = len(skipped) - len(shown)
-    if remaining > 0:
-        output.print_md(u'_...and {} more skipped elements not listed._'.format(remaining))
+print_skipped(skipped)
