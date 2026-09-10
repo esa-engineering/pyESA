@@ -382,11 +382,16 @@ if config.only_view_elements:
 else:
     collector = DB.FilteredElementCollector(doc)
 
-elements = collector\
-    .WherePasses(DB.ElementMulticategoryFilter(category_ids))\
-    .WherePasses(DB.ElementPhaseStatusFilter(element_phase.Id, phase_statuses))\
-    .WhereElementIsNotElementType()\
-    .ToElements()
+# Il collector e' un oggetto nativo: ToElements materializza la lista, dopo
+# si puo' rilasciare subito senza aspettare il garbage collector.
+try:
+    elements = collector\
+        .WherePasses(DB.ElementMulticategoryFilter(category_ids))\
+        .WherePasses(DB.ElementPhaseStatusFilter(element_phase.Id, phase_statuses))\
+        .WhereElementIsNotElementType()\
+        .ToElements()
+finally:
+    collector.Dispose()
 
 if not elements:
     forms.alert(
@@ -403,27 +408,30 @@ bound_rooms = {}
 
 boundary_options = DB.SpatialElementBoundaryOptions()
 
-for room in rooms:
-    key = element_id_value(room.Id)
-    room_value[key] = as_text(room.LookupParameter(source_name), room_doc)
-    if link_mode:
-        # I segmenti di contorno delle room di un link sono ElementId del documento
-        # del link: confrontarli con gli Id dell'host darebbe falsi positivi.
-        continue
-    try:
-        loops = room.GetBoundarySegments(boundary_options)
-    except Exception:
-        loops = None
-    if not loops:
-        continue
-    for loop in loops:
-        for segment in loop:
-            bounding_id = element_id_value(segment.ElementId)
-            if bounding_id < 0:
-                continue
-            hosts = bound_rooms.setdefault(bounding_id, [])
-            if key not in hosts:
-                hosts.append(key)
+try:
+    for room in rooms:
+        key = element_id_value(room.Id)
+        room_value[key] = as_text(room.LookupParameter(source_name), room_doc)
+        if link_mode:
+            # I segmenti di contorno delle room di un link sono ElementId del documento
+            # del link: confrontarli con gli Id dell'host darebbe falsi positivi.
+            continue
+        try:
+            loops = room.GetBoundarySegments(boundary_options)
+        except Exception:
+            loops = None
+        if not loops:
+            continue
+        for loop in loops:
+            for segment in loop:
+                bounding_id = element_id_value(segment.ElementId)
+                if bounding_id < 0:
+                    continue
+                hosts = bound_rooms.setdefault(bounding_id, [])
+                if key not in hosts:
+                    hosts.append(key)
+finally:
+    boundary_options.Dispose()
 
 rooms_without_value = len([key for key, value in room_value.items() if not value])
 

@@ -91,6 +91,7 @@ def collect_rooms(room_doc, phase, active_view_id):
     if phase is None:
         return []
     phase_id = element_id_value(phase.Id)
+    collector = None
     try:
         if active_view_id is not None:
             collector = DB.FilteredElementCollector(room_doc, active_view_id)
@@ -101,6 +102,9 @@ def collect_rooms(room_doc, phase, active_view_id):
             .ToElements()
     except Exception:
         return []
+    finally:
+        if collector is not None:
+            collector.Dispose()
 
     rooms = []
     for room in candidates:
@@ -156,13 +160,17 @@ def category_has_visible_elements(doc, view_id, category_id):
     FirstElement ferma il collector al primo risultato: costo trascurabile
     anche su molte categorie.
     """
+    collector = None
     try:
-        return DB.FilteredElementCollector(doc, view_id)\
-            .OfCategoryId(category_id)\
+        collector = DB.FilteredElementCollector(doc, view_id)
+        return collector.OfCategoryId(category_id)\
             .WhereElementIsNotElementType()\
             .FirstElement() is not None
     except Exception:
         return False
+    finally:
+        if collector is not None:
+            collector.Dispose()
 
 
 def room_param_names(rooms):
@@ -489,13 +497,15 @@ class ElementsInRoomForm(Window):
         della categoria, memorizzati. None se la categoria non ha istanze.
 
         I FilteredElementCollector sono lazy: iterando e fermandosi al decimo
-        elemento non si scandisce il modello intero.
+        elemento non si scandisce il modello intero. Il break lascia pero'
+        l'iteratore nativo aperto: Dispose sul collector lo chiude.
         """
         key = element_id_value(category_id)
         if key in self._param_cache:
             return self._param_cache[key]
 
         sample = []
+        collector = None
         try:
             collector = DB.FilteredElementCollector(self.doc)\
                 .OfCategoryId(category_id)\
@@ -506,6 +516,9 @@ class ElementsInRoomForm(Window):
                     break
         except Exception:
             sample = []
+        finally:
+            if collector is not None:
+                collector.Dispose()
 
         names = writable_text_param_names(sample) if sample else None
         self._param_cache[key] = names
