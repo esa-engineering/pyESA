@@ -68,6 +68,113 @@ def description_of(rows, code):
     return row[2] if row and len(row) > 2 else u""
 
 
+# ---------------------------------------------------------------------------
+# La regola di composizione, in forma leggibile
+# ---------------------------------------------------------------------------
+#
+# Si ricava dalla stessa definizione di scheda che guida la composizione, non
+# dai pattern scritti negli Excel: cosi' quello che l'utente legge in cima
+# alla finestra non puo' allontanarsi da quello che il tool produce davvero.
+
+# Come compare nel pattern ogni blocco opzionale.
+BLOCK_TOKEN = {
+    "leaves": u"L{n}",                 # sempre presente sulle aperture
+    "cw_hosted": u"[CW]",
+    "entrance": u"[EN]",
+    "rei": u"[REI]",
+    "wi": u"[WI]",
+    "rail_top": u"[Rail]",
+    "underside": u"[SM|ST]",
+    "use": u"[Use]",
+    "role": u"[Role]",
+    "custom": u"[CT]",
+    "manufacturer": u"[Manufacturer]",
+    "brand": u"[Brand]",
+    "description": u"[Description]",
+}
+
+# Come compare il blocco dimensionale.
+DIM_TOKEN = {
+    "wxh": u"{W}x{H}",
+    "wxdxh": u"{W}x{D}[x{H}]",
+    "wxl": u"{W}x{L}",
+    "wxd_or_d": u"{W}x{D} | D{Ø}",
+    "bxh_or_d": u"{B}x{H} | D{Ø}",
+    "wxt": u"{W}x{T}",
+    "t": u"T{t}",
+    "h": u"H{h}",
+    "nfin_t": u"nF.{T}",
+    "free": u"{Designation}",
+    "none": u"",
+}
+
+PATTERN_LEGEND = (
+    u"Plain blocks are always there.  [ ] appears only when filled.  "
+    u"{ } is a value you provide.  |  means one or the other.  "
+    u"(I) marks an element modelled in place and sticks to the category "
+    u"code with no separator."
+)
+
+
+def _dim_token(sheet):
+    """Il blocco dimensionale, con le sue sostituzioni e la sua opzionalita'."""
+    token = DIM_TOKEN.get(sheet.get("dim"), u"")
+    if not token:
+        return u""
+
+    # SR e SL non si aggiungono al nome: prendono il posto del blocco
+    for block in sheet.get("blocks", ()):
+        if block in DIM_SUBSTITUTES:
+            token = u"{0} | {1}".format(token, DIM_SUBSTITUTES[block])
+
+    # dove un Group1 non ha misure, tutto il blocco diventa opzionale
+    if sheet.get("dim_optional_g1"):
+        token = u"[{0}]".format(token)
+    return token
+
+
+def naming_pattern(sheet):
+    """Restituisce (regola del nome famiglia, regola del nome tipo).
+
+    La prima e' vuota sulle schede di sistema, che un nome famiglia non lo
+    compongono.
+    """
+    triplet = u"[(I)]Cat.G1.G2"
+    dim = _dim_token(sheet)
+    blocks = sheet.get("blocks", ())
+
+    def tokens(keys):
+        out = []
+        for block in keys:
+            if block in DIM_SUBSTITUTES:
+                continue               # gia' dentro il blocco dimensionale
+            token = BLOCK_TOKEN.get(block)
+            if token:
+                out.append(token)
+        return out
+
+    # L'autore non e' un campo da compilare ma una costante, quindi nella
+    # regola compare per quello che e': la lettera che finisce nel nome.
+    author = MAP.AUTHOR_CODE
+
+    if sheet.get("schema") == "loadable":
+        family = [author, triplet]
+        family.extend(tokens(blocks))
+
+        type_parts = [u"TypeMark"]
+        if dim:
+            type_parts.append(dim)
+        type_parts.append(u"[Description]")
+        return SEP.join(family), SEP.join(type_parts)
+
+    # schema 'system': il nome del tipo porta tutto
+    type_parts = [author, u"TypeMark", triplet]
+    if dim:
+        type_parts.append(dim)
+    type_parts.extend(tokens(blocks))
+    return u"", SEP.join(type_parts)
+
+
 def visible_notes(sheet_id):
     """Le note della scheda, filtrate secondo le scelte fatte in FamilyNaming_map.
 

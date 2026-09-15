@@ -34,6 +34,29 @@ dentro una tabella esistente funziona senza altri interventi. Aggiungere una
 **categoria** nuova richiede invece anche una voce in `FamilyNaming_map.py`,
 sia in `SHEETS` sia in `CATEGORY_MAP`.
 
+## La regola di composizione a schermo
+
+Subito sotto DETECTED la finestra dichiara la regola della categoria, in
+grassetto blu, prima di chiedere qualunque campo: cosi' si sa dove andra' a
+finire quello che si sta scrivendo senza doverlo dedurre dall'anteprima.
+
+```
+Doors     Family   e_[(I)]Cat.G1.G2_L{n}_[CW]_[EN]_[REI]_[Manufacturer]_[Brand]_[Description]
+          Type     TypeMark_{W}x{H}_[Description]
+
+Walls     Type     e_TypeMark_[(I)]Cat.G1.G2_nF.{T}_[REI]_[WI]_[Description]
+```
+
+Blocchi nudi sempre presenti, `[ ]` solo se compilati, `{ }` un valore, `|` una
+forma o l'altra. L'autore compare per quello che e', la lettera che finisce
+nel nome, e viene da `AUTHOR_CODE` nella mappa: se cambia, la regola lo segue. La riga Family sparisce sulle schede di sistema.
+
+La regola non e' copiata dai pattern scritti negli Excel: e' **ricavata dalla
+stessa definizione di scheda che guida la composizione** (`blocks` e `dim` in
+`FamilyNaming_map.py`). Aggiungere un blocco al nome lo fa comparire anche
+nella regola, senza allineamenti manuali, e non e' possibile che la finestra
+dichiari una regola diversa da quella che applica.
+
 ## Il Type Mark
 
 Sempre nella forma `AA-XXX`: due lettere, trattino, tre cifre.

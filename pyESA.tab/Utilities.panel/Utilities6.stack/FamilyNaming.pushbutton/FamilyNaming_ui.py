@@ -111,6 +111,8 @@ class NamingWindow(Window):
         names = (
             "lbl_element", "lbl_revit_category", "lbl_category",
             "grd_inplace", "lbl_inplace", "lbl_detect_warning",
+            "grd_rule_family", "lbl_rule_family", "lbl_rule_type",
+            "lbl_rule_legend",
             "cmb_group1", "cmb_group2",
             "lbl_group1", "lbl_group2", "lbl_group1_desc", "lbl_group2_desc",
             "txt_typemark", "lbl_tm_hint", "chk_tm_write", "lbl_tm_existing",
@@ -134,6 +136,7 @@ class NamingWindow(Window):
         is_loadable = sheet.get("schema") == "loadable"
 
         self._show_detected()
+        self._show_naming_rule()
 
         # una scheda di sistema lavora direttamente sul tipo: non compone un
         # nome famiglia, quindi ne' l'anteprima ne' la descrizione del tipo
@@ -161,6 +164,24 @@ class NamingWindow(Window):
         self.txt_desc_type.TextChanged += self._on_changed
         self.btn_cancel.Click += self._on_cancel
         self.btn_apply.Click += self._on_apply
+
+    def _show_naming_rule(self):
+        """La regola di composizione, dichiarata prima di chiedere i campi.
+
+        Serve a sapere dove finisce quello che si sta scrivendo senza doverlo
+        dedurre dall'anteprima in fondo. E' ricavata dalla definizione della
+        scheda, la stessa che guida la composizione, quindi non puo'
+        raccontare una regola diversa da quella applicata.
+        """
+        family, type_rule = RULES.naming_pattern(self.sheet)
+
+        if family:
+            self.lbl_rule_family.Text = family
+        else:
+            self.grd_rule_family.Visibility = COLLAPSED
+
+        self.lbl_rule_type.Text = type_rule
+        self.lbl_rule_legend.Text = RULES.PATTERN_LEGEND
 
     def _show_detected(self):
         """Tutto quello che lo script ha riconosciuto da solo, in sola lettura."""
