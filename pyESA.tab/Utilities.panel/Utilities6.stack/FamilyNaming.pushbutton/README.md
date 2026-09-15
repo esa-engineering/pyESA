@@ -1,0 +1,108 @@
+# Family Naming
+
+Rinomina guidata di una famiglia e di un tipo secondo la classificazione ESA.
+Si seleziona un elemento nel modello, il tool riconosce la categoria, apre la
+scheda che le corrisponde e compone il nome.
+
+## I file
+
+| File | Cosa contiene |
+|---|---|
+| `FamilyNaming_script.py` | Entry point. Selezione, rilevamento categoria, lettura delle misure dai parametri, transazione, report. E' l'unico che tocca le API di Revit. |
+| `FamilyNaming_map.py` | Mappa dichiarativa: quali schede esistono, quali tabelle DV le alimentano, quali blocchi compongono il nome, quale categoria Revit porta a quale scheda. Si corregge senza saper programmare. |
+| `FamilyNaming_rules.py` | Motore di composizione: Type Mark, blocco dimensionale, nomi, validazione. Logica pura, nessuna API. |
+| `FamilyNaming_ui.py` | Finestra. Costruisce a runtime i campi che cambiano da una categoria all'altra. |
+| `FamilyNaming.xaml` | Layout della finestra. |
+| `FamilyNaming_data.py` | **Generato.** Le tabelle dei tre Excel congelate in dizionari Python. Non si modifica a mano. |
+| `gen_data.py` | Rigenera `FamilyNaming_data.py` dagli Excel. Non fa parte del comando. |
+| `Naming classification-*.xlsx` | I tre file di classificazione, sorgente documentale. Il tool **non** li legge a runtime. |
+
+## Modificare le tabelle di classificazione
+
+Le tabelle non si leggono dagli Excel a ogni avvio: sono congelate in
+`FamilyNaming_data.py`. Dopo una modifica a uno dei tre file serve rigenerare.
+
+```powershell
+cd <questa cartella>
+py -m pip install openpyxl     # solo la prima volta
+py gen_data.py
+```
+
+Il generatore legge le Excel Table nominate (`Tbl_DR_G1`, `Tbl_BW_G2`,
+`Tbl_STR_G1`...), non le coordinate delle celle: aggiungere o togliere righe
+dentro una tabella esistente funziona senza altri interventi. Aggiungere una
+**categoria** nuova richiede invece anche una voce in `FamilyNaming_map.py`,
+sia in `SHEETS` sia in `CATEGORY_MAP`.
+
+## Il Type Mark
+
+Sempre nella forma `AA-XXX`: due lettere, trattino, tre cifre.
+
+| Caso | Prefisso | Cifre | Esempio |
+|---|---|---|---|
+| Caricabili con TM Code (DR, WN, CP, CM, PK, EN, PL, MS) | codice categoria | cifra del Group2 + 2 di sequenziale | `DR-101` |
+| Caricabili senza TM Code (FN, FS, CK, PF, SE, SI, GM) | codice **Group2** | 3 di sequenziale | `SE-001` |
+| System e Structural | codice categoria | cifra del Group1 + 2 di sequenziale | `BW-101` |
+| Group1 = Other | codice materiale | 3 di sequenziale | `WD-001` |
+| Structural Framing con Use | codice Use | 3 di sequenziale | `SK-001` |
+
+Il primo sequenziale libero si cerca **per prefisso sull'intero documento**,
+prendendo il massimo in uso piu' uno, e si legge dal parametro Type Mark dei
+tipi, compresi quelli non piazzati. La ricerca non e' per categoria perche'
+sulle sette categorie a Group1 condiviso il codice di categoria non compare nel
+Type Mark e gli stessi codici Group2 ricorrono altrove: `SE` e' Seating sia su
+Furniture sia su Furniture Systems, e numerare per categoria produrrebbe due
+`SE-001` diversi.
+
+> **Attenzione: divergenza nota dagli Excel.** Sulle sette categorie a Group1
+> condiviso i fogli riportano ancora la forma vecchia `FN-SE01`, mentre il tool
+> genera `SE-001`. La regola buona e' quella del tool. Gli Excel vanno allineati.
+
+## Cosa scrive il tool
+
+- **Famiglie caricabili**: nome della famiglia e nome del tipo. Il file `.rfa`
+  su disco non viene toccato, Revit non lo consente da dentro un progetto.
+- **Famiglie di sistema**: il solo nome del tipo, Type Mark compreso.
+- **Elementi in place**: un nome solo, famiglia e tipo uniti da `" - "`, scritto
+  sia sulla famiglia sia sul suo unico tipo. Sulle categorie di sistema, che una
+  regola sul nome famiglia non ce l'hanno, resta il solo nome del tipo.
+- **Parametro Type Mark**, salvo togliere la spunta. Se il tipo ne ha gia' uno
+  diverso l'anteprima lo segnala prima di sovrascriverlo.
+- **FireRating**, quando il campo REI e' compilato. Se il parametro ha gia' un
+  valore diverso, la sovrascrittura viene chiesta prima di applicare.
+
+Tutto avviene in una sola transazione.
+
+## Cosa viene dedotto e cosa si digita
+
+Le misure del blocco dimensionale vengono precompilate dove esiste un parametro
+affidabile: spessore delle pareti da `WallType.Width`, spessore dei pacchetti
+stratificati dalla `CompoundStructure`, larghezza e altezza di porte e finestre
+dai rispettivi parametri. Dove un parametro standard non c'e', il campo resta
+vuoto con un esempio in grigio e si compila a mano. Il testo di esempio non
+viene mai salvato come valore.
+
+Il numero di facce finite (`0F`, `1F`, `2F`) viene dedotto contando gli strati
+estremi della stratigrafia, applicando la regola per cui un elemento a strato
+singolo e' sempre `0F` anche quando quell'unico strato e' la finitura. Resta
+modificabile: la deduzione e' un default, non un vincolo.
+
+## Categorie non coperte
+
+Le categorie fuori dalle tre classificazioni (tutto l'MEP, annotazioni,
+elementi di dettaglio) fanno comparire un avviso e il tool si ferma senza
+rinominare nulla.
+
+Il foglio Toposolid si applica da Revit 2024 in avanti.
+
+## Limiti noti
+
+- Una esecuzione rinomina **una famiglia e un tipo**. Non e' una rinomina di
+  massa.
+- Con il sequenziale a due cifre l'ambito si esaurisce a 99 tipi: oltre quella
+  soglia il tool smette di suggerire e chiede di scrivere il Type Mark a mano.
+- Il rilevamento della famiglia di sistema (Basic Wall contro Curtain Wall,
+  platea contro plinto) e' una proposta: il menu resta aperto e la scelta si
+  puo' correggere.
+- Non testato in Revit. Tutte le verifiche fatte finora sono offline sul motore
+  di composizione e sulla coerenza delle tabelle.
