@@ -68,6 +68,32 @@ def description_of(rows, code):
     return row[2] if row and len(row) > 2 else u""
 
 
+def visible_notes(sheet_id):
+    """Le note della scheda, filtrate secondo le scelte fatte in FamilyNaming_map.
+
+    Due tagli. Il primo e' in blocco: dal marcatore REGOLE DI COMPILAZIONE in
+    avanti ci sono le istruzioni campo per campo, che il tool gia' mostra
+    accanto a ogni controllo, e con NOTES_SHOW_FIELD_RULES a False si fermano
+    li'. Il secondo e' per intestazione, sulle note di categoria rimaste.
+    """
+    out = []
+    for kind, head, body in DATA.NOTES.get(sheet_id, ()):
+        if kind == "section" and u"REGOLE" in head.upper():
+            if not MAP.NOTES_SHOW_FIELD_RULES:
+                break
+            out.append((kind, head, body))
+            continue
+
+        name = head.strip()
+        if name in MAP.NOTES_HIDDEN:
+            continue
+        hidden_on = MAP.NOTES_HIDDEN_ON.get(name)
+        if hidden_on and sheet_id in hidden_on:
+            continue
+        out.append((kind, head, body))
+    return tuple(out)
+
+
 def tm_digit_of(rows, code):
     """Prima cifra della colonna TM Code: '1xx' -> '1'. Vuoto se assente."""
     row = row_by_code(rows, code)

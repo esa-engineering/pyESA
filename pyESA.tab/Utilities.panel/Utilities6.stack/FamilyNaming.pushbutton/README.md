@@ -46,8 +46,10 @@ Sempre nella forma `AA-XXX`: due lettere, trattino, tre cifre.
 | Group1 = Other | codice materiale | 3 di sequenziale | `WD-001` |
 | Structural Framing con Use | codice Use | 3 di sequenziale | `SK-001` |
 
-Il primo sequenziale libero si cerca **per prefisso sull'intero documento**,
-prendendo il massimo in uso piu' uno, e si legge dal parametro Type Mark dei
+Il primo sequenziale libero viene sempre proposto, senza opzioni da attivare, e
+si puo' sovrascrivere scrivendoci sopra: finche' nel campo c'e' la proposta il
+tool la aggiorna, appena c'e' un valore digitato lo lascia stare. La ricerca e'
+**per prefisso sull'intero documento**, prendendo il massimo in uso piu' uno, e si legge dal parametro Type Mark dei
 tipi, compresi quelli non piazzati. La ricerca non e' per categoria perche'
 sulle sette categorie a Group1 condiviso il codice di categoria non compare nel
 Type Mark e gli stessi codici Group2 ricorrono altrove: `SE` e' Seating sia su
@@ -75,17 +77,51 @@ Tutto avviene in una sola transazione.
 
 ## Cosa viene dedotto e cosa si digita
 
-Le misure del blocco dimensionale vengono precompilate dove esiste un parametro
-affidabile: spessore delle pareti da `WallType.Width`, spessore dei pacchetti
-stratificati dalla `CompoundStructure`, larghezza e altezza di porte e finestre
-dai rispettivi parametri. Dove un parametro standard non c'e', il campo resta
-vuoto con un esempio in grigio e si compila a mano. Il testo di esempio non
-viene mai salvato come valore.
+Il criterio e' che **quello che si legge dal modello non si digita**. Una misura
+ricavata da un parametro di tipo compare in sola lettura su fondo grigio, con
+l'indicazione della provenienza: spessore delle pareti da `WallType.Width`,
+spessore dei pacchetti stratificati dalla `CompoundStructure`, larghezza e
+altezza di porte e finestre dai rispettivi parametri. Il nome deve dire quello
+che l'elemento e', non quello che si vorrebbe. Dove un parametro standard non
+esiste il campo resta editabile, vuoto, con un esempio in grigio che non viene
+mai salvato come valore.
 
-Il numero di facce finite (`0F`, `1F`, `2F`) viene dedotto contando gli strati
-estremi della stratigrafia, applicando la regola per cui un elemento a strato
-singolo e' sempre `0F` anche quando quell'unico strato e' la finitura. Resta
-modificabile: la deduzione e' un default, non un vincolo.
+Il numero di facce finite (`0F`, `1F`, `2F`) segue la stessa regola: viene
+contato dagli strati estremi della stratigrafia, applicando il principio per cui
+un elemento a strato singolo e' sempre `0F` anche quando quell'unico strato e'
+la finitura, e si mostra in sola lettura. Torna a essere una scelta solo se la
+stratigrafia non si riesce a leggere, altrimenti non si potrebbe procedere.
+
+La categoria, il codice della famiglia di sistema e la condizione di elemento
+modellato in place sono anch'essi rilevati e mostrati come testo, senza menu:
+non sono decisioni dell'utente. Se il riconoscimento della famiglia di sistema
+non riesce, il tool assume la prima voce e lo dichiara in giallo invece di
+tacere.
+
+## Le note di categoria
+
+I fogli generatore portano in coda 559 righe di note, divise in due blocchi: le
+NOTE della categoria, che dicono come classificare, e le REGOLE DI COMPILAZIONE,
+che spiegano colonna per colonna cosa scrivere. Il secondo blocco serve dentro
+l'Excel, dove non c'e' nessuno a spiegarti le colonne, ma nel tool e' ridondante
+perche' ogni campo porta gia' il suo suggerimento accanto.
+
+Il pannello ne mostra **58 su 559**, selezionate a mano dal dipartimento. Il
+filtro sta in `FamilyNaming_map.py` e non in `FamilyNaming_data.py`, perche'
+quello e' generato e le note tornerebbero alla prima rigenerazione:
+
+| Chiave | Cosa fa |
+|---|---|
+| `NOTES_SHOW_FIELD_RULES` | `False` nasconde in blocco tutte le REGOLE DI COMPILAZIONE |
+| `NOTES_HIDDEN` | intestazioni di note di categoria da non mostrare, su tutte le schede |
+| `NOTES_HIDDEN_ON` | eccezioni: intestazione da nascondere solo su alcune schede |
+
+Una nota aggiunta agli Excel in futuro **compare di default**: per toglierla si
+aggiunge la sua intestazione a `NOTES_HIDDEN`. La scelta e' voluta, cosi' un
+contenuto nuovo scritto apposta non sparisce in silenzio.
+
+Su Entourage, Mass, Ramps e Toposolid non resta nessuna nota e il riquadro
+sparisce del tutto invece di restare vuoto.
 
 ## Categorie non coperte
 
@@ -102,7 +138,9 @@ Il foglio Toposolid si applica da Revit 2024 in avanti.
 - Con il sequenziale a due cifre l'ambito si esaurisce a 99 tipi: oltre quella
   soglia il tool smette di suggerire e chiede di scrivere il Type Mark a mano.
 - Il rilevamento della famiglia di sistema (Basic Wall contro Curtain Wall,
-  platea contro plinto) e' una proposta: il menu resta aperto e la scelta si
-  puo' correggere.
+  platea contro plinto) non si puo' correggere dall'interfaccia. Nei casi
+  verificati funziona, ma su una libreria con famiglie di sistema rinominate
+  potrebbe sbagliare: in quel caso il tool lo segnala e la correzione va fatta
+  sulla mappa.
 - Non testato in Revit. Tutte le verifiche fatte finora sono offline sul motore
   di composizione e sulla coerenza delle tabelle.

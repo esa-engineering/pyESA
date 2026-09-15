@@ -132,51 +132,60 @@ def resolve_sheet(element, element_type, bic_name):
     if bic_name == "OST_CurtainWallPanels":
         return u"LOADABLE:03_CP" if is_loadable else u"SYSTEM:13_CP"
 
-    if bic_name == "OST_Floors":
-        # la platea e' un tipo di solaio con il flag di fondazione strutturale
-        if _is_foundation_slab(element_type):
-            return u"STRUCTURAL:01_FS"
-        return u"SYSTEM:02_FL"
-
     if bic_name == "OST_StructuralFoundation":
         if is_loadable:
             return u"STRUCTURAL:03_FI"
-        if isinstance(element_type, DB.WallFoundationType):
-            return u"STRUCTURAL:02_FW"
+        try:
+            if isinstance(element_type, DB.WallFoundationType):
+                return u"STRUCTURAL:02_FW"
+        except AttributeError:
+            pass                      # classe assente su alcune versioni
         return u"STRUCTURAL:01_FS"
 
     return candidates[0]
-
-
-def _is_foundation_slab(element_type):
-    """Una platea e' un FloorType con il flag di fondazione.
-
-    Non basta il parametro 'Structural': quello dice solo che il solaio e'
-    portante, e un solaio portante resta un solaio. Confonderli manderebbe
-    ogni solaio strutturale sulla scheda delle fondazioni.
-    """
-    try:
-        return bool(element_type.IsFoundationSlab)
-    except Exception:
-        return False
 
 
 def _normalize(text):
     return re.sub(r"[^a-z0-9]", "", (text or u"").lower())
 
 
-def detect_cat_code(sheet, element_type):
-    """Indovina la famiglia di sistema confrontandola con la tabella.
+def detect_cat_code(sheet, element_type, bic_name):
+    """Riconosce la famiglia di sistema. Restituisce (codice, certo).
 
-    Le etichette della colonna Category sono i nomi delle famiglie di sistema
-    di Revit, quindi il confronto e' diretto; normalizzo per assorbire spazi e
-    trattini ('NonMonolithic Run' contro 'Non-Monolithic Run'). Se non trovo
-    corrispondenza lascio la prima voce e il menu resta aperto: la scelta
-    torna all'utente invece di essere sbagliata in silenzio.
+    Il codice non si chiede all'utente: si legge dal modello. Tre strade, in
+    ordine di affidabilita'.
+
+      1. Alcune categorie Revit fissano il codice da sole, perche' sono
+         categorie distinte anche dove la scheda le tiene insieme: un bordo
+         di solaio e' OST_EdgeSlab, non OST_Floors.
+      2. Le pareti si distinguono su WallType.Kind, che e' una proprieta'
+         esplicita e non un nome.
+      3. Tutte le altre si riconoscono confrontando il nome della famiglia di
+         sistema con le etichette della tabella, normalizzando spazi e
+         trattini: 'Non-Monolithic Run' di Revit contro 'NonMonolithic Run'
+         della tabella.
+
+    Se nessuna strada porta a casa si assume la prima voce e si segnala
+    l'incertezza, perche' l'utente non ha un menu con cui correggere.
     """
     rows = RULES.table(sheet["cat_table"])
     if not rows:
-        return u""
+        return u"", True
+
+    forced = MAP.FORCED_CAT_CODE.get(bic_name)
+    if forced:
+        return forced, True
+
+    if isinstance(element_type, DB.WallType):
+        try:
+            return (u"CW" if element_type.Kind == DB.WallKind.Curtain
+                    else u"BW"), True
+        except Exception:
+            pass
+
+    # una scheda con una sola voce non ha nulla da riconoscere
+    if len(rows) == 1:
+        return rows[0][0], True
 
     family_name = u""
     try:
@@ -184,23 +193,16 @@ def detect_cat_code(sheet, element_type):
     except Exception:
         pass
 
-    # le Basic Wall e le Curtain Wall si distinguono per proprieta', non per nome
-    if isinstance(element_type, DB.WallType):
-        try:
-            return u"CW" if element_type.Kind == DB.WallKind.Curtain else u"BW"
-        except Exception:
-            pass
-
     target = _normalize(family_name)
     if target:
         for row in rows:
             if len(row) > 1 and _normalize(row[1]) == target:
-                return row[0]
+                return row[0], True
         for row in rows:
             if len(row) > 1 and target.startswith(_normalize(row[1])):
-                return row[0]
+                return row[0], True
 
-    return rows[0][0]
+    return rows[0][0], False
 
 
 def is_in_place(element, element_type):
@@ -566,14 +568,17 @@ def main():
         except Exception:
             pass
 
+    cat_code, cat_certain = detect_cat_code(sheet, element_type, bic_name)
+
     ctx = {
         "sheet_id": sheet_id,
         "sheet": sheet,
-        "cat_code": detect_cat_code(sheet, element_type),
+        "cat_code": cat_code,
+        "cat_uncertain": not cat_certain,
+        "revit_category": category_label,
         "in_place": is_in_place(element, element_type),
-        "element_label": u"{0}  |  {1}  |  {2}".format(
-            category_label, current_family_name or u"system family",
-            current_type_name),
+        "element_label": u"{0}  :  {1}".format(
+            current_family_name or u"system family", current_type_name),
         "current_family": current_family_name,
         "current_type": current_type_name,
         "current_type_mark": param_string(type_mark_param(element_type)),

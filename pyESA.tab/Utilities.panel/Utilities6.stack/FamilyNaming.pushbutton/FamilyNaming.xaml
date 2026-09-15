@@ -18,24 +18,13 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,0,10,0"/>
         </Style>
-        <Style x:Key="InputField" TargetType="TextBox">
-            <Setter Property="Width" Value="70"/>
-            <Setter Property="HorizontalAlignment" Value="Left"/>
-            <Setter Property="Padding" Value="3,2"/>
-        </Style>
-        <Style x:Key="TextField" TargetType="TextBox">
-            <Setter Property="Padding" Value="3,2"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Style x:Key="DetectedValue" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
         <Style x:Key="ComboStyle" TargetType="ComboBox">
             <Setter Property="Padding" Value="4,2"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
-        </Style>
-        <Style x:Key="UnitLabel" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Foreground" Value="Gray"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="6,0,0,0"/>
         </Style>
         <Style x:Key="HintText" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11"/>
@@ -72,15 +61,63 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,5,0">
             <StackPanel Margin="0,0,10,0">
 
-                <!-- SELECTED ELEMENT -->
+                <!-- DETECTED -->
                 <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
                         CornerRadius="5" Padding="10" Margin="0,0,0,10">
                     <StackPanel>
-                        <TextBlock Text="📌 SELECTED ELEMENT" Style="{StaticResource SectionHeader}"/>
-                        <TextBlock x:Name="lbl_element" Style="{StaticResource HintText}"
-                                   Text="-"/>
-                        <TextBlock x:Name="lbl_sheet" Style="{StaticResource HintText}"
-                                   Margin="0,3,0,0" Text="-"/>
+                        <TextBlock Text="📌 DETECTED" Style="{StaticResource SectionHeader}"/>
+
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Element"
+                                       Style="{StaticResource FieldLabel}"/>
+                            <TextBlock x:Name="lbl_element" Grid.Column="1" Text="-"
+                                       TextWrapping="Wrap"
+                                       Style="{StaticResource DetectedValue}"/>
+                        </Grid>
+
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Revit category"
+                                       Style="{StaticResource FieldLabel}"/>
+                            <TextBlock x:Name="lbl_revit_category" Grid.Column="1" Text="-"
+                                       TextWrapping="Wrap"
+                                       Style="{StaticResource DetectedValue}"/>
+                        </Grid>
+
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Category code"
+                                       Style="{StaticResource FieldLabel}"/>
+                            <TextBlock x:Name="lbl_category" Grid.Column="1" Text="-"
+                                       TextWrapping="Wrap"
+                                       Style="{StaticResource DetectedValue}"/>
+                        </Grid>
+
+                        <Grid x:Name="grd_inplace" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Modelled in place"
+                                       Style="{StaticResource FieldLabel}"/>
+                            <TextBlock x:Name="lbl_inplace" Grid.Column="1"
+                                       Text="yes — the (I) marker is added"
+                                       TextWrapping="Wrap" Foreground="#B06000"
+                                       Style="{StaticResource DetectedValue}"/>
+                        </Grid>
+
+                        <TextBlock x:Name="lbl_detect_warning" Style="{StaticResource HintText}"
+                                   Margin="150,6,0,0" Foreground="#B06000"/>
                     </StackPanel>
                 </Border>
 
@@ -89,17 +126,6 @@
                         Padding="10" Margin="0,0,0,10">
                     <StackPanel>
                         <TextBlock Text="🗂️ CLASSIFICATION" Style="{StaticResource SectionHeader}"/>
-
-                        <Grid Margin="0,5">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="150"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="System family"
-                                       Style="{StaticResource FieldLabel}"/>
-                            <ComboBox x:Name="cmb_category" Grid.Column="1"
-                                      Style="{StaticResource ComboStyle}"/>
-                        </Grid>
 
                         <Grid Margin="0,5">
                             <Grid.ColumnDefinitions>
@@ -126,9 +152,6 @@
                         </Grid>
                         <TextBlock x:Name="lbl_group2_desc" Style="{StaticResource HintText}"
                                    Margin="150,0,0,0"/>
-
-                        <CheckBox x:Name="chk_inplace" Content="Modelled in place — adds the (I) marker"
-                                  Margin="0,8,0,0" IsEnabled="False"/>
                     </StackPanel>
                 </Border>
 
@@ -150,15 +173,14 @@
                                      HorizontalAlignment="Left" Padding="3,2"
                                      FontFamily="Consolas"/>
                             <TextBlock x:Name="lbl_tm_hint" Grid.Column="2"
-                                       Style="{StaticResource UnitLabel}"/>
+                                       Style="{StaticResource HintText}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
                         </Grid>
+                        <TextBlock Text="The next free sequential is proposed. Type over it to set the Type Mark by hand."
+                                   Style="{StaticResource HintText}" Margin="150,2,0,0"/>
 
-                        <CheckBox x:Name="chk_tm_auto" Content="Suggest the next free sequential number"
-                                  Margin="150,4,0,0" IsChecked="True"/>
-                        <CheckBox x:Name="chk_tm_xx" Content="Type not defined yet — use XX instead of the sequential"
-                                  Margin="150,4,0,0"/>
                         <CheckBox x:Name="chk_tm_write" Content="Write the Type Mark into the type parameter"
-                                  Margin="150,4,0,0" IsChecked="True"/>
+                                  Margin="150,8,0,0" IsChecked="True"/>
                         <TextBlock x:Name="lbl_tm_existing" Style="{StaticResource HintText}"
                                    Margin="170,2,0,0" Foreground="#B06000"/>
                     </StackPanel>
@@ -199,24 +221,25 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="lbl_desc_family" Grid.Column="0"
                                        Text="Family description" Style="{StaticResource FieldLabel}"/>
-                            <TextBox x:Name="txt_desc_family" Grid.Column="1"
-                                     Style="{StaticResource TextField}"/>
+                            <TextBox x:Name="txt_desc_family" Grid.Column="1" Padding="3,2"/>
                         </Grid>
-                        <Grid Margin="0,5">
+
+                        <Grid x:Name="grd_desc_type" Margin="0,5">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="150"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Type description"
+                            <TextBlock x:Name="lbl_desc_type" Grid.Column="0"
+                                       Text="Type description"
                                        Style="{StaticResource FieldLabel}"/>
-                            <TextBox x:Name="txt_desc_type" Grid.Column="1"
-                                     Style="{StaticResource TextField}"/>
+                            <TextBox x:Name="txt_desc_type" Grid.Column="1" Padding="3,2"/>
                         </Grid>
                     </StackPanel>
                 </Border>
 
                 <!-- NOTES -->
-                <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
+                <Border x:Name="brd_notes"
+                        BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
                         CornerRadius="5" Padding="10" Margin="0,0,0,10">
                     <StackPanel>
                         <TextBlock x:Name="lbl_notes_header" Text="📖 CATEGORY NOTES"

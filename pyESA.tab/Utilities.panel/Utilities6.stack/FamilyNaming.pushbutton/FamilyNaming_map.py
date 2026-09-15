@@ -605,32 +605,159 @@ CATEGORY_MAP = {
 
     # architettonico di sistema
     "OST_Ceilings": (u"SYSTEM:01_CL",),
+    "OST_Floors": (u"SYSTEM:02_FL",),
+    "OST_EdgeSlab": (u"SYSTEM:02_FL",),          # Slab Edge, codice SG
     "OST_Roofs": (u"SYSTEM:03_RF",),
     "OST_StairsRailing": (u"SYSTEM:04_RL",),
     "OST_Railings": (u"SYSTEM:04_RL",),
+    "OST_RailingSystem": (u"SYSTEM:04_RL",),
     "OST_StairsRuns": (u"SYSTEM:05_RN",),
     "OST_StairsLandings": (u"SYSTEM:06_LN",),
     "OST_Stairs": (u"SYSTEM:07_ST",),
     "OST_Ramps": (u"SYSTEM:08_RM",),
     "OST_Walls": (u"SYSTEM:09_WL",),
+    "OST_StackedWalls": (u"SYSTEM:09_WL",),
     "OST_CurtainWallMullions": (u"SYSTEM:10_CN",),
-    "OST_StairsRailingBaseTop": (u"SYSTEM:11_TR",),
-    "OST_TopRails": (u"SYSTEM:11_TR",),
+    "OST_RailingTopRail": (u"SYSTEM:11_TR",),
+    "OST_RailingSystemTopRail": (u"SYSTEM:11_TR",),
     "OST_RailingHandRail": (u"SYSTEM:12_HR",),
-    "OST_Toposolid": (u"SYSTEM:14_TS",),
+    "OST_RailingSystemHandRail": (u"SYSTEM:12_HR",),
+    "OST_Toposolid": (u"SYSTEM:14_TS",),         # solo da Revit 2024
 
     # strutturale
     "OST_StructuralColumns": (u"STRUCTURAL:04_SC",),
     "OST_StructuralFraming": (u"STRUCTURAL:05_FR",),
     "OST_StructuralTruss": (u"STRUCTURAL:06_TR",),
     "OST_StructConnections": (u"STRUCTURAL:07_CN",),
+    "OST_StructuralStiffener": (u"STRUCTURAL:07_CN",),
 
-    # ambigue: stessa categoria Revit, schede diverse
-    #   un solaio ordinario e' 02_FL, una platea di fondazione 01_FS
-    "OST_Floors": (u"SYSTEM:02_FL", u"STRUCTURAL:01_FS"),
-    #   platea / trave rovescia / plinto convivono nella stessa categoria
+    # L'unica ambiguita' rimasta. Platea, trave rovescia e plinto stanno tutti
+    # in OST_StructuralFoundation: le prime due sono famiglie di sistema, il
+    # plinto e' caricabile, e resolve_sheet() le distingue sulla classe.
     "OST_StructuralFoundation": (u"STRUCTURAL:01_FS", u"STRUCTURAL:02_FW",
                                  u"STRUCTURAL:03_FI"),
-    #   pannello di sistema oppure famiglia caricabile annidata nella griglia
+    # pannello di sistema oppure famiglia caricabile annidata nella griglia
     "OST_CurtainWallPanels": (u"SYSTEM:13_CP", u"LOADABLE:03_CP"),
+}
+
+
+# Categorie Revit che fissano da sole il codice della famiglia di sistema,
+# perche' in Revit sono categorie distinte anche se la scheda le tiene
+# insieme. Senza questa tabella un bordo di solaio finirebbe nominato come
+# un solaio.
+FORCED_CAT_CODE = {
+    "OST_EdgeSlab": u"SG",
+    "OST_Floors": u"FL",
+}
+
+
+# ---------------------------------------------------------------------------
+# Quali note mostrare
+# ---------------------------------------------------------------------------
+#
+# I fogli generatore portano in coda 559 righe di note, divise in due blocchi:
+# le NOTE della categoria, che dicono come classificare, e le REGOLE DI
+# COMPILAZIONE, che spiegano campo per campo cosa scrivere in ogni colonna.
+#
+# Il secondo blocco e' comodo dentro l'Excel, dove non c'e' nessuno a
+# spiegarti le colonne, ma nel tool e' ridondante: ogni campo porta gia' il
+# suo suggerimento accanto, i due gruppi hanno la descrizione viva sotto la
+# tendina, e categoria e misure sono mostrate come valori calcolati.
+#
+# Il filtro sta qui e non in FamilyNaming_data.py perche' quello e' generato:
+# toglierle di la' significherebbe vederle tornare alla prossima
+# rigenerazione dagli Excel.
+# ---------------------------------------------------------------------------
+
+# Le istruzioni campo per campo. False le nasconde tutte in blocco.
+NOTES_SHOW_FIELD_RULES = False
+
+# Note di categoria da non mostrare, per intestazione. Valgono su tutte le
+# schede in cui quella intestazione compare.
+NOTES_HIDDEN = (
+    u"Building Pad",
+    u"Categoria di ultima istanza",
+    u"Contesto",
+    u"Elementi in place",
+    u"Family role è quasi sempre Component",
+    u"Fissaggio",
+    u"Fondazioni di sistema e caricabili nello stesso file",
+    u"Gli irrigidimenti stanno qui",
+    u"Gli usi non strutturali della categoria",
+    u"Il ruolo strutturale resta fuori",
+    u"Il template della famiglia",
+    u"Impianti",
+    u"La famiglia è il tipo di fondazione, il tipo è la misura",
+    u"La trave di fondazione",
+    u"Le due dimensioni",
+    u"Manufacturer",
+    u"Manufacturer e Brand",
+    u"NOTE — CASEWORK",
+    u"NOTE — CEILINGS",
+    u"NOTE — COLUMNS",
+    u"NOTE — CONNECTIONS",
+    u"NOTE — CURTAIN PANELS",
+    u"NOTE — CURTAIN WALL MULLIONS",
+    u"NOTE — DOORS",
+    u"NOTE — ENTOURAGE",
+    u"NOTE — FLOORS",
+    u"NOTE — FOUNDATION SLABS",
+    u"NOTE — FURNITURE",
+    u"NOTE — FURNITURE SYSTEMS",
+    u"NOTE — GENERIC MODELS",
+    u"NOTE — HANDRAILS",
+    u"NOTE — ISOLATED FOUNDATIONS",
+    u"NOTE — LANDINGS",
+    u"NOTE — MASS",
+    u"NOTE — PARKING",
+    u"NOTE — PLANTING",
+    u"NOTE — PLUMBING FIXTURES",
+    u"NOTE — RAILINGS",
+    u"NOTE — RAMPS",
+    u"NOTE — ROOFS",
+    u"NOTE — RUNS",
+    u"NOTE — SITE",
+    u"NOTE — SPECIALTY EQUIPMENT",
+    u"NOTE — STAIRS",
+    u"NOTE — STRUCTURAL COLUMNS",
+    u"NOTE — STRUCTURAL FRAMING",
+    u"NOTE — TOP RAILS",
+    u"NOTE — TOPOSOLID",
+    u"NOTE — TRUSSES",
+    u"NOTE — WALL FOUNDATIONS",
+    u"NOTE — WALLS",
+    u"NOTE — WINDOWS",
+    u"Niente altezza",
+    u"Niente campo Use",
+    u"Niente numero di finiture",
+    u"Niente resistenza al fuoco",
+    u"Non sono le rampe di scala",
+    u"Pali e plinti su pali",
+    u"Pannelli vuoti",
+    u"Pendenza",
+    u"Peso del modello",
+    u"Porte in facciata continua",
+    u"Site o famiglie di sistema",
+    u"SlabEdge",
+    u"Solo Compound Ceiling",
+    u"Solo pannelli caricabili",
+    u"Sovrapposizione con i Floors",
+    u"Terreno e pavimentazioni",
+)
+
+# Eccezioni: la stessa intestazione porta testi diversi su schede diverse e
+# va nascosta solo dove il testo non aggiunge nulla. Oggi ce n'e' una sola:
+# la nota Group1 spiega la tabella della provenienza, e serve solo sulle
+# sette categorie che quella tabella la usano davvero.
+NOTES_HIDDEN_ON = {
+    u"Group1": (
+        u"LOADABLE:01_DR",
+        u"LOADABLE:02_WN",
+        u"LOADABLE:03_CP",
+        u"LOADABLE:04_CM",
+        u"LOADABLE:11_PK",
+        u"LOADABLE:12_EN",
+        u"LOADABLE:13_PL",
+        u"LOADABLE:15_MS",
+    ),
 }
