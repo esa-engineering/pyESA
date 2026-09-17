@@ -188,6 +188,17 @@ finestre WPF di pyRevit non sono attualmente supportate (pyRevit issue #3033).
 import math
 import os.path as op
 
+import clr
+# Gli assembly WPF servono per costruire in codice le checkbox delle categorie.
+# Thickness sta in WindowsBase, Controls in PresentationFramework: vanno
+# referenziati esplicitamente, perche' IronPython non li carica da solo e
+# l'ordine degli import non garantisce che pyrevit.forms lo abbia gia' fatto.
+for _asm in ("WindowsBase", "PresentationCore", "PresentationFramework"):
+    try:
+        clr.AddReference(_asm)
+    except Exception:
+        pass
+
 from System.Collections.Generic import List
 from System.Windows import Thickness
 from System.Windows import Controls
