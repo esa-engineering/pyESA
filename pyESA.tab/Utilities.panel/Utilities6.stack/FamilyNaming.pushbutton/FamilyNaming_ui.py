@@ -400,9 +400,10 @@ class NamingWindow(Window):
         "wxt": u"Width x thickness in mm.",
         "t": u"Thickness in mm.",
         "h": u"Height in mm.",
-        "nfin_t": u"Number of finished faces and total thickness. A single "
-                  u"layer element is always 0F, even when that layer is the "
-                  u"finishing.",
+        "nfin_t": u"Number of finished faces and total thickness. A face "
+                  u"counts as finished when that side carries at least one "
+                  u"layer outside the core. A single layer element is "
+                  u"therefore always 0F.",
     }
 
     def _build_dimensions(self):
@@ -428,14 +429,15 @@ class NamingWindow(Window):
             deduced = self.ctx.get("nfin_default")
             if deduced:
                 self._add_computed(panel, "nfin", u"Finished faces", deduced,
-                                   note=u"counted from the layers")
+                                   note=u"sides with layers outside the core")
             else:
                 self._add_combo(
                     panel, "nfin", u"Finished faces",
                     RULES.table(self.sheet.get("nfin_table") or MAP.TBL_NFIN),
                     required=True,
                     hint=u"The layer structure could not be read, so the value "
-                         u"has to be picked by hand.")
+                         u"has to be picked by hand. Count the sides that "
+                         u"carry at least one layer outside the core.")
 
         self._rebuild_dim_fields(panel, kind, force=True)
 

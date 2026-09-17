@@ -299,32 +299,24 @@ def read_dimensions(sheet, element_type):
 
 
 def deduce_nfinishings(element_type, table_name):
-    """Conta le facce finite leggendo la stratigrafia.
+    """Conta le facce finite dalla posizione degli strati rispetto al core.
 
-    La regola che genera piu' dubbi e' quella dello strato singolo: un
-    elemento fatto di un solo strato e' sempre 0F, anche quando quell'unico
-    strato e' proprio la finitura. Conto quindi solo gli strati estremi, e
-    solo se ce n'e' piu' di uno.
+    Una faccia si considera finita quando su quel lato esiste almeno uno
+    strato fuori dal core, cioe' nello shell esterno o in quello interno.
+    Non conta a che funzione sia assegnato lo strato: conta che ci sia.
+    Uno strato per lato, o dieci, fanno lo stesso una faccia.
+
+    Ne discende da sola la regola dello strato singolo: un elemento fatto di
+    un solo strato ha quello strato dentro al core, nessuno shell, e quindi
+    e' 0F anche quando quell'unico strato e' proprio la finitura.
     """
     structure = _compound_structure(element_type)
     if structure is None:
         return None
-    try:
-        count = structure.LayerCount
-    except Exception:
-        return None
-    if count <= 1:
-        return u"0F"
 
-    finish = (DB.MaterialFunctionAssignment.Finish1,
-              DB.MaterialFunctionAssignment.Finish2)
-    faces = 0
-    for index in (0, count - 1):
-        try:
-            if structure.GetLayerFunction(index) in finish:
-                faces += 1
-        except Exception:
-            pass
+    faces = _count_shell_sides(structure)
+    if faces is None:
+        return None
 
     # i controsoffitti si fermano a una faccia finita
     allowed = [row[0] for row in RULES.table(table_name)]
@@ -332,6 +324,28 @@ def deduce_nfinishings(element_type, table_name):
     if allowed and code not in allowed:
         code = allowed[-1]
     return code
+
+
+def _count_shell_sides(structure):
+    """Quanti dei due lati hanno almeno uno strato fuori dal core."""
+    try:
+        exterior = structure.GetNumberOfShellLayers(
+            DB.ShellLayerType.Exterior)
+        interior = structure.GetNumberOfShellLayers(
+            DB.ShellLayerType.Interior)
+        return (1 if exterior > 0 else 0) + (1 if interior > 0 else 0)
+    except Exception:
+        pass
+
+    # ripiego per i tipi che non espongono gli shell: gli indici del core
+    # dicono la stessa cosa, cioe' se c'e' qualcosa prima o dopo di esso
+    try:
+        count = structure.LayerCount
+        first = structure.GetFirstCoreLayerIndex()
+        last = structure.GetLastCoreLayerIndex()
+    except Exception:
+        return None
+    return (1 if first > 0 else 0) + (1 if last < count - 1 else 0)
 
 
 # ---------------------------------------------------------------------------

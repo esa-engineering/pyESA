@@ -4,6 +4,11 @@ Rinomina guidata di una famiglia e di un tipo secondo la classificazione ESA.
 Si seleziona un elemento nel modello, il tool riconosce la categoria, apre la
 scheda che le corrisponde e compone il nome.
 
+> Questo documento spiega **come funziona** il tool.
+> Il perche' delle scelte fatte, le alternative scartate, i punti aperti e la
+> procedura per reingerire un Excel modificato stanno in
+> [FamilyNaming_NOTE-SVILUPPO.md](FamilyNaming_NOTE-SVILUPPO.md).
+
 ## I file
 
 | File | Cosa contiene |
@@ -16,6 +21,8 @@ scheda che le corrisponde e compone il nome.
 | `FamilyNaming_data.py` | **Generato.** Le tabelle dei tre Excel congelate in dizionari Python. Non si modifica a mano. |
 | `gen_data.py` | Rigenera `FamilyNaming_data.py` dagli Excel. Non fa parte del comando. |
 | `Naming classification-*.xlsx` | I tre file di classificazione, sorgente documentale. Il tool **non** li legge a runtime. |
+| `FamilyNaming_NOTE-SVILUPPO.md` | Registro delle scelte, divergenze note, procedura di reingestione. |
+| `NOTES-review.xlsx` | Traccia della selezione delle note fatta dal dipartimento. Il tool non lo legge. |
 
 ## Modificare le tabelle di classificazione
 
@@ -109,10 +116,13 @@ che l'elemento e', non quello che si vorrebbe. Dove un parametro standard non
 esiste il campo resta editabile, vuoto, con un esempio in grigio che non viene
 mai salvato come valore.
 
-Il numero di facce finite (`0F`, `1F`, `2F`) segue la stessa regola: viene
-contato dagli strati estremi della stratigrafia, applicando il principio per cui
-un elemento a strato singolo e' sempre `0F` anche quando quell'unico strato e'
-la finitura, e si mostra in sola lettura. Torna a essere una scelta solo se la
+Il numero di facce finite (`0F`, `1F`, `2F`) segue la stessa regola e si mostra
+in sola lettura. Una faccia conta come finita quando su quel lato esiste
+**almeno uno strato fuori dal core**, cioe' nello shell esterno o in quello
+interno: non conta a che funzione sia assegnato lo strato, conta che ci sia. Uno
+strato per lato o dieci fanno lo stesso una faccia. Da qui discende da sola la
+regola dello strato singolo, che sta tutto dentro al core e quindi e' `0F` anche
+quando e' proprio la finitura. I controsoffitti restano limitati a `1F`. Torna a essere una scelta solo se la
 stratigrafia non si riesce a leggere, altrimenti non si potrebbe procedere.
 
 La categoria, il codice della famiglia di sistema e la condizione di elemento
