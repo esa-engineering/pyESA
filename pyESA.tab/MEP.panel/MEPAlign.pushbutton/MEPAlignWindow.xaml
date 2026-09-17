@@ -1,0 +1,197 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Allineamento elementi MEP ai muri"
+        Width="580"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="#FFF4F4F4"
+        FontFamily="Segoe UI"
+        FontSize="12">
+
+    <Window.Resources>
+
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Padding" Value="10,6,10,10"/>
+            <Setter Property="BorderBrush" Value="#FFD0D0D0"/>
+            <Setter Property="Background" Value="White"/>
+        </Style>
+
+        <Style x:Key="HintStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FF707070"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="SmallButtonStyle" TargetType="Button">
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="110"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+
+    </Window.Resources>
+
+    <StackPanel Margin="14">
+
+        <TextBlock TextWrapping="Wrap"
+                   Margin="0,0,0,14"
+                   Foreground="#FF404040">
+            Porta gli elementi MEP vicini ai muri indicati fino alla faccia del muro
+            piu' vicina e li ruota di quanto basta perche' risultino perpendicolari
+            alla parete. La quota non viene modificata.
+        </TextBlock>
+
+        <!-- ============ Muri di riferimento ============ -->
+        <GroupBox>
+            <GroupBox.Header>
+                <TextBlock Text="Muri di riferimento" Style="{StaticResource SectionTitleStyle}"/>
+            </GroupBox.Header>
+            <StackPanel>
+                <TextBlock x:Name="tb_walls_info"
+                           TextWrapping="Wrap"
+                           Text="-"/>
+                <TextBlock x:Name="tb_walls_extent"
+                           Style="{StaticResource HintStyle}"
+                           Text="-"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- ============ 1. Categorie ============ -->
+        <GroupBox>
+            <GroupBox.Header>
+                <TextBlock Text="1. Categorie da allineare" Style="{StaticResource SectionTitleStyle}"/>
+            </GroupBox.Header>
+            <StackPanel>
+
+                <Border BorderBrush="#FFABADB3" BorderThickness="1" Background="White">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  MaxHeight="210"
+                                  Padding="6,4,6,4">
+                        <StackPanel x:Name="sp_categories"/>
+                    </ScrollViewer>
+                </Border>
+
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <Button x:Name="btn_cat_all"
+                            Style="{StaticResource SmallButtonStyle}"
+                            Content="Tutte"
+                            Click="on_select_all"/>
+                    <Button x:Name="btn_cat_none"
+                            Style="{StaticResource SmallButtonStyle}"
+                            Content="Nessuna"
+                            Click="on_select_none"/>
+                    <TextBlock x:Name="tb_cat_count"
+                               VerticalAlignment="Center"
+                               Margin="10,0,0,0"
+                               Foreground="#FF707070"
+                               Text="-"/>
+                </StackPanel>
+
+                <TextBlock Style="{StaticResource HintStyle}"
+                           Text="Fra parentesi il numero di istanze della categoria che ricadono nel volume di ricerca calcolato con la distanza predefinita di 30 cm, limitato in verticale all'estensione dei muri."/>
+
+            </StackPanel>
+        </GroupBox>
+
+        <!-- ============ 2. Distanza massima ============ -->
+        <GroupBox>
+            <GroupBox.Header>
+                <TextBlock Text="2. Distanza massima dalla faccia del muro" Style="{StaticResource SectionTitleStyle}"/>
+            </GroupBox.Header>
+            <StackPanel>
+
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Considera gli elementi entro"
+                               VerticalAlignment="Center"/>
+                    <TextBox x:Name="tb_threshold"
+                             Width="70"
+                             Height="22"
+                             Margin="8,0,6,0"
+                             VerticalContentAlignment="Center"
+                             TextAlignment="Right"
+                             Text="30"/>
+                    <TextBlock Text="cm dalla faccia" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <TextBlock Style="{StaticResource HintStyle}"
+                           Text="La distanza e' misurata in pianta fra il punto di inserimento dell'elemento e la faccia del muro piu' vicina, non il suo asse. Gli elementi che cadono dentro lo spessore del muro rientrano sempre nella soglia. Gli elementi oltre l'estremita' del muro non vengono spostati e sono elencati nel resoconto."/>
+
+            </StackPanel>
+        </GroupBox>
+
+        <!-- ============ 3. Opzioni ============ -->
+        <GroupBox>
+            <GroupBox.Header>
+                <TextBlock Text="3. Opzioni" Style="{StaticResource SectionTitleStyle}"/>
+            </GroupBox.Header>
+            <StackPanel>
+
+                <CheckBox x:Name="chk_rotate"
+                          Margin="0,2,0,2"
+                          IsChecked="True"
+                          Content="Ruota gli elementi perche' risultino perpendicolari al muro"/>
+                <TextBlock Style="{StaticResource HintStyle}"
+                           Margin="21,0,0,8"
+                           Text="Viene applicata la rotazione piu' piccola possibile, al massimo 90 gradi: l'elemento non viene mai ribaltato di 180 gradi. Di conseguenza un elemento montato al contrario viene reso perpendicolare ma non raddrizzato."/>
+
+                <CheckBox x:Name="chk_skip_connected"
+                          Margin="0,2,0,2"
+                          Content="Salta gli elementi collegati ad altri elementi (connettori)"/>
+                <TextBlock Style="{StaticResource HintStyle}"
+                           Margin="21,0,0,8"
+                           Text="Spostare un terminale aria collegato a un canale puo' far allungare il canale o rompere la connessione. Lasciando la casella vuota gli elementi vengono elaborati e il numero di connettori collegati compare nel resoconto."/>
+
+                <CheckBox x:Name="chk_dryrun"
+                          Margin="0,2,0,2"
+                          Content="Simulazione: calcola il risultato senza modificare il modello"/>
+
+            </StackPanel>
+        </GroupBox>
+
+        <!-- ============ Avvertenze ============ -->
+        <Border Background="#FFFFF8E1"
+                BorderBrush="#FFE6C86E"
+                BorderThickness="1"
+                Padding="10,8,10,8"
+                Margin="0,0,0,14">
+            <StackPanel>
+                <TextBlock Text="Avvertenze"
+                           FontWeight="SemiBold"
+                           Foreground="#FF6B5200"
+                           Margin="0,0,0,4"/>
+                <TextBlock TextWrapping="Wrap"
+                           FontSize="11"
+                           Foreground="#FF6B5200"
+                           Text="Lo spostamento porta il punto di inserimento esattamente sulla faccia del muro: se la famiglia ha l'origine al centro del proprio ingombro invece che sul retro, l'elemento risulta per meta' dentro il muro. Le colonne 'distanza prima' e 'distanza dopo' del resoconto servono a verificarlo. Gli elementi gia' ospitati da un muro, quelli bloccati, quelli in un gruppo e quelli di un'opzione di progetto non attiva vengono ignorati e riportati nel resoconto. Conviene eseguire prima una simulazione."/>
+            </StackPanel>
+        </Border>
+
+        <!-- ============ Pulsanti ============ -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="btn_cancel"
+                    Content="Annulla"
+                    Style="{StaticResource ActionButtonStyle}"
+                    IsCancel="True"
+                    Click="on_cancel"/>
+            <Button x:Name="btn_run"
+                    Content="Esegui"
+                    Style="{StaticResource ActionButtonStyle}"
+                    IsDefault="True"
+                    Click="on_run"/>
+        </StackPanel>
+
+    </StackPanel>
+</Window>

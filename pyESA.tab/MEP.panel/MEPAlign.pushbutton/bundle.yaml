@@ -1,0 +1,16 @@
+title: "MEP\nAlign"
+tooltip: >
+  Aligns wall mounted MEP devices to the nearest face of the selected walls, in plan only.
+  Elevation is never changed.
+
+  CLICK: starts from the walls currently selected in Revit, or prompts to pick them if
+  nothing is selected. A dialog asks which MEP categories to process, the maximum distance
+  from the wall face (30 cm by default) and whether to run a simulation first.
+  Each device whose insertion point lies within that distance is moved perpendicular to the
+  wall, flush with the nearest face, and rotated by the smallest angle that makes it
+  perpendicular to the wall, never by 180 degrees.
+
+  Devices hosted by a wall, pinned, inside a group or in an inactive design option are left
+  untouched and listed in the report, each with its own reason and its measured distance.
+  The search covers the whole model but is limited to the vertical extent of the walls.
+author: ESA Engineering
