@@ -222,6 +222,16 @@ assunzione tacita.
 - Muri tenda, muri inclinati, muri senza linea di posizionamento e muri con estensione
   verticale non leggibile vengono scartati con il motivo nella tabella *Muri scartati*.
   I muri stacked non vengono scartati ma espansi nei loro sotto-muri.
+- **L'inclinazione del muro si misura sulla geometria, non sui parametri.** La prima
+  versione leggeva `BuiltInParameter.WALL_CROSS_SECTION` assumendo `0 = Vertical`, e su un
+  progetto fatto di soli muri verticali scartava ogni muro: il valore intero di quel
+  parametro non significa quello che sembra. Ora si legge la componente Z della normale
+  delle facce laterali (`HostObjectUtils.GetSideFaces` più `Face.ComputeNormal`), che su
+  una faccia verticale vale zero per definizione. L'angolo `Angle From Vertical` resta
+  come scorciatoia per confermare la verticalità ed evitare il calcolo geometrico nel caso
+  normale, ma **da solo non basta mai a scartare un muro**. Se la geometria non è
+  leggibile il muro si assume verticale: un falso negativo sbaglia un muro, un falso
+  positivo rende il comando inutilizzabile sull'intero progetto.
 - Curve di posizionamento diverse da retta e arco (ellissi, spline) non sono gestite e
   producono un avviso.
 - Il volume di ricerca è dilatato di 1 m oltre la soglia, perché il filtro di prossimità

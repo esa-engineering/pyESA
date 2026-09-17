@@ -254,6 +254,9 @@ SAFETY_MARGIN_MM = 1000.0
 VERTICAL_FACING_TOL = 0.087     # sin(5 gradi): sotto, il fronte e' verticale
 GEOM_EPS = 1.0e-9
 
+SLANT_ANGLE_TOL = 1.0e-6        # radianti: sotto, il muro e' verticale
+SLANT_NORMAL_TOL = 0.02         # circa 1.1 gradi di inclinazione della faccia
+
 # Alzare a True se in prova la rilettura del punto di inserimento subito dopo
 # RotateElement risultasse non aggiornata (vedi "ORDINE DELLE OPERAZIONI").
 FORCE_REGEN = False
@@ -514,35 +517,79 @@ def wall_parameter(wall, name):
         return None
 
 
+def side_face_max_normal_z(wall):
+    """Componente Z massima, in valore assoluto, delle normali delle facce
+    laterali del muro. None se la geometria non e' leggibile.
+
+    Su una faccia verticale la normale e' orizzontale, quindi Z vale zero.
+    E' una misura diretta sulla geometria, indipendente dalla versione di
+    Revit e dalla semantica degli enumeratori.
+    """
+    references = []
+    for layer_name in ('Exterior', 'Interior'):
+        layer = getattr(DB.ShellLayerType, layer_name, None)
+        if layer is None:
+            continue
+        try:
+            found = DB.HostObjectUtils.GetSideFaces(wall, layer)
+        except Exception:
+            continue
+        if found:
+            references.extend(list(found))
+
+    if not references:
+        return None
+
+    worst = None
+    for reference in references:
+        try:
+            face = wall.GetGeometryObjectFromReference(reference)
+            if face is None:
+                continue
+            box = face.GetBoundingBox()
+            middle = DB.UV((box.Min.U + box.Max.U) / 2.0,
+                           (box.Min.V + box.Max.V) / 2.0)
+            normal_z = abs(face.ComputeNormal(middle).Z)
+        except Exception:
+            continue
+        if worst is None or normal_z > worst:
+            worst = normal_z
+    return worst
+
+
 def is_slanted(wall):
-    """True se il muro non e' verticale.
+    """(True se il muro non e' verticale, dettaglio della misura).
 
     Su un muro inclinato la faccia non e' verticale, quindi "distanza in
     pianta dalla faccia" dipenderebbe dalla quota e l'intero modello a
     traslazione orizzontale pura non regge: il muro va scartato.
 
-    Si interroga prima l'angolo di inclinazione, che e' un valore e non un
-    enumeratore: se esiste ed e' nullo il muro e' verticale e si conclude
-    subito. WALL_CROSS_SECTION si consulta solo in sua assenza, perche' e'
-    un enumeratore la cui semantica potrebbe cambiare fra versioni e una
-    lettura sbagliata scarterebbe ogni muro del progetto.
+    La decisione si prende sulla GEOMETRIA, non sugli enumeratori. La prima
+    versione di questa funzione leggeva WALL_CROSS_SECTION e scartava ogni
+    muro di un progetto fatto di soli muri verticali: il valore intero di
+    quel parametro non significa quello che sembra. L'angolo di inclinazione
+    resta come scorciatoia, ma solo per confermare la verticalita' ed
+    evitare il calcolo geometrico nel caso normale: da solo non basta mai a
+    scartare un muro.
     """
     angle = wall_parameter(wall, 'WALL_SINGLE_SLANT_ANGLE_FROM_VERTICAL')
     if angle is not None:
         try:
-            return abs(angle.AsDouble()) > 1.0e-6
+            if abs(angle.AsDouble()) <= SLANT_ANGLE_TOL:
+                return False, None
         except Exception:
             pass
 
-    section = wall_parameter(wall, 'WALL_CROSS_SECTION')
-    if section is not None:
-        try:
-            # 0 = Vertical
-            return section.AsInteger() != 0
-        except Exception:
-            pass
+    normal_z = side_face_max_normal_z(wall)
+    if normal_z is None:
+        # Geometria non leggibile: si assume verticale. Un falso negativo
+        # produce un risultato sbagliato su quel muro, un falso positivo
+        # renderebbe il comando inutilizzabile sull'intero progetto.
+        return False, None
 
-    return False
+    if normal_z > SLANT_NORMAL_TOL:
+        return True, u'componente Z della normale: {:.3f}'.format(normal_z)
+    return False, None
 
 
 def shell_thicknesses(wall):
@@ -672,8 +719,9 @@ def build_wall_info(wall):
     if width is None or width < GEOM_EPS:
         return None, W_CURTAIN
 
-    if is_slanted(wall):
-        return None, W_SLANTED
+    slanted, slant_detail = is_slanted(wall)
+    if slanted:
+        return None, u'{} ({})'.format(W_SLANTED, slant_detail)
 
     location = None
     try:
@@ -2249,8 +2297,14 @@ def main():
 
     wall_infos, wall_problems = build_all_wall_infos(walls)
     if not wall_infos:
-        for wall, reason in wall_problems:
-            warn(u'Muro {}: {}'.format(element_id_value(wall.Id), reason))
+        output.close_others()
+        output.print_md(u'# Allineamento MEP ai muri - muri non utilizzabili')
+        output.print_md(
+            u'Nessuno dei **{}** muri indicati puo\' essere elaborato. '
+            u'La tabella dice perche\', muro per muro.'.format(len(walls)))
+        stub = PlanResult()
+        stub.wall_problems = wall_problems
+        print_wall_problems(stub)
         print_warnings()
         forms.alert(
             u'Nessuno dei muri selezionati e\' utilizzabile.\n\n'
