@@ -35,7 +35,11 @@
       "Bash(ls \"C:/Users/andreapa/.claude/projects/c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension/memory/\")",
       "Read(//c/Users/andreapa/.claude/projects/c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension/memory/**)",
       "PowerShell($sp = \"C:\\\\Users\\\\andreapa\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\1872a164-cbb9-4d82-af6d-db45e8ffece4\\\\scratchpad\"; & \"$sp\\\\preview.ps1\" -dir $sp -prefix vA -out previewA.png; & \"$sp\\\\preview.ps1\" -dir $sp -prefix vB -out previewB.png)",
-      "PowerShell($sp = \"C:\\\\Users\\\\andreapa\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\1872a164-cbb9-4d82-af6d-db45e8ffece4\\\\scratchpad\"; $dst = \"c:\\\\Users\\\\andreapa\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities6.stack\\\\WorksetCreate.pushbutton\"; & \"$sp\\\\make_icon.ps1\" -outDir $dst -variant B -prefix icon; Get-ChildItem $dst | Select-Object Name, Length)"
+      "PowerShell($sp = \"C:\\\\Users\\\\andreapa\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-andreapa-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\1872a164-cbb9-4d82-af6d-db45e8ffece4\\\\scratchpad\"; $dst = \"c:\\\\Users\\\\andreapa\\\\AppData\\\\Roaming\\\\pyRevit\\\\Extensions\\\\ESAextensions.extension\\\\pyESA.tab\\\\Utilities.panel\\\\Utilities6.stack\\\\WorksetCreate.pushbutton\"; & \"$sp\\\\make_icon.ps1\" -outDir $dst -variant B -prefix icon; Get-ChildItem $dst | Select-Object Name, Length)",
+      "Bash(awk -F: '{print $3}')",
+      "Bash(awk 'END{print NR\" righe reali\"}' MEPAlign_script.py)",
+      "Bash(awk 'BEGIN{b=0;c=0;code=0} {if\\($0 ~ /^[[:space:]]*$/\\) b++; else if\\($0 ~ /^[[:space:]]*#/\\) c++; else code++} END{print \"vuote:\",b,\" commento:\",c,\" codice+docstring:\",code}' MEPAlign_script.py)",
+      "Bash(awk 'BEGIN{n=0} /^[[:space:]]*$/{n++; if\\(n>2\\) print NR\": \"n\" vuote consecutive\"; next} {n=0}' MEPAlign_script.py)"
     ]
   }
 }
