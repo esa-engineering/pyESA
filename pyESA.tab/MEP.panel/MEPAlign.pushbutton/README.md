@@ -61,14 +61,20 @@ valore era troppo stretto, senza rilanciare il comando.
 
 **4. Opzioni.**
 
-- *Ruota gli elementi*: attiva per default. Disattivandola viene applicata solo la
-  traslazione.
-- *Salta gli elementi collegati*: non attiva per default. Vedi "Connettori" più sotto.
-- *Simulazione*: calcola e riporta il risultato senza aprire alcuna transazione, quindi
-  senza modificare il modello. **Conviene sempre partire da qui.**
+| Opzione | Default | Effetto |
+| --- | --- | --- |
+| *Ruota gli elementi perpendicolari alla partizione* | attiva | Disattivandola viene applicata la sola traslazione |
+| *Cerca le partizioni anche nei modelli collegati* | attiva | Vedi "Modelli collegati" più sotto |
+| *Salta gli elementi collegati ad altri (connettori)* | non attiva | Vedi "Connettori" più sotto |
+| *Simulazione: non modificare il modello* | non attiva | Calcola e riporta senza aprire alcuna transazione. **Conviene sempre partire da qui** |
+
+Ogni opzione ha un tooltip con la spiegazione estesa: passandoci sopra si legge il
+perché, senza che la finestra debba contenerlo tutto.
 
 Al termine, il pannello di output riporta cosa è stato allineato, cosa era già a posto,
-cosa è stato saltato e perché, con collegamenti cliccabili ai singoli elementi.
+cosa è stato saltato e perché, con collegamenti cliccabili ai singoli elementi. Fanno
+eccezione le partizioni dei modelli collegati, che non sono selezionabili dall'host e per
+cui viene stampato l'id nudo.
 
 > **Ogni elemento che hai selezionato compare nel resoconto**, in esattamente una delle
 > quattro liste. Dato che gli oggetti li hai indicati uno per uno, un elemento che sparisce
@@ -142,6 +148,8 @@ misurata**, anche quando il motivo non c'entra con la distanza: un elemento bloc
 | fronte verticale | diffusore a controsoffitto: non ha un verso in pianta da ruotare. Scartato **solo se la rotazione è attiva**: con la sola traslazione l'elemento viene comunque spostato |
 | ingombro fuori dall'estensione verticale dei muri | nessuna delle partizioni vicine arriva alla quota dell'elemento |
 | oltre l'estremità del muro di *x* | la proiezione cade fuori dalla testata |
+| proiezione sulla geometria del muro non calcolabile | partizioni trovate, ma nessuna ha prodotto una proiezione utilizzabile |
+| errore in analisi: *messaggio* | eccezione Revit su quel singolo elemento; il lotto prosegue |
 
 Un elemento vicino a più partizioni viene assegnato a quella con il **valore assoluto**
 della distanza dalla faccia più piccolo, e se la seconda è a meno di 20 mm di scarto il caso
@@ -239,6 +247,19 @@ assunzione tacita.
    `doc.Regenerate()`? Se in prova la rilettura risultasse non aggiornata, basta alzare la
    costante `FORCE_REGEN` in testa allo script.
 7. **Effetto reale di `MoveElement` su un diffusore collegato a un canale rigido.**
+8. **`RevitLinkInstance.GetTotalTransform()` è la trasformazione giusta**, cioè quella che
+   include l'eventuale spostamento da coordinate condivise, e non `GetTransform()`. È la
+   scelta fatta, ma non è stata verificata su un modello con il collegamento posizionato
+   per coordinate condivise: se fosse sbagliata, i muri collegati risulterebbero spostati
+   in blocco e **tutti** gli elementi finirebbero fuori tolleranza, che è un sintomo
+   vistoso e quindi diagnosticabile in fretta.
+9. **Il bounding box di un muro collegato, letto con `get_BoundingBox(None)` dentro al
+   documento collegato, è nelle coordinate di quel documento** e non già trasformato. Il
+   codice lo assume, ed è su questa assunzione che poggia la conversione della quota
+   (`z_offset`). Se fosse già in coordinate host, il filtro verticale sui collegamenti
+   sbaglierebbe di quanto vale l'offset del link.
+10. **`Transform.Scale` vale 1 per un collegamento normale.** Il controllo esiste come
+    valvola di sicurezza, ma non è mai scattato su un caso reale.
 
 ## Comportamenti noti e accettati
 
@@ -248,12 +269,23 @@ assunzione tacita.
   a rilevarlo sul primo modello reale. Se si rivelasse un problema diffuso, la versione
   successiva introdurrà un offset impostabile o l'allineamento del bordo dell'ingombro.
 - Un elemento montato al contrario viene reso perpendicolare ma non raddrizzato.
-- Un elemento di un altro piano, allineato in pianta con il muro, **non compare affatto nel
-  resoconto**: viene escluso dal filtro verticale a monte. È corretto, perché elencare ogni
-  elemento fuori portata del modello renderebbe la tabella inutilizzabile.
+- Un elemento la cui quota non è coperta da nessuna partizione vicina **compare nel
+  resoconto** fra gli ignorati, con il motivo *ingombro fuori dall'estensione verticale
+  dei muri*. Nella versione precedente, quando era lo strumento a pescare gli elementi,
+  spariva in silenzio ed era corretto così; ora che lo hai indicato tu deve dirti perché
+  non lo ha toccato.
+- **Il filtro verticale toglie di mezzo le partizioni, non l'elemento.** Una partizione che
+  alla quota del dispositivo non arriva viene esclusa dal confronto prima ancora di
+  calcolare le distanze. Senza questo, un dispositivo vicino sia a un muro pieno sia a un
+  muretto basso poteva essere allineato al muretto, che alla sua quota non esiste.
 - Muri tenda, muri inclinati, muri senza linea di posizionamento e muri con estensione
-  verticale non leggibile vengono scartati con il motivo nella tabella *Muri scartati*.
-  I muri stacked non vengono scartati ma espansi nei loro sotto-muri.
+  verticale non leggibile vengono scartati con il motivo nella tabella *Partizioni
+  scartate*.
+- Il **contenitore** di un muro sovrapposto (stacked) viene scartato, non espanso: i suoi
+  membri sono elementi a sé stanti, già raccolti dalla ricerca sulla categoria Walls, e
+  ognuno ha spessore ed estensione verticale propri. Scartare il contenitore evita di
+  contare due volte la stessa parete. Nella versione a selezione di muri veniva invece
+  espanso, perché lì i muri arrivavano dalla selezione dell'utente e non da un collector.
 - **L'inclinazione del muro si misura sulla geometria, non sui parametri.** La prima
   versione leggeva `BuiltInParameter.WALL_CROSS_SECTION` assumendo `0 = Vertical`, e su un
   progetto fatto di soli muri verticali scartava ogni muro: il valore intero di quel
@@ -266,11 +298,31 @@ assunzione tacita.
   positivo rende il comando inutilizzabile sull'intero progetto.
 - Curve di posizionamento diverse da retta e arco (ellissi, spline) non sono gestite e
   producono un avviso.
-- Il volume di ricerca è dilatato di 1 m oltre la soglia, perché il filtro di prossimità
-  confronta il *bounding box* dell'elemento mentre il criterio vero è la distanza del
-  *punto di inserimento*: esistono famiglie con la geometria modellata lontano
-  dall'origine. Il margine non allarga la soglia, che viene verificata a valle in modo
-  esatto.
+- Il volume di ricerca attorno a ogni elemento è dilatato di **2 m** oltre la tolleranza
+  (`PARTITION_MARGIN_MM`), perché il filtro nativo confronta il *bounding box della
+  partizione* con quel volume, mentre il criterio vero è la distanza del *punto di
+  inserimento dalla faccia*. Il margine deve coprire lo spessore della partizione e il
+  fatto che il bounding box di un muro lungo si estende ben oltre il tratto vicino
+  all'elemento. Il margine **non allarga la tolleranza**, che viene verificata a valle in
+  modo esatto.
+- I `WallInfo` sono **in cache** per coppia (documento, id). Non è un dettaglio di
+  prestazioni: il controllo di inclinazione può estrarre la geometria della partizione, e
+  la stessa parete ricorre per tutti i dispositivi che le stanno davanti. Senza cache quel
+  costo verrebbe moltiplicato per il numero di elementi selezionati.
+
+### Sui modelli collegati
+
+- I muri collegati sono **solo letti**: la fase di applicazione lavora esclusivamente sul
+  documento host e non apre mai una transazione su un collegamento.
+- Host e collegamenti **concorrono insieme**. Se un dispositivo ha davanti un muro dell'host
+  a 5 cm e uno collegato a 3 cm, vince quello collegato. È voluto: la regola è la distanza,
+  non la provenienza.
+- Un collegamento ignorato non blocca il comando: gli altri vengono comunque usati, e il
+  motivo compare fra gli avvisi. Se però l'architettonico è l'unico collegamento e viene
+  ignorato, tutti gli elementi finiranno fra gli ignorati per *nessuna partizione
+  verticale nel raggio di ricerca*: vale la pena leggere sempre la sezione **Avvisi**.
+- Le partizioni collegate compaiono come `[Nome collegamento] Tipo di muro (id 123456)`,
+  con l'id non cliccabile.
 
 ## Avvertenze operative
 
