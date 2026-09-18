@@ -249,6 +249,7 @@ for _asm in ("WindowsBase", "PresentationCore", "PresentationFramework"):
 from System.Collections.Generic import List
 from System.Windows import Thickness
 from System.Windows import Controls
+from System.Windows import SystemParameters
 
 from pyrevit import revit, DB, UI, forms, script
 
@@ -2129,6 +2130,7 @@ class MEPAlignWindow(forms.WPFWindow):
         self._checks = []
         self._category_info = category_info
 
+        self._fit_to_screen()
         self._setup_selection(elements, source_label, out_of_scope)
         self._setup_categories(category_info)
 
@@ -2136,6 +2138,23 @@ class MEPAlignWindow(forms.WPFWindow):
         self._refresh_count()
 
     # --- popolamento ---------------------------------------------------
+
+    def _fit_to_screen(self):
+        """Impedisce alla finestra di superare l'area di lavoro.
+
+        Lo XAML usa SizeToContent="Height": senza un limite la finestra
+        cresce quanto il contenuto e su schermi piccoli, o con scalatura di
+        Windows elevata, esce dal monitor portandosi fuori i pulsanti. Il
+        limite si legge a runtime perche' dipende dal monitor e dalla
+        scalatura, che in XAML non sono note.
+        """
+        try:
+            available = SystemParameters.WorkArea.Height - 60
+        except Exception:
+            return
+        if available > 200:
+            self.MaxHeight = available
+
 
     def _setup_selection(self, elements, source_label, out_of_scope):
         self.tb_walls_info.Text = u'{} elementi selezionati ({}).'.format(
