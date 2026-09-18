@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Allineamento elementi MEP ai muri"
+        Title="Allineamento elementi MEP alle partizioni verticali"
         Width="580"
         SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
@@ -48,15 +48,16 @@
         <TextBlock TextWrapping="Wrap"
                    Margin="0,0,0,14"
                    Foreground="#FF404040">
-            Porta gli elementi MEP vicini ai muri indicati fino alla faccia del muro
-            piu' vicina e li ruota di quanto basta perche' risultino perpendicolari
-            alla parete. La quota non viene modificata.
+            Per ogni elemento MEP selezionato cerca la partizione verticale piu'
+            vicina, porta l'elemento a filo della sua faccia e lo ruota di quanto
+            basta perche' risulti perpendicolare alla parete. Gli elementi piu'
+            lontani della tolleranza vengono saltati. La quota non viene modificata.
         </TextBlock>
 
-        <!-- ============ Muri di riferimento ============ -->
+        <!-- ============ Elementi da allineare ============ -->
         <GroupBox>
             <GroupBox.Header>
-                <TextBlock Text="Muri di riferimento" Style="{StaticResource SectionTitleStyle}"/>
+                <TextBlock Text="Elementi da allineare" Style="{StaticResource SectionTitleStyle}"/>
             </GroupBox.Header>
             <StackPanel>
                 <TextBlock x:Name="tb_walls_info"
@@ -101,20 +102,20 @@
                 </StackPanel>
 
                 <TextBlock Style="{StaticResource HintStyle}"
-                           Text="Fra parentesi il numero di istanze della categoria che ricadono nel volume di ricerca calcolato con la distanza predefinita di 30 cm, limitato in verticale all'estensione dei muri."/>
+                           Text="Fra parentesi il numero di elementi di quella categoria presenti nella tua selezione. Togliendo la spunta a una categoria i suoi elementi vengono saltati e riportati nel resoconto: non spariscono in silenzio."/>
 
             </StackPanel>
         </GroupBox>
 
-        <!-- ============ 2. Distanza massima ============ -->
+        <!-- ============ 2. Tolleranza ============ -->
         <GroupBox>
             <GroupBox.Header>
-                <TextBlock Text="2. Distanza massima dalla faccia del muro" Style="{StaticResource SectionTitleStyle}"/>
+                <TextBlock Text="2. Tolleranza" Style="{StaticResource SectionTitleStyle}"/>
             </GroupBox.Header>
             <StackPanel>
 
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Considera gli elementi entro"
+                    <TextBlock Text="Allinea solo se la partizione e' entro"
                                VerticalAlignment="Center"/>
                     <TextBox x:Name="tb_threshold"
                              Width="70"
@@ -123,11 +124,11 @@
                              VerticalContentAlignment="Center"
                              TextAlignment="Right"
                              Text="30"/>
-                    <TextBlock Text="cm dalla faccia" VerticalAlignment="Center"/>
+                    <TextBlock Text="cm dal punto di inserimento" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <TextBlock Style="{StaticResource HintStyle}"
-                           Text="La distanza e' misurata in pianta fra il punto di inserimento dell'elemento e la faccia del muro piu' vicina, non il suo asse. Gli elementi che cadono dentro lo spessore del muro rientrano sempre nella soglia. Gli elementi oltre l'estremita' del muro non vengono spostati e sono elencati nel resoconto."/>
+                           Text="La distanza e' misurata in pianta fra il punto di inserimento dell'elemento e la faccia della partizione piu' vicina, non il suo asse. Un elemento piu' lontano di cosi' viene saltato e compare nel resoconto con la distanza misurata, cosi' vedi subito se la tolleranza era troppo stretta. Gli elementi dentro lo spessore della partizione rientrano sempre."/>
 
             </StackPanel>
         </GroupBox>
@@ -142,7 +143,7 @@
                 <CheckBox x:Name="chk_rotate"
                           Margin="0,2,0,2"
                           IsChecked="True"
-                          Content="Ruota gli elementi perche' risultino perpendicolari al muro"/>
+                          Content="Ruota gli elementi perche' risultino perpendicolari alla partizione"/>
                 <TextBlock Style="{StaticResource HintStyle}"
                            Margin="21,0,0,8"
                            Text="Viene applicata la rotazione piu' piccola possibile, al massimo 90 gradi: l'elemento non viene mai ribaltato di 180 gradi. Di conseguenza un elemento montato al contrario viene reso perpendicolare ma non raddrizzato."/>
@@ -175,7 +176,7 @@
                 <TextBlock TextWrapping="Wrap"
                            FontSize="11"
                            Foreground="#FF6B5200"
-                           Text="Lo spostamento porta il punto di inserimento esattamente sulla faccia del muro: se la famiglia ha l'origine al centro del proprio ingombro invece che sul retro, l'elemento risulta per meta' dentro il muro. Le colonne 'distanza prima' e 'distanza dopo' del resoconto servono a verificarlo. Gli elementi gia' ospitati da un muro, quelli bloccati, quelli in un gruppo e quelli di un'opzione di progetto non attiva vengono ignorati e riportati nel resoconto. Conviene eseguire prima una simulazione."/>
+                           Text="Lo spostamento porta il punto di inserimento esattamente sulla faccia della partizione: se la famiglia ha l'origine al centro del proprio ingombro invece che sul retro, l'elemento risulta per meta' dentro il muro. Le colonne 'distanza prima' e 'distanza dopo' del resoconto servono a verificarlo. Gli elementi gia' ospitati da un muro, quelli bloccati, quelli in un gruppo e quelli di un'opzione di progetto non attiva vengono ignorati. Ogni elemento che hai selezionato compare nel resoconto con il suo esito: nessuno viene ignorato in silenzio. Conviene eseguire prima una simulazione."/>
             </StackPanel>
         </Border>
 
