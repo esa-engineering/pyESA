@@ -1,9 +1,13 @@
 # MEP Align — strumento pyRevit
 
-Allinea in pianta i dispositivi MEP alle facce dei muri selezionati.
+Allinea in pianta i dispositivi MEP selezionati alla partizione verticale architettonica
+più vicina.
 
-Ogni dispositivo entro una distanza indicata dalla faccia del muro viene portato **a filo
-della faccia** e ruotato dell'angolo minimo che lo rende perpendicolare alla parete.
+**Selezioni tu gli oggetti da allineare.** Per ognuno lo strumento cerca la partizione
+verticale più vicina, porta il dispositivo **a filo della sua faccia** e lo ruota
+dell'angolo minimo che lo rende perpendicolare alla parete. Se la partizione più vicina è
+oltre la tolleranza che hai indicato, il dispositivo viene **saltato** e riportato con la
+distanza misurata.
 
 > **La quota Z non viene mai modificata.** È il motivo per cui il primo elemento
 > architettonico gestito è il muro. L'allineamento in quota è un problema diverso, perché
@@ -21,26 +25,39 @@ della faccia** e ruotato dell'angolo minimo che lo rende perpendicolare alla par
 
 ## Uso
 
-**1. Selezione dei muri.** Il comando parte dai muri già selezionati in Revit. Se la
-selezione non contiene muri, chiede di indicarli nella vista (`Finish` per confermare,
-`Esc` per annullare). I muri scelti graficamente restano selezionati, così rilanciando il
-comando non serve ripetere la selezione.
+**1. Selezione degli elementi.** Il comando parte dagli elementi già selezionati in Revit.
+Se non c'è selezione, chiede di indicarli nella vista (`Finish` per confermare, `Esc` per
+annullare). Gli elementi scelti graficamente restano selezionati, così rilanciando il
+comando — per esempio per applicare dopo una simulazione — non serve ripetere la selezione.
 
 La selezione avviene **prima** della finestra di dialogo: con un dialogo modale WPF aperto
-la vista di Revit non accetta la selezione, e conoscendo i muri in anticipo la finestra può
-mostrare quanti elementi candidati ci sono per ogni categoria.
+la vista di Revit non accetta la selezione, e conoscendo gli elementi in anticipo la
+finestra può mostrare quanti ce ne sono per ogni categoria.
+
+Le due strade si comportano diversamente, di proposito:
+
+| Come selezioni | Cosa succede agli oggetti fuori dalle nove categorie |
+| --- | --- |
+| Selezione grafica dal comando | Il filtro non te li fa nemmeno indicare |
+| Selezione fatta prima di lanciare | Vengono saltati e riportati con il motivo "categoria non gestita" |
 
 **2. Categorie da allineare.** Le nove categorie gestite, tutte pre-spuntate. Fra parentesi
-il numero di istanze che ricadono nel volume di ricerca calcolato con la distanza
-predefinita di 30 cm: una categoria a `(0)` dice subito che da lì non arriverà nulla.
+il numero di elementi di quella categoria **presenti nella tua selezione**: una categoria a
+`(0)` dice subito che fra gli oggetti indicati non ce n'è nessuno di quel tipo. Togliendo
+la spunta a una categoria i suoi elementi vengono saltati e riportati, non spariscono.
 
 | Categorie gestite |
 | --- |
 | Air Terminals, Communication Devices, Data Devices, Electrical Fixtures, Fire Alarm Devices, Lighting Devices, Lighting Fixtures, Nurse Call Devices, Security Devices |
 
-**3. Distanza massima.** Predefinita 30 cm, misurata in pianta fra il punto di inserimento
-dell'elemento e la **faccia** del muro più vicina, non il suo asse. Gli elementi che cadono
-dentro lo spessore del muro hanno distanza negativa e rientrano quindi sempre nella soglia.
+**3. Tolleranza.** Predefinita 30 cm, misurata in pianta fra il punto di inserimento
+dell'elemento e la **faccia** della partizione più vicina, non il suo asse. Gli elementi che
+cadono dentro lo spessore hanno distanza negativa e rientrano quindi sempre.
+
+Oltre la tolleranza l'elemento **viene saltato**, e compare nel resoconto con la distanza
+misurata e di quanto ha sforato. In fondo a quella tabella una riga dice di quanto alzare
+la tolleranza e quanti elementi si recupererebbero: è il modo più rapido per capire se il
+valore era troppo stretto, senza rilanciare il comando.
 
 **4. Opzioni.**
 
@@ -51,8 +68,11 @@ dentro lo spessore del muro hanno distanza negativa e rientrano quindi sempre ne
   senza modificare il modello. **Conviene sempre partire da qui.**
 
 Al termine, il pannello di output riporta cosa è stato allineato, cosa era già a posto,
-cosa è stato ignorato e perché, e cosa è rimasto appena fuori soglia, con collegamenti
-cliccabili ai singoli elementi.
+cosa è stato saltato e perché, con collegamenti cliccabili ai singoli elementi.
+
+> **Ogni elemento che hai selezionato compare nel resoconto**, in esattamente una delle
+> quattro liste. Dato che gli oggetti li hai indicati uno per uno, un elemento che sparisce
+> senza spiegazione sarebbe un difetto, non una semplificazione.
 
 ## Come viene ricavato il piano di riferimento del muro
 
@@ -107,6 +127,10 @@ misurata**, anche quando il motivo non c'entra con la distanza: un elemento bloc
 
 | Motivo | Nota |
 | --- | --- |
+| categoria non gestita dallo strumento | selezionato prima di lanciare il comando, fuori dalle nove categorie |
+| categoria esclusa nella finestra | la categoria esiste ma le hai tolto la spunta |
+| nessuna partizione verticale nel raggio di ricerca | nessun muro vicino: controlla anche i modelli collegati |
+| oltre la tolleranza: *x* dalla faccia più vicina | il caso richiesto esplicitamente; vedi la tabella dedicata |
 | ospitato dal muro *n* | un elemento wall-hosted è già vincolato alla faccia del suo host |
 | ospitato da *categoria n* | ospitato da soffitto, pavimento o altra faccia |
 | elemento bloccato (pin) | `MoveElement` lancia un'eccezione sugli elementi bloccati |
@@ -115,13 +139,21 @@ misurata**, anche quando il motivo non c'entra con la distanza: un elemento bloc
 | opzione di progetto non attiva | non modificabile |
 | in prestito ad altro utente | modello workshared |
 | elemento senza punto di inserimento | host based, workplane based o in place |
-| fronte verticale | diffusore a controsoffitto: non ha un verso in pianta da allineare |
-| ingombro fuori dall'estensione verticale dei muri | elemento di un altro piano |
+| fronte verticale | diffusore a controsoffitto: non ha un verso in pianta da ruotare. Scartato **solo se la rotazione è attiva**: con la sola traslazione l'elemento viene comunque spostato |
+| ingombro fuori dall'estensione verticale dei muri | nessuna delle partizioni vicine arriva alla quota dell'elemento |
 | oltre l'estremità del muro di *x* | la proiezione cade fuori dalla testata |
 
-Un elemento vicino a più muri selezionati viene assegnato a quello con il **valore assoluto**
-della distanza dalla faccia più piccolo, e se il secondo muro è a meno di 20 mm di scarto il
-caso viene segnalato come ambiguo nella colonna Note.
+Un elemento vicino a più partizioni viene assegnato a quella con il **valore assoluto**
+della distanza dalla faccia più piccolo, e se la seconda è a meno di 20 mm di scarto il caso
+viene segnalato come ambiguo nella colonna Note.
+
+Con la ricerca automatica l'ambiguità non è più un caso raro: in un angolo due muri sono
+quasi equidistanti. Vale la pena leggere quella colonna, perché è il motivo principale per
+cui un dispositivo può finire sulla faccia sbagliata.
+
+Le partizioni che **non coprono la quota** del dispositivo vengono tolte dalla gara prima
+del confronto: un muretto basso non è un bersaglio valido per un rilevatore montato in
+alto, anche se in pianta gli sta più vicino di tutti.
 
 ## Connettori
 
@@ -246,3 +278,17 @@ assunzione tacita.
 - L'operazione è annullabile con un solo Undo di Revit.
 - Tag e quote agganciati agli elementi spostati li seguono, ma la loro posizione relativa
   può diventare illeggibile: non c'è nulla che lo strumento possa fare via API.
+
+## Modelli collegati
+
+Lo strumento cerca le partizioni **nel documento corrente**: un
+`FilteredElementCollector` non vede gli elementi dei modelli collegati. Nei progetti MEP
+l'architettonico è spesso un collegamento, e in quel caso lo strumento non trova nessun
+riferimento.
+
+Il caso viene diagnosticato in modo esplicito: se il modello non contiene nessun muro, il
+comando lo dice e nomina il collegamento come causa probabile, invece di produrre un
+resoconto di scarti generici che sembrerebbe un problema di tolleranza.
+
+Il supporto ai modelli collegati non è implementato. È il candidato principale per la
+versione successiva, insieme ai pannelli di facciata continua.

@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 """Allineamento in pianta degli elementi MEP alle facce dei muri.
 
-Dati uno o piu' muri selezionati, lo strumento raccoglie i dispositivi MEP
-puntuali vicini e li porta a filo della faccia del muro piu' vicina, ruotandoli
-di quanto basta perche' risultino perpendicolari alla parete.
+L'utente seleziona i dispositivi MEP da allineare. Per ognuno lo strumento
+cerca la partizione verticale architettonica piu' vicina, porta il dispositivo
+a filo della sua faccia e lo ruota di quanto basta perche' risulti
+perpendicolare alla parete. Se la partizione piu' vicina e' oltre la tolleranza
+indicata dall'utente, il dispositivo viene saltato e riportato con la distanza
+misurata.
 
 La quota Z non viene MAI modificata: e' il motivo per cui il primo elemento
 architettonico gestito e' il muro. L'allineamento in quota e' un problema
@@ -13,21 +16,26 @@ diverso (serve un livello o un soffitto come riferimento) ed e' fuori ambito.
 LOGICA APPLICATA
 --------------------------------------------------------------------------
 
-1. MURI. Si parte dai muri nella selezione corrente; se non ce ne sono, viene
-   chiesta una selezione grafica. I muri stacked vengono espansi nei loro
-   sotto-muri. Muri tenda, muri inclinati e muri senza linea di
-   posizionamento vengono scartati con il motivo nel resoconto.
+1. ELEMENTI. Si parte dagli elementi nella selezione corrente; se non ce ne
+   sono, viene chiesta una selezione grafica limitata alle categorie gestite.
+   Un elemento selezionato prima del comando e fuori da quelle categorie non
+   viene ignorato in silenzio: compare fra i saltati con il suo motivo.
 
-2. CANDIDATI. Una sola passata di raccolta sul documento per le categorie
-   scelte, poi un filtro di prossimita' per ogni muro sugli id gia' raccolti.
-   La ricerca copre tutto il modello, ma e' limitata in verticale
-   all'estensione dei muri: un dispositivo del piano superiore, allineato in
-   pianta con il muro, non viene toccato.
+2. PARTIZIONI. Una sola passata di raccolta sul documento per la regione
+   occupata dalla selezione, poi un filtro di prossimita' per ogni elemento
+   sugli id gia' raccolti. I WallInfo sono in cache per id, perche' la stessa
+   partizione ricorre per tutti i dispositivi che le stanno davanti e il
+   controllo di inclinazione puo' estrarne la geometria.
+   Le partizioni che non coprono la quota del dispositivo vengono tolte dalla
+   gara: un muretto basso non e' un bersaglio valido per un rilevatore in
+   alto. Muri tenda, muri inclinati, contenitori di muri sovrapposti e muri
+   senza linea di posizionamento sono scartati con il motivo nel resoconto.
 
-3. DISTANZA. Misurata in pianta fra il punto di inserimento dell'elemento e la
-   faccia del muro piu' vicina, non il suo asse. Un elemento che cade dentro
-   lo spessore del muro ha distanza negativa e quindi rientra sempre nella
-   soglia.
+3. TOLLERANZA. Distanza misurata in pianta fra il punto di inserimento
+   dell'elemento e la faccia della partizione piu' vicina, non il suo asse.
+   Un elemento che cade dentro lo spessore ha distanza negativa e quindi
+   rientra sempre. Oltre la tolleranza l'elemento viene SALTATO: e' un esito
+   che l'utente deve vedere, perche' quell'oggetto lo ha indicato lui.
 
 4. TRASLAZIONE. Perpendicolare al muro, tale da portare il punto di
    inserimento esattamente sulla faccia. La posizione lungo il muro resta
@@ -122,11 +130,13 @@ NOTE SULLA GEOMETRIA
    documentata nel CLAUDE.md non si presenta affatto. Il bounding box tiene
    inoltre conto degli attacchi a tetto e dei profili modificati.
 
-5. ARBITRAGGIO FRA MURI. Un elemento vicino a piu' muri selezionati viene
-   assegnato a quello con il valore ASSOLUTO della distanza dalla faccia piu'
+5. ARBITRAGGIO FRA PARTIZIONI. Un elemento vicino a piu' partizioni viene
+   assegnato a quella con il valore ASSOLUTO della distanza dalla faccia piu'
    piccolo. Usare il valore firmato sarebbe sbagliato: un elemento immerso in
    un muro spesso ha distanza molto negativa e vincerebbe sempre contro un
-   muro adiacente a pochi millimetri.
+   muro adiacente a pochi millimetri. Con la ricerca automatica l'ambiguita'
+   non e' piu' un caso raro: in un angolo due muri sono quasi equidistanti,
+   e il resoconto la segnala nella colonna Note.
 
 --------------------------------------------------------------------------
 GESTIONE DEGLI AVVISI DI REVIT
@@ -170,7 +180,13 @@ LIMITI NOTI
   al centro del proprio ingombro invece che sul retro, l'elemento risulta per
   meta' dentro il muro. Le colonne "distanza prima" e "distanza dopo" del
   resoconto servono a rilevarlo sul primo modello reale.
-- Muri di modelli collegati non sono gestiti.
+- Muri di modelli collegati NON sono gestiti. Nei progetti MEP
+  l'architettonico e' spesso un collegamento, e un FilteredElementCollector
+  sul documento corrente non vede gli elementi dei modelli collegati: in quel
+  caso lo strumento non trova nessuna partizione. Il caso viene diagnosticato
+  esplicitamente invece di produrre un resoconto di soli scarti generici.
+- I pannelli di facciata continua non sono ancora gestiti: il muro tenda ha
+  spessore nullo e la faccia di riferimento andrebbe presa dal pannello.
 - Lo strumento non cambia mai l'host di un elemento: se e' ospitato da un muro
   lo salta.
 
@@ -269,7 +285,7 @@ SLANT_NORMAL_TOL = 0.02         # circa 1.1 gradi di inclinazione della faccia
 FORCE_REGEN = False
 
 MAX_MOVED_ROWS = 300
-MAX_SKIPPED_ROWS = 200
+MAX_SKIPPED_ROWS = 500
 MAX_OVER_TOLERANCE_ROWS = 50
 
 # Valori dell'enumeratore WallLocationLine.
@@ -1023,8 +1039,8 @@ def z_extent(element):
     return None
 
 
-def z_contained(element_extent, wall_infos):
-    """True se l'ingombro verticale ricade in quello di almeno una partizione.
+def z_contains(element_extent, wall_info):
+    """True se la partizione copre l'ingombro verticale dell'elemento.
 
     Il filtro nativo verifica l'INTERSEZIONE fra bounding box, mentre il
     requisito e' il CONTENIMENTO: serve quindi questo test esplicito a valle.
@@ -1032,10 +1048,20 @@ def z_contained(element_extent, wall_infos):
     if element_extent is None:
         return False
     low, high = element_extent
-    for wall_info in wall_infos:
-        if low >= wall_info.z_min - Z_TOL and high <= wall_info.z_max + Z_TOL:
-            return True
-    return False
+    return (low >= wall_info.z_min - Z_TOL
+            and high <= wall_info.z_max + Z_TOL)
+
+
+def partitions_at_height(element_extent, wall_infos):
+    """Sottoinsieme delle partizioni che coprono la quota dell'elemento.
+
+    E' un FILTRO SUI MURI, non una guardia sull'elemento. Un muro che alla
+    quota del dispositivo non esiste non e' un bersaglio valido e va tolto
+    dalla gara: se restasse, un dispositivo vicino a un muro alto e a un
+    muretto basso potrebbe essere allineato al muretto, che alla sua quota
+    non c'e'.
+    """
+    return [w for w in wall_infos if z_contains(element_extent, w)]
 
 
 # =========================================================================
@@ -1388,41 +1414,50 @@ def plan_element(element, options, context):
     for partition, problem_reason in problems:
         context.note_problem(partition, problem_reason)
 
+    # Un muro che non copre la quota dell'elemento non e' un bersaglio
+    # valido: si toglie dalla gara PRIMA di calcolare le proiezioni.
+    element_extent = z_extent(element)
+    at_height = partitions_at_height(element_extent, wall_infos)
+
     # Le proiezioni si calcolano subito, prima delle guardie, cosi' ogni riga
     # del resoconto porta la distanza misurata anche quando il motivo di
     # scarto non c'entra con la distanza: un elemento bloccato a 62 mm vale
     # la pena di sbloccarlo, uno a 290 mm probabilmente no.
-    hits = all_wall_hits(wall_infos, point)
+    hits = all_wall_hits(at_height, point)
+    context_hits = hits if hits else all_wall_hits(wall_infos, point)
 
     reason = host_skip_reason(element)
     if reason is not None:
         return skipped_with_context(element, category_name, category_key,
-                                    reason, hits)
+                                    reason, context_hits)
 
     reason = edit_skip_reason(element, context.active_design_option_id)
     if reason is not None:
         return skipped_with_context(element, category_name, category_key,
-                                    reason, hits)
+                                    reason, context_hits)
 
     if not wall_infos:
         return SkippedElement(element, category_name, category_key,
                               R_NO_PARTITION)
 
-    # Secondo test verticale, preciso: la fase larga ha confrontato il
-    # bounding box con l'outline, che e' intersezione, non contenimento.
-    if not z_contained(z_extent(element), wall_infos):
+    if not at_height:
         return skipped_with_context(element, category_name, category_key,
-                                    R_OUT_OF_Z, hits)
+                                    R_OUT_OF_Z, context_hits)
 
     connected = connected_connectors(element)
     if options.skip_connected and connected > 0:
         return skipped_with_context(element, category_name, category_key,
-                                    R_CONNECTED.format(connected), hits)
+                                    R_CONNECTED.format(connected),
+                                    context_hits)
 
+    # Il fronte serve SOLO alla rotazione: il punto bersaglio si ricava dalla
+    # normale della partizione. Con la rotazione disattivata un elemento dal
+    # fronte verticale puo' comunque essere traslato, quindi la guardia vale
+    # solo quando la rotazione e' richiesta.
     facing = planar_facing(element)
-    if facing is None:
+    if facing is None and options.apply_rotation:
         return skipped_with_context(element, category_name, category_key,
-                                    R_FACING_VERTICAL, hits)
+                                    R_FACING_VERTICAL, context_hits)
 
     if not hits:
         # Partizioni trovate, ma nessuna ha prodotto una proiezione
@@ -1484,12 +1519,13 @@ def plan_element(element, options, context):
     record.translation_length = abs(delta)
     record.connected = connected
 
-    if options.apply_rotation:
+    if options.apply_rotation and facing is not None:
         angle, _target = minimal_rotation(facing, normal_side)
         record.rotation_rad = angle
+        record.rotation_applicable = True
     else:
         record.rotation_rad = 0.0
-    record.rotation_applicable = True
+        record.rotation_applicable = facing is not None
 
     record.needs_move = record.translation_length > POSITION_TOL
     record.needs_rotation = abs(record.rotation_rad) > ANGLE_TOL
@@ -2360,6 +2396,26 @@ def out_of_scope_count(elements):
     return total
 
 
+def document_has_walls():
+    """True se il documento corrente contiene almeno un muro.
+
+    Serve a distinguere due casi che l'utente vivrebbe allo stesso modo:
+    "i dispositivi sono lontani dai muri" e "i muri non sono in questo
+    modello". Nei progetti MEP l'architettonico e' spesso un collegamento, e
+    un FilteredElementCollector sul documento corrente non vede gli elementi
+    dei modelli collegati.
+    """
+    try:
+        collector = DB.FilteredElementCollector(doc)\
+            .WherePasses(build_category_filter(PARTITION_CATEGORIES))\
+            .WhereElementIsNotElementType()
+        for _ in collector:
+            return True
+    except Exception:
+        return True
+    return False
+
+
 def active_design_option_id():
     try:
         return DB.DesignOption.GetActiveDesignOptionId(doc)
@@ -2404,6 +2460,24 @@ def main():
     # selezione; la restrizione per singolo elemento avviene poi su questo
     # insieme ridotto.
     region_ids = collect_partition_ids(points, options.tolerance_internal)
+
+    if region_ids.Count == 0 and not document_has_walls():
+        output.close_others()
+        output.print_md(u'# Allineamento MEP alle partizioni')
+        output.print_md(
+            u'**Questo modello non contiene nessun muro.** Lo strumento cerca '
+            u'le partizioni verticali nel documento corrente e non vede gli '
+            u'elementi dei modelli collegati, quindi non ha nessun '
+            u'riferimento a cui allineare.\n\n'
+            u'Se l\'architettonico e\' un collegamento, per ora lo strumento '
+            u'non puo\' usarlo: il supporto ai modelli collegati non e\' '
+            u'ancora implementato.')
+        forms.alert(
+            u'Questo modello non contiene muri.\n\n'
+            u'Se l\'architettonico e\' collegato, lo strumento non puo\' '
+            u'ancora usarlo come riferimento.',
+            title=u'Nessuna partizione nel modello', exitscript=True)
+
     context = PlanContext(region_ids, active_design_option_id())
 
     try:
