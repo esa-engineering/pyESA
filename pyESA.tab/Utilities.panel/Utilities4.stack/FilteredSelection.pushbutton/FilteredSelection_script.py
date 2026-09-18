@@ -32,6 +32,11 @@ BIC = DB.BuiltInCategory
 BIP = DB.BuiltInParameter
 collector = DB.FilteredElementCollector
 
+def get_element_id_value(eid):
+	if hasattr(eid, "Value"):
+		return eid.Value          # Revit 2026+
+	return eid.IntegerValue       # Revit <= 2025
+
 def f_flatten(x):
 	result = []
 	if x != None:
@@ -158,9 +163,9 @@ PSEUDO_TARGET_IDS = [int(bic) for bic in PSEUDO_TARGET_BICS]
 def f_get_kind(item):
 	item_kind = None
 	try:
-		if item.Category.Id.IntegerValue in PSEUDO_TARGET_IDS:
+		if get_element_id_value(item.Category.Id) in PSEUDO_TARGET_IDS:
 			item_type = item.Document.GetElement(item.GetTypeId())
-			item_kind = u"pseudo|{}|{}".format(item.Category.Id.IntegerValue, item_type.FamilyName)
+			item_kind = u"pseudo|{}|{}".format(get_element_id_value(item.Category.Id), item_type.FamilyName)
 		return item_kind
 	except:
 		return item_kind
@@ -193,7 +198,7 @@ for bic in PSEUDO_TARGET_BICS:
 	family_names = sorted(set([bic_type.FamilyName for bic_type in bic_types if bic_type.FamilyName]))
 	for family_name in family_names:
 		pseudo_name = u"{}: {}".format(bic_category.Name, family_name)
-		pseudo_token = u"pseudo|{}|{}".format(bic_category.Id.IntegerValue, family_name)
+		pseudo_token = u"pseudo|{}|{}".format(get_element_id_value(bic_category.Id), family_name)
 		pseudo_categories.append(PseudoCategory(pseudo_name, pseudo_token))
 
 ##Merged list used only for the dialog: pseudo entries must not reach the ElementMulticategoryFilter
