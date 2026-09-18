@@ -39,7 +39,10 @@
       "Bash(awk -F: '{print $3}')",
       "Bash(awk 'END{print NR\" righe reali\"}' MEPAlign_script.py)",
       "Bash(awk 'BEGIN{b=0;c=0;code=0} {if\\($0 ~ /^[[:space:]]*$/\\) b++; else if\\($0 ~ /^[[:space:]]*#/\\) c++; else code++} END{print \"vuote:\",b,\" commento:\",c,\" codice+docstring:\",code}' MEPAlign_script.py)",
-      "Bash(awk 'BEGIN{n=0} /^[[:space:]]*$/{n++; if\\(n>2\\) print NR\": \"n\" vuote consecutive\"; next} {n=0}' MEPAlign_script.py)"
+      "Bash(awk 'BEGIN{n=0} /^[[:space:]]*$/{n++; if\\(n>2\\) print NR\": \"n\" vuote consecutive\"; next} {n=0}' MEPAlign_script.py)",
+      "Bash(py /tmp/chk.py)",
+      "Bash(py -)",
+      "Bash(py /tmp/order.py)"
     ]
   }
 }
