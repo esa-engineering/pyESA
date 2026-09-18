@@ -21,9 +21,11 @@ LOGICA APPLICATA
    Un elemento selezionato prima del comando e fuori da quelle categorie non
    viene ignorato in silenzio: compare fra i saltati con il suo motivo.
 
-2. PARTIZIONI. Una sola passata di raccolta sul documento per la regione
-   occupata dalla selezione, poi un filtro di prossimita' per ogni elemento
-   sugli id gia' raccolti. I WallInfo sono in cache per id, perche' la stessa
+2. PARTIZIONI. Cercate nel documento host E nei modelli collegati. Una sola
+   passata di raccolta per documento sulla regione occupata dalla selezione,
+   poi un filtro di prossimita' per ogni elemento sugli id gia' raccolti.
+   Host e collegamenti concorrono insieme: vince la partizione piu' vicina,
+   da qualunque documento provenga. I WallInfo sono in cache per id, perche' la stessa
    partizione ricorre per tutti i dispositivi che le stanno davanti e il
    controllo di inclinazione puo' estrarne la geometria.
    Le partizioni che non coprono la quota del dispositivo vengono tolte dalla
@@ -139,6 +141,40 @@ NOTE SULLA GEOMETRIA
    e il resoconto la segnala nella colonna Note.
 
 --------------------------------------------------------------------------
+MODELLI COLLEGATI
+--------------------------------------------------------------------------
+
+Nei progetti MEP l'architettonico e' quasi sempre un collegamento, e un
+FilteredElementCollector sul documento corrente non vede i suoi elementi.
+Lo strumento raccoglie quindi le partizioni anche dai RevitLinkInstance
+caricati.
+
+Il punto chiave e' che sotto una trasformazione RIGIDA tutte le grandezze
+scalari del calcolo sono INVARIANTI: la distanza dalla faccia, lo spessore
+del muro, lo scostamento della linea di posizionamento e la sporgenza oltre
+la testata valgono lo stesso nelle due terne. Quindi:
+
+  - il punto di inserimento dell'elemento, che vive in coordinate host,
+    viene portato nelle coordinate del collegamento con la trasformazione
+    inversa;
+  - la matematica gia' collaudata gira li' dentro senza sapere nulla dei
+    link, e il muro non viene mai trasformato;
+  - solo la NORMALE USCENTE viene riportata in coordinate host, perche' e'
+    l'unica direzione che deve convivere con il fronte dell'elemento e con
+    il punto bersaglio.
+
+Un collegamento viene ignorato, con il motivo negli avvisi, quando e'
+scaricato, quando la sua trasformazione non e' leggibile, quando e'
+inclinato o capovolto (la normale riportata nell'host avrebbe una componente
+verticale e lo spostamento cambierebbe la quota), quando e' speculare (i
+versi esterno e interno risulterebbero invertiti) o quando e' in scala (le
+distanze non sarebbero confrontabili con la tolleranza dell'utente).
+
+I muri collegati sono usati SOLO come riferimento: la fase di applicazione
+lavora esclusivamente sul documento host e non tocca mai un modello
+collegato.
+
+--------------------------------------------------------------------------
 GESTIONE DEGLI AVVISI DI REVIT
 --------------------------------------------------------------------------
 
@@ -180,11 +216,6 @@ LIMITI NOTI
   al centro del proprio ingombro invece che sul retro, l'elemento risulta per
   meta' dentro il muro. Le colonne "distanza prima" e "distanza dopo" del
   resoconto servono a rilevarlo sul primo modello reale.
-- Muri di modelli collegati NON sono gestiti. Nei progetti MEP
-  l'architettonico e' spesso un collegamento, e un FilteredElementCollector
-  sul documento corrente non vede gli elementi dei modelli collegati: in quel
-  caso lo strumento non trova nessuna partizione. Il caso viene diagnosticato
-  esplicitamente invece di produrre un resoconto di soli scarti generici.
 - I pannelli di facciata continua non sono ancora gestiti: il muro tenda ha
   spessore nullo e la faccia di riferimento andrebbe presa dal pannello.
 - Lo strumento non cambia mai l'host di un elemento: se e' ospitato da un muro
@@ -279,6 +310,7 @@ GEOM_EPS = 1.0e-9
 
 SLANT_ANGLE_TOL = 1.0e-6        # radianti: sotto, il muro e' verticale
 SLANT_NORMAL_TOL = 0.02         # circa 1.1 gradi di inclinazione della faccia
+LINK_AXIS_TOL = 1.0e-6          # scarto ammesso sull'asse Z di un collegamento
 
 # Alzare a True se in prova la rilettura del punto di inserimento subito dopo
 # RotateElement risultasse non aggiornata (vedi "ORDINE DELLE OPERAZIONI").
@@ -321,6 +353,11 @@ W_CURTAIN = u'muro tenda: spessore nullo, la distanza dalla faccia non e\' defin
 W_SLANTED = u'muro inclinato: la faccia non e\' verticale'
 W_NO_CURVE = u'muro senza linea di posizionamento'
 W_STACKED_PARENT = u'contenitore di muro sovrapposto: si usano i suoi membri'
+L_NOT_LOADED = u'collegamento non caricato'
+L_TILTED = u'collegamento inclinato o capovolto: lo strumento lavora in pianta'
+L_MIRRORED = u'collegamento speculare: i versi delle facce sarebbero invertiti'
+L_NO_TRANSFORM = u'trasformazione del collegamento non leggibile'
+L_SCALED = u'collegamento in scala: le distanze non sarebbero confrontabili'
 W_NO_BBOX = u'estensione verticale del muro non leggibile'
 W_NO_OFFSET = u'scostamento della linea di posizionamento indeterminato'
 
@@ -443,10 +480,13 @@ def warn(message):
 class WallInfo(object):
     """Dati precalcolati di un muro, in coordinate interne."""
 
-    def __init__(self, wall):
+    def __init__(self, wall, source):
         self.wall = wall
         self.wall_id = wall.Id
+        self.source = source
         self.label = wall_label(wall)
+        if source.is_linked:
+            self.label = u'[{}] {}'.format(source.link_name, self.label)
         self.curve = None
         self.curve_z = 0.0
         self.is_straight = True
@@ -462,11 +502,12 @@ class WallInfo(object):
 class WallHit(object):
     """Esito del test di un punto contro un muro."""
 
-    def __init__(self, wall_info, foot, normal_ext, signed_center,
-                 face_distance, side, beyond):
+    def __init__(self, wall_info, foot, normal_ext, normal_host,
+                 signed_center, face_distance, side, beyond):
         self.wall_info = wall_info
         self.foot = foot
-        self.normal_ext = normal_ext
+        self.normal_ext = normal_ext        # coordinate del documento origine
+        self.normal_host = normal_host      # coordinate del documento host
         self.signed_center = signed_center
         self.face_distance = face_distance      # negativa se dentro lo spessore
         self.side = side                        # +1 faccia esterna, -1 interna
@@ -692,7 +733,7 @@ def exterior_normal_at(wall_info, tangent):
     return normal
 
 
-def build_wall_info(wall):
+def build_wall_info(wall, source):
     """Precalcola i dati di un muro.
 
     Ritorna (WallInfo, None) oppure (None, motivo di scarto).
@@ -741,7 +782,7 @@ def build_wall_info(wall):
     if offset is None:
         return None, offset_error
 
-    info = WallInfo(wall)
+    info = WallInfo(wall, source)
     info.curve = curve
     info.width = width
     info.half_width = width / 2.0
@@ -884,7 +925,11 @@ def project_on_curve(wall_info, point_flat):
 
 
 def test_point_against_wall(wall_info, point):
-    """Distanza firmata di un punto dalla faccia del muro piu' vicina."""
+    """Distanza firmata di un punto dalla faccia del muro piu' vicina.
+
+    Il punto deve essere gia' espresso nelle coordinate del documento in cui
+    vive il muro: per un muro collegato lo converte all_wall_hits().
+    """
     point_flat = DB.XYZ(point.X, point.Y, wall_info.curve_z)
     projected = project_on_curve(wall_info, point_flat)
     if projected is None:
@@ -900,7 +945,14 @@ def test_point_against_wall(wall_info, point):
     face_distance = abs(signed_center) - wall_info.half_width
     side = 1.0 if signed_center >= 0.0 else -1.0
 
-    return WallHit(wall_info, foot, normal_ext, signed_center,
+    # Le grandezze scalari sono invarianti per trasformazione rigida: solo
+    # la direzione va riportata nelle coordinate dell'host, dove vivono il
+    # punto di inserimento e il fronte dell'elemento.
+    normal_host = wall_info.source.to_host_vector(normal_ext)
+    if normal_host is None:
+        return None
+
+    return WallHit(wall_info, foot, normal_ext, normal_host, signed_center,
                    face_distance, side, beyond)
 
 
@@ -913,12 +965,52 @@ def test_point_against_wall(wall_info, point):
 # elementi attorno. Cambia solo la fase larga: la matematica di
 # test_point_against_wall() resta identica.
 
-# Cache dei WallInfo, indicizzata per valore di ElementId. Non e' una
-# ottimizzazione accessoria: build_wall_info() puo' estrarre la geometria
-# della partizione per il controllo di inclinazione, e la stessa partizione
-# ricorre per tutti gli elementi che le stanno davanti. Senza cache quel
-# costo verrebbe moltiplicato per il numero di elementi selezionati.
+# Cache dei WallInfo, indicizzata per (sorgente, valore di ElementId). La
+# sorgente entra nella chiave perche' documenti diversi possono contenere id
+# uguali. Non e' una ottimizzazione accessoria: build_wall_info() puo'
+# estrarre la geometria della partizione per il controllo di inclinazione, e
+# la stessa partizione ricorre per tutti gli elementi che le stanno davanti.
 PARTITION_CACHE = {}
+
+
+class PartitionSource(object):
+    """Documento in cui cercare le partizioni, con la sua trasformazione.
+
+    Per il documento host la trasformazione e' l'identita' e non viene
+    applicata. Per un modello collegato porta dalle coordinate del link a
+    quelle dell'host.
+    """
+
+    def __init__(self, key, document, transform, link_name):
+        self.key = key
+        self.document = document
+        self.transform = transform
+        self.inverse = transform.Inverse if transform is not None else None
+        self.link_name = link_name
+        self.z_offset = transform.Origin.Z if transform is not None else 0.0
+        self.ids = None
+
+    @property
+    def is_linked(self):
+        return self.link_name is not None
+
+    def to_local(self, point):
+        """Porta un punto dalle coordinate host a quelle della sorgente."""
+        if self.inverse is None:
+            return point
+        try:
+            return self.inverse.OfPoint(point)
+        except Exception:
+            return None
+
+    def to_host_vector(self, vector):
+        """Porta una direzione dalle coordinate della sorgente all'host."""
+        if self.transform is None:
+            return vector
+        try:
+            return self.transform.OfVector(vector)
+        except Exception:
+            return None
 
 
 def build_category_filter(built_in_categories):
@@ -929,14 +1021,61 @@ def build_category_filter(built_in_categories):
     return DB.ElementMulticategoryFilter(category_list)
 
 
-def partition_info(partition):
+def link_display_name(link):
+    """Nome leggibile di un'istanza di collegamento."""
+    for getter in (lambda: DB.Element.Name.GetValue(link),
+                   lambda: DB.Element.Name.GetValue(
+                       doc.GetElement(link.GetTypeId()))):
+        try:
+            name = getter()
+            if name:
+                return name
+        except Exception:
+            continue
+    return u'collegamento {}'.format(element_id_value(link.Id))
+
+
+def link_transform_problem(transform):
+    """Motivo per cui un collegamento non e' utilizzabile, None se va bene.
+
+    Lo strumento lavora in pianta e non tocca mai la quota. Se il
+    collegamento fosse inclinato, la normale di un muro riportata nell'host
+    avrebbe una componente verticale e lo spostamento cambierebbe la quota.
+    Se fosse speculare, i versi esterno e interno delle facce risulterebbero
+    invertiti e i dispositivi finirebbero sulla faccia sbagliata.
+    """
+    try:
+        basis_z = transform.BasisZ
+    except Exception:
+        return L_NO_TRANSFORM
+    if (abs(basis_z.X) > LINK_AXIS_TOL
+            or abs(basis_z.Y) > LINK_AXIS_TOL
+            or basis_z.Z <= 0.0):
+        return L_TILTED
+    try:
+        if transform.HasReflection:
+            return L_MIRRORED
+    except Exception:
+        pass
+    # Con una scala diversa da 1 le distanze misurate nel documento
+    # collegato non sarebbero confrontabili con la tolleranza dell'utente,
+    # che e' espressa in coordinate host.
+    try:
+        if abs(transform.Scale - 1.0) > 1.0e-9:
+            return L_SCALED
+    except Exception:
+        pass
+    return None
+
+
+def partition_info(source, partition):
     """(WallInfo, motivo di scarto) di una partizione, con cache."""
-    key = element_id_value(partition.Id)
+    key = (source.key, element_id_value(partition.Id))
     cached = PARTITION_CACHE.get(key)
     if cached is not None:
         return cached
     try:
-        info, reason = build_wall_info(partition)
+        info, reason = build_wall_info(partition, source)
     except Exception as error:
         info = None
         reason = u'errore in analisi: {}'.format(u'{}'.format(error)[:120])
@@ -964,56 +1103,128 @@ def point_outline(point, tolerance_internal):
         DB.XYZ(point.X + margin, point.Y + margin, point.Z + margin))
 
 
-def collect_partition_ids(points, tolerance_internal):
-    """Id delle partizioni verticali nella regione occupata dalla selezione.
-
-    Una sola passata sul documento. La restrizione per singolo elemento
-    avviene poi su questo insieme ridotto e non sull'intero modello: con
-    duemila elementi selezionati la differenza e' fra duemila scansioni del
-    documento e duemila filtri su qualche centinaio di id.
-    """
+def collect_ids_in(document, points, margin, label):
+    """Id delle partizioni di un documento nella regione data."""
     empty = List[DB.ElementId]()
+    outline = points_outline(points, margin)
+    if outline is None:
+        return empty
+    try:
+        collector = DB.FilteredElementCollector(document)\
+            .WherePasses(build_category_filter(PARTITION_CATEGORIES))\
+            .WhereElementIsNotElementType()\
+            .WherePasses(DB.BoundingBoxIntersectsFilter(outline))
+        return List[DB.ElementId](collector.ToElementIds())
+    except Exception as error:
+        warn(u'Raccolta delle partizioni in {} non riuscita: {}'.format(
+            label, error))
+        return empty
+
+
+def collect_partition_sources(points, tolerance_internal, include_links):
+    """Documento host piu' i modelli collegati utilizzabili.
+
+    Una sola passata per documento sulla regione occupata dalla selezione.
+    La restrizione per singolo elemento avviene poi su questi insiemi
+    ridotti e non sull'intero modello.
+    """
     if not PARTITION_CATEGORIES:
         warn(u'Nessuna categoria di partizione verticale disponibile in '
              u'questa versione di Revit.')
-        return empty
+        return []
 
-    outline = points_outline(points, tolerance_internal + PARTITION_MARGIN)
-    if outline is None:
-        return empty
+    margin = tolerance_internal + PARTITION_MARGIN
+    sources = []
+
+    host = PartitionSource(0, doc, None, None)
+    host.ids = collect_ids_in(doc, points, margin, u'questo modello')
+    sources.append(host)
+
+    if not include_links:
+        return sources
 
     try:
-        collector = DB.FilteredElementCollector(doc)            .WherePasses(build_category_filter(PARTITION_CATEGORIES))            .WhereElementIsNotElementType()            .WherePasses(DB.BoundingBoxIntersectsFilter(outline))
-        return List[DB.ElementId](collector.ToElementIds())
+        links = list(DB.FilteredElementCollector(doc)
+                     .OfClass(DB.RevitLinkInstance)
+                     .ToElements())
     except Exception as error:
-        warn(u'Raccolta delle partizioni verticali non riuscita: {}'.format(
-            error))
-        return empty
+        warn(u'Elenco dei modelli collegati non leggibile: {}'.format(error))
+        return sources
+
+    for link in links:
+        name = link_display_name(link)
+
+        link_doc = None
+        try:
+            link_doc = link.GetLinkDocument()
+        except Exception:
+            link_doc = None
+        if link_doc is None:
+            warn(u'Collegamento "{}" ignorato: {}.'.format(name, L_NOT_LOADED))
+            continue
+
+        transform = None
+        try:
+            transform = link.GetTotalTransform()
+        except Exception:
+            transform = None
+        if transform is None:
+            warn(u'Collegamento "{}" ignorato: {}.'.format(
+                name, L_NO_TRANSFORM))
+            continue
+
+        problem = link_transform_problem(transform)
+        if problem is not None:
+            warn(u'Collegamento "{}" ignorato: {}.'.format(name, problem))
+            continue
+
+        source = PartitionSource(element_id_value(link.Id), link_doc,
+                                 transform, name)
+        local_points = []
+        for point in points:
+            local = source.to_local(point)
+            if local is not None:
+                local_points.append(local)
+        source.ids = collect_ids_in(link_doc, local_points, margin,
+                                    u'"{}"'.format(name))
+        if source.ids.Count:
+            sources.append(source)
+
+    return sources
 
 
-def partitions_near_point(point, tolerance_internal, region_ids):
-    """Partizioni utilizzabili vicine a un punto.
+def partitions_near_point(point, tolerance_internal, sources):
+    """Partizioni utilizzabili vicine a un punto, host e collegamenti.
 
-    Ritorna (lista di WallInfo, lista di (partizione, motivo di scarto)).
+    Ritorna (lista di WallInfo, lista di (sorgente, partizione, motivo)).
     """
-    if region_ids is None or region_ids.Count == 0:
-        return [], []
-
-    try:
-        near = DB.FilteredElementCollector(doc, region_ids)            .WherePasses(DB.BoundingBoxIntersectsFilter(
-                point_outline(point, tolerance_internal)))            .ToElements()
-    except Exception as error:
-        warn(u"Filtro di prossimita' non riuscito: {}".format(error))
-        return [], []
-
     infos = []
     problems = []
-    for partition in near:
-        info, reason = partition_info(partition)
-        if info is None:
-            problems.append((partition, reason))
+
+    for source in sources:
+        if source.ids is None or source.ids.Count == 0:
             continue
-        infos.append(info)
+
+        local_point = source.to_local(point)
+        if local_point is None:
+            continue
+
+        try:
+            near = DB.FilteredElementCollector(source.document, source.ids)\
+                .WherePasses(DB.BoundingBoxIntersectsFilter(
+                    point_outline(local_point, tolerance_internal)))\
+                .ToElements()
+        except Exception as error:
+            warn(u"Filtro di prossimita' non riuscito: {}".format(error))
+            continue
+
+        for partition in near:
+            info, reason = partition_info(source, partition)
+            if info is None:
+                problems.append((source, partition, reason))
+                continue
+            infos.append(info)
+
     return infos, problems
 
 
@@ -1048,8 +1259,13 @@ def z_contains(element_extent, wall_info):
     if element_extent is None:
         return False
     low, high = element_extent
-    return (low >= wall_info.z_min - Z_TOL
-            and high <= wall_info.z_max + Z_TOL)
+    # z_min e z_max sono nelle coordinate del documento della partizione;
+    # l'ingombro dell'elemento e' in coordinate host. Con l'asse Z del
+    # collegamento verticale, garantito da link_transform_problem(), la
+    # conversione e' una sola traslazione.
+    offset = wall_info.source.z_offset
+    return (low >= wall_info.z_min + offset - Z_TOL
+            and high <= wall_info.z_max + offset + Z_TOL)
 
 
 def partitions_at_height(element_extent, wall_infos):
@@ -1072,12 +1288,13 @@ class AlignOptions(object):
     """Scelte effettuate dall'utente nella finestra di dialogo."""
 
     def __init__(self, categories, tolerance_cm, apply_rotation,
-                 skip_connected, dry_run):
+                 skip_connected, include_links, dry_run):
         self.categories = categories
         self.tolerance_cm = tolerance_cm
         self.tolerance_internal = cm_to_internal(tolerance_cm)
         self.apply_rotation = apply_rotation
         self.skip_connected = skip_connected
+        self.include_links = include_links
         self.dry_run = dry_run
 
 
@@ -1100,6 +1317,7 @@ class PlannedMove(object):
 
         self.wall_id = None
         self.wall_label = u'-'
+        self.wall_is_linked = False
         self.face_side = u'-'
 
         self.point_before = None
@@ -1132,13 +1350,16 @@ class SkippedElement(object):
     """Un elemento escluso, con il motivo specifico e la distanza misurata."""
 
     def __init__(self, element, category_name, category_key, reason,
-                 wall_id=None, distance=None):
+                 wall_id=None, distance=None, wall_label=u'-',
+                 wall_is_linked=False):
         self.element = element
         self.element_id = element.Id if element is not None else None
         self.category_name = category_name
         self.category_key = category_key
         self.reason = reason
         self.wall_id = wall_id
+        self.wall_label = wall_label
+        self.wall_is_linked = wall_is_linked
         self.distance = distance
 
 
@@ -1146,13 +1367,14 @@ class OverTolerance(object):
     """Un elemento vicino ma oltre la soglia."""
 
     def __init__(self, element, category_name, category_key, wall_id,
-                 wall_label, distance, excess):
+                 wall_label, distance, excess, wall_is_linked=False):
         self.element = element
         self.element_id = element.Id
         self.category_name = category_name
         self.category_key = category_key
         self.wall_id = wall_id
         self.wall_label = wall_label
+        self.wall_is_linked = wall_is_linked
         self.distance = distance
         self.excess = excess
 
@@ -1361,7 +1583,10 @@ def all_wall_hits(wall_infos, point):
     """
     hits = []
     for wall_info in wall_infos:
-        hit = test_point_against_wall(wall_info, point)
+        local_point = wall_info.source.to_local(point)
+        if local_point is None:
+            continue
+        hit = test_point_against_wall(wall_info, local_point)
         if hit is not None:
             hits.append(hit)
     hits.sort(key=lambda h: (abs(h.face_distance),
@@ -1377,25 +1602,31 @@ def skipped_with_context(element, category_name, category_key, reason, hits):
     290 mm probabilmente no.
     """
     nearest = hits[0] if hits else None
+    if nearest is None:
+        return SkippedElement(element, category_name, category_key, reason)
     return SkippedElement(
         element, category_name, category_key, reason,
-        nearest.wall_info.wall_id if nearest else None,
-        nearest.face_distance if nearest else None)
+        nearest.wall_info.wall_id,
+        nearest.face_distance,
+        nearest.wall_info.label,
+        nearest.wall_info.source.is_linked)
 
 
 class PlanContext(object):
     """Stato condiviso dalla fase di analisi, calcolato una volta sola."""
 
-    def __init__(self, region_ids, active_design_option_id):
-        self.region_ids = region_ids
+    def __init__(self, sources, active_design_option_id):
+        self.sources = sources
         self.active_design_option_id = active_design_option_id
-        # Indicizzati per id: la stessa partizione scartata ricorre per molti
-        # elementi e nel resoconto deve comparire una volta sola.
+        # Indicizzati per (sorgente, id): la stessa partizione scartata
+        # ricorre per molti elementi e nel resoconto deve comparire una
+        # volta sola. La sorgente entra nella chiave perche' documenti
+        # diversi possono contenere id uguali.
         self.partition_problems = {}
 
-    def note_problem(self, partition, reason):
-        self.partition_problems[element_id_value(partition.Id)] = (
-            partition, reason)
+    def note_problem(self, source, partition, reason):
+        key = (source.key, element_id_value(partition.Id))
+        self.partition_problems[key] = (source, partition, reason)
 
 
 def plan_element(element, options, context):
@@ -1410,9 +1641,9 @@ def plan_element(element, options, context):
     # lui. Nella prima versione l'elenco dei muri arrivava gia' fatto da
     # monte, perche' era l'utente a sceglierli.
     wall_infos, problems = partitions_near_point(
-        point, options.tolerance_internal, context.region_ids)
-    for partition, problem_reason in problems:
-        context.note_problem(partition, problem_reason)
+        point, options.tolerance_internal, context.sources)
+    for problem_source, partition, problem_reason in problems:
+        context.note_problem(problem_source, partition, problem_reason)
 
     # Un muro che non copre la quota dell'elemento non e' un bersaglio
     # valido: si toglie dalla gara PRIMA di calcolare le proiezioni.
@@ -1486,19 +1717,20 @@ def plan_element(element, options, context):
             nearest.wall_info.wall_id,
             nearest.wall_info.label,
             nearest.face_distance,
-            nearest.face_distance - options.tolerance_internal)
+            nearest.face_distance - options.tolerance_internal,
+            nearest.wall_info.source.is_linked)
 
     best = qualifying[0]
     second = qualifying[1] if len(qualifying) > 1 else None
     wall_info = best.wall_info
-    normal_side = best.normal_ext.Multiply(best.side)
+    normal_side = best.normal_host.Multiply(best.side)
 
     # Punto bersaglio: sulla faccia del muro, stessa posizione lungo il muro,
     # stessa quota. La componente Z e' invariata per costruzione.
     target_signed = best.side * wall_info.half_width
     delta = target_signed - best.signed_center
-    target_point = DB.XYZ(point.X + best.normal_ext.X * delta,
-                          point.Y + best.normal_ext.Y * delta,
+    target_point = DB.XYZ(point.X + best.normal_host.X * delta,
+                          point.Y + best.normal_host.Y * delta,
                           point.Z)
 
     record = PlannedMove()
@@ -1510,6 +1742,7 @@ def plan_element(element, options, context):
 
     record.wall_id = wall_info.wall_id
     record.wall_label = wall_info.label
+    record.wall_is_linked = wall_info.source.is_linked
     record.face_side = u'esterna' if best.side > 0 else u'interna'
 
     record.point_before = point
@@ -1992,6 +2225,7 @@ class MEPAlignWindow(forms.WPFWindow):
             tolerance_cm,
             bool(self.chk_rotate.IsChecked),
             bool(self.chk_skip_connected.IsChecked),
+            bool(self.chk_links.IsChecked),
             bool(self.chk_dryrun.IsChecked))
         self.Close()
 
@@ -2041,6 +2275,9 @@ def print_header(options, elements, source_label, result):
             if options.apply_rotation else u'disattivata'),
         u'- Elementi con connettori collegati: {}'.format(
             u'saltati' if options.skip_connected else u'elaborati'),
+        u'- Modelli collegati: {}'.format(
+            u'inclusi nella ricerca' if options.include_links
+            else u'esclusi dalla ricerca'),
         u'- Categorie elaborate: **{}** su {}'.format(
             len(options.categories), len(MEP_CATEGORIES)),
         u'- La quota Z non viene modificata',
@@ -2104,7 +2341,8 @@ def print_moves_table(result, options):
             output.linkify(record.element_id),
             record.category_name,
             record.type_name,
-            u'{} {}'.format(output.linkify(record.wall_id), record.wall_label),
+            partition_cell(record.wall_id, record.wall_label,
+                           record.wall_is_linked),
             record.face_side,
             format_mm(record.distance_before),
             format_mm(record.distance_after),
@@ -2156,7 +2394,9 @@ def print_skipped_table(result):
             output.linkify(record.element_id),
             record.category_name,
             record.reason,
-            output.linkify(record.wall_id) if record.wall_id else u'-',
+            (partition_cell(record.wall_id, record.wall_label,
+                            record.wall_is_linked)
+             if record.wall_id else u'-'),
             format_mm(record.distance) if record.distance is not None else u'-',
         ])
     output.print_table(
@@ -2183,7 +2423,8 @@ def print_over_tolerance_table(result, options):
         rows.append([
             output.linkify(record.element_id),
             record.category_name,
-            u'{} {}'.format(output.linkify(record.wall_id), record.wall_label),
+            partition_cell(record.wall_id, record.wall_label,
+                           record.wall_is_linked),
             format_mm(record.distance),
             u'+{}'.format(format_mm(record.excess)),
         ])
@@ -2223,17 +2464,34 @@ def tolerance_suggestion(ordered_over_tolerance_items, options):
            u'**{}** elementi._'.format(candidate_cm, recovered)
 
 
+def partition_cell(wall_id, label, is_linked):
+    """Cella "partizione" del resoconto.
+
+    Gli elementi di un modello collegato non sono selezionabili dall'host,
+    quindi output.linkify() non produrrebbe un collegamento risolvibile: per
+    quelli si stampa l'id nudo, che resta utilizzabile per una ricerca
+    dentro al modello collegato.
+    """
+    if is_linked:
+        return u'{} (id {})'.format(label, element_id_value(wall_id))
+    return u'{} {}'.format(output.linkify(wall_id), label)
+
+
 def print_wall_problems(result):
     if not result.wall_problems:
         return
     output.print_md(u'## Partizioni scartate')
     rows = []
-    for wall, reason in result.wall_problems:
-        rows.append([output.linkify(wall.Id), wall_label(wall), reason])
+    for problem_source, wall, reason in result.wall_problems:
+        label = wall_label(wall)
+        if problem_source.is_linked:
+            label = u'[{}] {}'.format(problem_source.link_name, label)
+        rows.append([partition_cell(wall.Id, label, problem_source.is_linked),
+                     reason])
     output.print_table(
         table_data=rows,
         title='',
-        columns=[u'Partizione', u'Tipo', u'Motivo'])
+        columns=[u'Partizione', u'Motivo'])
 
 
 def print_revit_failures(preprocessor):
@@ -2416,6 +2674,68 @@ def document_has_walls():
     return False
 
 
+def report_no_partition_found(options):
+    """Spiega perche' la ricerca non ha trovato nessuna partizione.
+
+    Distingue il caso "nessun muro raggiungibile" dal caso "muri presenti ma
+    lontani": il secondo non passa di qui, perche' i muri verrebbero comunque
+    raccolti nella regione e ogni elemento finirebbe fra i saltati per
+    tolleranza, che e' un messaggio del tutto diverso.
+    """
+    has_own = document_has_walls()
+    link_count = count_loaded_links()
+
+    output.close_others()
+    output.print_md(u'# Allineamento MEP alle partizioni')
+
+    if has_own:
+        headline = (u'**Nessun muro si trova vicino agli elementi '
+                    u'selezionati.** I muri di questo modello esistono, ma '
+                    u'nessuno ricade nella regione occupata dalla selezione.')
+        hint = (u'Controlla di aver selezionato gli elementi giusti, oppure '
+                u'alza la tolleranza.')
+    elif options.include_links and link_count:
+        headline = (u'**Nessun muro trovato, ne\' in questo modello ne\' nei '
+                    u'{} collegamenti caricati.**'.format(link_count))
+        hint = (u'Se i collegamenti sono stati ignorati, il motivo e\' negli '
+                u'avvisi qui sotto: un collegamento scaricato, inclinato o '
+                u'speculare non viene usato.')
+    elif link_count:
+        headline = (u'**Questo modello non contiene muri**, ma ci sono {} '
+                    u'modelli collegati caricati.'.format(link_count))
+        hint = (u'La ricerca nei collegamenti e\' disattivata: riattiva la '
+                u'casella "Cerca le partizioni anche nei modelli collegati" '
+                u'nella finestra del comando.')
+    else:
+        headline = (u'**Questo modello non contiene muri e non ha modelli '
+                    u'collegati caricati.**')
+        hint = (u'Carica il collegamento architettonico, oppure esegui il '
+                u'comando nel modello che contiene i muri.')
+
+    output.print_md(u'{}\n\n{}'.format(headline, hint))
+    print_warnings()
+
+    forms.alert(u'Nessuna partizione verticale trovata.\n\n'
+                u'Il resoconto nel pannello di output spiega il motivo.',
+                title=u'Nessuna partizione trovata', exitscript=True)
+
+
+def count_loaded_links():
+    """Numero di modelli collegati effettivamente caricati."""
+    total = 0
+    try:
+        for link in DB.FilteredElementCollector(doc)\
+                .OfClass(DB.RevitLinkInstance).ToElements():
+            try:
+                if link.GetLinkDocument() is not None:
+                    total += 1
+            except Exception:
+                continue
+    except Exception:
+        return 0
+    return total
+
+
 def active_design_option_id():
     try:
         return DB.DesignOption.GetActiveDesignOptionId(doc)
@@ -2459,26 +2779,27 @@ def main():
     # Una sola passata sul documento per la regione occupata dalla
     # selezione; la restrizione per singolo elemento avviene poi su questo
     # insieme ridotto.
-    region_ids = collect_partition_ids(points, options.tolerance_internal)
+    sources = collect_partition_sources(points, options.tolerance_internal,
+                                        options.include_links)
+    found_any = False
+    for source in sources:
+        if source.ids is not None and source.ids.Count:
+            found_any = True
+            break
 
-    if region_ids.Count == 0 and not document_has_walls():
-        output.close_others()
-        output.print_md(u'# Allineamento MEP alle partizioni')
-        output.print_md(
-            u'**Questo modello non contiene nessun muro.** Lo strumento cerca '
-            u'le partizioni verticali nel documento corrente e non vede gli '
-            u'elementi dei modelli collegati, quindi non ha nessun '
-            u'riferimento a cui allineare.\n\n'
-            u'Se l\'architettonico e\' un collegamento, per ora lo strumento '
-            u'non puo\' usarlo: il supporto ai modelli collegati non e\' '
-            u'ancora implementato.')
-        forms.alert(
-            u'Questo modello non contiene muri.\n\n'
-            u'Se l\'architettonico e\' collegato, lo strumento non puo\' '
-            u'ancora usarlo come riferimento.',
-            title=u'Nessuna partizione nel modello', exitscript=True)
+    if not found_any:
+        # Due cause si presenterebbero all'utente allo stesso modo, un
+        # resoconto di soli scarti generici: "i dispositivi sono lontani dai
+        # muri" e "i muri non sono dove sto cercando". Vanno distinte.
+        report_no_partition_found(options)
 
-    context = PlanContext(region_ids, active_design_option_id())
+    linked_sources = [s for s in sources if s.is_linked]
+    if linked_sources:
+        warn(u'Partizioni cercate anche in {} modelli collegati: {}.'.format(
+            len(linked_sources),
+            u', '.join([s.link_name for s in linked_sources])))
+
+    context = PlanContext(sources, active_design_option_id())
 
     try:
         result = build_plan(elements, options, context)

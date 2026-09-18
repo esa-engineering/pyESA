@@ -281,14 +281,51 @@ assunzione tacita.
 
 ## Modelli collegati
 
-Lo strumento cerca le partizioni **nel documento corrente**: un
-`FilteredElementCollector` non vede gli elementi dei modelli collegati. Nei progetti MEP
-l'architettonico è spesso un collegamento, e in quel caso lo strumento non trova nessun
-riferimento.
+Nei progetti MEP l'architettonico è quasi sempre un collegamento, e un
+`FilteredElementCollector` sul documento corrente non vede i suoi elementi. Lo strumento
+raccoglie quindi le partizioni **anche dai modelli collegati caricati**, controllato dalla
+casella *Cerca le partizioni anche nei modelli collegati* (attiva per default).
 
-Il caso viene diagnosticato in modo esplicito: se il modello non contiene nessun muro, il
-comando lo dice e nomina il collegamento come causa probabile, invece di produrre un
-resoconto di scarti generici che sembrerebbe un problema di tolleranza.
+Host e collegamenti concorrono insieme: vince la partizione più vicina, da qualunque
+documento provenga.
 
-Il supporto ai modelli collegati non è implementato. È il candidato principale per la
-versione successiva, insieme ai pannelli di facciata continua.
+### Come funziona
+
+Sotto una trasformazione **rigida** tutte le grandezze scalari del calcolo sono
+**invarianti**: la distanza dalla faccia, lo spessore del muro, lo scostamento della linea
+di posizionamento e la sporgenza oltre la testata valgono lo stesso nelle due terne. Quindi
+il muro collegato non viene mai trasformato. Si fa il contrario:
+
+1. il punto di inserimento dell'elemento, che vive in coordinate host, viene portato nelle
+   coordinate del collegamento con la trasformazione inversa;
+2. la matematica già collaudata gira lì dentro senza sapere nulla dei link;
+3. solo la **normale uscente** viene riportata in coordinate host, perché è l'unica
+   direzione che deve convivere con il fronte dell'elemento e con il punto bersaglio.
+
+È il motivo per cui il supporto ai collegamenti non ha richiesto di toccare il nucleo
+geometrico.
+
+### Quando un collegamento viene ignorato
+
+Sempre con il motivo scritto negli avvisi del resoconto:
+
+| Caso | Perché |
+| --- | --- |
+| collegamento non caricato | non c'è nessun documento da interrogare |
+| trasformazione non leggibile | senza trasformazione non si può convertire nulla |
+| collegamento inclinato o capovolto | la normale riportata nell'host avrebbe una componente verticale e lo spostamento cambierebbe la quota |
+| collegamento speculare | i versi esterno e interno delle facce risulterebbero invertiti e i dispositivi finirebbero sulla faccia sbagliata |
+| collegamento in scala | le distanze misurate nel collegamento non sarebbero confrontabili con la tolleranza, che è espressa in coordinate host |
+
+La regola è la stessa applicata altrove nello strumento: meglio saltare un riferimento
+dichiarandolo, che usarlo e spostare dispositivi nel punto sbagliato.
+
+### Nel resoconto
+
+Le partizioni collegate compaiono come `[Nome collegamento] Tipo di muro (id 123456)`.
+L'id è stampato nudo e non come collegamento cliccabile: gli elementi di un modello
+collegato non sono selezionabili dall'host, quindi un link non risolverebbe. L'id resta
+utilizzabile per cercarli aprendo il modello collegato.
+
+I muri collegati sono usati **solo come riferimento**: la fase di applicazione lavora
+esclusivamente sul documento host e non tocca mai un modello collegato.
