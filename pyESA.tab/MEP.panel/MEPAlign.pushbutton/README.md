@@ -4,10 +4,23 @@ Allinea in pianta i dispositivi MEP selezionati alla partizione verticale archit
 più vicina.
 
 **Selezioni tu gli oggetti da allineare.** Per ognuno lo strumento cerca la partizione
-verticale più vicina, porta il dispositivo **a filo della sua faccia** e lo ruota
-dell'angolo minimo che lo rende perpendicolare alla parete. Se la partizione più vicina è
-oltre la tolleranza che hai indicato, il dispositivo viene **saltato** e riportato con la
-distanza misurata.
+verticale più vicina e porta il dispositivo **a filo di una delle sue due facce**. Se la
+partizione più vicina è oltre la tolleranza che hai indicato, il dispositivo viene
+**saltato** e riportato con la distanza misurata.
+
+**Quale delle due facce lo decide il fronte della famiglia**, letto dal suo Room
+Calculation Point: un dispositivo che guarda la partizione invece di allontanarsene viene
+portato dall'altra parte. Lo spostamento avviene quindi nei due versi lungo la normale del
+muro, non solo verso la faccia più vicina. Vedi "Quale delle due facce" più sotto.
+
+**Lo spostamento avviene lungo la retta di analisi**, cioè l'asse di vista del
+dispositivo, non lungo la normale della parete: un apparecchio che guarda il muro in
+obliquo scorre quindi anche lateralmente. E se più istanze di muro sono a contatto, il
+bersaglio è la **faccia più esterna del pacchetto**, non quella della prima partizione
+incontrata.
+
+> **L'orientamento degli elementi non viene mai modificato: lo strumento trasla e basta.**
+> La rotazione automatica c'era nelle versioni precedenti ed è stata tolta.
 
 > **La quota Z non viene mai modificata.** È il motivo per cui il primo elemento
 > architettonico gestito è il muro. L'allineamento in quota è un problema diverso, perché
@@ -59,11 +72,15 @@ misurata e di quanto ha sforato. In fondo a quella tabella una riga dice di quan
 la tolleranza e quanti elementi si recupererebbero: è il modo più rapido per capire se il
 valore era troppo stretto, senza rilanciare il comando.
 
+Lo stesso valore regola anche la **retta con cui si riconosce il fronte** della
+famiglia, che è lunga il doppio della tolleranza: alzando la tolleranza si allarga sia
+il raggio di ricerca sia il cono entro cui il fronte viene considerato rivolto alla
+partizione. Vedi "Quale delle due facce".
+
 **4. Opzioni.**
 
 | Opzione | Default | Effetto |
 | --- | --- | --- |
-| *Ruota gli elementi perpendicolari alla partizione* | attiva | Disattivandola viene applicata la sola traslazione |
 | *Cerca le partizioni anche nei modelli collegati* | attiva | Vedi "Modelli collegati" più sotto |
 | *Salta gli elementi collegati ad altri (connettori)* | non attiva | Vedi "Connettori" più sotto |
 | *Simulazione: non modificare il modello* | non attiva | Calcola e riporta senza aprire alcuna transazione. **Conviene sempre partire da qui** |
@@ -79,6 +96,54 @@ cui viene stampato l'id nudo.
 > **Ogni elemento che hai selezionato compare nel resoconto**, in esattamente una delle
 > quattro liste. Dato che gli oggetti li hai indicati uno per uno, un elemento che sparisce
 > senza spiegazione sarebbe un difetto, non una semplificazione.
+
+## Più istanze di muro a contatto
+
+Una parete modellata come più istanze accostate (la muratura più il suo rivestimento, due
+tramezzi affiancati, un contromuro tecnico) viene trattata come **un pacchetto unico**: il
+dispositivo si allinea alla faccia più esterna, non alla prima che incontra. Senza questa
+regola un apparecchio modellato dentro il muro strutturale finirebbe a filo del suo
+rivestimento interno, cioè dentro la stratigrafia.
+
+Si lavora su un asse orientato come la normale del muro vincente, con l'origine nel punto
+di inserimento, su cui ogni partizione parallela occupa un intervallo noto. Partendo dalla
+faccia scelta il confine viene spinto in fuori finché esiste una partizione che lo contiene
+o lo sfiora e che si estende oltre.
+
+Tre vincoli tengono la regola stretta:
+
+| Vincolo | Perché |
+| --- | --- |
+| solo partizioni **parallele**, entro circa 2,5 gradi | un muro che forma un angolo non è parte dello stesso pacchetto |
+| solo partizioni su cui l'elemento **si proietta davvero** | una parete che finisce prima di arrivargli davanti non gli è adiacente |
+| solo scarti sotto **2 mm** | un'intercapedine vera è molto più larga e non deve essere attraversata |
+
+Il confine può solo essere **spinto più in fuori**: il muro vincente resta quello scelto
+per distanza e la sua faccia resta quella scelta dal fronte. Quando il pacchetto entra in
+gioco, la colonna *Note* del resoconto dice quante murature sono state attraversate e
+qual è l'ultima.
+
+## La direzione dello spostamento
+
+Lo spostamento avviene **esclusivamente lungo la retta di analisi**: il dispositivo scivola
+sul proprio asse di vista finché il punto di inserimento non raggiunge il piano della
+faccia bersaglio. Non lungo la normale del muro.
+
+Due conseguenze da conoscere:
+
+- **La posizione lungo il muro non è più invariante.** Un apparecchio che guarda la parete
+  in obliquo scivola anche di lato. Su un fronte perpendicolare non si vede affatto.
+- **La corsa vale 1/cos della distanza da coprire.** È il motivo per cui il fronte deve
+  stare entro **5 gradi** dalla perpendicolare al muro: oltre, l'elemento scivolerebbe
+  lungo la parete invece di avvicinarglisi. Entro quel cono la corsa supera la distanza
+  dello 0,4% e lo scivolamento laterale resta sotto il 9%, quindi in pratica lo
+  spostamento è perpendicolare: la retta pesa soprattutto sulla **scelta** del muro e
+  della faccia, non sulla direzione della corsa.
+
+La colonna *Corsa* del resoconto dice, elemento per elemento, se lo spostamento è avvenuto
+*lungo la retta* o *lungo la normale*. Il secondo caso è quello delle famiglie senza Room
+Calculation Point e dei fronti troppo obliqui: senza una retta da seguire resta la
+perpendicolare, che è il comportamento delle versioni precedenti.
 
 ## Come viene ricavato il piano di riferimento del muro
 
@@ -115,15 +180,104 @@ della linea di posizionamento. È stata scartata per due motivi concreti:
 Il calcolo analitico risponde sempre, e con una distanza **firmata**. `GetSideFaces` resta
 come riserva per i muri privi di linea di posizionamento.
 
-## La rotazione minima
+## Quale delle due facce
 
-Fra le due direzioni perpendicolari al muro (la normale uscente e la sua opposta) viene
-scelta quella più vicina all'orientamento attuale dell'elemento. L'angolo applicato non
-supera quindi mai 90 gradi, e un elemento già orientato bene non viene ribaltato.
+Portare il dispositivo sempre sulla faccia più vicina è corretto solo finché è già
+modellato dalla parte giusta della partizione. Non lo è quando sta **dentro lo spessore**
+del muro, e non lo è quando è stato inserito **dal lato sbagliato**: in quei casi il
+dispositivo finisce a filo della faccia che ha alle spalle, cioè dentro la stanza
+sbagliata.
 
-> **Conseguenza da conoscere:** un elemento montato al contrario viene reso perpendicolare
-> al muro ma **non raddrizzato**. È il prezzo della regola "verso conservato", che evita
-> rotazioni di 180 gradi indesiderate su famiglie autorate con il fronte invertito.
+Serve quindi distinguere il fronte della famiglia dal suo retro, e `FacingOrientation` non
+basta: dipende da come è orientato il sistema di riferimento con cui la famiglia è stata
+autorata, che non è una convenzione rispettata da tutti i produttori.
+
+Il **Room Calculation Point** è il punto che Revit usa per stabilire in quale locale sta il
+dispositivo, quindi per costruzione cade *davanti* all'apparecchio, dentro la stanza che
+serve. Il procedimento è questo:
+
+1. si prende il Room Calculation Point dell'istanza e lo si **proietta sul piano
+   orizzontale passante per il punto di inserimento**;
+2. la direzione che va dal punto di inserimento a quella proiezione è il **fronte**;
+3. lungo il fronte si traccia dal punto di inserimento una retta lunga **due volte la
+   tolleranza** impostata all'avvio;
+4. se la retta **intercetta la superficie del muro**, il dispositivo sta guardando la
+   partizione invece di allontanarsene, e viene quindi portato sulla **seconda superficie
+   di finitura** e non sulla prima.
+
+Attenzione al punto 4: un dispositivo che si trova a meno della tolleranza da una parete
+e la **guarda** viene portato dall'altra parte di quella parete. È la regola richiesta, ed
+è corretta per l'apparecchio modellato dal lato sbagliato, ma su un dispositivo che sta
+semplicemente davanti a un muro e lo fronteggia produce uno spostamento lungo tutto lo
+spessore. Il montaggio normale, con le **spalle** al muro, non è toccato: lì la retta si
+allontana e la faccia resta quella vicina.
+
+### Le pareti parallele alla retta sono escluse
+
+Non solo la faccia: il fronte **esclude le partizioni che corrono parallele alla retta di
+analisi**. Una parete parallela alla retta è una parete che il dispositivo ha *di fianco*,
+non davanti: allinearcelo significherebbe spostarlo lungo una normale ortogonale al suo
+asse di vista, cioè proprio lo spostamento di traverso che la retta serve a evitare.
+
+**L'esclusione è secca, senza ripiego.** Se dopo il filtro non resta nessuna partizione,
+l'elemento viene **saltato** e compare fra gli ignorati con il motivo *nessuna partizione
+fronteggiata*. Meglio lasciarlo dov'è dicendolo, che allinearlo a un riferimento che non è
+il suo: un ripiego "se non ne resta nessuna concorrono tutte" sembra prudente, ma riporta
+esattamente il difetto che il filtro doveva togliere, e proprio nel caso peggiore, quello
+in cui l'unica parete vicina è quella sbagliata.
+
+Fra le partizioni ammesse il criterio resta "vince la più vicina": il fronte decide chi
+entra in gara, non chi la vince. Quando un muro più vicino viene escluso, la colonna *Note*
+lo dichiara con il suo nome e la sua distanza.
+
+Il filtro guarda l'orientamento e **non il verso**, perché la retta di analisi è una retta e
+non una semiretta: una parete davanti e una alle spalle sono entrambe cose che il
+dispositivo guarda, ed è giusto così, visto che il montaggio normale è proprio con le
+spalle al muro.
+
+La soglia è **5 gradi** (`FRONT_MAX_ANGLE_DEG`): una parete che si discosta di più di 5
+gradi dalla perpendicolare al fronte è considerata parallela alla retta ed esclusa. È una
+soglia stretta di proposito, perché un dispositivo a parete è per costruzione
+perpendicolare al proprio muro: se non lo è entro quel margine, quel muro quasi certamente
+non è il suo riferimento.
+
+Senza Room Calculation Point non esiste nessuna retta, quindi non c'è nulla a cui una
+parete possa essere parallela, e concorrono tutte come nelle versioni precedenti.
+
+La proiezione al punto 1 non è un dettaglio: su un dispositivo a parete il punto di calcolo
+sta quasi sempre anche più in alto o più in basso dell'origine, e la componente verticale
+falserebbe l'angolo rispetto alla normale del muro.
+
+Il test non tocca la geometria del muro. Sotto una trasformazione rigida tutte le grandezze
+in gioco sono scalari invarianti (lo scostamento firmato dalla mezzeria, il semispessore e
+la componente del fronte lungo la normale), quindi **le partizioni dei modelli collegati
+non richiedono nessuna conversione in più**.
+
+### Perché la retta ha una lunghezza finita
+
+La retta lunga il doppio della tolleranza copre da sola un cono di 60 gradi, quindi è
+abbondante rispetto al cono di 5 gradi entro cui una parete conta come fronteggiata: per un
+dispositivo fuori dal muro non è mai la sua lunghezza a decidere. Resta vincolante solo per
+un dispositivo **sepolto dentro** una partizione più spessa della tolleranza, dove la retta
+può non raggiungere la faccia di uscita.
+
+### Quando il fronte non si può leggere
+
+L'elemento **viene comunque allineato** con il criterio posizionale di sempre, e la colonna
+*Fronte* del resoconto dice con quale criterio, elemento per elemento:
+
+| Valore | Significato | Faccia scelta | Corsa |
+| --- | --- | --- | --- |
+| *verso il muro* | la retta intercetta la partizione | quella verso cui guarda il dispositivo | lungo la retta |
+| *opposto al muro* | la retta si allontana dalla partizione | la più vicina | lungo la retta |
+| *radente al muro* | il fronte si discosta di oltre 5 gradi dalla perpendicolare, oppure la retta non arriva alla faccia | la più vicina | lungo la normale |
+| *non definito* | la famiglia non espone il Room Calculation Point, oppure l'autore non lo ha spostato dall'origine | la più vicina | lungo la normale |
+
+In testa al resoconto due righe contano quanti elementi sono stati portati sulla faccia
+opposta e su quanti il fronte non era leggibile. La seconda è la prima cosa da guardare se
+il risultato non convince: un lotto tutto a *non definito* vuol dire che quelle famiglie il
+punto di calcolo non ce l'hanno, e il comando si è comportato come nella versione
+precedente.
 
 ## Elementi ignorati
 
@@ -136,6 +290,7 @@ misurata**, anche quando il motivo non c'entra con la distanza: un elemento bloc
 | categoria non gestita dallo strumento | selezionato prima di lanciare il comando, fuori dalle nove categorie |
 | categoria esclusa nella finestra | la categoria esiste ma le hai tolto la spunta |
 | nessuna partizione verticale nel raggio di ricerca | nessun muro vicino: controlla anche i modelli collegati |
+| nessuna partizione fronteggiata | ci sono muri vicini, ma corrono tutti paralleli alla retta di analisi: il dispositivo li ha di fianco, non davanti |
 | oltre la tolleranza: *x* dalla faccia più vicina | il caso richiesto esplicitamente; vedi la tabella dedicata |
 | ospitato dal muro *n* | un elemento wall-hosted è già vincolato alla faccia del suo host |
 | ospitato da *categoria n* | ospitato da soffitto, pavimento o altra faccia |
@@ -145,7 +300,6 @@ misurata**, anche quando il motivo non c'entra con la distanza: un elemento bloc
 | opzione di progetto non attiva | non modificabile |
 | in prestito ad altro utente | modello workshared |
 | elemento senza punto di inserimento | host based, workplane based o in place |
-| fronte verticale | diffusore a controsoffitto: non ha un verso in pianta da ruotare. Scartato **solo se la rotazione è attiva**: con la sola traslazione l'elemento viene comunque spostato |
 | ingombro fuori dall'estensione verticale dei muri | nessuna delle partizioni vicine arriva alla quota dell'elemento |
 | oltre l'estremità del muro di *x* | la proiezione cade fuori dalla testata |
 | proiezione sulla geometria del muro non calcolabile | partizioni trovate, ma nessuna ha prodotto una proiezione utilizzabile |
@@ -189,19 +343,16 @@ resoconto, elimina soltanto i warning privi di risoluzioni (quelli che aprirebbe
 e bloccherebbero il lotto a metà), non applica nessuna risoluzione e chiede il rollback in
 presenza di errori.
 
-## Ordine delle operazioni
+## Applicazione
 
-Prima la rotazione, poi la traslazione. La traslazione viene **ricalcolata dal punto
-corrente** verso un punto bersaglio assoluto memorizzato in fase di analisi, perché non è
-garantito che `RotateElement` attorno a un asse passante per il punto di inserimento lasci
-quel punto esattamente invariato per ogni tipo di famiglia. Ricalcolandola dopo la
-rotazione, qualunque deriva si autocorregge, e la quota resta invariata per costruzione
-perché la componente Z del vettore è forzata a zero.
+La traslazione viene **ricalcolata dal punto corrente** verso un punto bersaglio assoluto
+memorizzato in fase di analisi, invece di riusare il vettore calcolato allora: se qualcosa
+ha mosso l'elemento nel frattempo, il bersaglio resta quello giusto. La quota resta
+invariata per costruzione, perché la componente Z del vettore è forzata a zero.
 
-Ogni elemento viene elaborato in una `SubTransaction` propria: se la rotazione riesce e la
-traslazione fallisce, l'elemento torna intatto invece di restare ruotato e non spostato.
-L'intera operazione è comunque un unico passo di annullamento, nominato
-*"Allineamento MEP ai muri"*.
+Ogni elemento viene elaborato in una `SubTransaction` propria, così il fallimento di uno
+non lascia il lotto a metà. L'intera operazione è comunque un unico passo di annullamento,
+nominato *"Allineamento MEP ai muri"*.
 
 ## Motore Python
 
@@ -238,27 +389,64 @@ assunzione tacita.
    nell'ordine della tabella sopra). Su un valore inatteso lo script ripiega sulla mezzeria
    e registra un avviso. Il caso di prova che lo verifica è un muro con *Location Line*
    impostata su `Finish Face: Exterior`.
-4. **`RotateElement` su un elemento bloccato**: lancia un'eccezione o falisce in silenzio?
-   È documentato solo per `MoveElement`. Il pre-controllo su `Pinned` rende la domanda
-   accademica, ma il pre-controllo non va rimosso.
-5. **`ElementTransformUtils` su un membro di gruppo**: eccezione, failure o successo. Anche
-   qui il pre-controllo precede la domanda.
-6. **`LocationPoint.Point` è aggiornato subito dopo `RotateElement`** o serve un
-   `doc.Regenerate()`? Se in prova la rilettura risultasse non aggiornata, basta alzare la
-   costante `FORCE_REGEN` in testa allo script.
-7. **Effetto reale di `MoveElement` su un diffusore collegato a un canale rigido.**
-8. **`RevitLinkInstance.GetTotalTransform()` è la trasformazione giusta**, cioè quella che
+4. **`ElementTransformUtils` su un membro di gruppo**: eccezione, failure o successo. Il
+   pre-controllo precede la domanda.
+5. **Effetto reale di `MoveElement` su un diffusore collegato a un canale rigido.**
+6. **Il Room Calculation Point di un dispositivo a parete cade davanti all'apparecchio.**
+   È la convenzione, ed è il senso stesso del punto (Revit lo usa per assegnare il
+   dispositivo a un locale, e il locale sta davanti), ma su famiglie di terze parti va
+   verificato prima di fidarsi del risultato su un lotto grande. Il caso di prova è un
+   dispositivo modellato **dentro lo spessore** di un muro: deve uscire dalla parte verso
+   cui guarda. Se su una libreria il punto risultasse dietro, il sintomo è vistoso (tutti
+   i dispositivi di quella famiglia finiscono nella stanza sbagliata) e la colonna
+   *Fronte* del resoconto dice subito quale criterio ha deciso.
+7. **`GetSpatialElementCalculationPoint()` restituisce il punto in coordinate del
+   modello**, non in coordinate della famiglia. Il codice lo assume, ed è su questa
+   assunzione che poggia la sottrazione con il punto di inserimento. Se fosse in
+   coordinate locali il vettore risultante sarebbe privo di senso, e il sintomo sarebbe
+   di nuovo dispositivi portati dalla parte sbagliata: verificarlo su un singolo elemento
+   in simulazione **prima** di applicare.
+8. **I 5 gradi di `FRONT_MAX_ANGLE_DEG`** sono la costante più delicata dello strumento,
+   perché **decide se un elemento viene spostato o saltato**, non solo con quale criterio.
+   Era inizialmente derivata dal fattore della retta (60 gradi) ed è stata poi stretta a 5:
+   un cono largo ammetteva scivolamenti laterali fino a 1,7 volte la distanza da coprire.
+
+   Va confermata su un lotto reale, leggendo quanti elementi finiscono fra gli ignorati con
+   il motivo *nessuna partizione fronteggiata*. Se fossero dispositivi che guardano
+   chiaramente una partizione, è la costante da alzare; se comparissero invece dispositivi
+   spostati con la parete di fianco, da abbassare.
+
+   **Il rischio concreto non è il disallineamento del dispositivo, è il Room Calculation
+   Point.** Il punto non è garantito stare esattamente davanti all'apparecchio: è dove
+   l'autore della famiglia lo ha trascinato, e molti lo spostano in diagonale per farlo
+   cadere comodamente dentro la stanza. Un RCP in diagonale produce un fronte che si
+   discosta di decine di gradi dalla perpendicolare anche su un dispositivo montato
+   perfettamente, e con un cono di 5 gradi quelle famiglie vengono saltate in blocco. Se
+   nel resoconto una famiglia intera risulta *nessuna partizione fronteggiata*, guardare
+   dov'è il pallino in quella famiglia prima di toccare la costante.
+9. **I 2 mm di `ADJACENT_GAP_MM`.** Due istanze di muro accostate in Revit dovrebbero
+   combaciare esattamente, ma fra un modello collegato e l'host non è garantito. Se in
+   prova un pacchetto evidente non venisse riconosciuto, è la costante da alzare; se
+   invece venisse attraversata un'intercapedine, da abbassare. Il caso di prova è una
+   muratura con contromuro modellato come istanza separata.
+10. **Il pacchetto murario attraversa i confini fra documenti.** Un muro dell'host e uno
+    di un collegamento che si toccano vengono uniti nello stesso pacchetto, perché il
+    calcolo lavora su scalari invarianti in coordinate host. È la scelta fatta, coerente
+    con "vince la partizione più vicina da qualunque documento provenga", ma non è stata
+    verificata su un caso reale di contromuro impiantistico modellato nell'host davanti
+    all'architettonico collegato.
+11. **`RevitLinkInstance.GetTotalTransform()` è la trasformazione giusta**, cioè quella che
    include l'eventuale spostamento da coordinate condivise, e non `GetTransform()`. È la
    scelta fatta, ma non è stata verificata su un modello con il collegamento posizionato
    per coordinate condivise: se fosse sbagliata, i muri collegati risulterebbero spostati
    in blocco e **tutti** gli elementi finirebbero fuori tolleranza, che è un sintomo
    vistoso e quindi diagnosticabile in fretta.
-9. **Il bounding box di un muro collegato, letto con `get_BoundingBox(None)` dentro al
-   documento collegato, è nelle coordinate di quel documento** e non già trasformato. Il
-   codice lo assume, ed è su questa assunzione che poggia la conversione della quota
-   (`z_offset`). Se fosse già in coordinate host, il filtro verticale sui collegamenti
-   sbaglierebbe di quanto vale l'offset del link.
-10. **`Transform.Scale` vale 1 per un collegamento normale.** Il controllo esiste come
+12. **Il bounding box di un muro collegato, letto con `get_BoundingBox(None)` dentro al
+    documento collegato, è nelle coordinate di quel documento** e non già trasformato. Il
+    codice lo assume, ed è su questa assunzione che poggia la conversione della quota
+    (`z_offset`). Se fosse già in coordinate host, il filtro verticale sui collegamenti
+    sbaglierebbe di quanto vale l'offset del link.
+13. **`Transform.Scale` vale 1 per un collegamento normale.** Il controllo esiste come
     valvola di sicurezza, ma non è mai scattato su un caso reale.
 
 ## Comportamenti noti e accettati
@@ -268,7 +456,20 @@ assunzione tacita.
   metà dentro il muro. Le colonne *distanza prima* e *distanza dopo* del resoconto servono
   a rilevarlo sul primo modello reale. Se si rivelasse un problema diffuso, la versione
   successiva introdurrà un offset impostabile o l'allineamento del bordo dell'ingombro.
-- Un elemento montato al contrario viene reso perpendicolare ma non raddrizzato.
+- **L'orientamento non viene mai toccato.** Un dispositivo portato sulla faccia opposta si
+  trova già rivolto verso la stanza giusta, perché è proprio il suo fronte ad averla
+  scelta, ma un dispositivo montato di traverso resta di traverso.
+- **Lo spostamento può superare di molto la tolleranza**, per tre motivi che si sommano: la
+  faccia opposta aggiunge lo spessore del muro, il pacchetto murario aggiunge quello delle
+  partizioni attraversate, e la corsa obliqua moltiplica tutto per 1/cos (al massimo 2). È
+  voluto: la tolleranza è il raggio entro cui cercare la partizione, non un limite allo
+  spostamento. La colonna *Spostamento* e le note lo rendono visibile.
+- **La posizione del dispositivo lungo il muro non è più invariante**, perché la corsa
+  segue la retta di analisi e non la normale.
+- **Fra i muri che il dispositivo guarda vince ancora il più vicino.** Il fronte decide
+  chi è ammesso alla gara, non chi la vince: in un angolo con due muri quasi equidistanti
+  ed entrambi fronteggiati vince il più vicino, ed è il motivo per cui la colonna *Note*
+  segnala l'ambiguità.
 - Un elemento la cui quota non è coperta da nessuna partizione vicina **compare nel
   resoconto** fra gli ignorati, con il motivo *ingombro fuori dall'estensione verticale
   dei muri*. Nella versione precedente, quando era lo strumento a pescare gli elementi,
@@ -329,7 +530,9 @@ assunzione tacita.
 - Eseguire sempre prima in **Simulazione**, leggere il resoconto, e solo dopo applicare.
 - L'operazione è annullabile con un solo Undo di Revit.
 - Tag e quote agganciati agli elementi spostati li seguono, ma la loro posizione relativa
-  può diventare illeggibile: non c'è nulla che lo strumento possa fare via API.
+  può diventare illeggibile: non c'è nulla che lo strumento possa fare via API. Con la
+  corsa lungo la retta di analisi il fenomeno è più marcato di prima, perché gli elementi
+  si spostano anche lateralmente.
 
 ## Modelli collegati
 

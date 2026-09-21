@@ -2,11 +2,18 @@
 """Allineamento in pianta degli elementi MEP alle facce dei muri.
 
 L'utente seleziona i dispositivi MEP da allineare. Per ognuno lo strumento
-cerca la partizione verticale architettonica piu' vicina, porta il dispositivo
-a filo della sua faccia e lo ruota di quanto basta perche' risulti
-perpendicolare alla parete. Se la partizione piu' vicina e' oltre la tolleranza
-indicata dall'utente, il dispositivo viene saltato e riportato con la distanza
-misurata.
+cerca la partizione verticale architettonica piu' vicina e porta il
+dispositivo a filo di una delle sue due facce. Se la partizione piu' vicina e'
+oltre la tolleranza indicata dall'utente, il dispositivo viene saltato e
+riportato con la distanza misurata.
+
+Quale delle due facce lo decide il FRONTE della famiglia, ricavato dal Room
+Calculation Point: e' il motivo per cui lo spostamento puo' avvenire nei due
+versi lungo la normale del muro, e non solo verso la faccia piu' vicina.
+
+L'orientamento degli elementi non viene MAI modificato: lo strumento trasla e
+basta. La rotazione automatica c'era nelle versioni precedenti ed e' stata
+tolta di proposito.
 
 La quota Z non viene MAI modificata: e' il motivo per cui il primo elemento
 architettonico gestito e' il muro. L'allineamento in quota e' un problema
@@ -39,17 +46,132 @@ LOGICA APPLICATA
    rientra sempre. Oltre la tolleranza l'elemento viene SALTATO: e' un esito
    che l'utente deve vedere, perche' quell'oggetto lo ha indicato lui.
 
-4. TRASLAZIONE. Perpendicolare al muro, tale da portare il punto di
-   inserimento esattamente sulla faccia. La posizione lungo il muro resta
-   invariata, la quota resta invariata.
+4. FACCIA. Il muro e' scelto per distanza FRA QUELLI CHE IL DISPOSITIVO
+   GUARDA, e quale delle sue due facce usare lo decide il fronte della
+   famiglia. E se piu' istanze di muro sono a
+   contatto, il bersaglio e' la faccia piu' esterna del pacchetto: vedi le
+   due sezioni dedicate qui sotto.
 
-5. ROTAZIONE. Attorno a un asse verticale passante per il punto di
-   inserimento, dell'angolo piu' piccolo che rende il fronte dell'elemento
-   perpendicolare al muro. Fra le due direzioni possibili (normale uscente e
-   sua opposta) si scegle quella piu' vicina all'orientamento attuale, quindi
-   l'angolo applicato non supera mai 90 gradi e un elemento gia' orientato
-   bene non viene ribaltato. Conseguenza da conoscere: un elemento montato al
-   contrario non viene raddrizzato, viene solo reso perpendicolare.
+5. TRASLAZIONE. Lungo la RETTA DI ANALISI, cioe' l'asse di vista del
+   dispositivo, fino a portare il punto di inserimento sul piano della
+   faccia bersaglio. Non lungo la normale del muro: un dispositivo che
+   guarda la parete in obliquo scorre quindi anche lateralmente, e la sua
+   posizione lungo il muro cambia. La quota resta invariata.
+
+   Muovendosi in obliquo la corsa vale 1/cos della distanza da coprire, e
+   questo e' il motivo per cui il fronte deve stare entro FRONT_MAX_ANGLE_DEG
+   dalla perpendicolare: oltre, l'elemento scivolerebbe lungo il muro invece
+   di avvicinarglisi. Con i 5 gradi attuali il termine 1/cos vale 1,004 e lo
+   scivolamento laterale resta sotto il 9% della distanza: lo spostamento e'
+   di fatto perpendicolare, e la retta pesa soprattutto sulla scelta del muro
+   e della faccia. Senza un fronte leggibile non c'e' nessuna retta, e la
+   traslazione torna a essere perpendicolare al muro.
+
+--------------------------------------------------------------------------
+QUALE DELLE DUE FACCE: IL FRONTE DAL ROOM CALCULATION POINT
+--------------------------------------------------------------------------
+
+Scegliere sempre la faccia piu' vicina al punto di inserimento e' corretto
+solo finche' il dispositivo e' gia' modellato dalla parte giusta della
+partizione. Non lo e' quando sta dentro lo spessore del muro, e non lo e'
+quando e' stato inserito dal lato sbagliato: in quei casi il dispositivo
+finisce a filo della faccia che ha alle spalle, cioe' dentro la stanza
+sbagliata.
+
+Serve quindi distinguere il fronte della famiglia dal suo retro, e
+FacingOrientation non basta: dipende da come e' orientato il sistema di
+riferimento con cui la famiglia e' stata autorata, che non e' una convenzione
+rispettata da tutti i produttori.
+
+Il Room Calculation Point e' il punto che Revit usa per stabilire in quale
+locale sta il dispositivo, quindi per costruzione cade DAVANTI
+all'apparecchio, dentro la stanza che serve. La direzione del fronte e' il
+vettore che va dal punto di inserimento alla proiezione del punto di calcolo
+sul piano orizzontale passante per il punto di inserimento. Si proietta
+invece di usare il vettore nello spazio perche' su un dispositivo a parete il
+punto di calcolo sta quasi sempre anche piu' in alto o piu' in basso
+dell'origine, e la componente verticale falserebbe l'angolo rispetto alla
+normale del muro.
+
+Lungo quella direzione si traccia dal punto di inserimento una retta lunga
+DUE VOLTE la tolleranza impostata dall'utente. Se la retta intercetta la
+superficie del muro, il dispositivo guarda la partizione invece di
+allontanarsene: va quindi portato sulla SECONDA faccia di finitura, non sulla
+prima.
+
+Il fronte non sceglie pero' solo la faccia: ESCLUDE le partizioni che
+corrono parallele alla retta di analisi (faces_the_wall). Una parete
+parallela alla retta e' una parete che il dispositivo ha di FIANCO, non
+davanti: allinearcelo significherebbe spostarlo lungo una normale ortogonale
+al suo asse di vista, cioe' proprio lo spostamento di traverso che la retta
+serve a evitare.
+
+L'esclusione e' secca, senza ripiego. Se dopo il filtro non resta nessuna
+partizione, l'elemento viene SALTATO e riportato con R_NOT_FACED: meglio
+lasciarlo dov'e' dicendolo, che allinearlo a un riferimento che non e' il
+suo. Un ripiego "se non ne resta nessuna concorrono tutte" sembra prudente
+ma riporta esattamente il difetto che il filtro doveva togliere, e lo fa
+proprio nel caso peggiore, quello in cui l'unica parete vicina e' quella
+sbagliata.
+
+Fra le partizioni ammesse il criterio resta "vince la piu' vicina": il
+fronte decide chi entra in gara, non chi la vince.
+
+Il filtro guarda l'orientamento e non il verso, perche' la retta di analisi
+e' una retta e non una semiretta: una parete davanti e una alle spalle sono
+entrambe cose che il dispositivo "guarda", ed e' giusto cosi', visto che il
+montaggio normale e' proprio con le spalle al muro.
+
+Senza fronte leggibile non esiste nessuna retta, quindi non c'e' nulla a cui
+una parete possa essere parallela: li' concorrono tutte, con il criterio
+posizionale delle versioni precedenti.
+
+Il test non usa la geometria del muro. Sotto una trasformazione rigida tutte
+le grandezze in gioco sono scalari invarianti (lo scostamento firmato dalla
+mezzeria, il semispessore e la componente del fronte lungo la normale),
+quindi le partizioni collegate non richiedono nessuna conversione in piu'.
+Vedi face_side_from_front().
+
+La retta lunga il doppio della tolleranza copre da sola un cono di 60 gradi:
+e' quindi abbondante rispetto al cono di FRONT_MAX_ANGLE_DEG entro cui una
+parete conta come fronteggiata, e per un elemento fuori dal muro non e' mai
+lei a decidere. Resta vincolante solo per un elemento sepolto dentro una
+partizione piu' spessa della tolleranza, dove la retta puo' non raggiungere
+la faccia di uscita.
+
+Quando la famiglia non espone il Room Calculation Point, o quando l'autore
+non lo ha spostato dall'origine, non c'e' nessuna retta: l'elemento viene
+comunque allineato con il criterio posizionale, e la colonna "Fronte" del
+resoconto dice con quale criterio.
+
+--------------------------------------------------------------------------
+PIU' ISTANZE DI MURO A CONTATTO
+--------------------------------------------------------------------------
+
+Una parete modellata come piu' istanze accostate - la muratura piu' il suo
+rivestimento, due tramezzi affiancati, un contromuro tecnico - va trattata
+come un pacchetto unico: il dispositivo si allinea alla faccia PIU' ESTERNA,
+non alla prima che incontra. Senza questo, un apparecchio modellato dentro il
+muro strutturale finirebbe a filo del suo rivestimento interno, cioe' dentro
+la stratigrafia.
+
+outermost_face() lavora su un asse orientato come la normale del muro
+vincente, con l'origine nel punto di inserimento, su cui ogni partizione
+parallela occupa un intervallo noto (span_along). Partendo dalla faccia
+scelta il confine viene spinto in fuori finche' esiste una partizione che lo
+contiene o lo sfiora e che si estende oltre.
+
+Tre vincoli tengono la regola stretta:
+
+  - solo partizioni PARALLELE entrano nel pacchetto (ADJACENT_PARALLEL_TOL);
+  - solo partizioni su cui l'elemento si PROIETTA davvero, cioe' quelle con
+    beyond entro tolleranza: una parete che finisce prima di arrivargli
+    davanti non gli e' adiacente;
+  - solo scarti sotto ADJACENT_GAP, due millimetri. Un'intercapedine vera e'
+    molto piu' larga e non viene attraversata.
+
+Il confine puo' solo essere spinto piu' in fuori: il muro vincente resta
+quello scelto per distanza e la sua faccia resta quella scelta dal fronte.
 
 --------------------------------------------------------------------------
 COME VIENE RICAVATO IL PIANO DI RIFERIMENTO DEL MURO
@@ -194,17 +316,14 @@ risoluzione e chiede il rollback in presenza di errori.
 ORDINE DELLE OPERAZIONI
 --------------------------------------------------------------------------
 
-Prima la rotazione, poi la traslazione, e la traslazione viene ricalcolata dal
-punto corrente verso un punto bersaglio ASSOLUTO memorizzato in fase di
-analisi. Non e' garantito che ElementTransformUtils.RotateElement attorno a un
-asse passante per il punto di inserimento lasci quel punto esattamente
-invariato per ogni tipo di famiglia. Ricalcolando la traslazione dopo la
-rotazione, qualunque deriva si autocorregge; la quota resta invariata per
-costruzione, perche' la componente Z del vettore e' forzata a zero.
+La traslazione viene ricalcolata dal punto CORRENTE verso un punto bersaglio
+ASSOLUTO memorizzato in fase di analisi, invece di riusare il vettore
+calcolato allora: se qualcosa ha mosso l'elemento nel frattempo il bersaglio
+resta quello giusto. La quota resta invariata per costruzione, perche' la
+componente Z del vettore e' forzata a zero.
 
-Ogni elemento viene elaborato in una SubTransaction propria: se la rotazione
-riesce e la traslazione fallisce, l'elemento torna intatto invece di restare
-ruotato e non spostato.
+Ogni elemento viene elaborato in una SubTransaction propria, cosi' il
+fallimento di uno non lascia il lotto a meta'.
 
 --------------------------------------------------------------------------
 LIMITI NOTI
@@ -220,6 +339,22 @@ LIMITI NOTI
   spessore nullo e la faccia di riferimento andrebbe presa dal pannello.
 - Lo strumento non cambia mai l'host di un elemento: se e' ospitato da un muro
   lo salta.
+- L'orientamento non viene mai toccato. Un dispositivo portato sulla faccia
+  opposta si trova gia' rivolto verso la stanza giusta, perche' e' proprio il
+  suo fronte ad averla scelta, ma un dispositivo montato di traverso resta di
+  traverso.
+- Lo spostamento puo' superare di molto la tolleranza, per tre motivi che si
+  sommano: la faccia opposta aggiunge lo spessore del muro, il pacchetto
+  murario aggiunge quello delle partizioni attraversate, e la corsa obliqua
+  moltiplica tutto per 1/cos (con il cono a 5 gradi, al massimo 1,004).
+  E' voluto: la tolleranza e' il
+  raggio entro cui cercare la partizione, non un limite allo spostamento. La
+  colonna "Spostamento" e le note del resoconto lo rendono visibile.
+- Con la corsa lungo la retta la posizione del dispositivo LUNGO il muro non
+  e' piu' invariante: un apparecchio che guarda la parete in obliquo scivola
+  anche di lato. E' la conseguenza diretta di "spostamento esclusivamente
+  lungo la retta calcolata", ma con il cono a 5 gradi lo scivolamento non
+  supera il 9% della distanza da coprire.
 
 --------------------------------------------------------------------------
 MOTORE PYTHON
@@ -287,10 +422,52 @@ DEFAULT_TOLERANCE_CM = 30.0     # soglia proposta nella finestra
 MAX_TOLERANCE_CM = 500.0        # oltre e' quasi certamente un errore di battitura
 
 POSITION_TOL_MM = 1.0           # sotto questo spostamento l'elemento e' gia' a posto
-ANGLE_TOL_DEG = 0.1             # sotto questo angolo non si ruota
 WALL_END_TOL_MM = 0.1           # sporgenza ammessa oltre l'estremita' del muro
 Z_TOL_MM = 10.0                 # margine verticale sul test di contenimento
 AMBIGUITY_TOL_MM = 20.0         # due muri entro questo scarto: caso segnalato
+
+# Il vettore che va dal punto di inserimento al Room Calculation Point
+# distingue il fronte della famiglia dal suo retro. Sotto questa lunghezza in
+# pianta il punto di calcolo sta praticamente sull'origine della famiglia
+# (l'autore non lo ha spostato) oppure gli sta esattamente sopra: in entrambi
+# i casi non indica nessuna direzione utilizzabile.
+FRONT_MIN_LENGTH_MM = 1.0
+
+# Moltiplicatore della tolleranza che da' la lunghezza della retta di
+# analisi tracciata lungo il fronte, come richiesto: lunga il doppio della
+# tolleranza. Con il cono stretto qui sotto la retta e' abbondante per un
+# elemento fuori dal muro, e resta vincolante solo per uno sepolto dentro
+# una partizione piu' spessa della tolleranza.
+FRONT_RAY_FACTOR = 2.0
+
+# Apertura massima, in gradi, fra la retta di analisi e la PERPENDICOLARE
+# al muro perche' quella partizione conti come fronteggiata. Oltre, la
+# parete corre di fatto parallela alla retta e viene esclusa; se non ne
+# resta nessuna l'elemento viene saltato e riportato.
+#
+# Non e' piu' derivata da FRONT_RAY_FACTOR come nella prima stesura. Una
+# retta lunga il doppio della tolleranza copre da sola un cono di 60 gradi,
+# ma un cono cosi' largo ammette scivolamenti laterali fino a 1,7 volte la
+# distanza da coprire: troppo, per uno strumento che deve mettere a filo un
+# dispositivo, non spostarlo di stanza. A 5 gradi la corsa supera la
+# distanza dello 0,4% e lo scivolamento laterale resta sotto il 9%, quindi
+# lo spostamento e' di fatto perpendicolare e la retta serve soprattutto a
+# scegliere il muro e la faccia.
+#
+# La soglia decide anche SE agire, non solo come: e' il numero da rivedere
+# se nel resoconto comparissero troppi elementi saltati per R_NOT_FACED.
+FRONT_MAX_ANGLE_DEG = 5.0
+
+# Due murature separate da meno di questo scarto lungo la normale contano
+# come adiacenti: il dispositivo le attraversa e si allinea alla faccia piu'
+# esterna del pacchetto. Non e' una tolleranza di modellazione generosa di
+# proposito: un'intercapedine vera e' molto piu' larga di cosi' e non deve
+# essere attraversata.
+ADJACENT_GAP_MM = 2.0
+
+# Coseno dell'angolo massimo fra le normali di due murature perche' contino
+# come parallele, e quindi come parte dello stesso pacchetto: circa 2.5 gradi.
+ADJACENT_PARALLEL_TOL = 0.999
 
 # Categorie che contano come partizione verticale architettonica a cui
 # allineare. I muri tenda restano esclusi dalla categoria Walls perche'
@@ -306,16 +483,11 @@ PARTITION_CATEGORY_NAMES = [
 # geometria si estende ben oltre il tratto vicino all'elemento.
 PARTITION_MARGIN_MM = 2000.0
 
-VERTICAL_FACING_TOL = 0.087     # sin(5 gradi): sotto, il fronte e' verticale
 GEOM_EPS = 1.0e-9
 
 SLANT_ANGLE_TOL = 1.0e-6        # radianti: sotto, il muro e' verticale
 SLANT_NORMAL_TOL = 0.02         # circa 1.1 gradi di inclinazione della faccia
 LINK_AXIS_TOL = 1.0e-6          # scarto ammesso sull'asse Z di un collegamento
-
-# Alzare a True se in prova la rilettura del punto di inserimento subito dopo
-# RotateElement risultasse non aggiornata (vedi "ORDINE DELLE OPERAZIONI").
-FORCE_REGEN = False
 
 MAX_MOVED_ROWS = 300
 MAX_SKIPPED_ROWS = 500
@@ -329,6 +501,13 @@ LOC_FINISH_INTERIOR = 3
 LOC_CORE_EXTERIOR = 4
 LOC_CORE_INTERIOR = 5
 
+# Esito del test del fronte, per la colonna omonima del resoconto. Dichiarati
+# qui perche' PlannedMove li usa come valore iniziale.
+F_TOWARDS = u'verso il muro'        # la retta intercetta: faccia opposta
+F_AWAY = u'opposto al muro'         # la retta si allontana: faccia vicina
+F_PARALLEL = u'radente al muro'     # la retta non arriva: faccia vicina
+F_UNKNOWN = u'non definito'         # niente Room Calculation Point
+
 # Vocabolario chiuso dei motivi di esclusione: dichiarati in un unico punto
 # perche' lo stesso motivo non finisca scritto in due modi diversi.
 R_NO_POINT = u'elemento senza punto di inserimento'
@@ -339,13 +518,14 @@ R_GROUP = u'elemento nel gruppo "{}"'
 R_SUBCOMPONENT = u'sotto-componente di famiglia annidata'
 R_DESIGN_OPTION = u'opzione di progetto non attiva'
 R_BORROWED = u'in prestito ad altro utente'
-R_FACING_VERTICAL = u'fronte verticale (elemento a soffitto o a pavimento)'
 R_OUT_OF_Z = u'ingombro fuori dall\'estensione verticale dei muri'
 R_BEYOND_END = u'oltre l\'estremita\' del muro di {}'
 R_NO_PROJECTION = u'proiezione sulla geometria del muro non calcolabile'
 R_CATEGORY_NOT_HANDLED = u'categoria non gestita dallo strumento'
 R_CATEGORY_NOT_SELECTED = u'categoria esclusa nella finestra'
 R_NO_PARTITION = u'nessuna partizione verticale nel raggio di ricerca'
+R_NOT_FACED = u'nessuna partizione fronteggiata: quelle vicine corrono ' \
+              u'parallele alla retta di analisi'
 R_OVER_TOLERANCE = u"oltre la tolleranza: {} dalla faccia piu' vicina"
 R_CONNECTED = u'collegato ad altri elementi ({} connettori)'
 R_ANALYSIS_ERROR = u'errore in analisi: {}'
@@ -410,9 +590,6 @@ def format_mm(value_internal):
     return u'{:.0f} mm'.format(internal_to_mm(value_internal))
 
 
-def format_deg(value_rad):
-    return u'{:+.1f} deg'.format(math.degrees(value_rad))
-
 
 def resolve_categories(category_names):
     """Risolve i nomi di BuiltInCategory validi nella versione in uso."""
@@ -455,7 +632,13 @@ WALL_END_TOL = mm_to_internal(WALL_END_TOL_MM)
 Z_TOL = mm_to_internal(Z_TOL_MM)
 AMBIGUITY_TOL = mm_to_internal(AMBIGUITY_TOL_MM)
 PARTITION_MARGIN = mm_to_internal(PARTITION_MARGIN_MM)
-ANGLE_TOL = math.radians(ANGLE_TOL_DEG)
+FRONT_MIN_LENGTH = mm_to_internal(FRONT_MIN_LENGTH_MM)
+ADJACENT_GAP = mm_to_internal(ADJACENT_GAP_MM)
+
+# Componente minima del fronte lungo la normale del muro, cioe' il coseno
+# dell'apertura ammessa. Sotto questa soglia la parete e' considerata
+# parallela alla retta e non e' un riferimento valido per quel dispositivo.
+FRONT_MIN_COS = math.cos(math.radians(FRONT_MAX_ANGLE_DEG))
 
 
 # =========================================================================
@@ -1288,12 +1471,15 @@ def partitions_at_height(element_extent, wall_infos):
 class AlignOptions(object):
     """Scelte effettuate dall'utente nella finestra di dialogo."""
 
-    def __init__(self, categories, tolerance_cm, apply_rotation,
+    def __init__(self, categories, tolerance_cm,
                  skip_connected, include_links, dry_run):
         self.categories = categories
         self.tolerance_cm = tolerance_cm
         self.tolerance_internal = cm_to_internal(tolerance_cm)
-        self.apply_rotation = apply_rotation
+        # Lunghezza della retta di analisi del fronte: la tolleranza e'
+        # l'unica misura che l'utente ha dichiarato, quindi la scala di
+        # ricerca del fronte si aggancia a quella.
+        self.front_ray_length = cm_to_internal(tolerance_cm) * FRONT_RAY_FACTOR
         self.skip_connected = skip_connected
         self.include_links = include_links
         self.dry_run = dry_run
@@ -1321,20 +1507,31 @@ class PlannedMove(object):
         self.wall_is_linked = False
         self.face_side = u'-'
 
+        # Esito del test del fronte e faccia effettivamente scelta: senza
+        # queste due colonne un dispositivo portato dall'altra parte del
+        # muro sembrerebbe uno spostamento sbagliato invece di una
+        # correzione voluta.
+        self.front_outcome = F_UNKNOWN
+        self.front_flipped = False
+
+        # Corsa lungo la retta di analisi invece che lungo la normale, e
+        # numero di partizioni attraversate oltre la prima: sono i due
+        # motivi per cui uno spostamento puo' risultare molto piu' lungo
+        # della distanza misurata.
+        self.along_front = False
+        self.crossed_partitions = 0
+
         self.point_before = None
         self.distance_before = 0.0
 
         # Punto bersaglio ASSOLUTO, non vettore: la traslazione viene
-        # ricalcolata dopo la rotazione, cosi' ogni deriva si autocorregge.
+        # ricalcolata dal punto corrente al momento di applicarla, cosi' un
+        # elemento mosso nel frattempo finisce comunque dove deve.
         self.target_point = None
         self.distance_after = 0.0
         self.translation_length = 0.0
 
-        self.rotation_rad = 0.0
-        self.rotation_applicable = True
-
         self.needs_move = False
-        self.needs_rotation = False
         self.status = PlannedMove.PLANNED
 
         self.connected = 0
@@ -1343,7 +1540,6 @@ class PlannedMove(object):
         self.note = None
 
         self.applied_move = False
-        self.applied_rotation = False
         self.error = None
 
 
@@ -1434,21 +1630,53 @@ def insertion_point(element):
     return None
 
 
-def planar_facing(element):
-    """Fronte dell'elemento proiettato in pianta e normalizzato.
+def room_calculation_point(element):
+    """Room Calculation Point dell'istanza, in coordinate del modello.
 
-    None se il fronte e' quasi verticale: un diffusore a controsoffitto non
-    ha un verso in pianta da allineare a un muro, e traslarlo senza ruotarlo
-    produrrebbe uno spostamento arbitrario.
+    None quando la famiglia non lo espone. E' il punto che Revit usa per
+    stabilire in quale locale sta il dispositivo, quindi per una famiglia
+    autorata con criterio cade DAVANTI all'apparecchio, dentro la stanza:
+    e' il dato che distingue il fronte dal retro senza dipendere da come e'
+    orientato il sistema di riferimento della famiglia.
+
+    GetSpatialElementCalculationPoint() solleva InvalidOperationException
+    quando il punto non c'e', quindi la property va interrogata prima. Il
+    metodo esiste dalla versione 2016 ed e' disponibile su tutte le versioni
+    coperte dallo strumento.
     """
     try:
-        facing = element.FacingOrientation
+        if not element.HasSpatialElementCalculationPoint:
+            return None
     except Exception:
         return None
-    if facing is None:
+    try:
+        return element.GetSpatialElementCalculationPoint()
+    except Exception:
         return None
-    planar = DB.XYZ(facing.X, facing.Y, 0.0)
-    if planar.GetLength() < VERTICAL_FACING_TOL:
+
+
+def front_direction(element, point):
+    """Direzione del fronte in pianta, ricavata dal Room Calculation Point.
+
+    Il punto di calcolo viene proiettato sul piano orizzontale passante per
+    il punto di inserimento, e la direzione e' quella che va dal secondo al
+    primo. Proiettare invece di usare il vettore nello spazio serve perche'
+    su un dispositivo a parete il punto di calcolo e' quasi sempre anche
+    piu' in alto o piu' in basso dell'origine, e la componente verticale
+    falserebbe l'angolo rispetto alla normale del muro.
+
+    Ritorna None quando il punto di calcolo manca, quando l'autore della
+    famiglia non lo ha spostato dall'origine e quando gli sta esattamente
+    sopra: in tutti e tre i casi non c'e' nessuna direzione da leggere, e
+    la faccia viene scelta con il criterio posizionale di sempre.
+    """
+    calculation_point = room_calculation_point(element)
+    if calculation_point is None:
+        return None
+    planar = DB.XYZ(calculation_point.X - point.X,
+                    calculation_point.Y - point.Y,
+                    0.0)
+    if planar.GetLength() < FRONT_MIN_LENGTH:
         return None
     return planar.Normalize()
 
@@ -1550,25 +1778,172 @@ def edit_skip_reason(element, active_design_option_id):
     return None
 
 
-def signed_angle_about_z(vector_from, vector_to):
-    """Angolo firmato attorno a +Z, positivo antiorario visto dall'alto."""
-    cross_z = vector_from.X * vector_to.Y - vector_from.Y * vector_to.X
-    dot = vector_from.X * vector_to.X + vector_from.Y * vector_to.Y
-    return math.atan2(cross_z, dot)
+def face_side_from_front(hit, front, ray_length):
+    """Su quale delle due facce del muro va portato il dispositivo.
 
+    Il criterio posizionale da solo sbaglia ogni volta che il dispositivo e'
+    modellato dalla parte sbagliata della partizione, o dentro il suo
+    spessore: porta il punto di inserimento sulla faccia piu' vicina, che
+    puo' essere quella alle spalle dell'apparecchio. Il fronte ricavato dal
+    Room Calculation Point risolve il caso, perche' dice da che parte
+    guarda il dispositivo.
 
-def minimal_rotation(facing, target_normal):
-    """Rotazione minima per rendere l'elemento perpendicolare al muro.
+    Il test e' quello chiesto: dal punto di inserimento si traccia una retta
+    lunga ray_length lungo il fronte e si guarda se intercetta la superficie
+    del muro. Non serve la geometria, perche' sotto una trasformazione
+    rigida tutte le grandezze in gioco sono scalari invarianti: lo
+    scostamento firmato dalla mezzeria, il semispessore e la componente del
+    fronte lungo la normale. Lavorando in coordinate host anche il prodotto
+    scalare fra fronte e normale e' invariante, quindi le partizioni
+    collegate non richiedono nessuna conversione aggiuntiva.
 
-    Fra normale uscente e sua opposta si scegle quella piu' vicina
-    all'orientamento attuale, quindi l'angolo resta in -90..+90 gradi e un
-    elemento gia' orientato bene non viene ribaltato di 180 gradi.
+    Lungo la normale il muro occupa l'intervallo [-half_width, +half_width]
+    e il punto sta a signed_center. Se la retta lo intercetta, il
+    dispositivo va sulla faccia dalla parte verso cui guarda, che e' la
+    SECONDA faccia quando il fronte punta contro il muro. Se non lo
+    intercetta, perche' se ne allontana o perche' e' troppo radente per
+    arrivarci entro ray_length, resta il criterio posizionale.
+
+    Ritorna (side, esito del test, componente del fronte lungo la normale).
+    L'ultimo valore serve a chi deve poi muovere l'elemento LUNGO la retta:
+    e' il coseno fra la retta e la normale, cioe' il fattore che lega la
+    distanza da coprire alla corsa da percorrere.
     """
-    if facing.DotProduct(target_normal) >= 0.0:
-        target = target_normal
+    if front is None:
+        return hit.side, F_UNKNOWN, 0.0
+
+    along_normal = front.DotProduct(hit.normal_host)
+    if abs(along_normal) < FRONT_MIN_COS:
+        # Fronte troppo radente: questo muro non e' cio' che il dispositivo
+        # guarda, quindi non ha titolo per sceglierne la faccia.
+        return hit.side, F_PARALLEL, along_normal
+
+    signed_center = hit.signed_center
+    half_width = hit.wall_info.half_width
+    front_side = 1.0 if along_normal > 0.0 else -1.0
+
+    if abs(signed_center) <= half_width:
+        # Punto dentro lo spessore: la retta esce comunque, dalla faccia
+        # verso cui guarda il dispositivo.
+        crossing = (front_side * half_width - signed_center) / along_normal
+    elif front_side * signed_center > 0.0:
+        # La retta si allontana dal muro: nessuna intersezione possibile.
+        return hit.side, F_AWAY, along_normal
     else:
-        target = target_normal.Negate()
-    return signed_angle_about_z(facing, target), target
+        # La retta punta contro il muro: entra dalla faccia vicina.
+        near_face = half_width if signed_center > 0.0 else -half_width
+        crossing = (near_face - signed_center) / along_normal
+
+    if crossing < 0.0 or crossing > ray_length:
+        # La retta non arriva alla faccia entro la lunghezza di analisi.
+        # Con il gate sul coseno qui sopra questo puo' accadere solo a un
+        # elemento sepolto dentro un muro piu' spesso della tolleranza.
+        return hit.side, F_PARALLEL, along_normal
+
+    return front_side, F_TOWARDS, along_normal
+
+
+def faces_the_wall(hit, front):
+    """True se il dispositivo sta guardando questa partizione.
+
+    Guarda solo l'orientamento, non il verso: una parete davanti e una
+    dietro sono entrambe cose che il dispositivo "guarda", perche' la retta
+    di analisi e' una retta e non una semiretta. Cio' che esclude e' la
+    parete di FIANCO, quella rispetto a cui la retta e' radente.
+    """
+    if front is None:
+        return False
+    return abs(front.DotProduct(hit.normal_host)) >= FRONT_MIN_COS
+
+
+def same_partition(first, second):
+    """True se due esiti riguardano la stessa partizione.
+
+    L'id da solo non basta: documenti diversi possono contenere id uguali,
+    quindi la sorgente entra nel confronto come entra nella chiave della
+    cache.
+    """
+    return (first.wall_info.source.key == second.wall_info.source.key
+            and element_id_value(first.wall_info.wall_id)
+            == element_id_value(second.wall_info.wall_id))
+
+
+def span_along(hit, normal):
+    """Intervallo occupato da una partizione lungo `normal`, relativo al punto.
+
+    L'asse ha origine nel punto di inserimento ed e' orientato come la
+    normale del muro di riferimento. Ritorna None se la partizione non e'
+    parallela a quella di riferimento, perche' allora non fa parte dello
+    stesso pacchetto murario e un intervallo su questo asse non
+    significherebbe nulla.
+
+    La mezzeria della partizione sta a -signed_center lungo la PROPRIA
+    normale. Se questa e' opposta a quella di riferimento il segno si
+    ribalta, ed e' il solo motivo per cui serve il prodotto scalare.
+    """
+    alignment = hit.normal_host.DotProduct(normal)
+    if abs(alignment) < ADJACENT_PARALLEL_TOL:
+        return None
+    center = -hit.signed_center if alignment > 0.0 else hit.signed_center
+    half_width = hit.wall_info.half_width
+    return center - half_width, center + half_width
+
+
+def outermost_face(best, face_side, hits):
+    """Faccia piu' esterna del pacchetto di murature adiacenti.
+
+    Una parete modellata come piu' istanze a contatto - il caso tipico e' la
+    muratura piu' il suo rivestimento, oppure due tramezzi accostati - va
+    trattata come un pacchetto unico: il dispositivo si allinea alla faccia
+    piu' esterna, non alla prima che incontra. Senza questo, un apparecchio
+    modellato dentro il muro strutturale finirebbe a filo del suo
+    rivestimento interno, cioe' dentro la stratigrafia.
+
+    Si lavora sull'asse orientato come la normale del muro vincente, con
+    l'origine nel punto di inserimento. Partendo dalla faccia scelta si
+    cerca una partizione parallela che la contenga o la sfiori e che si
+    estenda oltre; quando la si trova il confine avanza al suo bordo
+    esterno, e la ricerca riparte da li'. Il ciclo termina da solo perche'
+    ogni passo consuma una partizione.
+
+    Il muro vincente resta quello scelto per distanza e la sua faccia resta
+    quella scelta dal fronte: qui il confine puo' solo essere spinto piu' in
+    fuori, mai tirato indietro e mai girato dall'altra parte.
+
+    Ritorna (coordinata della faccia sull'asse, partizioni attraversate).
+    """
+    normal = best.normal_host
+    boundary = face_side * best.wall_info.half_width - best.signed_center
+
+    spans = []
+    for hit in hits:
+        if same_partition(hit, best):
+            continue
+        span = span_along(hit, normal)
+        if span is not None:
+            spans.append((span, hit))
+
+    crossed = []
+    while True:
+        winner = None
+        for (low, high), hit in spans:
+            if any(hit is done for done in crossed):
+                continue
+            if face_side > 0.0:
+                # Deve iniziare entro il confine (o sfiorarlo) e finire oltre.
+                if low <= boundary + ADJACENT_GAP \
+                        and high > boundary + GEOM_EPS \
+                        and (winner is None or high > winner[0]):
+                    winner = (high, hit)
+            else:
+                if high >= boundary - ADJACENT_GAP \
+                        and low < boundary - GEOM_EPS \
+                        and (winner is None or low < winner[0]):
+                    winner = (low, hit)
+        if winner is None:
+            return boundary, crossed
+        boundary = winner[0]
+        crossed.append(winner[1])
 
 
 def all_wall_hits(wall_infos, point):
@@ -1682,14 +2057,10 @@ def plan_element(element, options, context):
                                     R_CONNECTED.format(connected),
                                     context_hits)
 
-    # Il fronte serve SOLO alla rotazione: il punto bersaglio si ricava dalla
-    # normale della partizione. Con la rotazione disattivata un elemento dal
-    # fronte verticale puo' comunque essere traslato, quindi la guardia vale
-    # solo quando la rotazione e' richiesta.
-    facing = planar_facing(element)
-    if facing is None and options.apply_rotation:
-        return skipped_with_context(element, category_name, category_key,
-                                    R_FACING_VERTICAL, context_hits)
+    # Il fronte serve a scegliere QUALE delle due facce del muro usare, non
+    # a decidere se l'elemento sia trattabile: quando manca si ricade sul
+    # criterio posizionale e l'elemento viene comunque allineato.
+    front = front_direction(element, point)
 
     if not hits:
         # Partizioni trovate, ma nessuna ha prodotto una proiezione
@@ -1697,22 +2068,45 @@ def plan_element(element, options, context):
         return SkippedElement(element, category_name, category_key,
                               R_NO_PROJECTION)
 
-    qualifying = [h for h in hits
-                  if h.face_distance <= options.tolerance_internal
-                  and h.beyond <= WALL_END_TOL]
+    # Le partizioni su cui l'elemento si proietta davvero. Solo queste
+    # possono far parte del suo pacchetto murario: una parete che finisce
+    # prima di arrivargli davanti non gli sta adiacente.
+    in_range = [h for h in hits if h.beyond <= WALL_END_TOL]
+
+    if not in_range:
+        nearest = hits[0]
+        return skipped_with_context(
+            element, category_name, category_key,
+            R_BEYOND_END.format(format_mm(nearest.beyond)), hits)
+
+    # Una partizione parallela alla retta di analisi e' ESCLUSA, non
+    # sfavorita. Non e' il muro che il dispositivo guarda, e allinearcelo
+    # significherebbe spostarlo lungo una normale ortogonale al suo asse di
+    # vista: esattamente lo spostamento di traverso che la retta serve a
+    # evitare. Se non ne resta nessuna l'elemento viene SALTATO e riportato,
+    # non allineato a un riferimento sbagliato.
+    #
+    # Senza fronte leggibile non esiste nessuna retta, quindi non c'e' nulla
+    # a cui una parete possa essere parallela: li' concorrono tutte, con il
+    # criterio posizionale delle versioni precedenti.
+    candidates = in_range
+    if front is not None:
+        candidates = [h for h in in_range if faces_the_wall(h, front)]
+        if not candidates:
+            return skipped_with_context(element, category_name, category_key,
+                                        R_NOT_FACED, hits)
+
+    qualifying = [h for h in candidates
+                  if h.face_distance <= options.tolerance_internal]
 
     if not qualifying:
-        in_range = [h for h in hits if h.beyond <= WALL_END_TOL]
-        if not in_range:
-            nearest = hits[0]
-            return skipped_with_context(
-                element, category_name, category_key,
-                R_BEYOND_END.format(format_mm(nearest.beyond)), hits)
-
         # Oltre la tolleranza. Nella prima versione era informativo, perche'
         # era lo strumento a pescare gli elementi. Ora l'elemento lo ha
-        # indicato l'utente, quindi e' uno SCARTO che deve vedere.
-        nearest = in_range[0]
+        # indicato l'utente, quindi e' uno SCARTO che deve vedere. La
+        # distanza riportata e' quella della partizione fronteggiata piu'
+        # vicina, non di una che il dispositivo non guarda: sarebbe un
+        # suggerimento fuorviante su quanto alzare la tolleranza.
+        nearest = candidates[0]
         return OverTolerance(
             element, category_name, category_key,
             nearest.wall_info.wall_id,
@@ -1724,14 +2118,38 @@ def plan_element(element, options, context):
     best = qualifying[0]
     second = qualifying[1] if len(qualifying) > 1 else None
     wall_info = best.wall_info
-    normal_side = best.normal_host.Multiply(best.side)
 
-    # Punto bersaglio: sulla faccia del muro, stessa posizione lungo il muro,
-    # stessa quota. La componente Z e' invariata per costruzione.
-    target_signed = best.side * wall_info.half_width
-    delta = target_signed - best.signed_center
-    target_point = DB.XYZ(point.X + best.normal_host.X * delta,
-                          point.Y + best.normal_host.Y * delta,
+    # Quale delle due facce. Il muro e' scelto per distanza fra quelli che
+    # il dispositivo guarda: qui si decide soltanto da che parte della
+    # partizione portarlo, e la retta di analisi puo' mandarlo sulla faccia
+    # opposta a quella piu' vicina.
+    face_side, front_outcome, along_normal = face_side_from_front(
+        best, front, options.front_ray_length)
+
+    # Piu' istanze di muro a contatto sono un pacchetto unico: il bersaglio
+    # e' la faccia piu' esterna, non quella della prima partizione.
+    delta, crossed = outermost_face(best, face_side, in_range)
+
+    # La corsa avviene LUNGO LA RETTA DI ANALISI, non lungo la normale del
+    # muro: l'elemento scivola sul proprio asse di vista finche' il punto di
+    # inserimento non raggiunge il piano della faccia bersaglio. Muovendosi
+    # in obliquo deve percorrere 1/cos in piu' della distanza da coprire, ed
+    # e' il motivo per cui l'apertura ammessa e' stretta (FRONT_MIN_COS).
+    #
+    # Senza un fronte leggibile non c'e' nessuna retta, e resta la normale:
+    # e' il comportamento delle versioni precedenti.
+    use_front = front is not None and front_outcome in (F_TOWARDS, F_AWAY)
+    if use_front:
+        travel = delta / along_normal
+        direction = front
+    else:
+        travel = delta
+        direction = best.normal_host
+
+    # La quota resta invariata per costruzione: sia il fronte sia la normale
+    # sono orizzontali, e la componente Z non viene comunque usata.
+    target_point = DB.XYZ(point.X + direction.X * travel,
+                          point.Y + direction.Y * travel,
                           point.Z)
 
     record = PlannedMove()
@@ -1744,38 +2162,65 @@ def plan_element(element, options, context):
     record.wall_id = wall_info.wall_id
     record.wall_label = wall_info.label
     record.wall_is_linked = wall_info.source.is_linked
-    record.face_side = u'esterna' if best.side > 0 else u'interna'
+    record.face_side = u'esterna' if face_side > 0 else u'interna'
+    record.front_outcome = front_outcome
+    record.front_flipped = face_side != best.side
 
     record.point_before = point
     record.distance_before = best.face_distance
     record.target_point = target_point
-    record.distance_after = 0.0
-    record.translation_length = abs(delta)
+    # Distanza dalla faccia del muro in colonna, misurata dove l'elemento
+    # va a finire. E' zero nel caso normale, ma non quando il pacchetto
+    # murario ha spinto il bersaglio oltre la prima partizione: li' vale lo
+    # spessore di quelle attraversate, e scriverci zero sarebbe una bugia.
+    record.distance_after = abs(delta + best.signed_center) \
+        - wall_info.half_width
+    record.translation_length = abs(travel)
+    record.along_front = use_front
+    record.crossed_partitions = len(crossed)
     record.connected = connected
 
-    if options.apply_rotation and facing is not None:
-        angle, _target = minimal_rotation(facing, normal_side)
-        record.rotation_rad = angle
-        record.rotation_applicable = True
-    else:
-        record.rotation_rad = 0.0
-        record.rotation_applicable = facing is not None
-
     record.needs_move = record.translation_length > POSITION_TOL
-    record.needs_rotation = abs(record.rotation_rad) > ANGLE_TOL
-    if not record.needs_move and not record.needs_rotation:
+    if not record.needs_move:
         record.status = PlannedMove.ALREADY_OK
 
-    # Segnalazione di ambiguita': due muri praticamente equidistanti sono il
-    # caso che l'utente controllera' per primo quando qualcosa sembrera'
-    # sbagliato, quindi va dichiarato invece di lasciarlo scoprire.
+    notes = []
+    # Uno spostamento che attraversa il muro e' molto piu' lungo della
+    # distanza misurata: senza questa riga sembrerebbe un errore.
+    if record.front_flipped:
+        notes.append(u'il fronte guarda il muro: portato sulla faccia opposta')
+
+    # Un muro piu' vicino escluso perche' parallelo alla retta va
+    # dichiarato: e' la domanda che l'utente si fa per prima guardando il
+    # risultato. Va detto solo quando quel muro sarebbe stato davvero un
+    # contendente, cioe' quando rientrava nella tolleranza.
+    closest = in_range[0]
+    if closest is not best \
+            and closest.face_distance <= options.tolerance_internal \
+            and not faces_the_wall(closest, front):
+        notes.append(
+            u'muro piu\' vicino escluso, parallelo alla retta: {} a {}'
+            .format(closest.wall_info.label,
+                    format_mm(closest.face_distance)))
+
+    # Stesso discorso per il pacchetto murario, che allunga la corsa di
+    # tutto lo spessore delle partizioni attraversate.
+    if crossed:
+        notes.append(u'faccia esterna di {} murature adiacenti (ultima: {})'
+                     .format(len(crossed) + 1, crossed[-1].wall_info.label))
+
+    # Due muri praticamente equidistanti sono il caso che l'utente
+    # controllera' per primo quando qualcosa sembrera' sbagliato, quindi va
+    # dichiarato invece di lasciarlo scoprire.
     if second is not None:
         record.competing_walls = len(qualifying)
         record.second_distance = second.face_distance
         gap = abs(second.face_distance) - abs(best.face_distance)
         if gap <= AMBIGUITY_TOL:
-            record.note = u'ambiguo: secondo muro a {}'.format(
-                format_mm(second.face_distance))
+            notes.append(u'ambiguo: secondo muro a {}'.format(
+                format_mm(second.face_distance)))
+
+    record.note = u'; '.join(notes) if notes else None
 
     return record
 
@@ -1962,25 +2407,14 @@ class AlignFailurePreprocessor(DB.IFailuresPreprocessor):
 def apply_record(record):
     """Applica uno spostamento gia' calcolato.
 
-    Prima la rotazione, con l'asse nel punto di inserimento originale che e'
-    noto con certezza; poi la traslazione, ricalcolata dal punto CORRENTE
-    verso il bersaglio assoluto, cosi' ogni deriva introdotta dalla rotazione
-    si autocorregge. La componente Z del vettore e' sempre zero.
+    La traslazione viene ricalcolata dal punto CORRENTE verso il bersaglio
+    assoluto memorizzato in analisi, invece di riusare il vettore calcolato
+    allora: se qualcosa ha mosso l'elemento nel frattempo il bersaglio resta
+    quello giusto. La componente Z del vettore e' sempre zero.
     """
     sub = DB.SubTransaction(doc)
     sub.Start()
     try:
-        if record.needs_rotation:
-            origin = record.point_before
-            axis = DB.Line.CreateBound(
-                origin,
-                DB.XYZ(origin.X, origin.Y, origin.Z + 1.0))
-            DB.ElementTransformUtils.RotateElement(
-                doc, record.element_id, axis, record.rotation_rad)
-            record.applied_rotation = True
-            if FORCE_REGEN:
-                doc.Regenerate()
-
         if record.needs_move:
             current = insertion_point(record.element)
             if current is None:
@@ -2001,7 +2435,6 @@ def apply_record(record):
         except Exception:
             pass
         record.applied_move = False
-        record.applied_rotation = False
         record.error = u'{}'.format(error)[:180]
         return False
 
@@ -2242,7 +2675,6 @@ class MEPAlignWindow(forms.WPFWindow):
         self.options = AlignOptions(
             categories,
             tolerance_cm,
-            bool(self.chk_rotate.IsChecked),
             bool(self.chk_skip_connected.IsChecked),
             bool(self.chk_links.IsChecked),
             bool(self.chk_dryrun.IsChecked))
@@ -2288,10 +2720,14 @@ def print_header(options, elements, source_label, result):
         u'- Tolleranza: **{:.0f} cm** dalla faccia della partizione'.format(
             options.tolerance_cm),
         u'- Oltre la tolleranza l\'elemento viene saltato, non spostato',
-        u'- Posizione finale: punto di inserimento sulla faccia',
-        u'- Rotazione: {}'.format(
-            u'attiva, minima, mai oltre 90 gradi'
-            if options.apply_rotation else u'disattivata'),
+        u'- Posizione finale: punto di inserimento sulla faccia piu\' '
+        u'esterna del pacchetto murario',
+        u'- Faccia scelta con il Room Calculation Point della famiglia, '
+        u'retta di analisi lunga **{:.0f} cm**'.format(
+            options.tolerance_cm * FRONT_RAY_FACTOR),
+        u'- Spostamento lungo la retta di analisi, non lungo la normale '
+        u'del muro',
+        u'- Orientamento degli elementi: non modificato',
         u'- Elementi con connettori collegati: {}'.format(
             u'saltati' if options.skip_connected else u'elaborati'),
         u'- Modelli collegati: {}'.format(
@@ -2305,6 +2741,30 @@ def print_header(options, elements, source_label, result):
         lines.append(
             u'- Partizioni scartate: **{}** (tabella in fondo)'.format(
                 len(result.wall_problems)))
+
+    # Due numeri che dicono quanto ha pesato il fronte su questo lotto. Il
+    # primo e' il motivo per cui certi elementi si spostano molto piu' della
+    # tolleranza; il secondo dice su quanti elementi il criterio non ha
+    # potuto esprimersi, ed e' la prima cosa da guardare se il risultato non
+    # convince.
+    flipped = sum(1 for r in result.planned if r.front_flipped)
+    no_front = sum(1 for r in result.planned
+                   if r.front_outcome == F_UNKNOWN)
+    if flipped:
+        lines.append(
+            u'- Portati sulla faccia opposta perche\' il fronte guardava '
+            u'la partizione: **{}**'.format(flipped))
+    if no_front:
+        lines.append(
+            u'- Senza Room Calculation Point, faccia scelta dalla '
+            u'posizione e corsa lungo la normale: **{}**'.format(no_front))
+
+    packaged = sum(1 for r in result.planned if r.crossed_partitions)
+    if packaged:
+        lines.append(
+            u'- Allineati alla faccia esterna di un pacchetto di piu\' '
+            u'murature adiacenti: **{}**'.format(packaged))
+
     output.print_md(u'\n'.join(lines))
 
 
@@ -2349,8 +2809,8 @@ def print_moves_table(result, options):
     shown = ordered[:MAX_MOVED_ROWS]
 
     columns = [u'Elemento', u'Categoria', u'Tipo', u'Muro', u'Faccia',
-               u'Dist. prima', u'Dist. dopo', u'Spostamento', u'Rotazione',
-               u'Connettori', u'Note']
+               u'Fronte', u'Corsa', u'Dist. prima', u'Dist. dopo',
+               u'Spostamento', u'Connettori', u'Note']
     if not options.dry_run:
         columns.append(u'Esito')
 
@@ -2363,20 +2823,19 @@ def print_moves_table(result, options):
             partition_cell(record.wall_id, record.wall_label,
                            record.wall_is_linked),
             record.face_side,
+            record.front_outcome,
+            u'lungo la retta' if record.along_front else u'lungo la normale',
             format_mm(record.distance_before),
             format_mm(record.distance_after),
             format_mm(record.translation_length),
-            format_deg(record.rotation_rad) if record.needs_rotation else u'-',
             str(record.connected) if record.connected else u'-',
             record.note or u'',
         ]
         if not options.dry_run:
             if record.error:
                 outcome = u'errore: {}'.format(record.error)
-            elif record.needs_rotation and not record.applied_rotation:
-                outcome = u'spostato ma non ruotato'
             elif record.needs_move and not record.applied_move:
-                outcome = u'ruotato ma non spostato'
+                outcome = u'non spostato'
             else:
                 outcome = u'OK'
             row.append(outcome)
@@ -2396,9 +2855,9 @@ def print_already_ok(result):
         return
     output.print_md(
         u'## Elementi gia\' allineati\n\n'
-        u'**{}** elementi risultavano gia\' a posto (entro {:.0f} mm dalla '
-        u'faccia e {:.1f} gradi) e non sono stati toccati.'.format(
-            len(result.already_ok), POSITION_TOL_MM, ANGLE_TOL_DEG))
+        u'**{}** elementi risultavano gia\' a posto (entro {:.0f} mm '
+        u'dalla faccia scelta) e non sono stati toccati.'.format(
+            len(result.already_ok), POSITION_TOL_MM))
 
 
 def print_skipped_table(result):
@@ -2549,7 +3008,6 @@ def print_report(options, elements, source_label, result, preprocessor,
     if rolled_back:
         for record in result.planned:
             record.applied_move = False
-            record.applied_rotation = False
             if not record.error:
                 record.error = u'transazione annullata'
 

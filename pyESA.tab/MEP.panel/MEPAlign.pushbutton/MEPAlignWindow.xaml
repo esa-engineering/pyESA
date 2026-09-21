@@ -74,9 +74,12 @@
                            Margin="0,0,0,12"
                            Foreground="#FF404040">
                     Per ogni elemento MEP selezionato cerca la partizione verticale piu'
-                    vicina, lo porta a filo della sua faccia e lo ruota perpendicolare
-                    alla parete. Oltre la tolleranza l'elemento viene saltato. La quota
-                    non viene mai modificata.
+                    vicina e lo porta a filo di una delle sue due facce: quale, lo decide
+                    il fronte della famiglia letto dal suo Room Calculation Point. Lo
+                    spostamento avviene lungo quella stessa direzione, e se piu' muri sono
+                    a contatto il bersaglio e' la faccia piu' esterna del pacchetto. Oltre
+                    la tolleranza l'elemento viene saltato. La quota e l'orientamento non
+                    vengono mai modificati.
                 </TextBlock>
 
                 <!-- ============ Elementi da allineare ============ -->
@@ -155,6 +158,11 @@
                                    ToolTip="La distanza e' misurata in pianta fra il punto di inserimento dell'elemento e la faccia della partizione piu' vicina, non il suo asse. Gli elementi che cadono dentro lo spessore della partizione hanno distanza negativa e rientrano quindi sempre. Un elemento piu' lontano viene saltato e compare nel resoconto con la distanza misurata e di quanto ha sforato."
                                    Text="Misurata dalla faccia, non dall'asse. Oltre la tolleranza l'elemento viene saltato e riportato con la distanza misurata."/>
 
+                        <TextBlock Style="{StaticResource HintStyle}"
+                                   ToolTipService.ShowDuration="30000"
+                                   ToolTip="Per capire da che parte guarda il dispositivo lo strumento traccia dal punto di inserimento una retta lunga il doppio di questa tolleranza, nella direzione che va verso il Room Calculation Point della famiglia. Se la retta intercetta la partizione vuol dire che il dispositivo la sta guardando invece di allontanarsene, e viene quindi portato sulla faccia opposta: lo spostamento vale allora la distanza misurata piu' lo spessore del muro. Le pareti che si discostano di piu' di 5 gradi dalla perpendicolare al fronte sono considerate parallele alla retta ed escluse, perche' il dispositivo le ha di fianco e non davanti: se non ne resta nessuna l'elemento viene saltato e riportato, non allineato a un riferimento sbagliato. Sulle famiglie senza Room Calculation Point, o che non lo hanno spostato dall'origine, non c'e' nessuna retta e resta valida la faccia piu' vicina. La colonna Fronte del resoconto dice quale criterio ha deciso, elemento per elemento. Lo spostamento avviene lungo quella stessa retta e non lungo la normale del muro, ma con il cono di 5 gradi la differenza fra le due direzioni e' minima. Dove piu' istanze di muro si toccano il bersaglio e' la faccia piu' esterna dell'intero pacchetto."
+                                   Text="La stessa tolleranza regola la retta con cui si riconosce il fronte della famiglia. Le pareti che il dispositivo ha di fianco vengono escluse: se non ne resta nessuna davanti, l'elemento viene saltato e riportato."/>
+
                     </StackPanel>
                 </GroupBox>
 
@@ -164,11 +172,6 @@
                         <TextBlock Text="3. Opzioni" Style="{StaticResource SectionTitleStyle}"/>
                     </GroupBox.Header>
                     <StackPanel>
-
-                        <CheckBox x:Name="chk_rotate"
-                                  IsChecked="True"
-                                  Content="Ruota gli elementi perpendicolari alla partizione"
-                                  ToolTip="Viene applicata la rotazione piu' piccola possibile, al massimo 90 gradi: l'elemento non viene mai ribaltato di 180 gradi. Di conseguenza un elemento montato al contrario viene reso perpendicolare ma non raddrizzato. Togliendo la spunta viene applicata la sola traslazione."/>
 
                         <CheckBox x:Name="chk_links"
                                   IsChecked="True"
@@ -197,7 +200,7 @@
                     <TextBlock TextWrapping="Wrap"
                                FontSize="11"
                                Foreground="#FF6B5200"
-                               Text="Ogni elemento selezionato compare nel resoconto con il suo esito: nessuno viene ignorato in silenzio. Conviene eseguire prima una simulazione."/>
+                               Text="Lo strumento trasla soltanto: l'orientamento degli elementi non viene mai modificato. Ogni elemento selezionato compare nel resoconto con il suo esito: nessuno viene ignorato in silenzio. Conviene eseguire prima una simulazione."/>
                 </Border>
 
             </StackPanel>

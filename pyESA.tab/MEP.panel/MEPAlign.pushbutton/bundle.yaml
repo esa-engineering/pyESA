@@ -6,10 +6,18 @@ tooltip: >
   CLICK: select the MEP devices to align, then run the command. A dialog asks which of the
   nine handled categories to process, the maximum distance from the partition face (30 cm
   by default) and whether to run a simulation first. For each selected device the tool
-  looks for the nearest wall face: if it is closer than the tolerance the device is moved
-  perpendicular onto that face and rotated by the smallest angle that makes it
-  perpendicular to it, never by 180 degrees. If it is farther the device is SKIPPED and
+  looks for the nearest wall: if it is closer than the tolerance the device is moved
+  perpendicular onto one of its two faces. If it is farther the device is SKIPPED and
   reported with its measured distance.
+
+  Which of the two faces is decided by the family front, read from its Room Calculation
+  Point: a device that faces the partition instead of the room is carried across to the
+  far face, so the move can go either way along the wall normal. Where several wall
+  instances touch each other, the target is the outermost face of the whole package.
+
+  The device travels along the analysis line, that is its own line of sight, not along the
+  wall normal: one that faces the wall at an angle slides sideways as well. Orientation is
+  never changed: the tool only translates.
 
   Every element you selected appears in the report with its own outcome and reason, so
   nothing is ignored silently. Devices hosted by a wall, pinned, inside a group or in an
