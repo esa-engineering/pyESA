@@ -172,6 +172,36 @@ Note: `forms.alert(..., options=[...])` is not available in every pyRevit versio
 codebase isolates such calls with a `forms.CommandSwitchWindow.show` fallback
 (see `ask_link_strategy()` in `TagLinkedRooms_script.py`).
 
+### House style for new XAML windows
+
+New dialogs use approach 2 (raw `XamlReader.Load` from a `<Tool>_ui.py` module beside the
+script) and follow the look of `AutoComponents.pushbutton/legend_form.xaml` and
+`ElementsInRoom.pushbutton/ElementsInRoom_form.xaml` — copy from either rather than
+inventing a new one:
+
+- Default WPF chrome. **No** `Background`, `FontFamily`, `SizeToContent` or ControlTemplates
+  on the `Window`; `WindowStartupLocation="CenterScreen"`, `ResizeMode="CanResizeWithGrip"`.
+- `Window.Resources` carries the same five named styles — `SectionHeader` (bold 12pt,
+  `Foreground="#2D5A8A"`), `FieldLabel`, `InputField` (`Width="70"`, left-aligned),
+  `ComboStyle`, `UnitLabel` (gray 11pt) — plus `HintText` for gray 11pt wrapping notes.
+- Root `Grid Margin="15"` with rows `Auto / * / Auto`: centred emoji + title TextBlock,
+  a `ScrollViewer` holding the sections, then the button row.
+- One section per `Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
+  Padding="10" Margin="0,0,0,10"`, opened by a `SectionHeader` TextBlock reading
+  `emoji + ALL CAPS TITLE`. Informational panels use `BorderBrush="#E8E8E8"
+  Background="#F8F8F8"` and gray text.
+- Label/field rows are a 2-column `Grid` (fixed-width label column, `*` control column,
+  `Margin="0,5"`); sub-options indent with `Margin="20,5,0,0"`.
+- Bottom row right-aligned: Cancel (plain) then OK (`Width="100" Height="30"
+  IsDefault="True" Background="#2D5A8A" Foreground="White"`).
+- Multi-select lists are a plain `ListBox` filled in code with `CheckBox` objects carrying
+  the model item in `.Tag` (no `DataTemplate`, no binding), preceded by a `🔍` search row
+  and followed by a `Thumb` resize grip and Select All / Deselect All buttons.
+- Numeric input is validated all-at-once in `OnOK` via a `(bool, message)` helper, showing
+  `MessageBox.Show(...)` and leaving the window open — never with input masks.
+- Persist the last-used settings with `script.get_config('ESA_<ToolName>')` /
+  `script.save_config()`, wrapped in silent `try/except`.
+
 ## Reporting
 
 User-facing results go to the pyRevit output panel, not to `print`:
@@ -207,30 +237,17 @@ against geometry.
 
 ## Language
 
-**Everything a user of the tool can read is English.** That means the button title and
-tooltip in `bundle.yaml`, every string in the `.xaml`, the dialog text that the script
-builds at runtime, and the whole output report: column headings, table titles, skip
-reasons, notes, warnings and `forms.alert` messages. `bundle.yaml` may still carry
-`it_it:` localization keys alongside the English defaults.
+**Everything the user sees is in English — no exceptions.** Button titles and tooltips,
+`bundle.yaml` (with `it_it:` localization keys where a translation is wanted), `__title__`
+and `__doc__`, every XAML label / ToolTip / button caption, every `forms.alert` and
+`MessageBox` text, `forms.ProgressBar` titles, and the whole `output.print_md` /
+`print_table` report, column headers and status labels included. Constants whose *value* is
+a displayed label get English names too (`TO_WRITE = "TO WRITE"`, not
+`DA_SCRIVERE = "DA SCRIVERE"`).
 
-**Italian stays in two places, and only two:**
-
-| Italian is fine | Because |
-| --- | --- |
-| comments and docstrings inside the `.py` | they are read by whoever maintains the script, not by whoever runs it |
-| the per-tool `README.md` and any other dedicated `.md` | same audience, and they are where the reasoning behind a design choice gets written down |
-
-So a single file is routinely bilingual: Italian comments explaining *why*, around English
-strings that the user will see. That is intentional, not an oversight — don't "fix" it in
-either direction.
-
-Non-ASCII characters are avoided inside the `.py` (`e'` instead of `è`), including in the
-Italian comments; the `.md` files use proper accents.
-
-Several older tools predate this rule and are still Italian throughout. When you add a
-string to one of them, match that tool so its interface stays coherent in one language,
-and translate the whole tool only when asked to. `MEPAlignToWall` is the worked example of
-the convention: English UI and report, Italian comments, docstring and README.
+Code comments, docstrings and per-tool `README.md` files are mostly Italian — keep writing
+those in Italian, matching the file you are editing. The split is: **English out, Italian
+in.** Older tools still carry Italian UI strings; translate them when you touch them.
 
 ## Development notes worth reading
 

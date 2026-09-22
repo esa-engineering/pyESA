@@ -21,6 +21,8 @@ from System.IO import FileStream, FileMode
 from pyrevit import DB, revit, script
 import math
 
+XAML_FILE_NAME = 'legend_form.xaml'
+
 
 # Section name in pyRevit_config.ini used to remember the last-used settings
 CONFIG_SECTION = 'ESA_AutoComponents'
@@ -275,8 +277,9 @@ class LegendConfigForm(Window):
 
     def _load_xaml(self):
         """Carica e parsa il file XAML."""
-        script_dir = os.path.dirname(__file__)
-        xaml_path = os.path.join(script_dir, 'legend_form.xaml')
+        xaml_path = script.get_bundle_file(XAML_FILE_NAME)
+        if not xaml_path or not os.path.exists(xaml_path):
+            xaml_path = os.path.join(os.path.dirname(__file__), XAML_FILE_NAME)
         
         Window.__init__(self)
         

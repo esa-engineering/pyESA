@@ -4,8 +4,32 @@ title:
   at Level
 
 tooltip:
-  Edit the host level of all the picked elements of
+  CLICK - Reassign the host level of the selected elements keeping their
 
-  a selected category by keeping the same position.
+  absolute elevation. The selection is free - the script recognises the
+
+  category of each element and applies the right method. Base level and top
+
+  level can be set independently in a single run (walls, columns, stairs,
+
+  roofs). Stair runs/landings, hosted railings and wall sweeps are
+
+  redirected to their host.
+
+
+  SHIFT + CLICK - Keep the elements on their levels and move the levels
+
+  instead. Select the elements, then pick the levels in a section, elevation
+
+  or 3D view and enter an offset (mm, + or -) for each of them. The selected
+
+  elements hosted on the moved levels stay in place, everything else follows
+
+  its level. A selection made before launching the command is used as is -
+
+  the levels it contains are the levels to move, the rest are the elements.
+
+
+  Results are listed in the pyRevit output panel.
 
 author: Antonio Miano

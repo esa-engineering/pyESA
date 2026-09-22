@@ -3,9 +3,15 @@ title:
 
   Takeoff
 
-tooltip:
-  Extracts geometric quantities from all model elements 
-  
-  and exports them to CSV, with optional additional parameters. 
+tooltip: |
+  Extracts geometric quantities from all model elements
+  and exports them to CSV, with optional additional parameters
+  (the list entered the last time is proposed again).
 
-author: Claude.ai (Antonio Miano)
+  You can choose which documents to compute: the active document
+  and/or one or more loaded Revit links (nested links included).
+
+  The Source_Document column tells which model each row comes from
+  (element IDs are unique only within their own document).
+
+author: Claude + Antonio Miano

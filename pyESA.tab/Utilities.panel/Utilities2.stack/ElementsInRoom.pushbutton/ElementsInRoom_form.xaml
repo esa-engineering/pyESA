@@ -1,0 +1,275 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Elements in Room"
+        Height="880" Width="540"
+        MinHeight="640" MinWidth="470"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="True">
+
+    <Window.Resources>
+        <!-- Common Styles -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,10,0,5"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,15,0"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0"
+                   Text="🚪 Elements in Room"
+                   FontSize="16" FontWeight="Bold"
+                   Margin="0,0,0,10"
+                   HorizontalAlignment="Center"/>
+
+        <!-- Main content with scroll -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,5,0">
+            <StackPanel Margin="0,0,10,0">
+
+                <!-- SECTION: Phase and scope -->
+                <Border x:Name="border_phase" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="🕐 PHASE AND SCOPE" Style="{StaticResource SectionHeader}"/>
+
+                        <TextBlock x:Name="txt_room_source" Style="{StaticResource HintText}" Text=""/>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="Room phase:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_phase" Grid.Row="0" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                      ToolTip="Phase of the rooms used to resolve membership (phases of the document the rooms come from)"/>
+                            <TextBlock Grid.Row="1" Text="Element phase:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_element_phase" Grid.Row="1" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                      ToolTip="Only elements that exist in this phase are processed: demolished and not yet created elements are skipped"/>
+                        </Grid>
+
+                        <TextBlock Text="Rooms" Margin="0,8,0,0" FontWeight="Bold" FontSize="11"/>
+                        <StackPanel Margin="20,5,0,0">
+                            <RadioButton x:Name="rdo_scope_all" GroupName="scope"
+                                         Content="All rooms in the project"/>
+                            <RadioButton x:Name="rdo_scope_view" GroupName="scope" Margin="0,4,0,0"
+                                         Content="Only rooms visible in the active view"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Elements" Margin="0,8,0,0" FontWeight="Bold" FontSize="11"/>
+                        <StackPanel Margin="20,5,0,0">
+                            <CheckBox x:Name="chk_elements_view"
+                                      Content="Only elements visible in the active view"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="txt_room_count" Style="{StaticResource HintText}" Margin="0,6,0,0"
+                                   Text=""/>
+                    </StackPanel>
+                </Border>
+
+                <!-- SECTION: Categories -->
+                <Border x:Name="border_categories" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📁 CATEGORIES TO PROCESS" Style="{StaticResource SectionHeader}"/>
+
+                        <!-- Search Box -->
+                        <Grid Margin="0,0,0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBox x:Name="txt_search" Grid.Column="1"
+                                     Padding="5,3"
+                                     ToolTip="Filter categories by name"/>
+                            <Button x:Name="btn_clear_search" Grid.Column="2"
+                                    Content="✕" Width="25" Margin="5,0,0,0"
+                                    ToolTip="Clear search"/>
+                        </Grid>
+
+                        <ListBox x:Name="lst_categories"
+                                 MinHeight="120" Height="200"
+                                 SelectionMode="Extended"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        </ListBox>
+
+                        <Thumb x:Name="thumb_resize" Height="8" Cursor="SizeNS"
+                               HorizontalAlignment="Stretch"
+                               Background="#CCCCCC" Opacity="0.5"
+                               ToolTip="Drag to resize list"/>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                            <Button x:Name="btn_select_visible" Content="Visible in Current View" Padding="10,3" Margin="0,0,5,0"
+                                    ToolTip="Select only the categories that have elements visible in the active view"/>
+                            <Button x:Name="btn_select_all" Content="Select All" Padding="10,3" Margin="0,0,5,0"/>
+                            <Button x:Name="btn_select_none" Content="Deselect All" Padding="10,3" Margin="0,0,5,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="txt_category_count" Style="{StaticResource HintText}" Margin="0,6,0,0"
+                                   Text=""/>
+                    </StackPanel>
+                </Border>
+
+                <!-- SECTION: Parameters -->
+                <Border x:Name="border_params" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="🔤 PARAMETERS" Style="{StaticResource SectionHeader}"/>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Read from room:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_source" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                      ToolTip="Room parameter whose value is copied"/>
+                        </Grid>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Write to:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_target" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                      ToolTip="Writable text instance parameter on the elements"/>
+                        </Grid>
+
+                        <TextBlock x:Name="txt_target_hint" Style="{StaticResource HintText}" Text=""/>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Separator:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txt_separator" Grid.Column="1" Style="{StaticResource InputField}"
+                                     Text=";"
+                                     ToolTip="Used when an element belongs to more than one room"/>
+                        </Grid>
+
+                        <CheckBox x:Name="chk_overwrite" Margin="0,8,0,0"
+                                  Content="Overwrite values that are already filled in"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- SECTION: Tolerance -->
+                <Border x:Name="border_tolerance" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📏 MEMBERSHIP TOLERANCE" Style="{StaticResource SectionHeader}"/>
+
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="When no method finds a room, the element point is probed again, offset by the distances below. 0 disables that direction."/>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="± X:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txt_tol_x" Grid.Row="0" Grid.Column="1" Style="{StaticResource InputField}" Text="0"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="cm" Style="{StaticResource UnitLabel}"/>
+
+                            <TextBlock Grid.Row="1" Text="± Y:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txt_tol_y" Grid.Row="1" Grid.Column="1" Style="{StaticResource InputField}" Text="0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="2" Text="cm" Style="{StaticResource UnitLabel}"/>
+
+                            <TextBlock Grid.Row="2" Text="Z up:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txt_tol_zup" Grid.Row="2" Grid.Column="1" Style="{StaticResource InputField}" Text="0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="2" Text="cm" Style="{StaticResource UnitLabel}"/>
+
+                            <TextBlock Grid.Row="3" Text="Z down:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txt_tol_zdown" Grid.Row="3" Grid.Column="1" Style="{StaticResource InputField}" Text="0"/>
+                            <TextBlock Grid.Row="3" Grid.Column="2" Text="cm" Style="{StaticResource UnitLabel}"/>
+                        </Grid>
+
+                        <TextBlock Text="Offset directions" Margin="0,8,0,0" FontWeight="Bold" FontSize="11"/>
+                        <StackPanel Margin="20,5,0,0">
+                            <RadioButton x:Name="rdo_axes_global" GroupName="axes"
+                                         Content="Project global axes"/>
+                            <RadioButton x:Name="rdo_axes_local" GroupName="axes" Margin="0,4,0,0"
+                                         Content="Each object's own axes"/>
+                            <TextBlock Style="{StaticResource HintText}" Margin="0,4,0,0"
+                                       Text="Elements with no orientation of their own still use the global axes."/>
+                        </StackPanel>
+
+                        <CheckBox x:Name="chk_retry_level" Margin="0,8,0,0"
+                                  Content="If the point falls in no room, retry at level elevation"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- INFO -->
+                <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
+                        CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="ℹ️ RUN MODE"
+                                   Style="{StaticResource SectionHeader}" Foreground="Gray"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                            <Run Text="CLICK: rooms from the current document."/>
+                            <LineBreak/>
+                            <Run Text="SHIFT + CLICK: choose a loaded Revit link and read its rooms."/>
+                            <LineBreak/>
+                            <Run Text="The model is written in both cases; the report lists every change."/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button x:Name="btn_cancel" Content="Cancel" Width="100" Height="30"
+                    Margin="0,0,10,0"/>
+            <Button x:Name="btn_ok" Content="OK" Width="100" Height="30"
+                    IsDefault="True"
+                    Background="#2D5A8A" Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>
