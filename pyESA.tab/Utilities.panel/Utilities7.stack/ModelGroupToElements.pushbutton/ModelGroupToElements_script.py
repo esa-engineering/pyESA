@@ -27,6 +27,8 @@ clr.AddReference('WindowsBase')
 
 from Autodesk.Revit.DB import (
     BuiltInCategory,
+    BuiltInParameter,
+    Element,
     ElementId,
     FilteredElementCollector,
     Group,
@@ -113,14 +115,61 @@ def collect_selected_model_groups():
     return groups
 
 
-def group_type_name(group):
+def get_element_name(el):
+    """Nome di un elemento.
+
+    Sotto IronPython 2 l'accesso diretto a `el.Name` non si risolve su
+    diverse classi dell'API (Element.Name e' dichiarato piu' volte lungo
+    la gerarchia): pyRevit usa `Element.Name.GetValue(el)` e qui si
+    ripiega comunque sui parametri di nome del tipo.
+    """
+    if el is None:
+        return None
     try:
-        gtype = doc.GetElement(group.GetTypeId())
-        if gtype is not None and gtype.Name:
-            return gtype.Name
+        name = Element.Name.GetValue(el)
+        if name:
+            return name
     except Exception:
         pass
-    return "<unnamed group type>"
+    try:
+        name = el.Name
+        if name:
+            return name
+    except Exception:
+        pass
+    for bip in (BuiltInParameter.SYMBOL_NAME_PARAM,
+                BuiltInParameter.ALL_MODEL_TYPE_NAME):
+        try:
+            param = el.get_Parameter(bip)
+            if param is not None:
+                name = param.AsString()
+                if name:
+                    return name
+        except Exception:
+            pass
+    return None
+
+
+def group_type_name(group):
+    gtype = None
+    try:
+        gtype = group.GroupType
+    except Exception:
+        gtype = None
+    if gtype is None:
+        try:
+            gtype = doc.GetElement(group.GetTypeId())
+        except Exception:
+            gtype = None
+
+    name = get_element_name(gtype)
+    if name:
+        return name
+    # su un'istanza di gruppo Group.Name restituisce il nome del tipo
+    name = get_element_name(group)
+    if name:
+        return name
+    return "<group type {0}>".format(get_element_id_value(group.GetTypeId()))
 
 
 def category_name(el):
@@ -271,14 +320,11 @@ def value_to_display(storage, value):
     if value is None:
         return u""
     if storage == StorageType.ElementId:
-        target = doc.GetElement(value)
-        if target is not None:
-            try:
-                return u"{0} ({1})".format(
-                    target.Name, get_element_id_value(value)
-                )
-            except Exception:
-                pass
+        target_name = get_element_name(doc.GetElement(value))
+        if target_name:
+            return u"{0} ({1})".format(
+                target_name, get_element_id_value(value)
+            )
         return u"{0}".format(get_element_id_value(value))
     if storage == StorageType.Double:
         return u"{0:.6g}".format(value)

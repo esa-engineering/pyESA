@@ -5,4 +5,5 @@ layout:
   - MEPConnect
   - Insulation
   - ReLevelMEP
+  - MEPAlignToWall
   - IsVertical
