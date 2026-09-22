@@ -430,9 +430,9 @@ MEP_CATEGORY_NAMES = [
     'OST_SecurityDevices',
 ]
 
-XAML_FILE_NAME = 'MEPAlignWindow.xaml'
+XAML_FILE_NAME = 'MEPAlignToWallWindow.xaml'
 
-TRANSACTION_NAME = u'Allineamento MEP ai muri'
+TRANSACTION_NAME = u'Align MEP to walls'
 
 DEFAULT_TOLERANCE_CM = 30.0     # soglia proposta nella finestra
 MAX_TOLERANCE_CM = 500.0        # oltre e' quasi certamente un errore di battitura
@@ -525,44 +525,44 @@ LOC_CORE_INTERIOR = 5
 
 # Esito del test del fronte, per la colonna omonima del resoconto. Dichiarati
 # qui perche' PlannedMove li usa come valore iniziale.
-F_TOWARDS = u'verso il muro'        # la retta intercetta: faccia opposta
-F_AWAY = u'opposto al muro'         # la retta si allontana: faccia vicina
-F_PARALLEL = u'radente al muro'     # la retta non arriva: faccia vicina
-F_UNKNOWN = u'non definito'         # niente Room Calculation Point
+F_TOWARDS = u'towards the wall'     # la retta intercetta: faccia opposta
+F_AWAY = u'away from the wall'      # la retta si allontana: faccia vicina
+F_PARALLEL = u'grazing the wall'    # la retta non arriva: faccia vicina
+F_UNKNOWN = u'undefined'            # niente Room Calculation Point
 
 # Vocabolario chiuso dei motivi di esclusione: dichiarati in un unico punto
 # perche' lo stesso motivo non finisca scritto in due modi diversi.
-R_NO_POINT = u'elemento senza punto di inserimento'
-R_HOSTED_WALL = u'ospitato dal muro {}'
-R_HOSTED_OTHER = u'ospitato da {} {}'
-R_PINNED = u'elemento bloccato (pin)'
-R_GROUP = u'elemento nel gruppo "{}"'
-R_SUBCOMPONENT = u'sotto-componente di famiglia annidata'
-R_DESIGN_OPTION = u'opzione di progetto non attiva'
-R_BORROWED = u'in prestito ad altro utente'
-R_OUT_OF_Z = u'ingombro fuori dall\'estensione verticale dei muri'
-R_BEYOND_END = u'oltre l\'estremita\' del muro di {}'
-R_NO_PROJECTION = u'proiezione sulla geometria del muro non calcolabile'
-R_CATEGORY_NOT_HANDLED = u'categoria non gestita dallo strumento'
-R_CATEGORY_NOT_SELECTED = u'categoria esclusa nella finestra'
-R_NO_PARTITION = u'nessuna partizione verticale nel raggio di ricerca'
-R_NOT_FACED = u'nessuna partizione fronteggiata: quelle vicine corrono ' \
-              u'parallele alla retta di analisi'
-R_OVER_TOLERANCE = u"oltre la tolleranza: {} dalla faccia piu' vicina"
-R_CONNECTED = u'collegato ad altri elementi ({} connettori)'
-R_ANALYSIS_ERROR = u'errore in analisi: {}'
+R_NO_POINT = u'element has no insertion point'
+R_HOSTED_WALL = u'hosted by wall {}'
+R_HOSTED_OTHER = u'hosted by {} {}'
+R_PINNED = u'element is pinned'
+R_GROUP = u'element inside group "{}"'
+R_SUBCOMPONENT = u'sub-component of a nested family'
+R_DESIGN_OPTION = u'inactive design option'
+R_BORROWED = u'borrowed by another user'
+R_OUT_OF_Z = u'extents outside the vertical range of the walls'
+R_BEYOND_END = u'past the wall end by {}'
+R_NO_PROJECTION = u'projection onto the wall geometry cannot be computed'
+R_CATEGORY_NOT_HANDLED = u'category not handled by the tool'
+R_CATEGORY_NOT_SELECTED = u'category cleared in the dialog'
+R_NO_PARTITION = u'no vertical partition within the search radius'
+R_NOT_FACED = u'no partition is being faced: the nearby ones run ' \
+              u'parallel to the analysis line'
+R_OVER_TOLERANCE = u'beyond the tolerance: {} from the nearest face'
+R_CONNECTED = u'connected to other elements ({} connectors)'
+R_ANALYSIS_ERROR = u'analysis error: {}'
 
-W_CURTAIN = u'muro tenda: spessore nullo, la distanza dalla faccia non e\' definita'
-W_SLANTED = u'muro inclinato: la faccia non e\' verticale'
-W_NO_CURVE = u'muro senza linea di posizionamento'
-W_STACKED_PARENT = u'contenitore di muro sovrapposto: si usano i suoi membri'
-L_NOT_LOADED = u'collegamento non caricato'
-L_TILTED = u'collegamento inclinato o capovolto: lo strumento lavora in pianta'
-L_MIRRORED = u'collegamento speculare: i versi delle facce sarebbero invertiti'
-L_NO_TRANSFORM = u'trasformazione del collegamento non leggibile'
-L_SCALED = u'collegamento in scala: le distanze non sarebbero confrontabili'
-W_NO_BBOX = u'estensione verticale del muro non leggibile'
-W_NO_OFFSET = u'scostamento della linea di posizionamento indeterminato'
+W_CURTAIN = u'curtain wall: zero thickness, the distance from the face is undefined'
+W_SLANTED = u'slanted wall: the face is not vertical'
+W_NO_CURVE = u'wall with no location line'
+W_STACKED_PARENT = u'stacked wall container: its members are used instead'
+L_NOT_LOADED = u'link not loaded'
+L_TILTED = u'link tilted or flipped: the tool works in plan'
+L_MIRRORED = u'mirrored link: face directions would be reversed'
+L_NO_TRANSFORM = u'link transform cannot be read'
+L_SCALED = u'scaled link: distances would not be comparable'
+W_NO_BBOX = u'wall vertical extent cannot be read'
+W_NO_OFFSET = u'location line offset is indeterminate'
 
 
 # =========================================================================
@@ -741,7 +741,7 @@ def wall_label(wall):
             return DB.Element.Name.GetValue(wall_type)
     except Exception:
         pass
-    return u'Muro'
+    return u'Wall'
 
 
 def is_stacked_parent(wall):
@@ -840,7 +840,7 @@ def is_slanted(wall):
         return False, None
 
     if normal_z > SLANT_NORMAL_TOL:
-        return True, u'componente Z della normale: {:.3f}'.format(normal_z)
+        return True, u'normal Z component: {:.3f}'.format(normal_z)
     return False, None
 
 
@@ -917,8 +917,8 @@ def location_line_offset(wall):
     if kind == LOC_CORE_CENTERLINE:
         return (d_int - d_ext) / 2.0, None
 
-    warn(u'Muro {}: valore "Location Line" non riconosciuto ({}), '
-         u'usata la mezzeria.'.format(element_id_value(wall.Id), kind))
+    warn(u'Wall {}: unrecognised "Location Line" value ({}), '
+         u'centreline assumed.'.format(element_id_value(wall.Id), kind))
     return 0.0, None
 
 
@@ -1033,10 +1033,10 @@ def build_wall_info(wall, source):
             except Exception:
                 pass
             if computed.DotProduct(info.orientation) < 0.99:
-                warn(u'Muro {}: la normale calcolata dalla tangente non '
-                     u'coincide con Wall.Orientation. Sui muri rettilinei si '
-                     u'usa Wall.Orientation, ma sugli archi la convenzione '
-                     u'del prodotto vettoriale va verificata.'.format(
+                warn(u'Wall {}: the normal computed from the tangent does '
+                     u'not match Wall.Orientation. Straight walls use '
+                     u'Wall.Orientation, but on arcs the cross product '
+                     u'convention needs checking.'.format(
                          element_id_value(info.wall_id)))
 
     return info, None
@@ -1105,8 +1105,8 @@ def project_on_curve(wall_info, point_flat):
             param_is_angle = False
         else:
             param_is_angle = True
-            warn(u'Muro {}: parametrizzazione dell\'arco non riconosciuta, '
-                 u'assunto l\'angolo in radianti.'.format(
+            warn(u'Wall {}: unrecognised arc parametrisation, angle in '
+                 u'radians assumed.'.format(
                      element_id_value(wall_info.wall_id)))
 
         if param_is_angle:
@@ -1138,7 +1138,7 @@ def project_on_curve(wall_info, point_flat):
         return foot, tangent, beyond
 
     # Altri tipi di curva (ellissi, spline): non gestiti.
-    warn(u'Muro {}: tipo di linea di posizionamento non gestito ({}).'.format(
+    warn(u'Wall {}: unhandled location line type ({}).'.format(
         element_id_value(wall_info.wall_id), type(wall_info.curve).__name__))
     return None
 
@@ -1251,7 +1251,7 @@ def link_display_name(link):
                 return name
         except Exception:
             continue
-    return u'collegamento {}'.format(element_id_value(link.Id))
+    return u'link {}'.format(element_id_value(link.Id))
 
 
 def link_transform_problem(transform):
@@ -1297,7 +1297,7 @@ def partition_info(source, partition):
         info, reason = build_wall_info(partition, source)
     except Exception as error:
         info = None
-        reason = u'errore in analisi: {}'.format(u'{}'.format(error)[:120])
+        reason = R_ANALYSIS_ERROR.format(u'{}'.format(error)[:120])
     PARTITION_CACHE[key] = (info, reason)
     return info, reason
 
@@ -1335,7 +1335,7 @@ def collect_ids_in(document, points, margin, label):
             .WherePasses(DB.BoundingBoxIntersectsFilter(outline))
         return List[DB.ElementId](collector.ToElementIds())
     except Exception as error:
-        warn(u'Raccolta delle partizioni in {} non riuscita: {}'.format(
+        warn(u'Collecting partitions in {} failed: {}'.format(
             label, error))
         return empty
 
@@ -1348,15 +1348,15 @@ def collect_partition_sources(points, tolerance_internal, include_links):
     ridotti e non sull'intero modello.
     """
     if not PARTITION_CATEGORIES:
-        warn(u'Nessuna categoria di partizione verticale disponibile in '
-             u'questa versione di Revit.')
+        warn(u'No vertical partition category is available in this '
+             u'version of Revit.')
         return []
 
     margin = tolerance_internal + PARTITION_MARGIN
     sources = []
 
     host = PartitionSource(0, doc, None, None)
-    host.ids = collect_ids_in(doc, points, margin, u'questo modello')
+    host.ids = collect_ids_in(doc, points, margin, u'this model')
     sources.append(host)
 
     if not include_links:
@@ -1367,7 +1367,7 @@ def collect_partition_sources(points, tolerance_internal, include_links):
                      .OfClass(DB.RevitLinkInstance)
                      .ToElements())
     except Exception as error:
-        warn(u'Elenco dei modelli collegati non leggibile: {}'.format(error))
+        warn(u'The list of linked models cannot be read: {}'.format(error))
         return sources
 
     for link in links:
@@ -1379,7 +1379,7 @@ def collect_partition_sources(points, tolerance_internal, include_links):
         except Exception:
             link_doc = None
         if link_doc is None:
-            warn(u'Collegamento "{}" ignorato: {}.'.format(name, L_NOT_LOADED))
+            warn(u'Link "{}" ignored: {}.'.format(name, L_NOT_LOADED))
             continue
 
         transform = None
@@ -1388,13 +1388,13 @@ def collect_partition_sources(points, tolerance_internal, include_links):
         except Exception:
             transform = None
         if transform is None:
-            warn(u'Collegamento "{}" ignorato: {}.'.format(
+            warn(u'Link "{}" ignored: {}.'.format(
                 name, L_NO_TRANSFORM))
             continue
 
         problem = link_transform_problem(transform)
         if problem is not None:
-            warn(u'Collegamento "{}" ignorato: {}.'.format(name, problem))
+            warn(u'Link "{}" ignored: {}.'.format(name, problem))
             continue
 
         source = PartitionSource(element_id_value(link.Id), link_doc,
@@ -1434,7 +1434,7 @@ def partitions_near_point(point, tolerance_internal, sources):
                     point_outline(local_point, tolerance_internal)))\
                 .ToElements()
         except Exception as error:
-            warn(u"Filtro di prossimita' non riuscito: {}".format(error))
+            warn(u'Proximity filter failed: {}'.format(error))
             continue
 
         for partition in near:
@@ -2211,7 +2211,7 @@ def plan_element(element, options, context):
     record.wall_id = wall_info.wall_id
     record.wall_label = wall_info.label
     record.wall_is_linked = wall_info.source.is_linked
-    record.face_side = u'esterna' if face_side > 0 else u'interna'
+    record.face_side = u'exterior' if face_side > 0 else u'interior'
     record.front_outcome = front_outcome
     record.front_flipped = face_side != best.side
 
@@ -2259,13 +2259,13 @@ def plan_element(element, options, context):
 
     notes = []
     if record.rotation_over_limit:
-        notes.append(u'rotazione oltre il limite di {:.0f} gradi: '
-                     u'non applicata'.format(FRONT_MAX_ANGLE_DEG))
+        notes.append(u'rotation beyond the {:.0f} degree limit: '
+                     u'not applied'.format(FRONT_MAX_ANGLE_DEG))
 
     # Uno spostamento che attraversa il muro e' molto piu' lungo della
     # distanza misurata: senza questa riga sembrerebbe un errore.
     if record.front_flipped:
-        notes.append(u'il fronte guarda il muro: portato sulla faccia opposta')
+        notes.append(u'front faces the wall: moved to the opposite face')
 
     # Un muro piu' vicino escluso perche' parallelo alla retta va
     # dichiarato: e' la domanda che l'utente si fa per prima guardando il
@@ -2276,14 +2276,14 @@ def plan_element(element, options, context):
             and closest.face_distance <= options.tolerance_internal \
             and not faces_the_wall(closest, front):
         notes.append(
-            u'muro piu\' vicino escluso, parallelo alla retta: {} a {}'
+            u'nearer wall excluded, parallel to the line: {} at {}'
             .format(closest.wall_info.label,
                     format_mm(closest.face_distance)))
 
     # Stesso discorso per il pacchetto murario, che allunga la corsa di
     # tutto lo spessore delle partizioni attraversate.
     if crossed:
-        notes.append(u'faccia esterna di {} murature adiacenti (ultima: {})'
+        notes.append(u'outer face of {} adjacent walls (last one: {})'
                      .format(len(crossed) + 1, crossed[-1].wall_info.label))
 
     # Due muri praticamente equidistanti sono il caso che l'utente
@@ -2294,7 +2294,7 @@ def plan_element(element, options, context):
         record.second_distance = second.face_distance
         gap = abs(second.face_distance) - abs(best.face_distance)
         if gap <= AMBIGUITY_TOL:
-            notes.append(u'ambiguo: secondo muro a {}'.format(
+            notes.append(u'ambiguous: second wall at {}'.format(
                 format_mm(second.face_distance)))
 
     record.note = u'; '.join(notes) if notes else None
@@ -2317,12 +2317,12 @@ def build_plan(elements, options, context):
     for built_in_category in options.categories:
         selected_keys.add(element_id_value(DB.ElementId(built_in_category)))
 
-    with forms.ProgressBar(title='Analisi... ({value} di {max_value})',
+    with forms.ProgressBar(title='Analysing... ({value} of {max_value})',
                            cancellable=True) as progress:
         total = len(elements)
         for index, element in enumerate(elements):
             if progress.cancelled:
-                raise UserWarning(u'annullato')
+                raise UserWarning(u'cancelled')
             progress.update_progress(index + 1, total)
 
             category_name, category_key = category_of(element)
@@ -2450,7 +2450,7 @@ class AlignFailurePreprocessor(DB.IFailuresPreprocessor):
             if is_error:
                 has_error = True
 
-            record = (description, ids, u'errore' if is_error else u'avviso')
+            record = (description, ids, u'error' if is_error else u'warning')
             if record not in self.messages:
                 self.messages.append(record)
 
@@ -2535,12 +2535,12 @@ def apply_all(planned):
     """Applica tutti i movimenti pianificati. Ritorna (riusciti, falliti)."""
     ok = 0
     failed = 0
-    with forms.ProgressBar(title='Allineamento... ({value} di {max_value})',
+    with forms.ProgressBar(title='Aligning... ({value} of {max_value})',
                            cancellable=True) as progress:
         total = len(planned)
         for index, record in enumerate(planned):
             if progress.cancelled:
-                raise UserWarning(u'annullato')
+                raise UserWarning(u'cancelled')
             progress.update_progress(index + 1, total)
             if apply_record(record):
                 ok += 1
@@ -2598,13 +2598,13 @@ def elements_from_selection():
 
 def pick_elements():
     """Selezione grafica degli elementi MEP. Vuota se l'utente preme Esc."""
-    with forms.WarningBar(title='Seleziona gli elementi MEP da allineare, '
-                                'poi premi Finish'):
+    with forms.WarningBar(title='Select the MEP elements to align, '
+                                'then press Finish'):
         try:
             references = uidoc.Selection.PickObjects(
                 UI.Selection.ObjectType.Element,
                 MEPSelectionFilter(),
-                'Seleziona gli elementi MEP da allineare')
+                'Select the MEP elements to align')
         except Exception:
             return []
 
@@ -2632,16 +2632,16 @@ def resolve_elements():
     """(elementi, etichetta della fonte). Interrompe se non ce ne sono."""
     elements = elements_from_selection()
     if elements:
-        return elements, u'dalla selezione corrente'
+        return elements, u'from the current selection'
 
     elements = pick_elements()
     if not elements:
         script.exit()
-    return elements, u'scelti con la selezione grafica'
+    return elements, u'picked graphically'
 
 
-class MEPAlignWindow(forms.WPFWindow):
-    """Finestra di dialogo definita in MEPAlignWindow.xaml."""
+class MEPAlignToWallWindow(forms.WPFWindow):
+    """Finestra di dialogo definita in MEPAlignToWallWindow.xaml."""
 
     # Attributo di classe: gli handler delle CheckBox scattano durante il
     # popolamento iniziale, prima che __init__ abbia finito.
@@ -2682,15 +2682,15 @@ class MEPAlignWindow(forms.WPFWindow):
 
 
     def _setup_selection(self, elements, source_label, out_of_scope):
-        self.tb_walls_info.Text = u'{} elementi selezionati ({}).'.format(
+        self.tb_walls_info.Text = u'{} elements selected ({}).'.format(
             len(elements), source_label)
 
-        detail = (u'Per ognuno lo strumento cerca la partizione verticale '
-                  u'piu\' vicina. Gli elementi oltre la tolleranza vengono '
-                  u'saltati e riportati nel resoconto.')
+        detail = (u'For each of them the tool looks for the nearest '
+                  u'vertical partition. Elements beyond the tolerance are '
+                  u'skipped and reported.')
         if out_of_scope:
-            detail += (u' {} elementi selezionati non appartengono alle '
-                       u'categorie gestite e verranno saltati.'.format(
+            detail += (u' {} selected elements do not belong to the '
+                       u'handled categories and will be skipped.'.format(
                            out_of_scope))
         self.tb_walls_extent.Text = detail
 
@@ -2716,8 +2716,8 @@ class MEPAlignWindow(forms.WPFWindow):
                 if built_in_category == check.Tag:
                     candidates += count
                     break
-        self.tb_cat_count.Text = u'{} categorie su {}, {} elementi ' \
-                                 u'candidati'.format(len(selected),
+        self.tb_cat_count.Text = u'{} of {} categories, {} candidate ' \
+                                 u'elements'.format(len(selected),
                                                      len(self._checks),
                                                      candidates)
 
@@ -2740,28 +2740,28 @@ class MEPAlignWindow(forms.WPFWindow):
         """(valore in cm, errore). Accetta virgola o punto."""
         raw = (self.tb_threshold.Text or u'').strip().replace(u',', u'.')
         if not raw:
-            return None, u'Inserisci la distanza massima in centimetri.'
+            return None, u'Enter the maximum distance in centimetres.'
         try:
             value = float(raw)
         except ValueError:
-            return None, u'La distanza massima non e\' un numero valido.'
+            return None, u'The maximum distance is not a valid number.'
         if value <= 0.0:
-            return None, u'La distanza massima deve essere maggiore di zero.'
+            return None, u'The maximum distance must be greater than zero.'
         if value > MAX_TOLERANCE_CM:
-            return None, u'La distanza massima sembra fuori scala ' \
-                         u'(oltre {:.0f} cm).'.format(MAX_TOLERANCE_CM)
+            return None, u'The maximum distance looks out of scale ' \
+                         u'(over {:.0f} cm).'.format(MAX_TOLERANCE_CM)
         return value, None
 
     def on_run(self, sender, args):
         tolerance_cm, error = self._parse_tolerance()
         if error:
-            forms.alert(error, title=u'Valore non valido')
+            forms.alert(error, title=u'Invalid value')
             return
 
         categories = [c.Tag for c in self._checks if c.IsChecked]
         if not categories:
-            forms.alert(u'Seleziona almeno una categoria da allineare.',
-                        title=u'Nessuna categoria')
+            forms.alert(u'Select at least one category to align.',
+                        title=u'No category')
             return
 
         self.options = AlignOptions(
@@ -2787,9 +2787,9 @@ def resolve_xaml_path():
         path = op.join(op.dirname(__file__), XAML_FILE_NAME)
     if not op.isfile(path):
         forms.alert(
-            u'File grafica non trovato:\n\n{}\n\nDeve stare nella stessa '
-            u'cartella dello script.'.format(path),
-            title=u'Grafica mancante', exitscript=True)
+            u'Layout file not found:\n\n{}\n\nIt must sit in the same '
+            u'folder as the script.'.format(path),
+            title=u'Missing layout', exitscript=True)
     return path
 
 
@@ -2799,40 +2799,39 @@ def resolve_xaml_path():
 
 def print_header(options, elements, source_label, result):
     if options.dry_run:
-        output.print_md(u'# Allineamento MEP alle partizioni - simulazione')
+        output.print_md(u'# MEP alignment to partitions - simulation')
         output.print_md(
-            u'**Nessuna modifica e\' stata applicata al modello.** '
-            u'I valori seguenti sono il risultato che verrebbe prodotto.')
+            u'**No change has been applied to the model.** '
+            u'The figures below are the result that would be produced.')
     else:
-        output.print_md(u'# Allineamento MEP alle partizioni - resoconto')
+        output.print_md(u'# MEP alignment to partitions - report')
 
     lines = [
-        u'- Elementi selezionati: **{}** ({})'.format(
+        u'- Elements selected: **{}** ({})'.format(
             len(elements), source_label),
-        u'- Tolleranza: **{:.0f} cm** dalla faccia della partizione'.format(
+        u'- Tolerance: **{:.0f} cm** from the partition face'.format(
             options.tolerance_cm),
-        u'- Oltre la tolleranza l\'elemento viene saltato, non spostato',
-        u'- Posizione finale: punto di inserimento sulla faccia piu\' '
-        u'esterna del pacchetto murario',
-        u'- Faccia scelta con il Room Calculation Point della famiglia, '
-        u'retta di analisi lunga **{:.0f} cm**'.format(
+        u'- Beyond the tolerance the element is skipped, not moved',
+        u'- Final position: insertion point on the outermost face of '
+        u'the wall package',
+        u'- Face chosen from the family Room Calculation Point, '
+        u'analysis line **{:.0f} cm** long'.format(
             options.tolerance_cm * FRONT_RAY_FACTOR),
-        u'- Spostamento lungo la retta di analisi, non lungo la normale '
-        u'del muro',
-        u'- Raddrizzamento: il fronte viene portato perpendicolare alla '
-        u'faccia, al massimo di **{:.0f} gradi**'.format(FRONT_MAX_ANGLE_DEG),
-        u'- Elementi con connettori collegati: {}'.format(
-            u'saltati' if options.skip_connected else u'elaborati'),
-        u'- Modelli collegati: {}'.format(
-            u'inclusi nella ricerca' if options.include_links
-            else u'esclusi dalla ricerca'),
-        u'- Categorie elaborate: **{}** su {}'.format(
+        u'- Travel along the analysis line, not along the wall normal',
+        u'- Squaring up: the front is brought perpendicular to the face, '
+        u'by at most **{:.0f} degrees**'.format(FRONT_MAX_ANGLE_DEG),
+        u'- Elements with connected connectors: {}'.format(
+            u'skipped' if options.skip_connected else u'processed'),
+        u'- Linked models: {}'.format(
+            u'included in the search' if options.include_links
+            else u'excluded from the search'),
+        u'- Categories processed: **{}** of {}'.format(
             len(options.categories), len(MEP_CATEGORIES)),
-        u'- La quota Z non viene modificata',
+        u'- Elevation is never changed',
     ]
     if result.wall_problems:
         lines.append(
-            u'- Partizioni scartate: **{}** (tabella in fondo)'.format(
+            u'- Partitions discarded: **{}** (table at the end)'.format(
                 len(result.wall_problems)))
 
     # Due numeri che dicono quanto ha pesato il fronte su questo lotto. Il
@@ -2845,25 +2844,25 @@ def print_header(options, elements, source_label, result):
                    if r.front_outcome == F_UNKNOWN)
     if flipped:
         lines.append(
-            u'- Portati sulla faccia opposta perche\' il fronte guardava '
-            u'la partizione: **{}**'.format(flipped))
+            u'- Moved to the opposite face because the front was facing '
+            u'the partition: **{}**'.format(flipped))
     if no_front:
         lines.append(
-            u'- Senza Room Calculation Point, faccia scelta dalla '
-            u'posizione e corsa lungo la normale: **{}**'.format(no_front))
+            u'- Without a Room Calculation Point, face chosen by position '
+            u'and travel along the normal: **{}**'.format(no_front))
 
     packaged = sum(1 for r in result.planned if r.crossed_partitions)
     if packaged:
         lines.append(
-            u'- Allineati alla faccia esterna di un pacchetto di piu\' '
-            u'murature adiacenti: **{}**'.format(packaged))
+            u'- Aligned to the outer face of a package of several '
+            u'adjacent walls: **{}**'.format(packaged))
 
     output.print_md(u'\n'.join(lines))
 
 
 def print_category_summary(result, options):
-    output.print_md(u'## Riepilogo per categoria')
-    moved_header = u'Da allineare' if options.dry_run else u'Allineati'
+    output.print_md(u'## Summary by category')
+    moved_header = u'To align' if options.dry_run else u'Aligned'
 
     rows = []
     totals = [0, 0, 0, 0, 0]
@@ -2882,30 +2881,30 @@ def print_category_summary(result, options):
         totals[3] += row['skipped']
         totals[4] += row['near']
 
-    rows.append([u'**Totale**'] + [str(v) for v in totals])
+    rows.append([u'**Total**'] + [str(v) for v in totals])
     output.print_table(
         table_data=rows,
         title='',
-        columns=[u'Categoria', u'Selezionati', moved_header,
-                 u'Gia\' allineati', u'Ignorati', u'Oltre tolleranza'])
+        columns=[u'Category', u'Selected', moved_header,
+                 u'Already aligned', u'Skipped', u'Beyond tolerance'])
 
 
 def print_moves_table(result, options):
     if not result.planned:
         return
-    output.print_md(u'## Elementi {}'.format(
-        u'da allineare' if options.dry_run else u'allineati'))
+    output.print_md(u'## Elements {}'.format(
+        u'to align' if options.dry_run else u'aligned'))
 
     ordered = sorted(result.planned,
                      key=lambda r: (element_id_value(r.wall_id),
                                     -abs(r.distance_before)))
     shown = ordered[:MAX_MOVED_ROWS]
 
-    columns = [u'Elemento', u'Categoria', u'Tipo', u'Muro', u'Faccia',
-               u'Fronte', u'Corsa', u'Dist. prima', u'Dist. dopo',
-               u'Spostamento', u'Rotazione', u'Connettori', u'Note']
+    columns = [u'Element', u'Category', u'Type', u'Wall', u'Face',
+               u'Front', u'Travel', u'Dist. before', u'Dist. after',
+               u'Move', u'Rotation', u'Connectors', u'Notes']
     if not options.dry_run:
-        columns.append(u'Esito')
+        columns.append(u'Outcome')
 
     rows = []
     for record in shown:
@@ -2917,7 +2916,7 @@ def print_moves_table(result, options):
                            record.wall_is_linked),
             record.face_side,
             record.front_outcome,
-            u'lungo la retta' if record.along_front else u'lungo la normale',
+            u'along the line' if record.along_front else u'along the normal',
             format_mm(record.distance_before),
             format_mm(record.distance_after),
             format_mm(record.translation_length),
@@ -2927,11 +2926,11 @@ def print_moves_table(result, options):
         ]
         if not options.dry_run:
             if record.error:
-                outcome = u'errore: {}'.format(record.error)
+                outcome = u'error: {}'.format(record.error)
             elif record.needs_rotation and not record.applied_rotation:
-                outcome = u'spostato ma non raddrizzato'
+                outcome = u'moved but not squared up'
             elif record.needs_move and not record.applied_move:
-                outcome = u'raddrizzato ma non spostato'
+                outcome = u'squared up but not moved'
             else:
                 outcome = u'OK'
             row.append(outcome)
@@ -2941,8 +2940,8 @@ def print_moves_table(result, options):
 
     remaining = len(ordered) - len(shown)
     if remaining > 0:
-        output.print_md(u'_...e altri {} elementi non elencati. '
-                        u'Sono stati comunque elaborati tutti._'.format(
+        output.print_md(u'_...and {} more elements not listed. '
+                        u'All of them were processed anyway._'.format(
                             remaining))
 
 
@@ -2950,16 +2949,16 @@ def print_already_ok(result):
     if not result.already_ok:
         return
     output.print_md(
-        u'## Elementi gia\' allineati\n\n'
-        u'**{}** elementi risultavano gia\' a posto (entro {:.0f} mm '
-        u'dalla faccia scelta e {:.1f} gradi) e non sono stati toccati.'.format(
+        u'## Elements already aligned\n\n'
+        u'**{}** elements were already in place (within {:.0f} mm of the '
+        u'chosen face and {:.1f} degrees) and were left untouched.'.format(
             len(result.already_ok), POSITION_TOL_MM, ANGLE_TOL_DEG))
 
 
 def print_skipped_table(result):
     if not result.skipped:
         return
-    output.print_md(u'## Elementi ignorati')
+    output.print_md(u'## Skipped elements')
 
     shown = result.skipped[:MAX_SKIPPED_ROWS]
     rows = []
@@ -2976,19 +2975,19 @@ def print_skipped_table(result):
     output.print_table(
         table_data=rows,
         title='',
-        columns=[u'Elemento', u'Categoria', u'Motivo', u'Muro piu\' vicino',
-                 u'Distanza misurata'])
+        columns=[u'Element', u'Category', u'Reason', u'Nearest wall',
+                 u'Measured distance'])
 
     remaining = len(result.skipped) - len(shown)
     if remaining > 0:
-        output.print_md(u'_...e altri {} elementi ignorati non '
-                        u'elencati._'.format(remaining))
+        output.print_md(u'_...and {} more skipped elements not '
+                        u'listed._'.format(remaining))
 
 
 def print_over_tolerance_table(result, options):
     if not result.over_tolerance_items:
         return
-    output.print_md(u'## Saltati perche\' oltre la tolleranza')
+    output.print_md(u'## Skipped as beyond the tolerance')
 
     ordered = sorted(result.over_tolerance_items, key=lambda r: r.distance)
     shown = ordered[:MAX_OVER_TOLERANCE_ROWS]
@@ -3005,12 +3004,12 @@ def print_over_tolerance_table(result, options):
     output.print_table(
         table_data=rows,
         title='',
-        columns=[u'Elemento', u'Categoria', u'Muro piu\' vicino',
-                 u'Distanza', u'Eccedenza'])
+        columns=[u'Element', u'Category', u'Nearest wall',
+                 u'Distance', u'Overshoot'])
 
     remaining = len(ordered) - len(shown)
     if remaining > 0:
-        output.print_md(u'_...e altri {} elementi non elencati._'.format(
+        output.print_md(u'_...and {} more elements not listed._'.format(
             remaining))
 
     suggestion = tolerance_suggestion(ordered, options)
@@ -3034,8 +3033,8 @@ def tolerance_suggestion(ordered_over_tolerance_items, options):
     recovered = len([r for r in ordered_over_tolerance_items if r.distance <= limit])
     if not recovered:
         return None
-    return u'_Portando la tolleranza a **{:.0f} cm** rientrerebbero altri ' \
-           u'**{}** elementi._'.format(candidate_cm, recovered)
+    return u'_Raising the tolerance to **{:.0f} cm** would bring in ' \
+           u'**{}** more elements._'.format(candidate_cm, recovered)
 
 
 def partition_cell(wall_id, label, is_linked):
@@ -3054,7 +3053,7 @@ def partition_cell(wall_id, label, is_linked):
 def print_wall_problems(result):
     if not result.wall_problems:
         return
-    output.print_md(u'## Partizioni scartate')
+    output.print_md(u'## Partitions discarded')
     rows = []
     for problem_source, wall, reason in result.wall_problems:
         label = wall_label(wall)
@@ -3065,13 +3064,13 @@ def print_wall_problems(result):
     output.print_table(
         table_data=rows,
         title='',
-        columns=[u'Partizione', u'Motivo'])
+        columns=[u'Partition', u'Reason'])
 
 
 def print_revit_failures(preprocessor):
     if preprocessor is None or not preprocessor.messages:
         return
-    output.print_md(u'## Avvisi di Revit durante la modifica')
+    output.print_md(u'## Revit warnings raised while editing')
     rows = []
     for description, ids, kind in preprocessor.messages:
         links = u', '.join([output.linkify(i) for i in ids[:5]]) or u'-'
@@ -3081,15 +3080,15 @@ def print_revit_failures(preprocessor):
     output.print_table(
         table_data=rows,
         title='',
-        columns=[u'Tipo', u'Descrizione', u'Elementi'])
-    output.print_md(u'_Nessun vincolo e\' stato sbloccato o eliminato: lo '
-                    u'strumento non applica risoluzioni automatiche._')
+        columns=[u'Kind', u'Description', u'Elements'])
+    output.print_md(u'_No constraint was unlocked or deleted: the tool '
+                    u'applies no automatic resolutions._')
 
 
 def print_warnings():
     if not WARNINGS:
         return
-    output.print_md(u'## Avvisi')
+    output.print_md(u'## Warnings')
     for message in WARNINGS:
         output.print_md(u'- {}'.format(message))
 
@@ -3106,7 +3105,7 @@ def print_report(options, elements, source_label, result, preprocessor,
             record.applied_move = False
             record.applied_rotation = False
             if not record.error:
-                record.error = u'transazione annullata'
+                record.error = u'transaction rolled back'
 
     print_header(options, elements, source_label, result)
     print_category_summary(result, options)
@@ -3118,36 +3117,36 @@ def print_report(options, elements, source_label, result, preprocessor,
     print_revit_failures(preprocessor)
     print_warnings()
 
-    output.print_md(u'## Esito')
+    output.print_md(u'## Outcome')
     if rolled_back:
         output.print_md(
-            u'**La modifica e\' stata annullata: il modello non e\' stato '
-            u'toccato.** I {} elementi pianificati sono ancora nella loro '
-            u'posizione originale. Il motivo e\' negli avvisi qui '
-            u'sopra.'.format(len(result.planned)))
+            u'**The edit was rolled back: the model was not touched.** '
+            u'The {} planned elements are still in their original '
+            u'position. The reason is in the warnings above.'.format(
+                len(result.planned)))
     elif not result.planned:
         output.print_md(
-            u'Nessun elemento da allineare. Le tabelle "Elementi ignorati" e '
-            u'"Saltati perche\' oltre la tolleranza" dicono se il problema '
-            u'e\' la tolleranza, '
-            u'le categorie, i muri scelti o gli elementi ospitati.')
+            u'Nothing to align. The "Skipped elements" and "Skipped as '
+            u'beyond the tolerance" tables say whether the problem is the '
+            u'tolerance, the categories, the walls found or hosted '
+            u'elements.')
     elif options.dry_run:
         output.print_md(
-            u'**{}** elementi verrebbero allineati. Rieseguire il comando '
-            u'senza la spunta "Simulazione" per applicare la '
-            u'modifica.'.format(len(result.planned)))
+            u'**{}** elements would be aligned. Run the command again '
+            u'with "Simulation" cleared to apply the change.'.format(
+                len(result.planned)))
     else:
         output.print_md(
-            u'Elementi allineati: **{}** su {} pianificati.'.format(
+            u'Elements aligned: **{}** of {} planned.'.format(
                 applied_ok, len(result.planned)))
         if applied_failed:
             output.print_md(
-                u'Elementi non modificati per un errore di Revit: '
-                u'**{}**. Il motivo e\' nella colonna "Esito".'.format(
+                u'Elements left unchanged because of a Revit error: '
+                u'**{}**. The reason is in the "Outcome" column.'.format(
                     applied_failed))
         output.print_md(
-            u'La modifica e\' raggruppata in un unico passo di annullamento, '
-            u'nominato "{}".'.format(TRANSACTION_NAME))
+            u'The change is grouped into a single undo step, named '
+            u'"{}".'.format(TRANSACTION_NAME))
 
 
 # =========================================================================
@@ -3168,29 +3167,29 @@ def build_non_pickable_view_types():
 def check_preconditions():
     """Guardie di apertura, prima di qualunque interfaccia."""
     if doc is None:
-        forms.alert(u'Nessun documento aperto.', exitscript=True)
+        forms.alert(u'No document is open.', exitscript=True)
 
     if doc.IsFamilyDocument:
-        forms.alert(u'Comando non disponibile nell\'editor di famiglie.',
+        forms.alert(u'The command is not available in the family editor.',
                     exitscript=True)
 
     version = revit_version()
     if version and version < 2022:
-        forms.alert(u'Lo strumento richiede Revit 2022 o successivo. '
-                    u'Versione rilevata: {}.'.format(version),
+        forms.alert(u'The tool requires Revit 2022 or later. '
+                    u'Version detected: {}.'.format(version),
                     exitscript=True)
 
     if not MEP_CATEGORIES:
-        forms.alert(u'Nessuna delle categorie configurate e\' disponibile '
-                    u'in questa versione di Revit.', exitscript=True)
+        forms.alert(u'None of the configured categories is available '
+                    u'in this version of Revit.', exitscript=True)
 
     active_view = doc.ActiveView
     if active_view is None:
-        forms.alert(u'Nessuna vista attiva.', exitscript=True)
+        forms.alert(u'No active view.', exitscript=True)
     if active_view.ViewType in build_non_pickable_view_types():
         forms.alert(
-            u'Attivare una vista grafica (pianta, sezione, 3D) prima di '
-            u'lanciare il comando: la scelta dei muri avviene nella vista.',
+            u'Activate a graphical view (plan, section, 3D) before '
+            u'running the command: elements are picked in the view.',
             exitscript=True)
 
 
@@ -3198,8 +3197,15 @@ def count_per_category(elements):
     """[(BuiltInCategory, nome, conteggio)] per le caselle della finestra.
 
     I conteggi vengono dalla SELEZIONE dell'utente, non da una ricerca nel
-    modello: una categoria a zero dice subito che fra gli oggetti indicati
-    non ce n'e' nessuno di quel tipo.
+    modello. Le categorie che nella selezione non hanno nemmeno un elemento
+    NON compaiono affatto: una riga a zero non e' una scelta che l'utente
+    possa fare, e su una selezione stretta riempiva la lista di voci inerti
+    fra cui cercare le due che contano davvero.
+
+    Il filtro non cambia l'esito di nulla. Una categoria assente dalla
+    selezione non ha elementi da spuntare o da togliere, quindi tenerla
+    fuori dalle opzioni non sottrae niente all'utente e non fa sparire
+    nessun elemento dal resoconto.
     """
     counts = {}
     for element in elements:
@@ -3211,9 +3217,12 @@ def count_per_category(elements):
     info = []
     for built_in_category in MEP_CATEGORIES:
         key = element_id_value(DB.ElementId(built_in_category))
+        count = counts.get(key, 0)
+        if not count:
+            continue
         info.append((built_in_category,
                      category_display_name(built_in_category),
-                     counts.get(key, 0)))
+                     count))
     info.sort(key=lambda row: row[1])
     return info
 
@@ -3260,38 +3269,37 @@ def report_no_partition_found(options):
     link_count = count_loaded_links()
 
     output.close_others()
-    output.print_md(u'# Allineamento MEP alle partizioni')
+    output.print_md(u'# MEP alignment to partitions')
 
     if has_own:
-        headline = (u'**Nessun muro si trova vicino agli elementi '
-                    u'selezionati.** I muri di questo modello esistono, ma '
-                    u'nessuno ricade nella regione occupata dalla selezione.')
-        hint = (u'Controlla di aver selezionato gli elementi giusti, oppure '
-                u'alza la tolleranza.')
+        headline = (u'**No wall is near the selected elements.** This '
+                    u'model does contain walls, but none falls in the '
+                    u'region occupied by the selection.')
+        hint = (u'Check that you selected the right elements, or raise '
+                u'the tolerance.')
     elif options.include_links and link_count:
-        headline = (u'**Nessun muro trovato, ne\' in questo modello ne\' nei '
-                    u'{} collegamenti caricati.**'.format(link_count))
-        hint = (u'Se i collegamenti sono stati ignorati, il motivo e\' negli '
-                u'avvisi qui sotto: un collegamento scaricato, inclinato o '
-                u'speculare non viene usato.')
+        headline = (u'**No wall found, neither in this model nor in the '
+                    u'{} loaded links.**'.format(link_count))
+        hint = (u'If the links were ignored, the reason is in the '
+                u'warnings below: an unloaded, tilted or mirrored link is '
+                u'not used.')
     elif link_count:
-        headline = (u'**Questo modello non contiene muri**, ma ci sono {} '
-                    u'modelli collegati caricati.'.format(link_count))
-        hint = (u'La ricerca nei collegamenti e\' disattivata: riattiva la '
-                u'casella "Cerca le partizioni anche nei modelli collegati" '
-                u'nella finestra del comando.')
+        headline = (u'**This model contains no walls**, but {} linked '
+                    u'models are loaded.'.format(link_count))
+        hint = (u'Searching in links is off: tick "Look for partitions '
+                u'in linked models as well" in the command dialog.')
     else:
-        headline = (u'**Questo modello non contiene muri e non ha modelli '
-                    u'collegati caricati.**')
-        hint = (u'Carica il collegamento architettonico, oppure esegui il '
-                u'comando nel modello che contiene i muri.')
+        headline = (u'**This model contains no walls and has no linked '
+                    u'models loaded.**')
+        hint = (u'Load the architectural link, or run the command in the '
+                u'model that contains the walls.')
 
     output.print_md(u'{}\n\n{}'.format(headline, hint))
     print_warnings()
 
-    forms.alert(u'Nessuna partizione verticale trovata.\n\n'
-                u'Il resoconto nel pannello di output spiega il motivo.',
-                title=u'Nessuna partizione trovata', exitscript=True)
+    forms.alert(u'No vertical partition found.\n\n'
+                u'The report in the output panel explains why.',
+                title=u'No partition found', exitscript=True)
 
 
 def count_loaded_links():
@@ -3330,19 +3338,32 @@ def main():
 
     if not points:
         output.close_others()
-        output.print_md(u'# Allineamento MEP ai muri')
+        output.print_md(u'# MEP alignment to walls')
         output.print_md(
-            u'Nessuno dei **{}** elementi selezionati ha un punto di '
-            u'inserimento: sono tutti basati su host, su piano di lavoro o '
-            u'realizzati sul posto. Non c\'e\' niente da allineare in '
-            u'pianta.'.format(len(elements)))
+            u'None of the **{}** selected elements has an insertion '
+            u'point: they are all host based, work plane based or in '
+            u'place. There is nothing to align in plan.'.format(
+                len(elements)))
         forms.alert(
-            u'Nessuno degli elementi selezionati ha un punto di '
-            u'inserimento.',
-            title=u'Niente da allineare', exitscript=True)
+            u'None of the selected elements has an insertion point.',
+            title=u'Nothing to align', exitscript=True)
 
-    window = MEPAlignWindow(resolve_xaml_path(), elements, source_label,
-                            count_per_category(elements),
+    # Con la lista filtrata, una selezione priva di categorie gestite
+    # aprirebbe una finestra senza nemmeno una casella: meglio dirlo.
+    category_info = count_per_category(elements)
+    if not category_info:
+        output.close_others()
+        output.print_md(u'# MEP alignment to walls')
+        output.print_md(
+            u'None of the **{}** selected elements belongs to the {} '
+            u'categories this tool handles, so there is nothing it can '
+            u'align.'.format(len(elements), len(MEP_CATEGORIES)))
+        forms.alert(
+            u'None of the selected elements belongs to a handled category.',
+            title=u'Nothing to align', exitscript=True)
+
+    window = MEPAlignToWallWindow(resolve_xaml_path(), elements, source_label,
+                            category_info,
                             out_of_scope_count(elements))
     window.ShowDialog()
 
@@ -3369,7 +3390,7 @@ def main():
 
     linked_sources = [s for s in sources if s.is_linked]
     if linked_sources:
-        warn(u'Partizioni cercate anche in {} modelli collegati: {}.'.format(
+        warn(u'Partitions also searched in {} linked models: {}.'.format(
             len(linked_sources),
             u', '.join([s.link_name for s in linked_sources])))
 
@@ -3379,8 +3400,8 @@ def main():
         result = build_plan(elements, options, context)
     except UserWarning:
         forms.alert(
-            u'Analisi annullata: il modello non e\' stato modificato.',
-            title=u'Annullato', exitscript=True)
+            u'Analysis cancelled: the model was not modified.',
+            title=u'Cancelled', exitscript=True)
 
     preprocessor = None
     applied_ok = 0
@@ -3404,22 +3425,21 @@ def main():
             # errori: in quel caso il commit annulla tutto, e dichiarare
             # comunque N elementi allineati sarebbe falso.
             if status == DB.TransactionStatus.RolledBack:
-                warn(u'Revit ha annullato la transazione per un errore: '
-                     u'nessuna modifica e\' stata applicata. Il dettaglio e\' '
-                     u'nella sezione "Avvisi di Revit durante la modifica".')
+                warn(u'Revit rolled the transaction back on an error: no '
+                     u'change was applied. The detail is in the "Revit '
+                     u'warnings raised while editing" section.')
                 applied_failed += applied_ok
                 applied_ok = 0
                 rolled_back = True
         except UserWarning:
             transaction.RollBack()
-            warn(u'Operazione annullata dall\'utente: nessuna modifica '
-                 u'applicata.')
+            warn(u'Operation cancelled by the user: no change applied.')
             applied_ok = 0
             applied_failed = 0
             rolled_back = True
         except Exception as error:
             transaction.RollBack()
-            warn(u'Transazione annullata per un errore: {}'.format(error))
+            warn(u'Transaction rolled back on an error: {}'.format(error))
             applied_ok = 0
             applied_failed = 0
             rolled_back = True
@@ -3429,10 +3449,10 @@ def main():
 
     if not result.planned:
         forms.alert(
-            u'Nessun elemento da allineare.\n\n'
-            u'Il resoconto nel pannello di output spiega il motivo elemento '
-            u'per elemento.',
-            title=u'Niente da fare')
+            u'Nothing to align.\n\n'
+            u'The report in the output panel explains why, element by '
+            u'element.',
+            title=u'Nothing to do')
 
 
 if __name__ == '__main__':

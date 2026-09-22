@@ -1,4 +1,4 @@
-# MEP Align — strumento pyRevit
+# MEP Align to Wall — strumento pyRevit
 
 Allinea in pianta i dispositivi MEP selezionati alla partizione verticale architettonica
 più vicina.
@@ -31,8 +31,8 @@ incontrata.
 
 | File | Ruolo |
 | --- | --- |
-| `MEPAlign_script.py` | Logica dello strumento (Revit API, motore IronPython) |
-| `MEPAlignWindow.xaml` | Interfaccia grafica della finestra di dialogo |
+| `MEPAlignToWall_script.py` | Logica dello strumento (Revit API, motore IronPython) |
+| `MEPAlignToWallWindow.xaml` | Interfaccia grafica della finestra di dialogo |
 | `bundle.yaml` | Etichetta e descrizione del pulsante nella barra pyRevit |
 | `icon.png` / `icon.dark.png` | Icone per il tema chiaro e per quello scuro |
 | `README.md` | Questo file |
@@ -55,10 +55,15 @@ Le due strade si comportano diversamente, di proposito:
 | Selezione grafica dal comando | Il filtro non te li fa nemmeno indicare |
 | Selezione fatta prima di lanciare | Vengono saltati e riportati con il motivo "categoria non gestita" |
 
-**2. Categorie da allineare.** Le nove categorie gestite, tutte pre-spuntate. Fra parentesi
-il numero di elementi di quella categoria **presenti nella tua selezione**: una categoria a
-`(0)` dice subito che fra gli oggetti indicati non ce n'è nessuno di quel tipo. Togliendo
-la spunta a una categoria i suoi elementi vengono saltati e riportati, non spariscono.
+**2. Categorie da allineare.** Compaiono **solo le categorie effettivamente presenti nella
+tua selezione**, tutte pre-spuntate, con fra parentesi quanti elementi ne hai indicati. Le
+categorie gestite ma assenti non vengono elencate: una riga a `(0)` non è una scelta che
+tu possa fare, e su una selezione stretta riempiva la lista di voci inerti fra cui cercare
+le due che contano. Togliendo la spunta a una categoria presente i suoi elementi vengono
+saltati e riportati, non spariscono.
+
+Se nessuno degli elementi selezionati appartiene a una categoria gestita, la finestra non
+si apre affatto: il comando lo dice e si ferma, invece di mostrare un elenco vuoto.
 
 | Categorie gestite |
 | --- |
@@ -82,9 +87,9 @@ partizione. Vedi "Quale delle due facce".
 
 | Opzione | Default | Effetto |
 | --- | --- | --- |
-| *Cerca le partizioni anche nei modelli collegati* | attiva | Vedi "Modelli collegati" più sotto |
-| *Salta gli elementi collegati ad altri (connettori)* | non attiva | Vedi "Connettori" più sotto |
-| *Simulazione: non modificare il modello* | non attiva | Calcola e riporta senza aprire alcuna transazione. **Conviene sempre partire da qui** |
+| *Look for partitions in linked models as well* | attiva | Vedi "Modelli collegati" più sotto |
+| *Skip elements connected to others (connectors)* | non attiva | Vedi "Connettori" più sotto |
+| *Simulation: do not modify the model* | non attiva | Calcola e riporta senza aprire alcuna transazione. **Conviene sempre partire da qui** |
 
 Ogni opzione ha un tooltip con la spiegazione estesa: passandoci sopra si legge il
 perché, senza che la finestra debba contenerlo tutto.
@@ -121,7 +126,7 @@ Tre vincoli tengono la regola stretta:
 
 Il confine può solo essere **spinto più in fuori**: il muro vincente resta quello scelto
 per distanza e la sua faccia resta quella scelta dal fronte. Quando il pacchetto entra in
-gioco, la colonna *Note* del resoconto dice quante murature sono state attraversate e
+gioco, la colonna *Notes* del resoconto dice quante murature sono state attraversate e
 qual è l'ultima.
 
 ## Il raddrizzamento
@@ -137,7 +142,7 @@ vista da due lati: un dispositivo montato davvero di traverso non viene raddrizz
 *saltato* prima, perché per lui nessuna partizione risulta fronteggiata.
 
 Nel codice la guardia sui 5 gradi è comunque scritta esplicitamente, e se scattasse lo
-direbbe in colonna *Note*. Non perché possa scattare oggi, ma perché quell'invariante si
+direbbe in colonna *Notes*. Non perché possa scattare oggi, ma perché quell'invariante si
 regge su due funzioni diverse e un domani potrebbe rompersi in silenzio.
 
 Due cose da sapere:
@@ -149,7 +154,7 @@ Due cose da sapere:
   ha disegnato la famiglia.
 - **Il rovescio della stessa medaglia:** se in una famiglia il punto di calcolo è autorato
   leggermente di sbieco, ma entro il cono, l'elemento viene ruotato di quel tanto anche se
-  era montato bene. L'errore è limitato a 5 gradi e la colonna *Rotazione* lo rende
+  era montato bene. L'errore è limitato a 5 gradi e la colonna *Rotation* lo rende
   visibile, ma se vedi un'intera famiglia ruotata sempre dello stesso angolo, il problema è
   dov'è il pallino in quella famiglia.
 
@@ -173,8 +178,8 @@ Due conseguenze da conoscere:
   spostamento è perpendicolare: la retta pesa soprattutto sulla **scelta** del muro e
   della faccia, non sulla direzione della corsa.
 
-La colonna *Corsa* del resoconto dice, elemento per elemento, se lo spostamento è avvenuto
-*lungo la retta* o *lungo la normale*. Il secondo caso è quello delle famiglie senza Room
+La colonna *Travel* del resoconto dice, elemento per elemento, se lo spostamento è avvenuto
+*along the line* o *along the normal*. Il secondo caso è quello delle famiglie senza Room
 Calculation Point e dei fronti troppo obliqui: senza una retta da seguire resta la
 perpendicolare, che è il comportamento delle versioni precedenti.
 
@@ -260,7 +265,7 @@ esattamente il difetto che il filtro doveva togliere, e proprio nel caso peggior
 in cui l'unica parete vicina è quella sbagliata.
 
 Fra le partizioni ammesse il criterio resta "vince la più vicina": il fronte decide chi
-entra in gara, non chi la vince. Quando un muro più vicino viene escluso, la colonna *Note*
+entra in gara, non chi la vince. Quando un muro più vicino viene escluso, la colonna *Notes*
 lo dichiara con il suo nome e la sua distanza.
 
 Il filtro guarda l'orientamento e **non il verso**, perché la retta di analisi è una retta e
@@ -297,14 +302,14 @@ può non raggiungere la faccia di uscita.
 ### Quando il fronte non si può leggere
 
 L'elemento **viene comunque allineato** con il criterio posizionale di sempre, e la colonna
-*Fronte* del resoconto dice con quale criterio, elemento per elemento:
+*Front* del resoconto dice con quale criterio, elemento per elemento:
 
 | Valore | Significato | Faccia scelta | Corsa |
 | --- | --- | --- | --- |
-| *verso il muro* | la retta intercetta la partizione | quella verso cui guarda il dispositivo | lungo la retta |
-| *opposto al muro* | la retta si allontana dalla partizione | la più vicina | lungo la retta |
-| *radente al muro* | il fronte si discosta di oltre 5 gradi dalla perpendicolare, oppure la retta non arriva alla faccia | la più vicina | lungo la normale |
-| *non definito* | la famiglia non espone il Room Calculation Point, oppure l'autore non lo ha spostato dall'origine | la più vicina | lungo la normale |
+| *towards the wall* | la retta intercetta la partizione | quella verso cui guarda il dispositivo | along the line |
+| *away from the wall* | la retta si allontana dalla partizione | la più vicina | along the line |
+| *grazing the wall* | il fronte si discosta di oltre 5 gradi dalla perpendicolare, oppure la retta non arriva alla faccia | la più vicina | along the normal |
+| *undefined* | la famiglia non espone il Room Calculation Point, oppure l'autore non lo ha spostato dall'origine | la più vicina | along the normal |
 
 In testa al resoconto due righe contano quanti elementi sono stati portati sulla faccia
 opposta e su quanti il fronte non era leggibile. La seconda è la prima cosa da guardare se
@@ -320,23 +325,23 @@ misurata**, anche quando il motivo non c'entra con la distanza: un elemento bloc
 
 | Motivo | Nota |
 | --- | --- |
-| categoria non gestita dallo strumento | selezionato prima di lanciare il comando, fuori dalle nove categorie |
-| categoria esclusa nella finestra | la categoria esiste ma le hai tolto la spunta |
-| nessuna partizione verticale nel raggio di ricerca | nessun muro vicino: controlla anche i modelli collegati |
-| nessuna partizione fronteggiata | ci sono muri vicini, ma corrono tutti paralleli alla retta di analisi: il dispositivo li ha di fianco, non davanti |
-| oltre la tolleranza: *x* dalla faccia più vicina | il caso richiesto esplicitamente; vedi la tabella dedicata |
-| ospitato dal muro *n* | un elemento wall-hosted è già vincolato alla faccia del suo host |
-| ospitato da *categoria n* | ospitato da soffitto, pavimento o altra faccia |
-| elemento bloccato (pin) | `MoveElement` lancia un'eccezione sugli elementi bloccati |
-| elemento nel gruppo *nome* | spostare un membro desincronizzerebbe tutte le istanze del gruppo |
-| sotto-componente di famiglia annidata | non spostabile da solo |
-| opzione di progetto non attiva | non modificabile |
-| in prestito ad altro utente | modello workshared |
-| elemento senza punto di inserimento | host based, workplane based o in place |
-| ingombro fuori dall'estensione verticale dei muri | nessuna delle partizioni vicine arriva alla quota dell'elemento |
-| oltre l'estremità del muro di *x* | la proiezione cade fuori dalla testata |
-| proiezione sulla geometria del muro non calcolabile | partizioni trovate, ma nessuna ha prodotto una proiezione utilizzabile |
-| errore in analisi: *messaggio* | eccezione Revit su quel singolo elemento; il lotto prosegue |
+| category not handled by the tool | selezionato prima di lanciare il comando, fuori dalle nove categorie |
+| category cleared in the dialog | la categoria esiste ma le hai tolto la spunta |
+| no vertical partition within the search radius | nessun muro vicino: controlla anche i modelli collegati |
+| no partition is being faced | ci sono muri vicini, ma corrono tutti paralleli alla retta di analisi: il dispositivo li ha di fianco, non davanti |
+| beyond the tolerance: *x* from the nearest face | il caso richiesto esplicitamente; vedi la tabella dedicata |
+| hosted by wall *n* | un elemento wall-hosted è già vincolato alla faccia del suo host |
+| hosted by *categoria n* | ospitato da soffitto, pavimento o altra faccia |
+| element is pinned | `MoveElement` lancia un'eccezione sugli elementi bloccati |
+| element inside group *nome* | spostare un membro desincronizzerebbe tutte le istanze del gruppo |
+| sub-component of a nested family | non spostabile da solo |
+| inactive design option | non modificabile |
+| borrowed by another user | modello workshared |
+| element has no insertion point | host based, workplane based o in place |
+| extents outside the vertical range of the walls | nessuna delle partizioni vicine arriva alla quota dell'elemento |
+| past the wall end by *x* | la proiezione cade fuori dalla testata |
+| projection onto the wall geometry cannot be computed | partizioni trovate, ma nessuna ha prodotto una proiezione utilizzabile |
+| analysis error: *messaggio* | eccezione Revit su quel singolo elemento; il lotto prosegue |
 
 Un elemento vicino a più partizioni viene assegnato a quella con il **valore assoluto**
 della distanza dalla faccia più piccolo, e se la seconda è a meno di 20 mm di scarto il caso
@@ -356,7 +361,7 @@ Spostare un terminale aria collegato a un canale passa per lo stesso motore del 
 spostamento dell'interfaccia: Revit prova a mantenere la connessione allungando il canale e,
 se non riesce, **rompe la connessione con un avviso**, non con un'eccezione.
 
-La casella *Salta gli elementi collegati* è **non spuntata per default**, perché gli Air
+La casella *Skip elements connected to others* è **non spuntata per default**, perché gli Air
 Terminals sono fra le categorie richieste e saltarli per default renderebbe il comando
 inerte proprio dove serve. Il numero di connettori collegati compare in una colonna del
 resoconto, così il rischio è visibile e controllabile. Da rivedere dopo il primo collaudo
@@ -435,7 +440,7 @@ assunzione tacita.
    dispositivo modellato **dentro lo spessore** di un muro: deve uscire dalla parte verso
    cui guarda. Se su una libreria il punto risultasse dietro, il sintomo è vistoso (tutti
    i dispositivi di quella famiglia finiscono nella stanza sbagliata) e la colonna
-   *Fronte* del resoconto dice subito quale criterio ha deciso.
+   *Front* del resoconto dice subito quale criterio ha deciso.
 7. **`GetSpatialElementCalculationPoint()` restituisce il punto in coordinate del
    modello**, non in coordinate della famiglia. Il codice lo assume, ed è su questa
    assunzione che poggia la sottrazione con il punto di inserimento. Se fosse in
@@ -498,7 +503,7 @@ assunzione tacita.
 
 - Il punto di inserimento finisce **esattamente sulla faccia**. Se una famiglia ha
   l'origine al centro del proprio ingombro invece che sul retro, l'elemento risulta per
-  metà dentro il muro. Le colonne *distanza prima* e *distanza dopo* del resoconto servono
+  metà dentro il muro. Le colonne *Dist. before* e *Dist. after* del resoconto servono
   a rilevarlo sul primo modello reale. Se si rivelasse un problema diffuso, la versione
   successiva introdurrà un offset impostabile o l'allineamento del bordo dell'ingombro.
 - **Un dispositivo montato davvero di traverso non viene raddrizzato: viene saltato prima**,
@@ -508,12 +513,12 @@ assunzione tacita.
   faccia opposta aggiunge lo spessore del muro, il pacchetto murario aggiunge quello delle
   partizioni attraversate, e la corsa obliqua moltiplica tutto per 1/cos (al massimo 2). È
   voluto: la tolleranza è il raggio entro cui cercare la partizione, non un limite allo
-  spostamento. La colonna *Spostamento* e le note lo rendono visibile.
+  spostamento. La colonna *Move* e le note lo rendono visibile.
 - **La posizione del dispositivo lungo il muro non è più invariante**, perché la corsa
   segue la retta di analisi e non la normale.
 - **Fra i muri che il dispositivo guarda vince ancora il più vicino.** Il fronte decide
   chi è ammesso alla gara, non chi la vince: in un angolo con due muri quasi equidistanti
-  ed entrambi fronteggiati vince il più vicino, ed è il motivo per cui la colonna *Note*
+  ed entrambi fronteggiati vince il più vicino, ed è il motivo per cui la colonna *Notes*
   segnala l'ambiguità.
 - Un elemento la cui quota non è coperta da nessuna partizione vicina **compare nel
   resoconto** fra gli ignorati, con il motivo *ingombro fuori dall'estensione verticale
@@ -525,8 +530,8 @@ assunzione tacita.
   calcolare le distanze. Senza questo, un dispositivo vicino sia a un muro pieno sia a un
   muretto basso poteva essere allineato al muretto, che alla sua quota non esiste.
 - Muri tenda, muri inclinati, muri senza linea di posizionamento e muri con estensione
-  verticale non leggibile vengono scartati con il motivo nella tabella *Partizioni
-  scartate*.
+  verticale non leggibile vengono scartati con il motivo nella tabella *Partitions
+  discarded*.
 - Il **contenitore** di un muro sovrapposto (stacked) viene scartato, non espanso: i suoi
   membri sono elementi a sé stanti, già raccolti dalla ricerca sulla categoria Walls, e
   ognuno ha spessore ed estensione verticale propri. Scartare il contenitore evita di
@@ -566,13 +571,13 @@ assunzione tacita.
 - Un collegamento ignorato non blocca il comando: gli altri vengono comunque usati, e il
   motivo compare fra gli avvisi. Se però l'architettonico è l'unico collegamento e viene
   ignorato, tutti gli elementi finiranno fra gli ignorati per *nessuna partizione
-  verticale nel raggio di ricerca*: vale la pena leggere sempre la sezione **Avvisi**.
+  verticale nel raggio di ricerca*: vale la pena leggere sempre la sezione **Warnings**.
 - Le partizioni collegate compaiono come `[Nome collegamento] Tipo di muro (id 123456)`,
   con l'id non cliccabile.
 
 ## Avvertenze operative
 
-- Eseguire sempre prima in **Simulazione**, leggere il resoconto, e solo dopo applicare.
+- Eseguire sempre prima in **Simulation**, leggere il resoconto, e solo dopo applicare.
 - L'operazione è annullabile con un solo Undo di Revit.
 - Tag e quote agganciati agli elementi spostati li seguono, ma la loro posizione relativa
   può diventare illeggibile: non c'è nulla che lo strumento possa fare via API. Con la
@@ -584,7 +589,7 @@ assunzione tacita.
 Nei progetti MEP l'architettonico è quasi sempre un collegamento, e un
 `FilteredElementCollector` sul documento corrente non vede i suoi elementi. Lo strumento
 raccoglie quindi le partizioni **anche dai modelli collegati caricati**, controllato dalla
-casella *Cerca le partizioni anche nei modelli collegati* (attiva per default).
+casella *Look for partitions in linked models as well* (attiva per default).
 
 Host e collegamenti concorrono insieme: vince la partizione più vicina, da qualunque
 documento provenga.

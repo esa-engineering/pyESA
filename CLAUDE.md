@@ -126,8 +126,7 @@ command with two modes, documented in the `bundle.yaml` tooltip as `CLICK:` / `S
 Reference it as `__shiftclick__` directly (add `# noqa: F821` if the linter complains).
 
 Runtime is **IronPython 2.7**: no f-strings anywhere in the repo, `.format()` throughout.
-Non-ASCII characters in comments are frequently avoided (`e'` instead of `è`) in the newer
-scripts; keep that where you find it.
+Non-ASCII characters are avoided inside the `.py` (see "Language" below).
 
 Entry points, in order of preference:
 
@@ -208,9 +207,30 @@ against geometry.
 
 ## Language
 
-Button titles and tooltips are English, sometimes with `it_it:` localization keys in
-`bundle.yaml`. Code comments and per-tool `README.md` files are mostly Italian. Match the
-file you are editing.
+**Everything a user of the tool can read is English.** That means the button title and
+tooltip in `bundle.yaml`, every string in the `.xaml`, the dialog text that the script
+builds at runtime, and the whole output report: column headings, table titles, skip
+reasons, notes, warnings and `forms.alert` messages. `bundle.yaml` may still carry
+`it_it:` localization keys alongside the English defaults.
+
+**Italian stays in two places, and only two:**
+
+| Italian is fine | Because |
+| --- | --- |
+| comments and docstrings inside the `.py` | they are read by whoever maintains the script, not by whoever runs it |
+| the per-tool `README.md` and any other dedicated `.md` | same audience, and they are where the reasoning behind a design choice gets written down |
+
+So a single file is routinely bilingual: Italian comments explaining *why*, around English
+strings that the user will see. That is intentional, not an oversight — don't "fix" it in
+either direction.
+
+Non-ASCII characters are avoided inside the `.py` (`e'` instead of `è`), including in the
+Italian comments; the `.md` files use proper accents.
+
+Several older tools predate this rule and are still Italian throughout. When you add a
+string to one of them, match that tool so its interface stays coherent in one language,
+and translate the whole tool only when asked to. `MEPAlignToWall` is the worked example of
+the convention: English UI and report, Italian comments, docstring and README.
 
 ## Development notes worth reading
 
