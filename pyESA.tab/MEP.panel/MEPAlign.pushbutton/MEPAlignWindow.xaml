@@ -78,8 +78,9 @@
                     il fronte della famiglia letto dal suo Room Calculation Point. Lo
                     spostamento avviene lungo quella stessa direzione, e se piu' muri sono
                     a contatto il bersaglio e' la faccia piu' esterna del pacchetto. Oltre
-                    la tolleranza l'elemento viene saltato. La quota e l'orientamento non
-                    vengono mai modificati.
+                    la tolleranza l'elemento viene saltato. L'elemento viene poi raddrizzato
+                    perpendicolare alla faccia, al massimo di 5 gradi. La quota non viene
+                    mai modificata.
                 </TextBlock>
 
                 <!-- ============ Elementi da allineare ============ -->
@@ -200,7 +201,7 @@
                     <TextBlock TextWrapping="Wrap"
                                FontSize="11"
                                Foreground="#FF6B5200"
-                               Text="Lo strumento trasla soltanto: l'orientamento degli elementi non viene mai modificato. Ogni elemento selezionato compare nel resoconto con il suo esito: nessuno viene ignorato in silenzio. Conviene eseguire prima una simulazione."/>
+                               Text="Il raddrizzamento non supera mai i 5 gradi: un elemento davvero di traverso viene saltato, non ruotato. Ogni elemento selezionato compare nel resoconto con il suo esito: nessuno viene ignorato in silenzio. Conviene eseguire prima una simulazione."/>
                 </Border>
 
             </StackPanel>

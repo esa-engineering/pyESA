@@ -16,8 +16,10 @@ tooltip: >
   instances touch each other, the target is the outermost face of the whole package.
 
   The device travels along the analysis line, that is its own line of sight, not along the
-  wall normal: one that faces the wall at an angle slides sideways as well. Orientation is
-  never changed: the tool only translates.
+  wall normal. It is then squared up, so that its front ends perpendicular to the face: a
+  fine correction, never more than 5 degrees, because a wall is only considered at all when
+  the front already points within that cone. A device that is genuinely askew is skipped
+  rather than straightened, and one without a Room Calculation Point is never rotated.
 
   Every element you selected appears in the report with its own outcome and reason, so
   nothing is ignored silently. Devices hosted by a wall, pinned, inside a group or in an

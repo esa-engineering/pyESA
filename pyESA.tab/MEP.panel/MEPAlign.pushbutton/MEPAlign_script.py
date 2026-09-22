@@ -11,9 +11,12 @@ Quale delle due facce lo decide il FRONTE della famiglia, ricavato dal Room
 Calculation Point: e' il motivo per cui lo spostamento puo' avvenire nei due
 versi lungo la normale del muro, e non solo verso la faccia piu' vicina.
 
-L'orientamento degli elementi non viene MAI modificato: lo strumento trasla e
-basta. La rotazione automatica c'era nelle versioni precedenti ed e' stata
-tolta di proposito.
+Sull'orientamento lo strumento interviene solo per RADDRIZZARE: porta il
+fronte perpendicolare alla faccia bersaglio, e mai di piu' di
+FRONT_MAX_ANGLE_DEG. Non e' un riorientamento, perche' una partizione viene
+ammessa solo se il fronte le sta gia' entro quel cono: l'angolo da
+recuperare non puo' superarlo. Un elemento senza Room Calculation Point non
+viene ruotato affatto, perche' non c'e' nessun verso di cui fidarsi.
 
 La quota Z non viene MAI modificata: e' il motivo per cui il primo elemento
 architettonico gestito e' il muro. L'allineamento in quota e' un problema
@@ -316,14 +319,21 @@ risoluzione e chiede il rollback in presenza di errori.
 ORDINE DELLE OPERAZIONI
 --------------------------------------------------------------------------
 
-La traslazione viene ricalcolata dal punto CORRENTE verso un punto bersaglio
-ASSOLUTO memorizzato in fase di analisi, invece di riusare il vettore
-calcolato allora: se qualcosa ha mosso l'elemento nel frattempo il bersaglio
-resta quello giusto. La quota resta invariata per costruzione, perche' la
-componente Z del vettore e' forzata a zero.
+Prima il raddrizzamento, attorno a un asse verticale per il punto di
+inserimento originale, che e' noto con certezza. Poi la traslazione,
+ricalcolata dal punto CORRENTE verso un punto bersaglio ASSOLUTO memorizzato
+in fase di analisi, invece di riusare il vettore calcolato allora: non e'
+garantito che RotateElement lasci il punto di inserimento esattamente
+invariato per ogni tipo di famiglia, e ricalcolando dopo la rotazione
+qualunque deriva si autocorregge. La quota resta invariata per costruzione,
+perche' la componente Z del vettore e' forzata a zero.
 
-Ogni elemento viene elaborato in una SubTransaction propria, cosi' il
-fallimento di uno non lascia il lotto a meta'.
+Se la rilettura del punto subito dopo RotateElement risultasse non
+aggiornata, basta alzare FORCE_REGEN in testa allo script.
+
+Ogni elemento viene elaborato in una SubTransaction propria: se la rotazione
+riesce e la traslazione fallisce, l'elemento torna intatto invece di restare
+ruotato e non spostato.
 
 --------------------------------------------------------------------------
 LIMITI NOTI
@@ -339,10 +349,16 @@ LIMITI NOTI
   spessore nullo e la faccia di riferimento andrebbe presa dal pannello.
 - Lo strumento non cambia mai l'host di un elemento: se e' ospitato da un muro
   lo salta.
-- L'orientamento non viene mai toccato. Un dispositivo portato sulla faccia
-  opposta si trova gia' rivolto verso la stanza giusta, perche' e' proprio il
-  suo fronte ad averla scelta, ma un dispositivo montato di traverso resta di
-  traverso.
+- Il raddrizzamento e' fine per costruzione, al massimo FRONT_MAX_ANGLE_DEG:
+  un dispositivo montato davvero di traverso non viene raddrizzato, viene
+  SALTATO prima, perche' nessuna partizione risulta fronteggiata. Le due cose
+  sono la stessa regola vista da due lati.
+- Si ruota il FRONTE, cioe' la direzione del Room Calculation Point, non
+  FacingOrientation. La rotazione e' rigida e porta con se' anche il punto di
+  calcolo, quindi il risultato non dipende dalla convenzione con cui la
+  famiglia e' stata autorata. Il rovescio: se in una famiglia il punto e'
+  autorato leggermente di sbieco, entro il cono, l'elemento viene ruotato di
+  quel tanto anche se era montato bene.
 - Lo spostamento puo' superare di molto la tolleranza, per tre motivi che si
   sommano: la faccia opposta aggiunge lo spessore del muro, il pacchetto
   murario aggiunge quello delle partizioni attraversate, e la corsa obliqua
@@ -422,6 +438,7 @@ DEFAULT_TOLERANCE_CM = 30.0     # soglia proposta nella finestra
 MAX_TOLERANCE_CM = 500.0        # oltre e' quasi certamente un errore di battitura
 
 POSITION_TOL_MM = 1.0           # sotto questo spostamento l'elemento e' gia' a posto
+ANGLE_TOL_DEG = 0.1             # sotto questo angolo non si ruota
 WALL_END_TOL_MM = 0.1           # sporgenza ammessa oltre l'estremita' del muro
 Z_TOL_MM = 10.0                 # margine verticale sul test di contenimento
 AMBIGUITY_TOL_MM = 20.0         # due muri entro questo scarto: caso segnalato
@@ -488,6 +505,11 @@ GEOM_EPS = 1.0e-9
 SLANT_ANGLE_TOL = 1.0e-6        # radianti: sotto, il muro e' verticale
 SLANT_NORMAL_TOL = 0.02         # circa 1.1 gradi di inclinazione della faccia
 LINK_AXIS_TOL = 1.0e-6          # scarto ammesso sull'asse Z di un collegamento
+
+# Alzare a True se in prova la rilettura del punto di inserimento subito
+# dopo RotateElement risultasse non aggiornata: la traslazione viene
+# ricalcolata da quel punto, quindi leggerlo stantio sposterebbe male.
+FORCE_REGEN = False
 
 MAX_MOVED_ROWS = 300
 MAX_SKIPPED_ROWS = 500
@@ -585,6 +607,10 @@ def cm_to_internal(value_cm):
     return mm_to_internal(value_cm * 10.0)
 
 
+def format_deg(value_rad):
+    return u'{:+.1f} deg'.format(math.degrees(value_rad))
+
+
 def format_mm(value_internal):
     """Lunghezza in millimetri, con il segno se negativa."""
     return u'{:.0f} mm'.format(internal_to_mm(value_internal))
@@ -628,6 +654,7 @@ MEP_CATEGORY_KEYS = set(
 PARTITION_CATEGORIES = resolve_categories(PARTITION_CATEGORY_NAMES)
 
 POSITION_TOL = mm_to_internal(POSITION_TOL_MM)
+ANGLE_TOL = math.radians(ANGLE_TOL_DEG)
 WALL_END_TOL = mm_to_internal(WALL_END_TOL_MM)
 Z_TOL = mm_to_internal(Z_TOL_MM)
 AMBIGUITY_TOL = mm_to_internal(AMBIGUITY_TOL_MM)
@@ -639,6 +666,14 @@ ADJACENT_GAP = mm_to_internal(ADJACENT_GAP_MM)
 # dell'apertura ammessa. Sotto questa soglia la parete e' considerata
 # parallela alla retta e non e' un riferimento valido per quel dispositivo.
 FRONT_MIN_COS = math.cos(math.radians(FRONT_MAX_ANGLE_DEG))
+
+# Rotazione massima applicabile. E' la stessa apertura del cono, e non per
+# simmetria estetica: una partizione e' ammessa solo se il fronte le sta
+# entro FRONT_MAX_ANGLE_DEG dalla perpendicolare, quindi l'angolo da
+# recuperare per raddrizzare l'elemento NON PUO' superare quel valore. La
+# guardia esiste lo stesso, perche' quell'invariante si regge su due
+# funzioni diverse e un domani potrebbe rompersi in silenzio.
+MAX_ROTATION = math.radians(FRONT_MAX_ANGLE_DEG)
 
 
 # =========================================================================
@@ -1521,6 +1556,13 @@ class PlannedMove(object):
         self.along_front = False
         self.crossed_partitions = 0
 
+        # Raddrizzamento fine attorno all'asse verticale. Non e' un
+        # riorientamento: per costruzione non supera FRONT_MAX_ANGLE_DEG.
+        self.rotation_rad = 0.0
+        self.rotation_over_limit = False
+        self.needs_rotation = False
+        self.applied_rotation = False
+
         self.point_before = None
         self.distance_before = 0.0
 
@@ -1841,6 +1883,13 @@ def face_side_from_front(hit, front, ray_length):
         return hit.side, F_PARALLEL, along_normal
 
     return front_side, F_TOWARDS, along_normal
+
+
+def signed_angle_about_z(vector_from, vector_to):
+    """Angolo firmato attorno a +Z, positivo antiorario visto dall'alto."""
+    cross_z = vector_from.X * vector_to.Y - vector_from.Y * vector_to.X
+    dot = vector_from.X * vector_to.X + vector_from.Y * vector_to.Y
+    return math.atan2(cross_z, dot)
 
 
 def faces_the_wall(hit, front):
@@ -2180,11 +2229,39 @@ def plan_element(element, options, context):
     record.crossed_partitions = len(crossed)
     record.connected = connected
 
+    # Raddrizzamento: il fronte viene portato esattamente perpendicolare
+    # alla faccia bersaglio. E' una correzione fine, non un riorientamento,
+    # perche' quella partizione e' stata ammessa solo se il fronte le stava
+    # gia' entro FRONT_MAX_ANGLE_DEG dalla perpendicolare: l'angolo da
+    # recuperare non puo' superare quel valore.
+    #
+    # Si ruota il fronte, non FacingOrientation: la rotazione e' rigida e
+    # porta con se' anche il Room Calculation Point, quindi dopo il comando
+    # il fronte e' perpendicolare al muro qualunque sia la convenzione con
+    # cui la famiglia e' stata autorata. Senza fronte leggibile non c'e'
+    # nessun verso di cui fidarsi, e l'elemento non viene ruotato.
+    if use_front:
+        target_direction = best.normal_host.Multiply(face_side)
+        angle = signed_angle_about_z(front, target_direction)
+        if abs(angle) <= MAX_ROTATION:
+            record.rotation_rad = angle
+        else:
+            # Non puo' accadere finche' faces_the_wall filtra i candidati,
+            # ma l'invariante si regge su due funzioni diverse: se un giorno
+            # si rompe, deve comparire nel resoconto e non nel modello.
+            record.rotation_over_limit = True
+            record.rotation_rad = 0.0
+
     record.needs_move = record.translation_length > POSITION_TOL
-    if not record.needs_move:
+    record.needs_rotation = abs(record.rotation_rad) > ANGLE_TOL
+    if not record.needs_move and not record.needs_rotation:
         record.status = PlannedMove.ALREADY_OK
 
     notes = []
+    if record.rotation_over_limit:
+        notes.append(u'rotazione oltre il limite di {:.0f} gradi: '
+                     u'non applicata'.format(FRONT_MAX_ANGLE_DEG))
+
     # Uno spostamento che attraversa il muro e' molto piu' lungo della
     # distanza misurata: senza questa riga sembrerebbe un errore.
     if record.front_flipped:
@@ -2405,16 +2482,30 @@ class AlignFailurePreprocessor(DB.IFailuresPreprocessor):
 # =========================================================================
 
 def apply_record(record):
-    """Applica uno spostamento gia' calcolato.
+    """Applica rotazione e spostamento gia' calcolati.
 
-    La traslazione viene ricalcolata dal punto CORRENTE verso il bersaglio
-    assoluto memorizzato in analisi, invece di riusare il vettore calcolato
-    allora: se qualcosa ha mosso l'elemento nel frattempo il bersaglio resta
-    quello giusto. La componente Z del vettore e' sempre zero.
+    Prima la rotazione, attorno a un asse verticale per il punto di
+    inserimento originale, che e' noto con certezza. Poi la traslazione,
+    ricalcolata dal punto CORRENTE verso il bersaglio assoluto memorizzato
+    in analisi, invece di riusare il vettore calcolato allora: non e'
+    garantito che RotateElement lasci il punto di inserimento esattamente
+    invariato per ogni tipo di famiglia, e ricalcolando dopo la rotazione
+    qualunque deriva si autocorregge. La componente Z e' sempre zero.
     """
     sub = DB.SubTransaction(doc)
     sub.Start()
     try:
+        if record.needs_rotation:
+            origin = record.point_before
+            axis = DB.Line.CreateBound(
+                origin,
+                DB.XYZ(origin.X, origin.Y, origin.Z + 1.0))
+            DB.ElementTransformUtils.RotateElement(
+                doc, record.element_id, axis, record.rotation_rad)
+            record.applied_rotation = True
+            if FORCE_REGEN:
+                doc.Regenerate()
+
         if record.needs_move:
             current = insertion_point(record.element)
             if current is None:
@@ -2435,6 +2526,7 @@ def apply_record(record):
         except Exception:
             pass
         record.applied_move = False
+        record.applied_rotation = False
         record.error = u'{}'.format(error)[:180]
         return False
 
@@ -2727,7 +2819,8 @@ def print_header(options, elements, source_label, result):
             options.tolerance_cm * FRONT_RAY_FACTOR),
         u'- Spostamento lungo la retta di analisi, non lungo la normale '
         u'del muro',
-        u'- Orientamento degli elementi: non modificato',
+        u'- Raddrizzamento: il fronte viene portato perpendicolare alla '
+        u'faccia, al massimo di **{:.0f} gradi**'.format(FRONT_MAX_ANGLE_DEG),
         u'- Elementi con connettori collegati: {}'.format(
             u'saltati' if options.skip_connected else u'elaborati'),
         u'- Modelli collegati: {}'.format(
@@ -2810,7 +2903,7 @@ def print_moves_table(result, options):
 
     columns = [u'Elemento', u'Categoria', u'Tipo', u'Muro', u'Faccia',
                u'Fronte', u'Corsa', u'Dist. prima', u'Dist. dopo',
-               u'Spostamento', u'Connettori', u'Note']
+               u'Spostamento', u'Rotazione', u'Connettori', u'Note']
     if not options.dry_run:
         columns.append(u'Esito')
 
@@ -2828,14 +2921,17 @@ def print_moves_table(result, options):
             format_mm(record.distance_before),
             format_mm(record.distance_after),
             format_mm(record.translation_length),
+            format_deg(record.rotation_rad) if record.needs_rotation else u'-',
             str(record.connected) if record.connected else u'-',
             record.note or u'',
         ]
         if not options.dry_run:
             if record.error:
                 outcome = u'errore: {}'.format(record.error)
+            elif record.needs_rotation and not record.applied_rotation:
+                outcome = u'spostato ma non raddrizzato'
             elif record.needs_move and not record.applied_move:
-                outcome = u'non spostato'
+                outcome = u'raddrizzato ma non spostato'
             else:
                 outcome = u'OK'
             row.append(outcome)
@@ -2856,8 +2952,8 @@ def print_already_ok(result):
     output.print_md(
         u'## Elementi gia\' allineati\n\n'
         u'**{}** elementi risultavano gia\' a posto (entro {:.0f} mm '
-        u'dalla faccia scelta) e non sono stati toccati.'.format(
-            len(result.already_ok), POSITION_TOL_MM))
+        u'dalla faccia scelta e {:.1f} gradi) e non sono stati toccati.'.format(
+            len(result.already_ok), POSITION_TOL_MM, ANGLE_TOL_DEG))
 
 
 def print_skipped_table(result):
@@ -3008,6 +3104,7 @@ def print_report(options, elements, source_label, result, preprocessor,
     if rolled_back:
         for record in result.planned:
             record.applied_move = False
+            record.applied_rotation = False
             if not record.error:
                 record.error = u'transazione annullata'
 

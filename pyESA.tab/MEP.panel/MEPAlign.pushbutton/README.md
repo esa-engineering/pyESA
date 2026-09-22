@@ -19,8 +19,9 @@ obliquo scorre quindi anche lateralmente. E se più istanze di muro sono a conta
 bersaglio è la **faccia più esterna del pacchetto**, non quella della prima partizione
 incontrata.
 
-> **L'orientamento degli elementi non viene mai modificato: lo strumento trasla e basta.**
-> La rotazione automatica c'era nelle versioni precedenti ed è stata tolta.
+> **Sull'orientamento lo strumento interviene solo per raddrizzare**, portando il fronte
+> perpendicolare alla faccia, e mai di più di 5 gradi. Non è un riorientamento: vedi
+> "Il raddrizzamento" più sotto.
 
 > **La quota Z non viene mai modificata.** È il motivo per cui il primo elemento
 > architettonico gestito è il muro. L'allineamento in quota è un problema diverso, perché
@@ -122,6 +123,38 @@ Il confine può solo essere **spinto più in fuori**: il muro vincente resta que
 per distanza e la sua faccia resta quella scelta dal fronte. Quando il pacchetto entra in
 gioco, la colonna *Note* del resoconto dice quante murature sono state attraversate e
 qual è l'ultima.
+
+## Il raddrizzamento
+
+Dopo aver scelto muro e faccia, lo strumento porta il fronte **perpendicolare alla faccia
+bersaglio**, ruotando l'elemento attorno a un asse verticale passante per il suo punto di
+inserimento.
+
+È una correzione fine, non un riorientamento, e lo è **per costruzione**: quella partizione
+è stata ammessa solo perché il fronte le stava già entro 5 gradi dalla perpendicolare,
+quindi l'angolo da recuperare non può superare i 5 gradi. Le due regole sono la stessa cosa
+vista da due lati: un dispositivo montato davvero di traverso non viene raddrizzato, viene
+*saltato* prima, perché per lui nessuna partizione risulta fronteggiata.
+
+Nel codice la guardia sui 5 gradi è comunque scritta esplicitamente, e se scattasse lo
+direbbe in colonna *Note*. Non perché possa scattare oggi, ma perché quell'invariante si
+regge su due funzioni diverse e un domani potrebbe rompersi in silenzio.
+
+Due cose da sapere:
+
+- **Si ruota il fronte, cioè la direzione del Room Calculation Point, non
+  `FacingOrientation`.** La rotazione è rigida e porta con sé anche il punto di calcolo,
+  quindi dopo il comando il fronte è perpendicolare al muro qualunque sia la convenzione
+  con cui la famiglia è stata autorata. È il motivo per cui il risultato non dipende da chi
+  ha disegnato la famiglia.
+- **Il rovescio della stessa medaglia:** se in una famiglia il punto di calcolo è autorato
+  leggermente di sbieco, ma entro il cono, l'elemento viene ruotato di quel tanto anche se
+  era montato bene. L'errore è limitato a 5 gradi e la colonna *Rotazione* lo rende
+  visibile, ma se vedi un'intera famiglia ruotata sempre dello stesso angolo, il problema è
+  dov'è il pallino in quella famiglia.
+
+Un elemento senza Room Calculation Point **non viene ruotato affatto**: non c'è nessun verso
+di cui fidarsi. Viene solo traslato, come nelle versioni precedenti.
 
 ## La direzione dello spostamento
 
@@ -345,13 +378,16 @@ presenza di errori.
 
 ## Applicazione
 
-La traslazione viene **ricalcolata dal punto corrente** verso un punto bersaglio assoluto
-memorizzato in fase di analisi, invece di riusare il vettore calcolato allora: se qualcosa
-ha mosso l'elemento nel frattempo, il bersaglio resta quello giusto. La quota resta
-invariata per costruzione, perché la componente Z del vettore è forzata a zero.
+Prima il raddrizzamento, attorno a un asse verticale passante per il punto di inserimento
+originale, che è noto con certezza. Poi la traslazione, **ricalcolata dal punto corrente**
+verso un punto bersaglio assoluto memorizzato in fase di analisi, invece di riusare il
+vettore calcolato allora: non è garantito che `RotateElement` lasci il punto di inserimento
+esattamente invariato per ogni tipo di famiglia, e ricalcolando dopo la rotazione qualunque
+deriva si autocorregge. La quota resta invariata per costruzione, perché la componente Z del
+vettore è forzata a zero.
 
-Ogni elemento viene elaborato in una `SubTransaction` propria, così il fallimento di uno
-non lascia il lotto a metà. L'intera operazione è comunque un unico passo di annullamento,
+Ogni elemento viene elaborato in una `SubTransaction` propria: se la rotazione riesce e la
+traslazione fallisce, l'elemento torna intatto invece di restare ruotato e non spostato. L'intera operazione è comunque un unico passo di annullamento,
 nominato *"Allineamento MEP ai muri"*.
 
 ## Motore Python
@@ -448,6 +484,15 @@ assunzione tacita.
     sbaglierebbe di quanto vale l'offset del link.
 13. **`Transform.Scale` vale 1 per un collegamento normale.** Il controllo esiste come
     valvola di sicurezza, ma non è mai scattato su un caso reale.
+14. **`RotateElement` su un elemento bloccato**: lancia un'eccezione o fallisce in silenzio?
+    È documentato solo per `MoveElement`. Il pre-controllo su `Pinned` rende la domanda
+    accademica, ma il pre-controllo non va rimosso.
+15. **`LocationPoint.Point` è aggiornato subito dopo `RotateElement`**, o serve un
+    `doc.Regenerate()`? La traslazione viene ricalcolata proprio da quel punto, quindi
+    leggerlo stantio sposterebbe male. Se in prova risultasse non aggiornato, basta alzare
+    la costante `FORCE_REGEN` in testa allo script. Il sintomo sarebbe uno scarto residuo
+    pari allo spostamento dovuto alla rotazione: piccolo, e visibile solo sulle famiglie la
+    cui origine non sta sull'asse di rotazione.
 
 ## Comportamenti noti e accettati
 
@@ -456,9 +501,9 @@ assunzione tacita.
   metà dentro il muro. Le colonne *distanza prima* e *distanza dopo* del resoconto servono
   a rilevarlo sul primo modello reale. Se si rivelasse un problema diffuso, la versione
   successiva introdurrà un offset impostabile o l'allineamento del bordo dell'ingombro.
-- **L'orientamento non viene mai toccato.** Un dispositivo portato sulla faccia opposta si
-  trova già rivolto verso la stanza giusta, perché è proprio il suo fronte ad averla
-  scelta, ma un dispositivo montato di traverso resta di traverso.
+- **Un dispositivo montato davvero di traverso non viene raddrizzato: viene saltato prima**,
+  perché nessuna partizione risulta fronteggiata. Il raddrizzamento e l'esclusione sono la
+  stessa regola vista da due lati.
 - **Lo spostamento può superare di molto la tolleranza**, per tre motivi che si sommano: la
   faccia opposta aggiunge lo spessore del muro, il pacchetto murario aggiunge quello delle
   partizioni attraversate, e la corsa obliqua moltiplica tutto per 1/cos (al massimo 2). È
