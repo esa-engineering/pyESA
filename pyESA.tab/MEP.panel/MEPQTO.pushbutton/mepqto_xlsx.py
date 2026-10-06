@@ -33,6 +33,8 @@ STYLE_TITLE = 7
 STYLE_WRAP = 8
 # quantita' di una voce con override della maggiorazione (stesso colore della scheda)
 STYLE_NUMBER_OVERRIDE = 9
+# riga di gruppo del riepilogo Type Mark: grassetto su fondo chiaro, a capo automatico
+STYLE_GROUP = 10
 
 _INVALID_XML = re.compile(u"[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f]")
 MAX_CELL_TEXT = 32000
@@ -170,18 +172,19 @@ _STYLES = (
     u'<font><b/><sz val="10"/><name val="Arial"/></font>'
     u'<font><b/><sz val="13"/><name val="Arial"/></font>'
     u'</fonts>'
-    u'<fills count="4">'
+    u'<fills count="5">'
     u'<fill><patternFill patternType="none"/></fill>'
     u'<fill><patternFill patternType="gray125"/></fill>'
     u'<fill><patternFill patternType="solid"><fgColor rgb="FFD9E2EC"/><bgColor indexed="64"/></patternFill></fill>'
     u'<fill><patternFill patternType="solid"><fgColor rgb="FFFFE3A3"/><bgColor indexed="64"/></patternFill></fill>'
+    u'<fill><patternFill patternType="solid"><fgColor rgb="FFEEF3F8"/><bgColor indexed="64"/></patternFill></fill>'
     u'</fills>'
     u'<borders count="2">'
     u'<border><left/><right/><top/><bottom/><diagonal/></border>'
     u'<border><left/><right/><top/><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border>'
     u'</borders>'
     u'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    u'<cellXfs count="10">'
+    u'<cellXfs count="11">'
     u'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
     u'<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>'
     u'<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
@@ -193,6 +196,8 @@ _STYLES = (
     u'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1">'
     u'<alignment wrapText="1" vertical="top"/></xf>'
     u'<xf numFmtId="164" fontId="0" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1"/>'
+    u'<xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" '
+    u'applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>'
     u'</cellXfs>'
     u'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
     u'</styleSheet>')
@@ -359,26 +364,21 @@ def _bill_sheet(session):
 
 
 def _type_marks_sheet(session):
+    """Come nella scheda: una riga di gruppo per tipo, poi una riga per codice."""
     sheet = Sheet("Type Marks")
-    # Come nella scheda: coppie di tipo fino all'ultima usata, poi quelle d'istanza.
-    type_slots, instance_slots = session.slot_count
-    offset = qm.INSTANCE_SLOT_OFFSET
-    sheet.widths = [24, 14, 50, 9] + [16, 50] * (type_slots + instance_slots)
-    headers = [u"Category", u"Type Mark", u"Family and Type", u"Nested"]
-    for index in range(type_slots):
-        headers += [u"Type price code {}".format(index + 1),
-                    u"Type price code description {}".format(index + 1)]
-    for index in range(instance_slots):
-        headers += [u"Instance price code {}".format(index + 1),
-                    u"Instance price code description {}".format(index + 1)]
+    sheet.widths = [24, 16, 40, 9, 12, 20, 80]
+    headers = (u"Category", u"Type Mark", u"Family and Type", u"Nested", u"Code slot",
+               u"Price book code", u"Description")
     _header(sheet, headers)
     for row in session.type_rows:
-        cells = [row.category, row.type_mark, Cell(row.type_label, STYLE_WRAP),
-                 u"Yes" if row.nested else u"No"]
-        for code in row.slots[:type_slots] + row.slots[offset:offset + instance_slots]:
-            item = session.items.get(code) if code else None
-            cells += [code, Cell(item.description if item else u"", STYLE_WRAP)]
-        sheet.add_row(cells)
+        # Tutte le celle con lo stile del gruppo, cosi' il fondo copre la riga intera.
+        sheet.add_row([Cell(value, STYLE_GROUP) for value in (
+            row.category, row.type_mark, row.type_label,
+            u"Yes" if row.nested else u"No", None, None, None)])
+        for label, code in row.code_entries():
+            item = session.items.get(code)
+            sheet.add_row([None, None, None, None, label, code,
+                           Cell(item.description if item else u"", STYLE_WRAP)])
     return sheet
 
 

@@ -71,9 +71,6 @@ RED_BRUSH.Freeze()
 PRICE_FIELDS = {"Chapter": "chapter", "Subchapter": "subchapter",
                 "EpuItem": "epu_item", "PriceBook": "price_book",
                 "Description": "description", "Unit": "unit", "UnitPrice": "price"}
-SLOT_COUNT = qm.TOTAL_SLOTS
-# Colonne fisse del riepilogo Type Mark prima delle coppie codice / descrizione.
-MARK_FIXED_COLUMNS = 4
 
 CLR_STRING = clr.GetClrType(System.String)
 CLR_DOUBLE = clr.GetClrType(System.Double)
@@ -165,8 +162,6 @@ class Session(object):
         self.rules = qr.Rules.defaults()
         self.param_map = qm.ParameterMap.defaults()
         self.type_rows = []
-        # (coppie codice / descrizione di tipo, coppie d'istanza) usate nel riepilogo
-        self.slot_count = (0, 0)
         self.issues = []
         self.project_file = None
         self.price_list_path = None
@@ -330,12 +325,14 @@ class TakeoffForm(Window):
             column.Visibility = Visibility.Collapsed
             self.dg_bill.Columns.Insert(index, column)
             self._wbs_columns.append(column)
-        mark_columns = [("Category", CLR_STRING), ("TypeMark", CLR_STRING),
-                        ("Types", CLR_STRING), ("Nested", CLR_STRING)]
-        for index in range(1, SLOT_COUNT + 1):
-            mark_columns += [("Code{}".format(index), CLR_STRING),
-                             ("Desc{}".format(index), CLR_STRING)]
-        self.marks_table = new_table("marks", mark_columns)
+        # Riepilogo Type Mark a matrice: una riga "group" per tipo (categoria, Type Mark,
+        # famiglia e tipo, annidata) seguita da una riga "code" per codice. Search, nascosta,
+        # porta i dati del gruppo anche sulle righe dei codici, cosi' la ricerca di un Type
+        # Mark mostra tutto il gruppo.
+        self.marks_table = new_table("marks", (
+            ("Kind", CLR_STRING), ("Category", CLR_STRING), ("TypeMark", CLR_STRING),
+            ("Types", CLR_STRING), ("Nested", CLR_STRING), ("Slot", CLR_STRING),
+            ("Code", CLR_STRING), ("Description", CLR_STRING), ("Search", CLR_STRING)))
         self.issues_table = new_table("issues", (
             ("Kind", CLR_STRING), ("Subject", CLR_STRING), ("Detail", CLR_STRING),
             ("Instances", CLR_INT)))
@@ -613,7 +610,6 @@ class TakeoffForm(Window):
                                        self._price_list.items, self._store.items)
         session.price_codes.sort(key=lambda code: price_sort_key(session.items[code]))
         session.type_rows = qm.type_rows(self._collect, selected)
-        session.slot_count = qm.used_slot_count(session.type_rows)
 
         phase = self.cbo_phase.SelectedItem or u"(no phase)"
         session.phase_label = u"{} ({})".format(phase, self.cbo_phase_status.SelectedItem)
@@ -763,45 +759,37 @@ class TakeoffForm(Window):
         self.dg_bill.CanUserSortColumns = not session.wbs_labels
 
     def _fill_marks_table(self):
+        """Una riga di gruppo per tipo, poi una riga per ogni codice valorizzato."""
         session = self.session
         self._mark_cells = {}
         self._updating = True
         try:
             self.marks_table.Rows.Clear()
             for type_row in session.type_rows:
+                entries = type_row.code_entries()
+                # Separatore che l'utente non puo' digitare nella ricerca.
+                group_text = u"\n".join((type_row.category, type_row.type_mark,
+                                         type_row.type_label))
                 row = self.marks_table.NewRow()
+                row["Kind"] = u"group"
                 row["Category"] = type_row.category
                 row["TypeMark"] = type_row.type_mark
                 row["Types"] = type_row.type_label
                 row["Nested"] = u"Yes" if type_row.nested else u"No"
-                for index, code in enumerate(type_row.slots):
-                    if not code:
-                        continue
-                    item = session.items.get(code)
-                    desc_column = "Desc{}".format(index + 1)
-                    row["Code{}".format(index + 1)] = code
-                    row[desc_column] = item.description if item else u""
-                    self._mark_cells.setdefault(code, []).append((row, desc_column))
+                row["Search"] = u"\n".join([group_text] + [code for _, code in entries])
                 self.marks_table.Rows.Add(row)
+                for label, code in entries:
+                    item = session.items.get(code)
+                    row = self.marks_table.NewRow()
+                    row["Kind"] = u"code"
+                    row["Slot"] = label
+                    row["Code"] = code
+                    row["Description"] = item.description if item else u""
+                    row["Search"] = u"\n".join((group_text, code))
+                    self.marks_table.Rows.Add(row)
+                    self._mark_cells.setdefault(code, []).append((row, "Description"))
         finally:
             self._updating = False
-
-        # Si mostrano le coppie codice / descrizione fino all'ultima usata, separatamente
-        # per tipo e istanza (almeno una di tipo se non c'e' nessun codice).
-        type_shown, instance_shown = session.slot_count
-        if not type_shown and not instance_shown:
-            type_shown = 1
-        columns = self.dg_marks.Columns
-        for index in range(SLOT_COUNT):
-            if index < qm.INSTANCE_SLOT_OFFSET:
-                visible = index < type_shown
-            else:
-                visible = index - qm.INSTANCE_SLOT_OFFSET < instance_shown
-            state = Visibility.Visible if visible else Visibility.Collapsed
-            for offset in (0, 1):
-                position = MARK_FIXED_COLUMNS + 2 * index + offset
-                if position < columns.Count:
-                    columns[position].Visibility = state
 
     def _commit_edits(self):
         try:
@@ -1261,10 +1249,9 @@ class TakeoffForm(Window):
         if not text:
             self.marks_table.DefaultView.RowFilter = u""
             return
-        columns = ["Category", "TypeMark", "Types"] + \
-            ["Code{}".format(i) for i in range(1, SLOT_COUNT + 1)]
-        self.marks_table.DefaultView.RowFilter = u" OR ".join(
-            u"{} LIKE '%{}%'".format(column, text) for column in columns)
+        # Search contiene categoria, Type Mark, famiglia e tipo e i codici: un tipo trovato
+        # mostra tutti i suoi codici, un codice trovato mostra anche la riga del suo tipo.
+        self.marks_table.DefaultView.RowFilter = u"Search LIKE '%{}%'".format(text)
 
     def OnClearMarkSearch(self, sender, args):
         self.txt_search_marks.Text = u""

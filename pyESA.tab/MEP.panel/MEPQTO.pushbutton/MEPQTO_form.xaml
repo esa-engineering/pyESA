@@ -322,7 +322,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
-                               Text="One row per category, Type Mark, family type, nesting and set of codes. Type price code N is the N-th type parameter set with Parameters... (piece categories only); Instance price code N is the N-th instance parameter, read on every category. Both are counted. Types whose instances carry different instance codes (e.g. ducts and pipes by size) appear once per set of codes. Code pairs that no row uses are hidden."/>
+                               Text="One bold row per category, Type Mark, family type, nesting and set of codes, followed by one row per price code with its description. Code slot 'Type N' is the N-th type parameter set with Parameters... (piece categories only); 'Instance N' is the N-th instance parameter, read on every category. Both are counted. Types whose instances carry different instance codes (e.g. ducts and pipes by size) appear once per set of codes. Searching a Type Mark shows all its codes; searching a code also shows the row of its type."/>
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -336,72 +336,28 @@
                                 ToolTip="Clear search"/>
                     </Grid>
                     <DataGrid x:Name="dg_marks" Grid.Row="2" Style="{StaticResource GridStyle}" IsReadOnly="True"
-                              HorizontalScrollBarVisibility="Auto" FrozenColumnCount="2">
+                              CanUserSortColumns="False">
+                        <!-- Riga di gruppo per tipo, poi una riga per codice: l'ordine delle
+                             righe e' la struttura, quindi niente riordino per colonna. -->
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Kind}" Value="group">
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                        <Setter Property="Background" Value="#EEF3F8"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="140"/>
-                            <DataGridTextColumn Header="Type Mark" Binding="{Binding TypeMark}" Width="90"/>
+                            <DataGridTextColumn Header="Type Mark" Binding="{Binding TypeMark}" Width="110"/>
                             <DataGridTextColumn Header="Family and Type" Binding="{Binding Types}" Width="220"
                                                 ElementStyle="{StaticResource WrapCell}"/>
                             <DataGridTextColumn Header="Nested" Binding="{Binding Nested}" Width="60"/>
-                            <DataGridTextColumn Header="Type price code 1" Binding="{Binding Code1}" Width="110"/>
-                            <DataGridTextColumn Header="Type price code description 1" Binding="{Binding Desc1}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Type price code 2" Binding="{Binding Code2}" Width="110"/>
-                            <DataGridTextColumn Header="Type price code description 2" Binding="{Binding Desc2}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Type price code 3" Binding="{Binding Code3}" Width="110"/>
-                            <DataGridTextColumn Header="Type price code description 3" Binding="{Binding Desc3}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Type price code 4" Binding="{Binding Code4}" Width="110"/>
-                            <DataGridTextColumn Header="Type price code description 4" Binding="{Binding Desc4}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Type price code 5" Binding="{Binding Code5}" Width="110"/>
-                            <DataGridTextColumn Header="Type price code description 5" Binding="{Binding Desc5}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Type price code 6" Binding="{Binding Code6}" Width="110"/>
-                            <DataGridTextColumn Header="Type price code description 6" Binding="{Binding Desc6}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Type price code 7" Binding="{Binding Code7}" Width="110"/>
-                            <DataGridTextColumn Header="Type price code description 7" Binding="{Binding Desc7}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Type price code 8" Binding="{Binding Code8}" Width="110"/>
-                            <DataGridTextColumn Header="Type price code description 8" Binding="{Binding Desc8}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Type price code 9" Binding="{Binding Code9}" Width="110"/>
-                            <DataGridTextColumn Header="Type price code description 9" Binding="{Binding Desc9}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Type price code 10" Binding="{Binding Code10}" Width="110"/>
-                            <DataGridTextColumn Header="Type price code description 10" Binding="{Binding Desc10}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Instance price code 1" Binding="{Binding Code11}" Width="110"/>
-                            <DataGridTextColumn Header="Instance price code description 1" Binding="{Binding Desc11}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Instance price code 2" Binding="{Binding Code12}" Width="110"/>
-                            <DataGridTextColumn Header="Instance price code description 2" Binding="{Binding Desc12}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Instance price code 3" Binding="{Binding Code13}" Width="110"/>
-                            <DataGridTextColumn Header="Instance price code description 3" Binding="{Binding Desc13}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Instance price code 4" Binding="{Binding Code14}" Width="110"/>
-                            <DataGridTextColumn Header="Instance price code description 4" Binding="{Binding Desc14}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Instance price code 5" Binding="{Binding Code15}" Width="110"/>
-                            <DataGridTextColumn Header="Instance price code description 5" Binding="{Binding Desc15}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Instance price code 6" Binding="{Binding Code16}" Width="110"/>
-                            <DataGridTextColumn Header="Instance price code description 6" Binding="{Binding Desc16}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Instance price code 7" Binding="{Binding Code17}" Width="110"/>
-                            <DataGridTextColumn Header="Instance price code description 7" Binding="{Binding Desc17}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Instance price code 8" Binding="{Binding Code18}" Width="110"/>
-                            <DataGridTextColumn Header="Instance price code description 8" Binding="{Binding Desc18}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Instance price code 9" Binding="{Binding Code19}" Width="110"/>
-                            <DataGridTextColumn Header="Instance price code description 9" Binding="{Binding Desc19}" Width="240"
-                                                ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Instance price code 10" Binding="{Binding Code20}" Width="110"/>
-                            <DataGridTextColumn Header="Instance price code description 10" Binding="{Binding Desc20}" Width="240"
+                            <DataGridTextColumn Header="Code slot" Binding="{Binding Slot}" Width="80"/>
+                            <DataGridTextColumn Header="Price book code" Binding="{Binding Code}" Width="160"/>
+                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="250"
                                                 ElementStyle="{StaticResource WrapCell}"/>
                         </DataGrid.Columns>
                     </DataGrid>

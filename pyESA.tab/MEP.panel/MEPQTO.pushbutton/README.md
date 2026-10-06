@@ -94,7 +94,7 @@ trovati su un campione di elementi, oppure se ne scrive il nome.
 | --- | --- | --- |
 | Price list | capitolo, sottocapitolo, n. articolo EPU, prezzario di riferimento, codice prezzario, descrizione, unità, prezzo unitario dei codici usati nel modello | sì: tutto tranne il codice prezzario (unità da tendina) |
 | Bill of quantities | Type Mark, n. articolo EPU, codice prezzario, descrizione, unità, quantità, prezzo unitario, importo, con il totale sotto; una riga per Type Mark e codice; con la WBS, colonne dei livelli in testa e una riga di totale per combinazione | no, si compila da sola; si può solo dare a una voce una maggiorazione propria |
-| Type Marks | categoria, Type Mark, famiglia e tipo, annidata sì/no, poi le coppie codice / descrizione di tipo 1..10 e d'istanza 1..10 | no |
+| Type Marks | matrice: una riga di gruppo per tipo (categoria, Type Mark, famiglia e tipo, annidata sì/no), seguita da una riga per codice con posizione (`Type 1..10`, `Instance 1..10`), codice prezzario e descrizione | no |
 | Rules | maggiorazioni per categoria, kg/mq della lamiera dei canali, densità dei tubi | sì |
 | Issues | anomalie (vedi sotto) | no |
 
@@ -122,15 +122,21 @@ trovati su un campione di elementi, oppure se ne scrive il nome.
 - **Le unità lette dal listino** vengono ricondotte ai valori della tendina quando sono
   varianti note: `cad.`, `nr`, `pz` → `cad`; `ml` → `m`; `m2`, `m²` → `mq`; `m3`, `m³` →
   `mc`. Le altre restano come sono e compaiono in fondo alla tendina.
-- **Nel riepilogo Type Marks** la colonna "Type price code N" corrisponde all'N-esimo
-  parametro di tipo impostato con Parameters... (solo categorie a pezzo), la colonna
-  "Instance price code N" all'N-esimo parametro d'istanza (tutte le categorie). Un buco
-  (codice 1 vuoto, codice 3 pieno) resta visibile. Un tipo le cui istanze portano codici
-  d'istanza diversi compare una volta per ogni combinazione (ad esempio una riga per
-  diametro). Le coppie che nessuna riga usa sono nascoste, separatamente per tipo e
-  istanza: le colonne d'istanza compaiono solo se almeno una riga ha un codice d'istanza
-  (di norma le categorie lineari). Gli elementi senza Type Mark compaiono in fondo alla
-  loro categoria.
+- **Il riepilogo Type Marks** è una matrice. Ogni tipo ha una riga di gruppo in
+  grassetto con categoria, Type Mark, famiglia e tipo e annidata sì/no, seguita da una
+  riga per ogni codice valorizzato, con la sua descrizione. Prima vengono i codici di
+  tipo, poi quelli d'istanza. Un tipo senza codici ha solo la riga di gruppo.
+  - **Code slot:** `Type N` è l'N-esimo parametro di tipo impostato con Parameters...
+    (solo categorie a pezzo), `Instance N` l'N-esimo parametro d'istanza (tutte le
+    categorie). Un buco (codice 1 vuoto, codice 3 pieno) resta visibile dal numero.
+  - Un tipo le cui istanze portano codici d'istanza diversi ha un gruppo per ogni
+    combinazione (ad esempio uno per diametro).
+  - Gli elementi senza Type Mark compaiono in fondo alla loro categoria.
+  - Le colonne non si riordinano, perché l'ordine delle righe è la struttura.
+  - **Ricerca:** guarda categoria, Type Mark, famiglia e tipo e codici. Cercando un Type
+    Mark si vede il gruppo con tutti i suoi codici; cercando un codice si vedono le
+    righe di quel codice e quelle dei tipi che lo portano.
+  - La descrizione segue le modifiche della scheda Price list senza ricalcolo.
 
 ## WBS
 
@@ -435,8 +441,9 @@ di default è `YYMMDD_HHMMSS_MEPQTO_<Modello>.xlsx`. I fogli sono gli stessi del
   prime sono i livelli, poi Type Mark, n. articolo EPU e codice prezzario. Le quantità
   delle voci con override della maggiorazione sono colorate, con una nota in testa al
   foglio.
-- **Type Marks**: le stesse colonne della scheda, fino all'ultima coppia usata di tipo e
-  poi d'istanza.
+- **Type Marks**: la stessa matrice della scheda, con le righe di gruppo in grassetto su
+  fondo chiaro. Le righe dei codici lasciano vuote le colonne del gruppo, quindi il filtro
+  automatico su Category o Type Mark mostra solo le righe di gruppo.
 - **Rules**: maggiorazioni, override sulle voci, kg/mq e densità usati per il calcolo, e
   la mappa dei parametri del modello.
 - **Issues**: le anomalie con gli ElementId.

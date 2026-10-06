@@ -1033,8 +1033,9 @@ def model_codes(collect_result):
 
 
 class TypeRow(object):
-    """Riga del riepilogo Type Mark: categoria, Type Mark, tipo, annidata, 10 codici di
-    tipo e 10 d'istanza."""
+    """Gruppo del riepilogo Type Mark: categoria, Type Mark, tipo, annidata, 10 codici di
+    tipo e 10 d'istanza. Nella scheda e nell'export diventa una riga di gruppo seguita
+    da una riga per codice."""
 
     __slots__ = ("category_key", "type_mark", "type_label", "nested", "slots", "element_ids")
 
@@ -1049,6 +1050,28 @@ class TypeRow(object):
     @property
     def category(self):
         return category_label(self.category_key)
+
+    def code_entries(self):
+        """(etichetta della posizione, codice) dei codici valorizzati: prima quelli di
+        tipo, poi quelli d'istanza. L'etichetta conserva il numero della posizione, cosi'
+        un buco (codice 1 vuoto, codice 3 pieno) resta visibile."""
+        entries = []
+        for index, code in enumerate(self.slots):
+            if code:
+                entries.append((slot_label(index), code))
+        return entries
+
+
+# Etichette delle posizioni dei codici nel riepilogo Type Mark (UI ed Excel).
+SLOT_TYPE = u"Type"
+SLOT_INSTANCE = u"Instance"
+
+
+def slot_label(index):
+    """0..9 -> "Type 1..10", 10..19 -> "Instance 1..10"."""
+    if index < INSTANCE_SLOT_OFFSET:
+        return u"{} {}".format(SLOT_TYPE, index + 1)
+    return u"{} {}".format(SLOT_INSTANCE, index - INSTANCE_SLOT_OFFSET + 1)
 
 
 def type_rows(collect_result, selected_keys):
@@ -1072,21 +1095,6 @@ def type_rows(collect_result, selected_keys):
     return sorted(rows.values(), key=lambda r: (
         r.category.lower(), r.type_mark == u"", r.type_mark.lower(),
         r.type_label.lower(), r.nested))
-
-
-def used_slot_count(rows):
-    """(coppie di tipo, coppie d'istanza) da mostrare: per ciascun gruppo, fino
-    all'ultimo slot valorizzato."""
-    last_type = last_instance = 0
-    for row in rows:
-        for index, code in enumerate(row.slots):
-            if not code:
-                continue
-            if index < INSTANCE_SLOT_OFFSET:
-                last_type = max(last_type, index + 1)
-            else:
-                last_instance = max(last_instance, index - INSTANCE_SLOT_OFFSET + 1)
-    return last_type, last_instance
 
 
 def description_issues(takeoff, merged_items):
