@@ -29,7 +29,7 @@ clr.AddReference('System.Data')
 
 import System
 from System import Action, DBNull
-from System.Data import DataTable, DataRowState
+from System.Data import DataTable, DataRowState, DataView, DataViewRowState
 from System.Diagnostics import Process
 from System.IO import FileStream, FileMode
 from System.Windows import (Window, MessageBox, MessageBoxButton, MessageBoxImage,
@@ -53,12 +53,20 @@ from mepqto_wbs_ui import show_wbs_dialog
 from mepqto_params_ui import show_parameters_dialog
 from mepqto_pricelist_ui import show_pricelist_editor
 from mepqto_allowance_ui import show_allowance_dialog
+from mepqto_scope_ui import show_scope_dialog, ScopeSettings, SET_NAME_SEPARATOR
+from mepqto_grid_filter import GridFilters
 
 XAML_FILE_NAME = 'MEPQTO_form.xaml'
 CONFIG_SECTION = 'ESA_MEPQTO'
 TITLE = "MEP Quantity Takeoff"
 EURO = u"\u20ac"
 CONFIG_SEPARATOR = u"::"
+# Separatore dei nomi dei workset nella config: Revit non ammette '|' nei nomi.
+# Si computano solo il modello principale e le opzioni di progetto primarie: la casella
+# che lo rendeva modificabile e' stata tolta dalla finestra (vedi README, "Opzioni di
+# progetto"). La logica di filtro resta in mepqto_model (CollectOptions.primary_only).
+PRIMARY_OPTIONS_ONLY = True
+WORKSET_SEPARATOR = u"|"
 
 BLACK_BRUSH = SolidColorBrush(Colors.Black)
 BLACK_BRUSH.Freeze()
@@ -70,6 +78,7 @@ RED_BRUSH.Freeze()
 # Colonna della griglia elenco prezzi -> campo dell'archivio
 PRICE_FIELDS = {"Chapter": "chapter", "Subchapter": "subchapter",
                 "EpuItem": "epu_item", "PriceBook": "price_book",
+                "ShortDescription": "short_description",
                 "Description": "description", "Unit": "unit", "UnitPrice": "price"}
 
 CLR_STRING = clr.GetClrType(System.String)
@@ -162,6 +171,10 @@ class Session(object):
         self.rules = qr.Rules.defaults()
         self.param_map = qm.ParameterMap.defaults()
         self.type_rows = []
+        # modelli letti (aperto e link), per l'intestazione dell'export
+        self.models_label = u""
+        # workset esclusi, per l'intestazione dell'export
+        self.worksets_label = u""
         self.issues = []
         self.project_file = None
         self.price_list_path = None
@@ -210,6 +223,14 @@ class TakeoffForm(Window):
         self._rules = qr.Rules.defaults()
         self._param_map = qm.ParameterMap.defaults()
         self._cfg = self._get_config()
+        # Ambito della lettura, scelto con show_scope_dialog: link (LinkSource) e chiavi
+        # delle categorie. None finche' l'utente non ha confermato la prima scelta.
+        self._scope_links = None
+        self._scope_keys = None
+        # nomi dei workset i cui elementi non si leggono
+        self._scope_worksets = None
+        # True se l'utente annulla la scelta iniziale: la finestra non si apre.
+        self.cancelled = False
 
         self._load_xaml()
         self._build_tables()
@@ -217,6 +238,10 @@ class TakeoffForm(Window):
         self._init_store()
         self._loading = False
 
+        # Prima della lettura si chiedono modelli e categorie, per leggere solo il necessario.
+        if not self._choose_scope(None):
+            self.cancelled = True
+            return
         self._collect_model()
         self._refresh()
 
@@ -247,12 +272,15 @@ class TakeoffForm(Window):
         for name in ("txt_price_list", "btn_price_list", "btn_price_edit", "btn_price_reload",
                      "btn_price_clear",
                      "txt_project_file", "btn_project_file",
-                     "cbo_phase", "cbo_phase_status", "chk_primary_only", "txt_settings_hint",
+                     "cbo_phase", "cbo_phase_status", "txt_settings_hint",
                      "txt_wbs", "btn_wbs", "txt_params", "btn_params",
+                     "txt_models", "btn_scope",
                      "lst_categories", "btn_select_all", "btn_select_none",
                      "tabs", "tab_prices", "tab_bill", "tab_marks", "tab_issues",
                      "txt_search_prices", "btn_clear_prices", "chk_missing_only", "dg_prices",
+                     "btn_clear_filters_prices",
                      "txt_search_bill", "btn_clear_bill", "btn_allowance", "dg_bill",
+                     "btn_clear_filters_bill",
                      "txt_search_marks", "btn_clear_marks", "dg_marks", "dg_issues",
                      "tab_rules", "dg_allowance", "dg_duct_weight", "dg_density",
                      "btn_density_add", "btn_density_remove", "btn_rules_defaults",
@@ -266,8 +294,6 @@ class TakeoffForm(Window):
         self.btn_project_file.Click += self.OnChangeProjectFile
         self.cbo_phase.SelectionChanged += self.OnCollectOptionsChanged
         self.cbo_phase_status.SelectionChanged += self.OnCollectOptionsChanged
-        self.chk_primary_only.Checked += self.OnCollectOptionsChanged
-        self.chk_primary_only.Unchecked += self.OnCollectOptionsChanged
         self.btn_select_all.Click += self.OnSelectAll
         self.btn_select_none.Click += self.OnSelectNone
         self.txt_search_prices.TextChanged += self.OnPriceFilterChanged
@@ -297,18 +323,24 @@ class TakeoffForm(Window):
         self.btn_rules_defaults.Click += self.OnRestoreRules
         self.btn_wbs.Click += self.OnWbs
         self.btn_params.Click += self.OnParameters
+        self.btn_scope.Click += self.OnScope
+        self.btn_clear_filters_prices.Click += self.OnClearPriceFilters
+        self.btn_clear_filters_bill.Click += self.OnClearBillFilters
         self.Closing += self.OnWindowClosing
 
     def _build_tables(self):
         self.prices_table = new_table("prices", (
             ("Chapter", CLR_STRING), ("Subchapter", CLR_STRING),
             ("EpuItem", CLR_STRING), ("PriceBook", CLR_STRING),
-            ("Code", CLR_STRING), ("Description", CLR_STRING), ("Unit", CLR_STRING),
+            ("Code", CLR_STRING), ("ShortDescription", CLR_STRING),
+            ("Description", CLR_STRING), ("Unit", CLR_STRING),
             ("UnitPrice", CLR_STRING), ("NoDescription", CLR_BOOL)))
         # Kind: "group" per la riga di totale di una combinazione WBS, "item" per le voci.
+        # Group: numero della combinazione, sulla riga di totale e sulle sue voci (con i
+        # filtri restano visibili solo le combinazioni con voci visibili).
         # W1..W15: valori dei livelli WBS attivi.
         self.bill_table = new_table("bill", [
-            ("Kind", CLR_STRING)] + [("W{}".format(i + 1), CLR_STRING)
+            ("Kind", CLR_STRING), ("Group", CLR_INT)] + [("W{}".format(i + 1), CLR_STRING)
                                      for i in range(qm.WBS_LEVELS)] + [
             ("TypeMark", CLR_STRING), ("EpuItem", CLR_STRING), ("Code", CLR_STRING),
             ("Description", CLR_STRING), ("Unit", CLR_STRING), ("Quantity", CLR_DOUBLE),
@@ -331,7 +363,8 @@ class TakeoffForm(Window):
         # Mark mostra tutto il gruppo.
         self.marks_table = new_table("marks", (
             ("Kind", CLR_STRING), ("Category", CLR_STRING), ("TypeMark", CLR_STRING),
-            ("Types", CLR_STRING), ("Nested", CLR_STRING), ("Slot", CLR_STRING),
+            ("Types", CLR_STRING), ("Nested", CLR_STRING), ("Model", CLR_STRING),
+            ("Slot", CLR_STRING),
             ("Code", CLR_STRING), ("Description", CLR_STRING), ("Search", CLR_STRING)))
         self.issues_table = new_table("issues", (
             ("Kind", CLR_STRING), ("Subject", CLR_STRING), ("Detail", CLR_STRING),
@@ -367,8 +400,19 @@ class TakeoffForm(Window):
             if cell_text(column.Header) == u"Unit":
                 self.col_unit = column
 
+        # Filtri per colonna (dopo la ricerca della colonna Unit: le intestazioni diventano
+        # titolo + imbuto). Nel computo si filtrano solo le voci, non le righe di totale.
+        self.price_filters = GridFilters(self.dg_prices, self.prices_table,
+                                         self._apply_price_filter,
+                                         context=self._price_search_expression)
+        self.bill_filters = GridFilters(
+            self.dg_bill, self.bill_table, self._apply_bill_filter,
+            context=self._bill_search_expression, rows_filter=u"Kind = 'item'",
+            formatters={"Quantity": lambda v: u"{:,.2f}".format(v),
+                        "UnitPrice": lambda v: u"{:,.2f}".format(v),
+                        "Amount": lambda v: u"{:,.2f}".format(v)})
+
     def _init_options(self):
-        cfg = self._cfg
         view_phase = self._active_view_phase_name()
         for phase in self.doc.Phases:
             self._phases[phase.Name] = phase
@@ -385,15 +429,20 @@ class TakeoffForm(Window):
         self.cbo_phase_status.SelectedItem = status if status in qm.PHASE_STATUS_OPTIONS \
             else qm.PHASE_STATUS_NEW
 
-        self.chk_primary_only.IsChecked = bool(self._cfg_get('last_primary_only', True))
 
-        saved = self._cfg_get('last_categories', None) if cfg is not None else None
-        wanted_keys = set(saved) if saved else None
+    def _build_category_boxes(self):
+        """Caselle delle categorie lette, tutte spuntate: le spunte filtrano il computo
+        senza rileggere il modello."""
+        wanted = set(self._scope_keys or [])
+        self._category_boxes = []
+        self.lst_categories.Items.Clear()
         for key, label, _, _ in qm.available_rules():
+            if key not in wanted:
+                continue
             box = CheckBox()
             box.Content = label
             box.Tag = key
-            box.IsChecked = wanted_keys is None or key in wanted_keys
+            box.IsChecked = True
             box.Checked += self.OnCategoryChanged
             box.Unchecked += self.OnCategoryChanged
             self._category_boxes.append(box)
@@ -465,14 +514,79 @@ class TakeoffForm(Window):
         except Exception:
             pass
 
+    def _named_sets(self, option, separator):
+        """Set con nome salvati nella config: {nome: [valori]}, nell'ordine di
+        salvataggio. Ogni voce e' "nome::valore<separator>valore"."""
+        sets = OrderedDict()
+        for entry in self._cfg_get(option, None) or []:
+            if SET_NAME_SEPARATOR not in entry:
+                continue
+            name, values = entry.split(SET_NAME_SEPARATOR, 1)
+            sets[name] = [value for value in values.split(separator) if value]
+        return sets
+
+    def _save_named_sets(self, option, separator, sets):
+        """Chiamata dalla finestra di scelta a ogni Save Set / Delete Set. Gli errori
+        risalgono: la finestra li mostra."""
+        if self._cfg is None:
+            raise IOError("pyRevit settings not available")
+        setattr(self._cfg, option, [u"{}{}{}".format(name, SET_NAME_SEPARATOR,
+                                                     separator.join(values))
+                                    for name, values in sets.items()])
+        script.save_config()
+
+    def _category_sets(self):
+        return self._named_sets('category_sets', u",")
+
+    def _save_category_sets(self, sets):
+        self._save_named_sets('category_sets', u",", sets)
+
+    def _workset_sets(self):
+        return self._named_sets('workset_sets', WORKSET_SEPARATOR)
+
+    def _save_workset_sets(self, sets):
+        self._save_named_sets('workset_sets', WORKSET_SEPARATOR, sets)
+
+    def _link_map(self):
+        entries = self._cfg_get('scope_links', None) or []
+        mapping = OrderedDict()
+        for entry in entries:
+            if CONFIG_SEPARATOR in entry:
+                key, ids = entry.split(CONFIG_SEPARATOR, 1)
+                mapping[key] = [uid for uid in ids.split(u"|") if uid]
+        return mapping
+
+    def _remembered_links(self):
+        """UniqueId dei link scelti l'ultima volta per questo modello."""
+        return self._link_map().get(qs.document_key(self.doc), [])
+
+    def _remember_scope(self, choice):
+        if self._cfg is None:
+            return
+        try:
+            mapping = self._link_map()
+            key = qs.document_key(self.doc)
+            mapping.pop(key, None)
+            mapping[key] = [link.unique_id for link in choice.links]
+            # Come per i file di progetto, bastano le ultime 50 associazioni.
+            self._cfg.scope_links = [u"{}{}{}".format(k, CONFIG_SEPARATOR, u"|".join(v))
+                                     for k, v in mapping.items()][-50:]
+            self._cfg.last_categories = list(choice.category_keys)
+            self._cfg.last_category_set = choice.set_name or u""
+            self._cfg.last_excluded_worksets = list(choice.excluded_worksets)
+            self._cfg.last_workset_set = choice.workset_set_name or u""
+            script.save_config()
+        except Exception:
+            pass
+
     def _save_settings(self):
         if self._cfg is None:
             return
         try:
             self._cfg.last_phase = self.cbo_phase.SelectedItem
             self._cfg.last_phase_status = self.cbo_phase_status.SelectedItem
-            self._cfg.last_primary_only = bool(self.chk_primary_only.IsChecked)
-            self._cfg.last_categories = self._selected_keys()
+            if self._scope_keys:
+                self._cfg.last_categories = list(self._scope_keys)
             self._cfg.last_price_list = self.session.price_list_path or u""
             script.save_config()
         except Exception:
@@ -584,8 +698,10 @@ class TakeoffForm(Window):
     def _collect_model(self):
         options = qm.CollectOptions(self._current_phase(),
                                     self.cbo_phase_status.SelectedItem or qm.PHASE_STATUS_NEW,
-                                    bool(self.chk_primary_only.IsChecked),
-                                    self._wbs_labels(), self._param_map)
+                                    PRIMARY_OPTIONS_ONLY,
+                                    self._wbs_labels(), self._param_map,
+                                    self._scope_keys, self._scope_links or [],
+                                    self.session.model_name, self._scope_worksets or [])
         self.Cursor = Cursors.Wait
         try:
             self._collect = qm.collect_records(self.doc, options)
@@ -597,6 +713,73 @@ class TakeoffForm(Window):
             counts[record.category_key] = counts.get(record.category_key, 0) + 1
         for box in self._category_boxes:
             box.Content = u"{} ({})".format(qm.category_label(box.Tag), counts.get(box.Tag, 0))
+        self._update_models_text()
+
+    # ------------------------------------------------------------ ambito della lettura
+
+    def _choose_scope(self, owner):
+        """Chiede link, workset esclusi e categorie da leggere; False se l'utente
+        annulla."""
+        rules = [(key, label, kind) for key, label, kind, _ in qm.available_rules()]
+        all_keys = [key for key, _, _ in rules]
+        if self._scope_keys is not None:
+            keys = list(self._scope_keys)
+            link_ids = [link.unique_id for link in self._scope_links or []]
+            excluded = list(self._scope_worksets or [])
+        else:
+            keys = self._cfg_get('last_categories', None) or all_keys
+            link_ids = self._remembered_links()
+            excluded = self._cfg_get('last_excluded_worksets', None) or []
+        try:
+            links = qm.list_links(self.doc)
+        except Exception:
+            links = []
+        host_label = self.session.model_name
+        settings = ScopeSettings(
+            host_label, links, link_ids, rules, keys,
+            self._category_sets(), self._cfg_get('last_category_set', u""),
+            self._save_category_sets,
+            lambda chosen: qm.list_worksets(self.doc, host_label, chosen),
+            excluded, self._workset_sets(), self._cfg_get('last_workset_set', u""),
+            self._save_workset_sets)
+        choice = show_scope_dialog(owner, settings)
+        if choice is None:
+            return False
+        chosen = set(choice.category_keys)
+        self._scope_links = choice.links
+        self._scope_keys = [key for key in all_keys if key in chosen]
+        self._scope_worksets = list(choice.excluded_worksets)
+        self._remember_scope(choice)
+        self._build_category_boxes()
+        return True
+
+    def _update_models_text(self):
+        read = list(self._collect.sources)
+        text = u"{} (open model)".format(read[0]) if read else u""
+        if len(read) > 1:
+            text += u" + {} linked: {}".format(len(read) - 1, u", ".join(read[1:]))
+        skipped = list(getattr(self._collect, "skipped_links", []))
+        if skipped:
+            text += u"  ({} not read: see Issues)".format(len(skipped))
+        excluded = list(self._scope_worksets or [])
+        if excluded:
+            text += u"  |  {} workset{} excluded".format(len(excluded),
+                                                         u"" if len(excluded) == 1 else u"s")
+        self.txt_models.Text = text
+        lines = [u"Models read:"] + [u"  " + label for label in read]
+        if skipped:
+            lines += [u"Not read:"] + [u"  {}: {}".format(label, reason)
+                                       for label, reason in skipped]
+        if excluded:
+            counts = getattr(self._collect, "skipped_worksets", {})
+            lines += [u"Worksets excluded (elements skipped):"] + [
+                u"  {} ({})".format(name, counts.get(name, 0)) for name in excluded]
+        self.txt_models.ToolTip = u"\n".join(lines)
+
+    def OnScope(self, sender, args):
+        if self._choose_scope(self):
+            self._collect_model()
+            self._refresh()
 
     def _refresh(self):
         """Ricalcola computo e griglie dai record gia' raccolti."""
@@ -614,9 +797,11 @@ class TakeoffForm(Window):
         phase = self.cbo_phase.SelectedItem or u"(no phase)"
         session.phase_label = u"{} ({})".format(phase, self.cbo_phase_status.SelectedItem)
         total_categories = len(self._category_boxes)
-        session.categories_label = u"all {}".format(total_categories) \
+        session.categories_label = u"all {} read".format(total_categories) \
             if len(selected) == total_categories \
-            else u"{} of {}".format(len(selected), total_categories)
+            else u"{} of {} read".format(len(selected), total_categories)
+        session.models_label = u", ".join(self._collect.sources)
+        session.worksets_label = u", ".join(self._scope_worksets or []) or u"none"
 
         self._fill_prices_table()
         self._fill_marks_table()
@@ -677,6 +862,7 @@ class TakeoffForm(Window):
         row["Subchapter"] = item.subchapter or u""
         row["EpuItem"] = item.epu_item or u""
         row["PriceBook"] = item.price_book or u""
+        row["ShortDescription"] = item.short_description or u""
         row["Description"] = item.description or u""
         row["Unit"] = item.unit or u""
         row["UnitPrice"] = qs.format_decimal(item.price)
@@ -718,10 +904,15 @@ class TakeoffForm(Window):
         outline = qm.bill_outline(session.bill, labels)
         for index, column in enumerate(self._wbs_columns):
             if index < len(labels):
-                column.Header = labels[index]
+                self.bill_filters.set_title(column, labels[index])
                 column.Visibility = Visibility.Visible
             else:
                 column.Visibility = Visibility.Collapsed
+        # Un filtro su un livello WBS spento non avrebbe una colonna per toglierlo.
+        self.bill_filters.clear_missing_columns(
+            set(["W{}".format(i + 1) for i in range(len(labels))] +
+                ["TypeMark", "EpuItem", "Code", "Description", "Unit", "Quantity",
+                 "UnitPrice", "Amount"]))
         amounts = []
         for entry in outline:
             item = session.items[entry.code] if entry.kind == "item" else None
@@ -730,10 +921,14 @@ class TakeoffForm(Window):
 
         self._bill_rows = {}
         self._updating = True
+        group_number = 0
         try:
             self.bill_table.Rows.Clear()
             for index, entry in enumerate(outline):
                 row = self.bill_table.NewRow()
+                if entry.kind == "group":
+                    group_number += 1
+                row["Group"] = group_number
                 for level, value in enumerate(qm.wbs_cells(entry.key, len(labels))):
                     row["W{}".format(level + 1)] = value
                 if entry.kind == "group":
@@ -757,6 +952,8 @@ class TakeoffForm(Window):
             self._updating = False
         # Con la WBS l'ordine delle righe e' la struttura: niente riordino per colonna.
         self.dg_bill.CanUserSortColumns = not session.wbs_labels
+        # Le combinazioni visibili dipendono dalle righe appena scritte.
+        self._apply_bill_filter()
 
     def _fill_marks_table(self):
         """Una riga di gruppo per tipo, poi una riga per ogni codice valorizzato."""
@@ -769,13 +966,14 @@ class TakeoffForm(Window):
                 entries = type_row.code_entries()
                 # Separatore che l'utente non puo' digitare nella ricerca.
                 group_text = u"\n".join((type_row.category, type_row.type_mark,
-                                         type_row.type_label))
+                                         type_row.type_label, type_row.model))
                 row = self.marks_table.NewRow()
                 row["Kind"] = u"group"
                 row["Category"] = type_row.category
                 row["TypeMark"] = type_row.type_mark
                 row["Types"] = type_row.type_label
                 row["Nested"] = u"Yes" if type_row.nested else u"No"
+                row["Model"] = type_row.model
                 row["Search"] = u"\n".join([group_text] + [code for _, code in entries])
                 self.marks_table.Rows.Add(row)
                 for label, code in entries:
@@ -811,6 +1009,9 @@ class TakeoffForm(Window):
         takeoff = session.takeoff
         parts = [u"{} elements counted, {} Type Marks, {} price codes in the bill.".format(
             takeoff.instance_count, len(takeoff.groups), len(session.quantities))]
+        skipped_ws = getattr(self._collect, "skipped_workset_count", 0)
+        if skipped_ws:
+            parts.append(u"{} elements on excluded worksets skipped.".format(skipped_ws))
         if self._collect.skipped_options:
             parts.append(u"{} instances in secondary design options skipped.".format(
                 self._collect.skipped_options))
@@ -1126,35 +1327,72 @@ class TakeoffForm(Window):
 
     # ------------------------------------------------------------ filtri
 
-    def OnPriceFilterChanged(self, sender, args):
-        self._commit_edits()
+    def _price_search_expression(self):
+        """Ricerca e casella "senza descrizione" dell'elenco prezzi."""
         parts = []
         text = escape_like((self.txt_search_prices.Text or u"").strip())
         if text:
             parts.append(u"(Code LIKE '%{0}%' OR Description LIKE '%{0}%' "
-                         u"OR Chapter LIKE '%{0}%' OR Subchapter LIKE '%{0}%' "
+                         u"OR ShortDescription LIKE '%{0}%' OR Chapter LIKE '%{0}%' OR Subchapter LIKE '%{0}%' "
                          u"OR EpuItem LIKE '%{0}%' OR PriceBook LIKE '%{0}%')".format(text))
         if self.chk_missing_only.IsChecked:
             parts.append(u"NoDescription = true")
+        return u" AND ".join(parts)
+
+    def _apply_price_filter(self):
+        self._commit_edits()
+        parts = [part for part in (self._price_search_expression(),
+                                   self.price_filters.expression()) if part]
         self.prices_table.DefaultView.RowFilter = u" AND ".join(parts)
+        self.btn_clear_filters_prices.IsEnabled = self.price_filters.active
+
+    def OnPriceFilterChanged(self, sender, args):
+        self._apply_price_filter()
 
     def OnClearPriceSearch(self, sender, args):
         self.txt_search_prices.Text = u""
 
-    def OnBillFilterChanged(self, sender, args):
+    def OnClearPriceFilters(self, sender, args):
+        self.price_filters.clear()
+
+    def _bill_search_expression(self):
+        """Ricerca sulle voci del computo, anche sui valori WBS."""
         text = escape_like((self.txt_search_bill.Text or u"").strip())
         if not text:
-            self.bill_table.DefaultView.RowFilter = u""
-            return
-        # La ricerca vale anche sui valori WBS; le righe di totale restano visibili, senza
-        # le voci filtrate perdono la loro combinazione.
+            return u""
         columns = ["TypeMark", "EpuItem", "Code", "Description"] + ["W{}".format(i + 1)
                                              for i in range(len(self.session.wbs_labels))]
-        self.bill_table.DefaultView.RowFilter = u"Kind = 'group' OR " + u" OR ".join(
-            u"{} LIKE '%{}%'".format(column, text) for column in columns)
+        return u"(" + u" OR ".join(u"{} LIKE '%{}%'".format(column, text)
+                                   for column in columns) + u")"
+
+    def _apply_bill_filter(self):
+        """Ricerca e filtri valgono sulle voci; una riga di totale resta visibile se la sua
+        combinazione ha almeno una voce visibile (il totale resta quello di tutte le voci)."""
+        parts = [part for part in (self._bill_search_expression(),
+                                   self.bill_filters.expression()) if part]
+        self.btn_clear_filters_bill.IsEnabled = self.bill_filters.active
+        if not parts:
+            self.bill_table.DefaultView.RowFilter = u""
+            return
+        items = u"Kind = 'item' AND " + u" AND ".join(parts)
+        groups = set()
+        for row_view in DataView(self.bill_table, items, u"", DataViewRowState.CurrentRows):
+            groups.add(int(row_view["Group"]))
+        has_groups = any(cell_text(row["Kind"]) == u"group" for row in self.bill_table.Rows)
+        if has_groups and groups:
+            self.bill_table.DefaultView.RowFilter = u"({}) OR (Kind = 'group' AND [Group] IN ({}))".format(
+                items, u", ".join(str(number) for number in sorted(groups)))
+        else:
+            self.bill_table.DefaultView.RowFilter = items
+
+    def OnBillFilterChanged(self, sender, args):
+        self._apply_bill_filter()
 
     def OnClearBillSearch(self, sender, args):
         self.txt_search_bill.Text = u""
+
+    def OnClearBillFilters(self, sender, args):
+        self.bill_filters.clear()
 
     # ------------------------------------------------------------ override maggiorazione
 
@@ -1394,7 +1632,7 @@ class TakeoffForm(Window):
         error_message = None
         self.Cursor = Cursors.Wait
         try:
-            qx.export_takeoff(path, self.session, qm.get_element_id_value,
+            qx.export_takeoff(path, self.session, qm.id_text,
                               qm.category_label, qm.LINEAR_KEYS)
         except qx.FileLockedError:
             error_message = (u"The file is open in another program (Excel?):\n{}\n\n"
@@ -1440,7 +1678,10 @@ class TakeoffForm(Window):
 
 
 def show_takeoff_window(doc):
-    """Apre la finestra (modale) e restituisce la Session finale."""
+    """Chiede modelli e categorie, apre la finestra (modale) e restituisce la Session
+    finale; None se l'utente annulla la scelta iniziale."""
     form = TakeoffForm(doc)
+    if form.cancelled:
+        return None
     form.ShowDialog()
     return form.session

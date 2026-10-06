@@ -92,6 +92,7 @@ ISSUE_GEOMETRY = "Dimensions missing"
 ISSUE_DENSITY = "No pipe density"
 ISSUE_HOST = "Insulation on fittings not measured"
 ISSUE_EXCLUDED = "Excluded from the bill"
+ISSUE_LINK_SKIPPED = "Linked model not read"
 
 # WBS: fino a 15 livelli, ognuno legato a un parametro scelto dall'utente.
 WBS_LEVELS = 15
@@ -124,6 +125,25 @@ def element_name(element):
             return element.Name or ""
         except Exception:
             return ""
+
+
+class LinkedId(object):
+    """ElementId di un elemento di un modello linkato, con il nome del link: negli Id
+    delle anomalie distingue gli elementi di modelli diversi."""
+
+    __slots__ = ("model", "element_id")
+
+    def __init__(self, model, element_id):
+        self.model = model
+        self.element_id = element_id
+
+
+def id_text(ref):
+    """Testo di un riferimento a un elemento: "12345" nel modello aperto,
+    "Link.rvt: 12345" in un modello linkato."""
+    if isinstance(ref, LinkedId):
+        return u"{}: {}".format(ref.model, get_element_id_value(ref.element_id))
+    return u"{}".format(get_element_id_value(ref))
 
 
 def available_rules():
@@ -188,12 +208,17 @@ def _double_ft(element, *names):
 class InstanceRecord(object):
     """Un elemento computabile, ridotto ai soli dati che servono al computo."""
 
-    __slots__ = ("element_id", "category_key", "kind", "type_mark", "type_label",
-                 "slots", "codes", "nested", "geometry", "wbs")
+    __slots__ = ("element_id", "source", "ref", "category_key", "kind", "type_mark",
+                 "type_label", "slots", "codes", "nested", "geometry", "wbs")
 
     def __init__(self, element_id, category_key, type_mark, type_label, slots, nested,
-                 geometry=None, wbs=()):
+                 geometry=None, wbs=(), source=0, ref=None):
+        # element_id vale nel documento della sorgente (CollectResult.docs[source]):
+        # 0 e' il modello aperto, gli altri sono i link letti.
         self.element_id = element_id
+        self.source = source
+        # ref: riferimento usato nelle anomalie (ElementId, oppure LinkedId nei link)
+        self.ref = ref if ref is not None else element_id
         self.category_key = category_key
         self.kind = category_kind(category_key)
         self.type_mark = type_mark
@@ -303,13 +328,22 @@ def flag_is_no(param):
 
 class CollectOptions(object):
     def __init__(self, phase=None, phase_status=PHASE_STATUS_NEW, primary_only=True,
-                 wbs_names=(), param_map=None):
+                 wbs_names=(), param_map=None, category_keys=None, links=(),
+                 host_label=u"", excluded_worksets=()):
+        # phase: fase del modello aperto; nei link si usa la fase con lo stesso nome
         self.phase = phase
         self.phase_status = phase_status
         self.primary_only = primary_only
         # parametri dei livelli WBS attivi, gia' senza i livelli lasciati vuoti
         self.wbs_names = tuple(wbs_names)
         self.param_map = param_map or ParameterMap.defaults()
+        # categorie da leggere (chiavi di CATEGORY_RULES); None = tutte
+        self.category_keys = None if category_keys is None else tuple(category_keys)
+        # LinkSource da leggere oltre al modello aperto
+        self.links = tuple(links)
+        self.host_label = host_label
+        # nomi dei workset i cui elementi non si leggono, in tutti i modelli
+        self.excluded_worksets = tuple(excluded_worksets)
 
 
 class CollectResult(object):
@@ -319,8 +353,123 @@ class CollectResult(object):
         self.params_found = False
         self.skipped_options = 0
         self.param_map = ParameterMap.defaults()
-        # elementi tolti dal Si/No: [(chiave categoria, etichetta tipo, origine, ElementId)]
+        # elementi tolti dal Si/No: [(chiave categoria, etichetta tipo, origine, ref)]
         self.excluded = []
+        # sorgenti lette, nell'ordine di InstanceRecord.source: etichette e documenti
+        self.sources = []
+        self.docs = []
+        # link scelti ma non letti: [(etichetta, motivo)]
+        self.skipped_links = []
+        # chiavi delle categorie lette
+        self.category_keys = ()
+        # elementi saltati perche' su un workset escluso: {nome workset: numero}
+        self.skipped_worksets = OrderedDict()
+
+    @property
+    def skipped_workset_count(self):
+        return sum(self.skipped_worksets.values())
+
+
+class LinkSource(object):
+    """Istanza di link Revit che l'utente puo' scegliere di leggere."""
+
+    __slots__ = ("unique_id", "label", "instance_name", "link_doc")
+
+    def __init__(self, unique_id, label, instance_name, link_doc):
+        self.unique_id = unique_id
+        self.label = label
+        self.instance_name = instance_name
+        # None se il link non e' caricato
+        self.link_doc = link_doc
+
+    @property
+    def loaded(self):
+        return self.link_doc is not None
+
+
+def list_links(doc):
+    """Istanze di link Revit del modello aperto, ordinate per nome.
+
+    L'etichetta e' il nome del file; un file posizionato piu' volte ha le istanze
+    numerate ("Edificio.rvt [2]"), perche' ogni istanza si computa per conto suo.
+    I link annidati non sono istanze del modello aperto e non compaiono.
+    """
+    found = []
+    collector = DB.FilteredElementCollector(doc).OfClass(DB.RevitLinkInstance)
+    try:
+        for instance in collector:
+            try:
+                link_type = doc.GetElement(instance.GetTypeId())
+                file_name = element_name(link_type) if link_type is not None else u""
+                try:
+                    link_doc = instance.GetLinkDocument()
+                except Exception:
+                    link_doc = None
+                found.append((file_name or element_name(instance), instance.UniqueId,
+                              element_name(instance), link_doc))
+            except Exception:
+                continue
+    finally:
+        collector.Dispose()
+
+    found.sort(key=lambda entry: (entry[0].lower(), entry[2].lower()))
+    totals = {}
+    for file_name, _, _, _ in found:
+        totals[file_name] = totals.get(file_name, 0) + 1
+    seen = {}
+    links = []
+    for file_name, unique_id, instance_name, link_doc in found:
+        seen[file_name] = seen.get(file_name, 0) + 1
+        label = file_name if totals[file_name] == 1 \
+            else u"{} [{}]".format(file_name, seen[file_name])
+        links.append(LinkSource(unique_id, label, instance_name, link_doc))
+    return links
+
+
+def _workset_id_value(workset_id):
+    """Intero di un WorksetId (non e' un ElementId: IntegerValue esiste anche in 2026)."""
+    try:
+        return workset_id.IntegerValue
+    except Exception:
+        return None
+
+
+def user_worksets(doc):
+    """Workset utente di un documento condiviso, {intero del WorksetId: nome}; vuoto per
+    i modelli non condivisi."""
+    found = OrderedDict()
+    try:
+        if doc is None or not doc.IsWorkshared:
+            return found
+        collector = DB.FilteredWorksetCollector(doc).OfKind(DB.WorksetKind.UserWorkset)
+        for workset in collector:
+            found[_workset_id_value(workset.Id)] = workset.Name
+    except Exception:
+        pass
+    return found
+
+
+def list_worksets(host_doc, host_label, links):
+    """Nomi dei workset utente del modello aperto e dei link indicati (solo quelli
+    caricati), {nome: [etichette dei modelli che lo hanno]}, ordinati per nome. I workset
+    si escludono per nome: lo stesso nome vale in tutti i modelli letti."""
+    names = {}
+    sources = [(host_doc, host_label)] + [(link.link_doc, link.label) for link in links
+                                         if link.loaded]
+    for doc, label in sources:
+        for name in user_worksets(doc).values():
+            models = names.setdefault(name, [])
+            if label not in models:
+                models.append(label)
+    return OrderedDict((name, names[name])
+                       for name in sorted(names, key=lambda n: (n.lower(), n)))
+
+
+def _phase_by_name(doc, name):
+    for phase in doc.Phases:
+        if phase.Name == name:
+            return phase
+    return None
 
 
 class _TypeInfo(object):
@@ -409,14 +558,14 @@ def _instance_has_code_params(type_info, instance):
     return False
 
 
-def _phase_filter(options):
-    if options.phase is None:
+def _phase_filter(phase, phase_status):
+    if phase is None:
         return None
     statuses = List[DB.ElementOnPhaseStatus]()
     statuses.Add(DB.ElementOnPhaseStatus.New)
-    if options.phase_status == PHASE_STATUS_NEW_EXISTING:
+    if phase_status == PHASE_STATUS_NEW_EXISTING:
         statuses.Add(DB.ElementOnPhaseStatus.Existing)
-    return DB.ElementPhaseStatusFilter(options.phase.Id, statuses)
+    return DB.ElementPhaseStatusFilter(phase.Id, statuses)
 
 
 # --- geometria ---------------------------------------------------------------
@@ -521,10 +670,12 @@ def _wbs_parent(doc, element, kind):
 
 def sample_parameter_names(doc, collect_result, per_category=10):
     """Nomi dei parametri (istanza e tipo) presenti su un campione di elementi per
-    categoria: sono le scelte proposte nella finestra WBS."""
+    categoria e modello: sono le scelte proposte nella finestra WBS e in Parameters...
+    Ogni record si legge nel documento della sua sorgente (doc solo se manca)."""
     names = set()
     seen_types = set()
     counts = {}
+    docs = getattr(collect_result, "docs", None) or [doc]
 
     def add(parameters):
         for param in parameters:
@@ -534,20 +685,22 @@ def sample_parameter_names(doc, collect_result, per_category=10):
                 pass
 
     for record in collect_result.records:
-        count = counts.get(record.category_key, 0)
+        sample_key = (record.source, record.category_key)
+        count = counts.get(sample_key, 0)
         if count >= per_category:
             continue
-        counts[record.category_key] = count + 1
+        counts[sample_key] = count + 1
         try:
-            element = doc.GetElement(record.element_id)
+            source_doc = docs[record.source] if record.source < len(docs) else doc
+            element = source_doc.GetElement(record.element_id)
             if element is None:
                 continue
             add(element.Parameters)
             type_id = element.GetTypeId()
-            type_key = get_element_id_value(type_id)
+            type_key = (record.source, get_element_id_value(type_id))
             if type_key not in seen_types:
                 seen_types.add(type_key)
-                elem_type = doc.GetElement(type_id)
+                elem_type = source_doc.GetElement(type_id)
                 if elem_type is not None:
                     add(elem_type.Parameters)
         except Exception:
@@ -556,34 +709,77 @@ def sample_parameter_names(doc, collect_result, per_category=10):
 
 
 def collect_records(doc, options):
-    """Elementi di tutte le categorie computabili, filtrati per fase e opzione.
+    """Elementi delle categorie scelte, nel modello aperto e nei link scelti, filtrati
+    per fase e opzione.
 
-    Le categorie scelte nella finestra si applicano dopo, sui record: cambiare
-    la spunta di una categoria non richiede una nuova lettura del modello.
+    Le spunte delle categorie nella finestra principale si applicano dopo, sui record:
+    toglierne una non richiede una nuova lettura. Un link si legge nella fase con lo
+    stesso nome di quella scelta; se non ce l'ha non si legge e finisce fra le anomalie,
+    cosi' il computo non prende elementi di fasi sbagliate.
     """
     result = CollectResult()
     rules = available_rules()
+    if options.category_keys is not None:
+        wanted = set(options.category_keys)
+        rules = [rule for rule in rules if rule[0] in wanted]
+    result.category_keys = tuple(rule[0] for rule in rules)
+    result.param_map = options.param_map
     if not rules:
         return result
 
     key_by_cat_id = {}
-    bics = List[DB.BuiltInCategory]()
+    bic_list = []
     for key, _, _, bic in rules:
-        bics.Add(bic)
+        bic_list.append(bic)
         key_by_cat_id[int(bic)] = key
 
+    sources = [(doc, options.host_label or doc.Title, options.phase, False)]
+    for link in options.links:
+        if not link.loaded:
+            result.skipped_links.append((link.label, u"The link is not loaded: not read."))
+            continue
+        phase = None
+        if options.phase is not None:
+            phase = _phase_by_name(link.link_doc, options.phase.Name)
+            if phase is None:
+                result.skipped_links.append((link.label, (
+                    u"The linked model has no phase named '{}': not read, so that "
+                    u"elements of other phases are not counted. Rename the phase in the "
+                    u"linked model or leave it out.").format(options.phase.Name)))
+                continue
+        sources.append((link.link_doc, link.label, phase, True))
+
+    for index, (source_doc, label, phase, is_link) in enumerate(sources):
+        result.sources.append(label)
+        result.docs.append(source_doc)
+        _collect_source(source_doc, index, label if is_link else None, phase,
+                        bic_list, key_by_cat_id, options, result)
+    return result
+
+
+def _collect_source(doc, source, link_label, phase, bic_list, key_by_cat_id, options,
+                    result):
+    """Raccolta in un solo documento; i record portano l'indice della sorgente e, nei
+    link, un LinkedId per le anomalie. Le cache sono per documento, perche' gli
+    ElementId di modelli diversi si sovrappongono."""
+    bics = List[DB.BuiltInCategory]()
+    for bic in bic_list:
+        bics.Add(bic)
     collector = DB.FilteredElementCollector(doc)\
         .WherePasses(DB.ElementMulticategoryFilter(bics))\
         .WhereElementIsNotElementType()
-    phase_filter = _phase_filter(options)
+    phase_filter = _phase_filter(phase, options.phase_status)
     if phase_filter is not None:
         collector = collector.WherePasses(phase_filter)
 
     param_map = options.param_map
-    result.param_map = param_map
     type_cache = {}
     host_cache = {}
     wbs_reader = _WbsReader(doc, options.wbs_names) if options.wbs_names else None
+    # Workset esclusi di questo documento: {intero del WorksetId: nome}.
+    excluded_names = set(options.excluded_worksets)
+    excluded_ws = dict((ws_id, name) for ws_id, name in user_worksets(doc).items()
+                       if name in excluded_names) if excluded_names else {}
     try:
         for element in collector:
             try:
@@ -603,6 +799,14 @@ def collect_records(doc, options):
                         result.skipped_options += 1
                         continue
 
+                if excluded_ws:
+                    ws_name = excluded_ws.get(_workset_id_value(element.WorksetId))
+                    if ws_name is not None:
+                        result.skipped_worksets[ws_name] = \
+                            result.skipped_worksets.get(ws_name, 0) + 1
+                        continue
+
+                ref = element.Id if link_label is None else LinkedId(link_label, element.Id)
                 type_id = element.GetTypeId()
                 type_key = get_element_id_value(type_id)
                 type_info = type_cache.get(type_key)
@@ -613,8 +817,7 @@ def collect_records(doc, options):
                 # Si/No di inclusione: sull'istanza, per tutte le categorie.
                 if param_map.include and \
                         flag_is_no(element.LookupParameter(param_map.include)):
-                    result.excluded.append((key, type_info.label, param_map.include,
-                                            element.Id))
+                    result.excluded.append((key, type_info.label, param_map.include, ref))
                     continue
 
                 geometry = None
@@ -641,13 +844,11 @@ def collect_records(doc, options):
 
                 result.records.append(InstanceRecord(
                     element.Id, key, type_info.type_mark, type_info.label,
-                    slots, nested, geometry, wbs))
+                    slots, nested, geometry, wbs, source, ref))
             except Exception:
                 continue
     finally:
         collector.Dispose()
-
-    return result
 
 
 # =============================================================================
@@ -677,7 +878,7 @@ class TypeMarkGroup(object):
 
     @property
     def code_ids(self):
-        return OrderedDict((code, [r.element_id for r in records])
+        return OrderedDict((code, [r.ref for r in records])
                            for code, records in self.code_records.items())
 
     @property
@@ -733,7 +934,7 @@ def aggregate(collect_result, selected_keys):
     for record in records:
         takeoff.instance_count += 1
         if not record.type_mark:
-            missing_mark_ids.setdefault(record.type_label, []).append(record.element_id)
+            missing_mark_ids.setdefault(record.type_label, []).append(record.ref)
             continue
 
         group = takeoff.groups.get(record.type_mark)
@@ -741,7 +942,7 @@ def aggregate(collect_result, selected_keys):
             group = TypeMarkGroup(record.type_mark)
             takeoff.groups[record.type_mark] = group
 
-        group.element_ids.append(record.element_id)
+        group.element_ids.append(record.ref)
         if record.category_key not in group.category_keys:
             group.category_keys.append(record.category_key)
         if record.type_label not in group.type_labels:
@@ -753,13 +954,13 @@ def aggregate(collect_result, selected_keys):
         if linear:
             group.has_linear = True
             if not record.codes:
-                group.linear_no_code_ids.append(record.element_id)
+                group.linear_no_code_ids.append(record.ref)
         else:
             group.has_piece = True
             type_codes = codes_from_slots(record.slots[:INSTANCE_SLOT_OFFSET])
             group.code_sets[type_codes] = group.code_sets.get(type_codes, 0) + 1
         if not record.codes:
-            group.no_code_ids.append(record.element_id)
+            group.no_code_ids.append(record.ref)
         for code in record.codes:
             group.code_records.setdefault(code, []).append(record)
 
@@ -767,10 +968,14 @@ def aggregate(collect_result, selected_keys):
     piece_label = param_map.piece_label
     linear_label = param_map.linear_label
 
+    # Link scelti ma non letti (non caricati, fase assente): indipendenti dalle categorie.
+    for label, reason in getattr(collect_result, "skipped_links", []):
+        takeoff.issues.append(Issue(ISSUE_LINK_SKIPPED, label, reason, []))
+
     excluded = OrderedDict()
-    for key, type_label, param_name, element_id in getattr(collect_result, "excluded", []):
+    for key, type_label, param_name, ref in getattr(collect_result, "excluded", []):
         if key in selected:
-            excluded.setdefault((key, type_label, param_name), []).append(element_id)
+            excluded.setdefault((key, type_label, param_name), []).append(ref)
     for (key, type_label, param_name), ids in excluded.items():
         takeoff.issues.append(Issue(
             ISSUE_EXCLUDED, type_label or u"(unknown type)",
@@ -859,7 +1064,7 @@ def _problem_issue(problem, code, unit, record):
     if problem == qr.PROBLEM_UNIT:
         return (ISSUE_UNIT, code,
                 u"{} are measured in {}, but the code has unit '{}': not counted. "
-                u"Set the unit in the Price list.".format(
+                u"Set the unit in the EPU tab.".format(
                     label, u" / ".join(allowed), unit or u"(empty)"))
     if problem == qr.PROBLEM_UNIT_FORCED:
         return (ISSUE_UNIT_FORCED, code,
@@ -936,7 +1141,7 @@ def compute_bill(takeoff, items, rules, overrides=None):
                     kind, subject, detail = _problem_issue(problem, code, unit, record)
                     entry = problems.setdefault((kind, subject, record.category_key),
                                                 [detail, []])
-                    entry[1].append(record.element_id)
+                    entry[1].append(record.ref)
                 if value is None:
                     continue
                 quantity += value
@@ -1033,17 +1238,20 @@ def model_codes(collect_result):
 
 
 class TypeRow(object):
-    """Gruppo del riepilogo Type Mark: categoria, Type Mark, tipo, annidata, 10 codici di
-    tipo e 10 d'istanza. Nella scheda e nell'export diventa una riga di gruppo seguita
-    da una riga per codice."""
+    """Gruppo del riepilogo Type Mark: categoria, Type Mark, tipo, annidata, modello, 10
+    codici di tipo e 10 d'istanza. Nella scheda e nell'export diventa una riga di gruppo
+    seguita da una riga per codice."""
 
-    __slots__ = ("category_key", "type_mark", "type_label", "nested", "slots", "element_ids")
+    __slots__ = ("category_key", "type_mark", "type_label", "nested", "model", "slots",
+                 "element_ids")
 
-    def __init__(self, record):
+    def __init__(self, record, model=u""):
         self.category_key = record.category_key
         self.type_mark = record.type_mark
         self.type_label = record.type_label
         self.nested = record.nested
+        # model: etichetta della sorgente (modello aperto o link)
+        self.model = model
         self.slots = record.slots
         self.element_ids = []
 
@@ -1075,26 +1283,31 @@ def slot_label(index):
 
 
 def type_rows(collect_result, selected_keys):
-    """Una riga per categoria / Type Mark / famiglia e tipo / annidata / codici.
+    """Una riga per categoria / Type Mark / famiglia e tipo / annidata / modello / codici.
 
-    Gli elementi senza Type Mark compaiono in fondo alla loro categoria: sono esclusi
-    dal computo ma il riepilogo serve proprio a vederli.
+    Lo stesso tipo letto in modelli diversi ha un gruppo per modello: i codici possono
+    essere diversi. Gli elementi senza Type Mark compaiono in fondo alla loro categoria:
+    sono esclusi dal computo ma il riepilogo serve proprio a vederli.
     """
     selected = set(selected_keys)
+    sources = getattr(collect_result, "sources", None) or []
     rows = OrderedDict()
     for record in collect_result.records:
         if record.category_key not in selected:
             continue
         key = (record.category_key, record.type_mark, record.type_label,
-               record.nested, record.slots)
+               record.nested, record.source, record.slots)
         row = rows.get(key)
         if row is None:
-            row = TypeRow(record)
+            model = sources[record.source] if record.source < len(sources) else u""
+            row = TypeRow(record, model)
             rows[key] = row
-        row.element_ids.append(record.element_id)
+        row.element_ids.append(record.ref)
+    # Il modello aperto (sorgente 0) prima dei link, a parita' di tipo.
+    order = dict((label, index) for index, label in enumerate(sources))
     return sorted(rows.values(), key=lambda r: (
         r.category.lower(), r.type_mark == u"", r.type_mark.lower(),
-        r.type_label.lower(), r.nested))
+        r.type_label.lower(), r.nested, order.get(r.model, 0)))
 
 
 def description_issues(takeoff, merged_items):
@@ -1108,7 +1321,7 @@ def description_issues(takeoff, merged_items):
         marks = []
         for group in takeoff.groups.values():
             if code in group.code_records:
-                ids.extend(r.element_id for r in group.code_records[code])
+                ids.extend(r.ref for r in group.code_records[code])
                 marks.append(group.type_mark)
         issues.append(Issue(
             ISSUE_NO_DESCRIPTION, code,

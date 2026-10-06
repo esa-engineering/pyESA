@@ -41,11 +41,11 @@ import mepqto_store as qs
 
 XAML_FILE_NAME = 'MEPQTO_pricelist.xaml'
 TITLE = "Price list editor"
-COLUMNS = ("Chapter", "Subchapter", "EpuItem", "PriceBook", "Code", "Description", "Unit",
-           "UnitPrice")
+COLUMNS = ("Chapter", "Subchapter", "EpuItem", "PriceBook", "Code", "ShortDescription",
+           "Description", "Unit", "UnitPrice")
 FIELD_OF = {"Chapter": "chapter", "Subchapter": "subchapter", "EpuItem": "epu_item",
-            "PriceBook": "price_book", "Description": "description", "Unit": "unit",
-            "UnitPrice": "price"}
+            "PriceBook": "price_book", "ShortDescription": "short_description",
+            "Description": "description", "Unit": "unit", "UnitPrice": "price"}
 JSON_FILTER = "MEP QTO price list (*.json)|*.json"
 IMPORT_FILTER = ("Price list (*.xlsx;*.xlsm;*.csv;*.json)|*.xlsx;*.xlsm;*.csv;*.json"
                  "|All files (*.*)|*.*")
@@ -181,6 +181,7 @@ class PriceListEditor(Window):
         row["Subchapter"] = item.get("subchapter") or u""
         row["EpuItem"] = item.get("epu_item") or u""
         row["PriceBook"] = item.get("price_book") or u""
+        row["ShortDescription"] = item.get("short_description") or u""
         row["Description"] = item.get("description") or u""
         row["Unit"] = item.get("unit") or u""
         row["UnitPrice"] = qs.format_decimal(item.get("price"))
@@ -373,6 +374,7 @@ class PriceListEditor(Window):
                 row["Subchapter"] = item["subchapter"]
                 row["EpuItem"] = item["epu_item"]
                 row["PriceBook"] = item["price_book"]
+                row["ShortDescription"] = item["short_description"]
                 row["Description"] = item["description"]
                 row["Unit"] = item["unit"]
                 row["UnitPrice"] = qs.format_decimal(item["price"])
@@ -482,6 +484,7 @@ class PriceListEditor(Window):
         text = escape_like((self.txt_search.Text or u"").strip())
         self.table.DefaultView.RowFilter = (
             u"(Code LIKE '%{0}%' OR Description LIKE '%{0}%' OR Chapter LIKE '%{0}%' "
+            u"OR ShortDescription LIKE '%{0}%' "
             u"OR Subchapter LIKE '%{0}%' OR EpuItem LIKE '%{0}%' "
             u"OR PriceBook LIKE '%{0}%')".format(text)) if text else u""
         self._update_count()

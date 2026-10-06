@@ -270,12 +270,12 @@ Read it before changing behaviour, and keep it in sync with the code.
 | Module | Role |
 | --- | --- |
 | `MEPQTO_script.py` | entry point only: document checks, then `show_takeoff_window(doc)` |
-| `mepqto_model.py` | the **only** module that reads Revit. `collect_records()` reduces elements to plain `InstanceRecord`s (geometry already in mm / m); aggregation, bill, Type Mark summary and issues are pure Python on those records. `CATEGORY_RULES` lists the categories and their measure kind |
+| `mepqto_model.py` | the **only** module that reads Revit. `list_links()` lists the link instances; `collect_records()` reads the open model plus the chosen links, only the chosen categories, and reduces elements to plain `InstanceRecord`s (geometry already in mm / m); aggregation, bill, Type Mark summary and issues are pure Python on those records. `CATEGORY_RULES` lists the categories and their measure kind |
 | `mepqto_rules.py` | measurement formulas, allowances, duct sheet kg/mq bands, pipe densities. No Revit imports |
 | `mepqto_store.py` | price list readers (JSON, .xlsx, .csv), unit aliases, project file, field-by-field merge (`merge_item`) |
 | `mepqto_xlsx.py` | minimal .xlsx writer and the export sheets |
 | `mepqto_ui.py` + `MEPQTO_form.xaml` | main window (`TakeoffForm`, `Session`) |
-| `mepqto_<x>_ui.py` + `MEPQTO_<x>.xaml` | one pair per sub-dialog: `wbs`, `params`, `allowance`, `pricelist` (price list editor) |
+| `mepqto_<x>_ui.py` + `MEPQTO_<x>.xaml` | one pair per sub-dialog: `scope` (models, worksets to exclude and categories to read, shown before every read; its `_SetPicker` handles both kinds of named sets), `wbs`, `params`, `allowance`, `pricelist` (price list editor) |
 
 Rules that come with the pattern:
 
@@ -284,14 +284,28 @@ Rules that come with the pattern:
   the tool name so it cannot shadow another bundle's module, and never end a helper's name
   with `_script.py` (pyRevit would load it as a command).
 - **Read the model once, compute in Python.** `_collect_model()` runs only when phase, phase
-  status, design-option filter, parameter map, WBS levels or project file change. Category
-  ticks, units, prices, rules and allowance overrides only call `_refresh()` on the cached
+  status, parameter map, WBS levels, project file or the scope (links
+  and categories, chosen in `mepqto_scope_ui`) change. Category ticks in the main window, units, prices, rules and allowance overrides only call `_refresh()` on the cached
   records. Keep new options on the right side of that line.
 - **The model is never modified**: no transactions anywhere in the tool. Everything the user
   types goes to files, not to Revit parameters.
 - Display labels that end up in UI and Excel (`ISSUE_*`, `CATEGORY_RULES` labels,
   `WBS_NOT_SET`, `PHASE_STATUS_*`) are English constants in `mepqto_model.py`.
 - Its own `get_element_id_value` returns `-1` for `None`: a fourth variant of the helper.
+- **Linked models.** Each record carries `source` (index into `CollectResult.docs` /
+  `.sources`; 0 = open model) and `ref`, which issues use instead of the bare ElementId:
+  an `ElementId` in the open model, a `LinkedId(label, id)` in a link, printed by
+  `id_text()`. Element ids of different documents overlap, so per-type and per-host caches
+  are per source, and any `GetElement` on a record must use `docs[record.source]`. A link is
+  read in the phase with the same name as the host phase, or skipped with an Issue.
+  Worksets are excluded **by name** in every source (`CollectOptions.excluded_worksets`,
+  counted in `CollectResult.skipped_worksets`): workset ids differ between documents, and
+  names keep saved sets valid across projects. A tick means *exclude*, so a workset added
+  later is read rather than silently dropped.
+- Design options: only the main model and primary options are read
+  (`PRIMARY_OPTIONS_ONLY = True` in `mepqto_ui.py`; the UI checkbox was removed). The
+  `CollectOptions.primary_only` logic is kept on purpose; the tool README ("Opzioni di
+  progetto") explains how to restore it and why "all options at once" double counts.
 
 ### Data outside the model
 
@@ -299,7 +313,7 @@ Rules that come with the pattern:
 | --- | --- | --- |
 | Shared price list | `.json` (`"format": "ESA_MEPQTO_PriceList"`) on a network path, or a read-only `.xlsx` / `.xlsm` / `.csv` | price list editor (`mepqto_pricelist_ui.py`) |
 | Project file | `<Model>_MEPQTO.json` next to the **central** model (`default_project_file()`); cloud / unsaved models pick a path, remembered in config | Save button |
-| Per-user settings | `script.get_config('ESA_MEPQTO')`: last phase, categories, price list, plus `project_files` as `"<doc key>::<path>"` strings, capped at 50 | window close |
+| Per-user settings | `script.get_config('ESA_MEPQTO')`: last phase, categories, category set, price list; `project_files` as `"<doc key>::<path>"` and `scope_links` as `"<doc key>::<uid>|<uid>"` strings, both capped at 50; `category_sets` as `"<name>::<key>,<key>"`, `workset_sets` as `"<name>::<ws>|<ws>"` (Revit forbids `|` and `:` in names); last excluded worksets and workset set | window close; scope and sets as soon as they are chosen / saved |
 
 - Window values = empty item, then non-empty price list fields, then non-empty project
   fields. An emptied field falls back to the price list; project values never flow back
@@ -312,6 +326,13 @@ Rules that come with the pattern:
 - `write_json_file()` writes via a `.tmp` file and escapes non-ASCII by hand (see the
   IronPython `ensure_ascii` trap); reads accept UTF-8 with BOM. A project file that is not
   valid JSON is never overwritten: the user is asked for another one.
+- **Adding a field to a price item** (as `short_description` was) touches: `FIELDS`,
+  `MergedItem.__slots__` / `__init__`, `HEADER_ALIASES` and `_rows_to_items()` in
+  `mepqto_store.py`; `COLUMNS`, `FIELD_OF`, `_add_row()` and the import loop in
+  `mepqto_pricelist_ui.py` plus its XAML column; `prices_table`, `PRICE_FIELDS`,
+  `_write_price_values()` and the search in `mepqto_ui.py` plus the EPU tab column;
+  `_price_list_sheet()` in `mepqto_xlsx.py`. Merge, project file and concurrent save
+  pick it up from `FIELDS` with no further change.
 - Older files must keep loading without conversion: new keys are optional, and the
   `parameters` keys keep their historical names (`piece_codes`, `linear_codes`,
   `linear_include`) even where they no longer describe the content.
@@ -329,6 +350,12 @@ these two modules when another tool needs .xlsx I/O instead of introducing COM i
 - Grids are bound to `System.Data.DataTable` (`grid.ItemsSource = table.DefaultView`): .NET
   handles two-way binding, so no IronPython `INotifyPropertyChanged` objects. Search uses
   `DefaultView.RowFilter` with `LIKE`, escaped by `escape_like()`.
+- Excel-style column filters come from `mepqto_grid_filter.GridFilters`: it replaces each
+  bound column's `Header` with title + funnel button, builds the value popup in code and
+  only *returns* a RowFilter fragment (`expression()`); the window ANDs it with its search
+  and owns the final `RowFilter`. Set a filtered column's title with `set_title()`, never
+  `column.Header =` (that would drop the funnel), and look up columns by header text
+  (as `col_unit` does) **before** creating `GridFilters`. Reusable on any DataTable grid.
 - Editable numeric cells are **string** columns converted by hand in the table's
   `ColumnChanging` handler, because WPF binding uses the en-US culture and would read
   `12,5` as `125`. `qs.parse_decimal()` accepts both comma and dot.

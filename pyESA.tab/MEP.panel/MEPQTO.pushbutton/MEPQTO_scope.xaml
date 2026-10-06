@@ -1,0 +1,238 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Models and categories"
+        Height="820" Width="620"
+        MinHeight="560" MinWidth="500"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="True">
+
+    <Window.Resources>
+        <!-- Common Styles -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,15,0"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0"
+                   Text="🏢 Models, worksets and categories to read"
+                   FontSize="16" FontWeight="Bold"
+                   Margin="0,0,0,10"
+                   HorizontalAlignment="Center"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,5,0">
+            <StackPanel Margin="0,0,10,0">
+
+                <!-- SECTION: Models -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="🏢 MODELS" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock x:Name="txt_host" Style="{StaticResource HintText}" Text=""/>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="Tick the linked models to read as well. Every placed link instance is read and counted on its own. Links that are not loaded cannot be read: load them in Manage Links first."/>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBox x:Name="txt_search_links" Grid.Column="1" Padding="5,3"
+                                     ToolTip="Filter linked models by name"/>
+                            <Button x:Name="btn_clear_links" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0"
+                                    ToolTip="Clear search"/>
+                        </Grid>
+
+                        <ListBox x:Name="lst_links" MinHeight="80" Height="150"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                        <Thumb x:Name="thumb_links" Height="8" Cursor="SizeNS"
+                               HorizontalAlignment="Stretch"
+                               Background="#CCCCCC" Opacity="0.5"
+                               ToolTip="Drag to resize list"/>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                            <Button x:Name="btn_links_all" Content="Select All" Padding="10,3" Margin="0,0,5,0"/>
+                            <Button x:Name="btn_links_none" Content="Deselect All" Padding="10,3"/>
+                        </StackPanel>
+                        <TextBlock x:Name="txt_link_count" Style="{StaticResource HintText}" Margin="0,6,0,0" Text=""/>
+                    </StackPanel>
+                </Border>
+
+                <!-- SECTION: Worksets -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="🗂️ WORKSETS TO EXCLUDE" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="Elements on the ticked worksets are not read. The list joins the user worksets of the open model and of the ticked links, by name: a ticked name is excluded in every model that has it. Worksets not ticked, and new ones, are read."/>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Workset set:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_workset_sets" Grid.Column="1" IsEditable="True" IsTextSearchEnabled="False"
+                                      Style="{StaticResource ComboStyle}"
+                                      ToolTip="Saved workset sets: pick one to tick its worksets, or type a new name"/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                <Button x:Name="btn_workset_set_save" Content="Save Set" Padding="10,3" Margin="5,2,0,2"
+                                        ToolTip="Save the ticked worksets under the name typed in Workset set (an existing set is replaced). A set with no worksets ticked excludes nothing."/>
+                                <Button x:Name="btn_workset_set_delete" Content="Delete Set" Padding="10,3" Margin="5,2,0,2"
+                                        ToolTip="Delete the workset set named in Workset set"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBox x:Name="txt_search_worksets" Grid.Column="1" Padding="5,3"
+                                     ToolTip="Filter worksets by name"/>
+                            <Button x:Name="btn_clear_worksets" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0"
+                                    ToolTip="Clear search"/>
+                        </Grid>
+
+                        <ListBox x:Name="lst_worksets" MinHeight="80" Height="150"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                        <Thumb x:Name="thumb_worksets" Height="8" Cursor="SizeNS"
+                               HorizontalAlignment="Stretch"
+                               Background="#CCCCCC" Opacity="0.5"
+                               ToolTip="Drag to resize list"/>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                            <Button x:Name="btn_worksets_all" Content="Select All" Padding="10,3" Margin="0,0,5,0"/>
+                            <Button x:Name="btn_worksets_none" Content="Deselect All" Padding="10,3"/>
+                        </StackPanel>
+                        <TextBlock x:Name="txt_workset_count" Style="{StaticResource HintText}" Margin="0,6,0,0" Text=""/>
+                    </StackPanel>
+                </Border>
+
+                <!-- SECTION: Categories -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📁 CATEGORIES" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="Only the ticked categories are read from the models. Pick a category set to tick its categories, or type a name and press Save Set to keep the current ticks for next time."/>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Category set:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_sets" Grid.Column="1" IsEditable="True" IsTextSearchEnabled="False"
+                                      Style="{StaticResource ComboStyle}"
+                                      ToolTip="Saved category sets: pick one to tick its categories, or type a new name"/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                <Button x:Name="btn_set_save" Content="Save Set" Padding="10,3" Margin="5,2,0,2"
+                                        ToolTip="Save the ticked categories under the name typed in Category set (an existing set is replaced)"/>
+                                <Button x:Name="btn_set_delete" Content="Delete Set" Padding="10,3" Margin="5,2,0,2"
+                                        ToolTip="Delete the category set named in Category set"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBox x:Name="txt_search_categories" Grid.Column="1" Padding="5,3"
+                                     ToolTip="Filter categories by name"/>
+                            <Button x:Name="btn_clear_categories" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0"
+                                    ToolTip="Clear search"/>
+                        </Grid>
+
+                        <ListBox x:Name="lst_categories" MinHeight="120" Height="230"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                        <Thumb x:Name="thumb_categories" Height="8" Cursor="SizeNS"
+                               HorizontalAlignment="Stretch"
+                               Background="#CCCCCC" Opacity="0.5"
+                               ToolTip="Drag to resize list"/>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                            <Button x:Name="btn_categories_all" Content="Select All" Padding="10,3" Margin="0,0,5,0"/>
+                            <Button x:Name="btn_categories_none" Content="Deselect All" Padding="10,3"/>
+                        </StackPanel>
+                        <TextBlock x:Name="txt_category_count" Style="{StaticResource HintText}" Margin="0,6,0,0" Text=""/>
+                    </StackPanel>
+                </Border>
+
+                <!-- INFO -->
+                <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
+                        CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="ℹ️ HOW THE MODELS ARE READ"
+                                   Style="{StaticResource SectionHeader}" Foreground="Gray"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                            <Run Text="Fewer models and categories make the reading faster. The choice can be changed later with Models and Categories... in the takeoff window: the models are then read again."/>
+                            <LineBreak/>
+                            <Run Text="A linked model is read in the phase with the same name as the phase chosen in the takeoff window. A link without that phase is not read and is listed in the Issues tab. Links nested inside linked models are not read."/>
+                            <LineBreak/>
+                            <Run Text="Excluding a workset leaves out only the elements that sit on it: an insulation on another workset than its duct or pipe is still read."/>
+                            <LineBreak/>
+                            <Run Text="Category and workset sets are saved in your pyRevit settings: they are available in every project on this computer."/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button x:Name="btn_cancel" Content="Cancel" Width="100" Height="30"
+                    Margin="0,0,10,0"/>
+            <Button x:Name="btn_ok" Content="Read Models" Width="100" Height="30"
+                    IsDefault="True"
+                    Background="#2D5A8A" Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -12,13 +12,17 @@ tooltip: >
   and waste (30% by default, as in the company QTO sheets), which can be overridden on
   single items of the bill.
 
-  CLICK: opens the takeoff window. Choose the phase and the categories and link the shared
+  CLICK: first asks which linked models (besides the open model) and which categories to
+  read, and which worksets to leave out (by name, in every model read); category and
+  workset selections can be saved as named sets for next time. Then opens the
+  takeoff window, which sums the open model and the chosen links (Models and Categories...
+  changes the choice and reads again). Choose the phase and link the shared
   price list: a .json price list, created and edited with the Edit button (an Excel or CSV
   list can be imported), or an .xlsx / .csv file read as it is. WBS Levels: pick the
   parameter of up to 15 WBS levels; the bill of quantities then starts with one column per
   level and shows one total row for every combination of levels, followed by its items.
-  Price list tab: complete chapters, EPU item numbers, reference price books, descriptions,
-  units (cad, m, kg, mq, mc) and unit prices. Bill of quantities tab: filled automatically;
+  EPU tab: complete chapters, EPU item numbers, reference price books, short descriptions,
+  descriptions, units (cad, m, kg, mq, mc) and unit prices. Bill of quantities tab: filled automatically;
   right click (or Allowance Override...) to give the selected items an allowance of their
   own, their quantity is highlighted. Type Marks tab: type and instance price codes 1..10
   and their descriptions for every family type. Rules tab: allowances, duct sheet weight per

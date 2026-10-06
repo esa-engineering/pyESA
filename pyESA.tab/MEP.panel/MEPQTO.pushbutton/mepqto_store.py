@@ -36,8 +36,10 @@ FILE_VERSION = 1
 
 # epu_item: n. articolo dell'elenco prezzi unitari (EPU) di progetto.
 # price_book: prezzario di riferimento della voce (es. Prezzario Regione Lombardia 2026).
+# short_description: descrizione breve della voce, accanto a quella estesa.
 # Il codice della voce (chiave, letto dal modello) e' il codice del prezzario.
-FIELDS = ("chapter", "subchapter", "epu_item", "price_book", "description", "unit", "price")
+FIELDS = ("chapter", "subchapter", "epu_item", "price_book", "short_description",
+          "description", "unit", "price")
 
 # Unita' di misura proposte dalla tendina dell'elenco prezzi.
 UNITS = (u"cad", u"m", u"kg", u"mq", u"mc")
@@ -67,6 +69,8 @@ HEADER_ALIASES = {
                  "nepu", "epu", "epuitem", "epuitemno", "epuitemnumber"),
     "price_book": ("prezzariodiriferimento", "prezziariodiriferimento", "prezzario",
                    "prezziario", "referencepricebook", "pricebook"),
+    "short_description": ("shortdescription", "shortdesc", "descrizionebreve",
+                          "descrizionesintetica", "descrizioneridotta", "descrizionecorta"),
     "description": ("description", "descrizione", "desc", "designazione",
                     "designazionedeilavori", "descrizionevoce", "itemdescription"),
     "unit": ("unit", "um", "uom", "unitofmeasure", "unitdimisura", "unita",
@@ -127,8 +131,8 @@ def normalize_unit(text):
 class MergedItem(object):
     """Voce di computo vista dalla finestra: listino + override di progetto."""
 
-    __slots__ = ("code", "chapter", "subchapter", "epu_item", "price_book", "description",
-                 "unit", "price", "origin")
+    __slots__ = ("code", "chapter", "subchapter", "epu_item", "price_book",
+                 "short_description", "description", "unit", "price", "origin")
 
     def __init__(self, code):
         self.code = code
@@ -136,6 +140,7 @@ class MergedItem(object):
         self.subchapter = u""
         self.epu_item = u""
         self.price_book = u""
+        self.short_description = u""
         self.description = u""
         self.unit = u""
         self.price = None
@@ -211,9 +216,9 @@ def _rows_to_items(rows, price_list, numeric_prices):
         raise PriceListError(
             "No 'Code' column found in the first {} rows. The header row must name "
             "the columns, e.g. Chapter, Subchapter, EPU item No., Reference price book, "
-            "Code, Description, Unit, Price (Italian names such as Capitolo, "
-            "Sottocapitolo, N. articolo EPU, Prezzario di riferimento, Codice prezzario, "
-            "Descrizione, UM, Prezzo are recognised too).".format(HEADER_SCAN_ROWS))
+            "Code, Short Description, Description, Unit, Price (Italian names such as "
+            "Capitolo, Sottocapitolo, N. articolo EPU, Prezzario di riferimento, Codice "
+            "prezzario, Descrizione breve, Descrizione, UM, Prezzo are recognised too).".format(HEADER_SCAN_ROWS))
 
     def cell(cells, field):
         index = header.get(field)
@@ -241,6 +246,7 @@ def _rows_to_items(rows, price_list, numeric_prices):
             "subchapter": cell(cells, "subchapter"),
             "epu_item": cell(cells, "epu_item"),
             "price_book": cell(cells, "price_book"),
+            "short_description": cell(cells, "short_description"),
             "description": cell(cells, "description"),
             "unit": normalize_unit(cell(cells, "unit")),
             "price": price,
@@ -485,8 +491,8 @@ class PriceListDocument(object):
 
         {"format": "ESA_MEPQTO_PriceList", "version": 1, "name": ..., "currency": "EUR",
          "updated_by": ..., "updated_at": ...,
-         "items": {codice: {chapter, subchapter, epu_item, price_book, description,
-                            unit, price}}}
+         "items": {codice: {chapter, subchapter, epu_item, price_book,
+                            short_description, description, unit, price}}}
 
     Salvataggio concorrente come per il file di progetto: si salvano solo i codici
     toccati (aggiunti, cambiati, cancellati); se il file su disco e' cambiato dopo il

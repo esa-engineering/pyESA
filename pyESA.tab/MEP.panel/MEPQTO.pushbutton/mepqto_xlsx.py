@@ -282,13 +282,15 @@ def _header(sheet, headers):
 
 
 def _price_list_sheet(session):
-    sheet = Sheet("Price list")
-    sheet.widths = [18, 18, 14, 24, 18, 80, 8, 14]
+    sheet = Sheet("EPU")
+    sheet.widths = [18, 18, 14, 24, 18, 36, 80, 8, 14]
     _header(sheet, (u"Chapter", u"Subchapter", u"EPU item No.", u"Reference price book",
-                    u"Price book code", u"Description", u"Unit", u"Unit price"))
+                    u"Price book code", u"Short Description", u"Description", u"Unit",
+                    u"Unit price"))
     for code in session.price_codes:
         item = session.items[code]
         sheet.add_row([item.chapter, item.subchapter, item.epu_item, item.price_book, code,
+                       Cell(item.short_description, STYLE_WRAP),
                        Cell(item.description, STYLE_WRAP), item.unit,
                        Cell(item.price, STYLE_MONEY)])
     return sheet
@@ -302,6 +304,9 @@ def _bill_sheet(session):
     sheet.add_row([Cell(u"MEP Bill of Quantities - {}".format(session.model_name), STYLE_TITLE)])
     sheet.add_row([u"Phase: {}    Categories: {}    Generated: {}".format(
         session.phase_label, session.categories_label, session.generated_at)])
+    sheet.add_row([u"Models: {}    Excluded worksets: {}".format(
+        getattr(session, "models_label", u"") or session.model_name,
+        getattr(session, "worksets_label", u"") or u"none")])
     sheet.add_row([u"Price list: {}    Project file: {}".format(
         session.price_list_path or u"(none)", session.project_file or u"(none)")])
     overridden = session.bill.overridden if session.bill is not None else {}
@@ -366,18 +371,18 @@ def _bill_sheet(session):
 def _type_marks_sheet(session):
     """Come nella scheda: una riga di gruppo per tipo, poi una riga per codice."""
     sheet = Sheet("Type Marks")
-    sheet.widths = [24, 16, 40, 9, 12, 20, 80]
-    headers = (u"Category", u"Type Mark", u"Family and Type", u"Nested", u"Code slot",
-               u"Price book code", u"Description")
+    sheet.widths = [24, 16, 40, 9, 24, 12, 20, 80]
+    headers = (u"Category", u"Type Mark", u"Family and Type", u"Nested", u"Model",
+               u"Code slot", u"Price book code", u"Description")
     _header(sheet, headers)
     for row in session.type_rows:
         # Tutte le celle con lo stile del gruppo, cosi' il fondo copre la riga intera.
         sheet.add_row([Cell(value, STYLE_GROUP) for value in (
             row.category, row.type_mark, row.type_label,
-            u"Yes" if row.nested else u"No", None, None, None)])
+            u"Yes" if row.nested else u"No", getattr(row, "model", u""), None, None, None)])
         for label, code in row.code_entries():
             item = session.items.get(code)
-            sheet.add_row([None, None, None, None, label, code,
+            sheet.add_row([None, None, None, None, None, label, code,
                            Cell(item.description if item else u"", STYLE_WRAP)])
     return sheet
 

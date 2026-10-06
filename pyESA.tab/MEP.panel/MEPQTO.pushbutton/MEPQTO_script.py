@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 __title__ = "MEP\nQTO"
 
-__doc__ = """Version = 1.2
-Date    = 02.10.2026
+__doc__ = """Version = 1.3
+Date    = 06.10.2026
 _____________________________________________________________________
 Quantity takeoff of the MEP model, driven by the Type Mark.
 
@@ -11,6 +11,13 @@ Communication / Data / Fire Alarm / Nurse Call / Security Devices,
 Conduit Fittings, Duct and Pipe Accessories, Electrical Equipment and
 Fixtures, Lighting Devices and Fixtures, Mechanical Equipment,
 Plumbing Fixtures, Sprinklers, Specialty Equipment.
+
+Before reading, a window asks which Revit links to read besides the
+open model (every placed link instance is counted), which worksets
+to exclude (by name, in every model read) and which categories.
+Category and workset selections can be saved as named sets in the
+pyRevit settings. A link is read in the phase with the same name; a
+link without it is skipped and listed in the Issues tab.
 
 Measured categories: Ducts, Flex Ducts, Pipes, Flex Pipes (m, mq or
 kg, from the unit of the price code), Cable Trays and Conduits
@@ -34,9 +41,10 @@ editor - Edit... button - or .xlsx / .csv, read only) and from a
 project file <Model>_MEPQTO.json next to the central model, which
 keeps everything typed in the window.
 
-Tabs: Price list (editable: chapter, subchapter, EPU item No.,
-reference price book, description, unit from a drop-down list, unit
-price; the price book code is the code read from the model), Bill of
+Tabs: EPU (editable: chapter, subchapter, EPU item No.,
+reference price book, short description, description, unit from a
+drop-down list, unit price; the price book code is the code read from
+the model), Bill of
 quantities (filled automatically, grouped by WBS when WBS levels are
 set; right click or Allowance Override... sets the allowance of the
 selected items, whose quantity is then highlighted), Type Marks (type
@@ -73,6 +81,7 @@ def main():
         script.exit()
 
     # Nessun report alla chiusura: computo, anomalie ed export stanno nella finestra.
+    # Se l'utente annulla la scelta di modelli e categorie la finestra non si apre.
     show_takeoff_window(doc)
 
 
