@@ -1,0 +1,31 @@
+title: "MEP\nQTO"
+tooltip: >
+  Quantity takeoff of the MEP model, driven by the Type Mark and the price codes stored in
+  instance parameters on every category (default e_DAT_PriceCode_i_1..10) and, for the
+  piece categories, also in type parameters (default e_DAT_PriceCode_1..10): type and
+  instance codes are both counted. The Yes/No instance parameter e_DAT_BOQ_i leaves
+  elements of any category out of the bill. All of them can be remapped with the
+  Parameters button. Piece categories (air terminals, devices, fixtures, equipment,
+  accessories, conduit fittings, sprinklers) are counted. Ducts, flex ducts, pipes, flex
+  pipes and insulation are measured in m, mq or kg according to the unit of the price code;
+  cable trays and conduits always in m. Linear quantities include an allowance for fittings
+  and waste (30% by default, as in the company QTO sheets), which can be overridden on
+  single items of the bill.
+
+  CLICK: opens the takeoff window. Choose the phase and the categories and link the shared
+  price list: a .json price list, created and edited with the Edit button (an Excel or CSV
+  list can be imported), or an .xlsx / .csv file read as it is. WBS Levels: pick the
+  parameter of up to 15 WBS levels; the bill of quantities then starts with one column per
+  level and shows one total row for every combination of levels, followed by its items.
+  Price list tab: complete chapters, EPU item numbers, reference price books, descriptions,
+  units (cad, m, kg, mq, mc) and unit prices. Bill of quantities tab: filled automatically;
+  right click (or Allowance Override...) to give the selected items an allowance of their
+  own, their quantity is highlighted. Type Marks tab: type and instance price codes 1..10
+  and their descriptions for every family type. Rules tab: allowances, duct sheet weight per
+  size band, pipe steel density per Type Mark. Everything typed in the window is saved to a
+  project file (<Model>_MEPQTO.json next to the central model), never to the model. Export
+  Excel writes the same tables to a workbook.
+
+  Missing Type Marks, codes, descriptions, units, dimensions or pipe densities are listed in
+  the Issues tab and in the Issues sheet of the Excel export, with their Element Ids.
+author: ESA Engineering

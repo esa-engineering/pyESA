@@ -1,0 +1,548 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MEP Quantity Takeoff"
+        Height="800" Width="1180"
+        MinHeight="600" MinWidth="900"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="True">
+
+    <Window.Resources>
+        <!-- Common Styles -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,15,0"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+        <Style x:Key="NumberCell" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Margin" Value="4,0"/>
+        </Style>
+        <Style x:Key="WrapCell" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="GridStyle" TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="CanUserDeleteRows" Value="False"/>
+            <Setter Property="CanUserReorderColumns" Value="False"/>
+            <Setter Property="SelectionUnit" Value="CellOrRowHeader"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#E8E8E8"/>
+            <Setter Property="AlternatingRowBackground" Value="#FAFAFA"/>
+            <Setter Property="EnableRowVirtualization" Value="True"/>
+            <Setter Property="Margin" Value="0,5,0,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0"
+                   Text="🧮 MEP Quantity Takeoff"
+                   FontSize="16" FontWeight="Bold"
+                   Margin="0,0,0,10"
+                   HorizontalAlignment="Center"/>
+
+        <!-- SECTION: Settings -->
+        <Border Grid.Row="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="330"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="⚙️ SETTINGS" Style="{StaticResource SectionHeader}"/>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="Price list:" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="txt_price_list" Grid.Row="0" Grid.Column="1" Padding="5,3" Margin="0,2"
+                                 IsReadOnly="True" Background="#F8F8F8"
+                                 ToolTip="Shared price list: .json (editable with Edit...) or .xlsx / .csv (read only, maintained in Excel)."/>
+                        <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal">
+                            <Button x:Name="btn_price_list" Content="Browse..." Padding="10,3" Margin="5,2,0,2"/>
+                            <Button x:Name="btn_price_edit" Content="Edit..." Padding="10,3" Margin="5,2,0,2"
+                                    ToolTip="Edit the price list (.json). An Excel or CSV price list is imported into a new .json price list."/>
+                            <Button x:Name="btn_price_reload" Content="Reload" Padding="10,3" Margin="5,2,0,2"
+                                    ToolTip="Read the price list again (after editing it in Excel or by someone else)"/>
+                            <Button x:Name="btn_price_clear" Content="✕" Width="25" Margin="5,2,0,2"
+                                    ToolTip="Work without a price list"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Row="1" Text="Project file:" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="txt_project_file" Grid.Row="1" Grid.Column="1" Padding="5,3" Margin="0,2"
+                                 IsReadOnly="True" Background="#F8F8F8"
+                                 ToolTip="JSON file with descriptions, units and unit prices of this project. The model is never written."/>
+                        <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal">
+                            <Button x:Name="btn_project_file" Content="Change..." Padding="10,3" Margin="5,2,0,2"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="220"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="160"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Phase:" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox x:Name="cbo_phase" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                  ToolTip="Elements are counted in this phase"/>
+                        <TextBlock Grid.Column="3" Text="Phase status:" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox x:Name="cbo_phase_status" Grid.Column="4" Style="{StaticResource ComboStyle}"
+                                  ToolTip="New: only elements created in the phase. New + Existing: also elements carried over from earlier phases. Demolished elements are never counted."/>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="WBS:" Style="{StaticResource FieldLabel}"/>
+                        <TextBlock x:Name="txt_wbs" Grid.Column="1" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" Text=""/>
+                        <Button x:Name="btn_wbs" Grid.Column="2" Content="WBS Levels..." Padding="10,3" Margin="5,2,0,2"
+                                ToolTip="Choose the parameters of the WBS levels used to group the bill of quantities"/>
+                    </Grid>
+
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Parameters:" Style="{StaticResource FieldLabel}"/>
+                        <TextBlock x:Name="txt_params" Grid.Column="1" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" Text=""/>
+                        <Button x:Name="btn_params" Grid.Column="2" Content="Parameters..." Padding="10,3" Margin="5,2,0,2"
+                                ToolTip="Choose the parameters holding the price codes and the Yes/No parameters that include elements in the bill"/>
+                    </Grid>
+
+                    <CheckBox x:Name="chk_primary_only" Margin="0,6,0,0"
+                              Content="Main model and primary design options only"/>
+
+                    <TextBlock x:Name="txt_settings_hint" Style="{StaticResource HintText}" Margin="0,8,0,0" Text=""/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="📁 CATEGORIES" Style="{StaticResource SectionHeader}"/>
+                    <ListBox x:Name="lst_categories" Height="125"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                        <Button x:Name="btn_select_all" Content="Select All" Padding="10,3" Margin="0,0,5,0"/>
+                        <Button x:Name="btn_select_none" Content="Deselect All" Padding="10,3"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Tabs -->
+        <TabControl x:Name="tabs" Grid.Row="2">
+
+            <!-- TAB: Price list -->
+            <TabItem x:Name="tab_prices" Header="💶 Price list">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
+                               Text="Unit prices of the price codes used in the model, sorted by chapter and subchapter. Chapter, Subchapter, EPU item No., Reference price book, Description, Unit and Unit price are editable (decimal comma or point): changes go to the project file, never to the model. A cleared field falls back to the shared price list. Red rows have no description."/>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox x:Name="txt_search_prices" Grid.Column="1" Padding="5,3"
+                                 ToolTip="Filter by chapter, subchapter, EPU item No., price book, code or description"/>
+                        <Button x:Name="btn_clear_prices" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0"
+                                ToolTip="Clear search"/>
+                        <CheckBox x:Name="chk_missing_only" Grid.Column="3" Margin="15,0,0,0" VerticalAlignment="Center"
+                                  Content="Only codes without description"/>
+                    </Grid>
+                    <DataGrid x:Name="dg_prices" Grid.Row="2" Style="{StaticResource GridStyle}">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding NoDescription}" Value="True">
+                                        <Setter Property="Background" Value="#FDECEA"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Chapter" Binding="{Binding Chapter}" Width="110"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Subchapter" Binding="{Binding Subchapter}" Width="110"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="EPU item No." Binding="{Binding EpuItem}" Width="90"/>
+                            <DataGridTextColumn Header="Reference price book" Binding="{Binding PriceBook}" Width="130"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Price book code" Binding="{Binding Code}" Width="120" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="250"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridComboBoxColumn x:Name="col_unit" Header="Unit" SelectedItemBinding="{Binding Unit}" Width="80"/>
+                            <DataGridTextColumn Header="Unit price" Binding="{Binding UnitPrice}" Width="110"
+                                                ElementStyle="{StaticResource NumberCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- TAB: Bill of quantities -->
+            <TabItem x:Name="tab_bill" Header="📋 Bill of quantities">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
+                               Text="Filled automatically from the model, the price list and the Rules tab. Pieces are counted; ducts, pipes, flex, cable trays, conduits and insulation are measured in the unit of the code, allowance for fittings included. One row per Type Mark and code. Elements without Type Mark are excluded. Right click (or Allowance Override...) to give the selected items an allowance of their own: their quantity is highlighted. With WBS levels set (WBS Levels... button), the first columns are the WBS levels and every combination has one bold row with its total, followed by its items."/>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox x:Name="txt_search_bill" Grid.Column="1" Padding="5,3"
+                                 ToolTip="Filter by Type Mark, EPU item No., price book code, description or WBS value"/>
+                        <Button x:Name="btn_clear_bill" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0"
+                                ToolTip="Clear search"/>
+                        <Button x:Name="btn_allowance" Grid.Column="3" Content="Allowance Override..." Padding="10,3" Margin="15,0,0,0"
+                                ToolTip="Set or remove the allowance of the selected items (also with a right click on the grid). Quantities with an override are highlighted."/>
+                    </Grid>
+                    <DataGrid x:Name="dg_bill" Grid.Row="2" Style="{StaticResource GridStyle}" IsReadOnly="True">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Kind}" Value="group">
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                        <Setter Property="Background" Value="#EEF3F8"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Type Mark" Binding="{Binding TypeMark}" Width="90"/>
+                            <DataGridTextColumn Header="EPU item No." Binding="{Binding EpuItem}" Width="90"/>
+                            <DataGridTextColumn Header="Price book code" Binding="{Binding Code}" Width="150"/>
+                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="250"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="60"/>
+                            <DataGridTextColumn Header="Quantity" Binding="{Binding Quantity, StringFormat={}{0:0.##}}" Width="85"
+                                                ElementStyle="{StaticResource NumberCell}">
+                                <!-- Voce con override della maggiorazione: cella colorata e
+                                     tooltip con il valore; la selezione resta visibile. -->
+                                <DataGridTextColumn.CellStyle>
+                                    <Style TargetType="DataGridCell">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AllowanceOverride}" Value="True">
+                                                <Setter Property="Background" Value="#FFE3A3"/>
+                                                <Setter Property="ToolTip" Value="{Binding AllowanceTip}"/>
+                                            </DataTrigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.CellStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Unit price" Binding="{Binding UnitPrice, StringFormat=N2}" Width="100"
+                                                ElementStyle="{StaticResource NumberCell}"/>
+                            <DataGridTextColumn Header="Amount" Binding="{Binding Amount, StringFormat=N2}" Width="115"
+                                                ElementStyle="{StaticResource NumberCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- TAB: Type Marks -->
+            <TabItem x:Name="tab_marks" Header="🏷️ Type Marks">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
+                               Text="One row per category, Type Mark, family type, nesting and set of codes. Type price code N is the N-th type parameter set with Parameters... (piece categories only); Instance price code N is the N-th instance parameter, read on every category. Both are counted. Types whose instances carry different instance codes (e.g. ducts and pipes by size) appear once per set of codes. Code pairs that no row uses are hidden."/>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox x:Name="txt_search_marks" Grid.Column="1" Padding="5,3"
+                                 ToolTip="Filter by category, Type Mark, family, type or code"/>
+                        <Button x:Name="btn_clear_marks" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0"
+                                ToolTip="Clear search"/>
+                    </Grid>
+                    <DataGrid x:Name="dg_marks" Grid.Row="2" Style="{StaticResource GridStyle}" IsReadOnly="True"
+                              HorizontalScrollBarVisibility="Auto" FrozenColumnCount="2">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="140"/>
+                            <DataGridTextColumn Header="Type Mark" Binding="{Binding TypeMark}" Width="90"/>
+                            <DataGridTextColumn Header="Family and Type" Binding="{Binding Types}" Width="220"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Nested" Binding="{Binding Nested}" Width="60"/>
+                            <DataGridTextColumn Header="Type price code 1" Binding="{Binding Code1}" Width="110"/>
+                            <DataGridTextColumn Header="Type price code description 1" Binding="{Binding Desc1}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Type price code 2" Binding="{Binding Code2}" Width="110"/>
+                            <DataGridTextColumn Header="Type price code description 2" Binding="{Binding Desc2}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Type price code 3" Binding="{Binding Code3}" Width="110"/>
+                            <DataGridTextColumn Header="Type price code description 3" Binding="{Binding Desc3}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Type price code 4" Binding="{Binding Code4}" Width="110"/>
+                            <DataGridTextColumn Header="Type price code description 4" Binding="{Binding Desc4}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Type price code 5" Binding="{Binding Code5}" Width="110"/>
+                            <DataGridTextColumn Header="Type price code description 5" Binding="{Binding Desc5}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Type price code 6" Binding="{Binding Code6}" Width="110"/>
+                            <DataGridTextColumn Header="Type price code description 6" Binding="{Binding Desc6}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Type price code 7" Binding="{Binding Code7}" Width="110"/>
+                            <DataGridTextColumn Header="Type price code description 7" Binding="{Binding Desc7}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Type price code 8" Binding="{Binding Code8}" Width="110"/>
+                            <DataGridTextColumn Header="Type price code description 8" Binding="{Binding Desc8}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Type price code 9" Binding="{Binding Code9}" Width="110"/>
+                            <DataGridTextColumn Header="Type price code description 9" Binding="{Binding Desc9}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Type price code 10" Binding="{Binding Code10}" Width="110"/>
+                            <DataGridTextColumn Header="Type price code description 10" Binding="{Binding Desc10}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instance price code 1" Binding="{Binding Code11}" Width="110"/>
+                            <DataGridTextColumn Header="Instance price code description 1" Binding="{Binding Desc11}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instance price code 2" Binding="{Binding Code12}" Width="110"/>
+                            <DataGridTextColumn Header="Instance price code description 2" Binding="{Binding Desc12}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instance price code 3" Binding="{Binding Code13}" Width="110"/>
+                            <DataGridTextColumn Header="Instance price code description 3" Binding="{Binding Desc13}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instance price code 4" Binding="{Binding Code14}" Width="110"/>
+                            <DataGridTextColumn Header="Instance price code description 4" Binding="{Binding Desc14}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instance price code 5" Binding="{Binding Code15}" Width="110"/>
+                            <DataGridTextColumn Header="Instance price code description 5" Binding="{Binding Desc15}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instance price code 6" Binding="{Binding Code16}" Width="110"/>
+                            <DataGridTextColumn Header="Instance price code description 6" Binding="{Binding Desc16}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instance price code 7" Binding="{Binding Code17}" Width="110"/>
+                            <DataGridTextColumn Header="Instance price code description 7" Binding="{Binding Desc17}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instance price code 8" Binding="{Binding Code18}" Width="110"/>
+                            <DataGridTextColumn Header="Instance price code description 8" Binding="{Binding Desc18}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instance price code 9" Binding="{Binding Code19}" Width="110"/>
+                            <DataGridTextColumn Header="Instance price code description 9" Binding="{Binding Desc19}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instance price code 10" Binding="{Binding Code20}" Width="110"/>
+                            <DataGridTextColumn Header="Instance price code description 10" Binding="{Binding Desc20}" Width="240"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- TAB: Rules -->
+            <TabItem x:Name="tab_rules" Header="📐 Rules">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
+                               Text="Measurement rules of the linear categories, from the company QTO sheets. Ducts and pipes are measured in the unit of their price code (m, mq or kg), cable trays and conduits always in m, insulation in mq or m. Every linear quantity is increased by the allowance of its category for fittings and waste. Changes are stored in the project file."/>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="1.4*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Text="➕ FITTINGS AND WASTE" Style="{StaticResource SectionHeader}"/>
+                                <TextBlock Grid.Row="1" Style="{StaticResource HintText}"
+                                           Text="Percentage added to length, area and weight, because fittings are not measured (30% in the QTO sheets)."/>
+                                <DataGrid x:Name="dg_allowance" Grid.Row="2" Style="{StaticResource GridStyle}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="*" IsReadOnly="True"/>
+                                        <DataGridTextColumn Header="Allowance %" Binding="{Binding Allowance}" Width="90"
+                                                            ElementStyle="{StaticResource NumberCell}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Text="⚖️ DUCT SHEET WEIGHT" Style="{StaticResource SectionHeader}"/>
+                                <TextBlock Grid.Row="1" Style="{StaticResource HintText}"
+                                           Text="kg = kg/mq x duct surface. A band applies when the largest side (the diameter for round ducts) is below its limit; an empty limit is the last band."/>
+                                <DataGrid x:Name="dg_duct_weight" Grid.Row="2" Style="{StaticResource GridStyle}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Shape" Binding="{Binding ShapeLabel}" Width="*" IsReadOnly="True"/>
+                                        <DataGridTextColumn Header="Side below [mm]" Binding="{Binding Limit}" Width="105"
+                                                            ElementStyle="{StaticResource NumberCell}"/>
+                                        <DataGridTextColumn Header="kg/mq" Binding="{Binding Weight}" Width="70"
+                                                            ElementStyle="{StaticResource NumberCell}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="4" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Text="🔩 PIPE STEEL DENSITY" Style="{StaticResource SectionHeader}"/>
+                                <TextBlock Grid.Row="1" Style="{StaticResource HintText}"
+                                           Text="kg = density x pi/4 x (OD&#178; - ID&#178;) x length. Only pipes whose Type Mark is listed can be measured in kg."/>
+                                <DataGrid x:Name="dg_density" Grid.Row="2" Style="{StaticResource GridStyle}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Type Mark" Binding="{Binding TypeMark}" Width="80"/>
+                                        <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="*"/>
+                                        <DataGridTextColumn Header="kg/mc" Binding="{Binding Density}" Width="70"
+                                                            ElementStyle="{StaticResource NumberCell}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                                    <Button x:Name="btn_density_add" Content="Add row" Padding="10,3" Margin="0,0,5,0"/>
+                                    <Button x:Name="btn_density_remove" Content="Remove selected" Padding="10,3"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button x:Name="btn_rules_defaults" Content="Restore defaults" Padding="10,3"
+                                ToolTip="Put back the values of the company QTO sheets"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- TAB: Issues -->
+            <TabItem x:Name="tab_issues" Header="⚠️ Issues">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
+                               Text="The Element Ids of every issue are listed in the Issues sheet of the Excel export."/>
+                    <DataGrid x:Name="dg_issues" Grid.Row="1" Style="{StaticResource GridStyle}" IsReadOnly="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Issue" Binding="{Binding Kind}" Width="190"/>
+                            <DataGridTextColumn Header="Subject" Binding="{Binding Subject}" Width="200"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Detail" Binding="{Binding Detail}" Width="*"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Instances" Binding="{Binding Instances}" Width="75"
+                                                ElementStyle="{StaticResource NumberCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Status -->
+        <Grid Grid.Row="3" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="txt_status" Style="{StaticResource HintText}" VerticalAlignment="Center" Margin="0" Text=""/>
+            <TextBlock x:Name="txt_total" Grid.Column="1" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" Text=""/>
+        </Grid>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button x:Name="btn_close" Content="Close" Width="100" Height="30" Margin="0,0,10,0"/>
+            <Button x:Name="btn_export" Content="Export Excel..." Width="120" Height="30" Margin="0,0,10,0"/>
+            <Button x:Name="btn_save" Content="Save" Width="100" Height="30"
+                    Background="#2D5A8A" Foreground="White"
+                    ToolTip="Save descriptions, units and unit prices to the project file"/>
+        </StackPanel>
+    </Grid>
+</Window>
