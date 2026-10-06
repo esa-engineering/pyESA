@@ -275,7 +275,7 @@ Read it before changing behaviour, and keep it in sync with the code.
 | `mepqto_store.py` | price list readers (JSON, .xlsx, .csv), unit aliases, project file, field-by-field merge (`merge_item`) |
 | `mepqto_xlsx.py` | minimal .xlsx writer and the export sheets |
 | `mepqto_ui.py` + `MEPQTO_form.xaml` | main window (`TakeoffForm`, `Session`) |
-| `mepqto_<x>_ui.py` + `MEPQTO_<x>.xaml` | one pair per sub-dialog: `scope` (models, worksets to exclude and categories to read, shown before every read; its `_SetPicker` handles both kinds of named sets), `wbs`, `params`, `allowance`, `pricelist` (price list editor) |
+| `mepqto_<x>_ui.py` + `MEPQTO_<x>.xaml` | one pair per sub-dialog: `scope` (models, worksets and categories to read, shown before every read; its `_SetPicker` handles both kinds of named sets), `wbs`, `params`, `allowance`, `pricelist` (price list editor) |
 
 Rules that come with the pattern:
 
@@ -300,8 +300,11 @@ Rules that come with the pattern:
   read in the phase with the same name as the host phase, or skipped with an Issue.
   Worksets are excluded **by name** in every source (`CollectOptions.excluded_worksets`,
   counted in `CollectResult.skipped_worksets`): workset ids differ between documents, and
-  names keep saved sets valid across projects. A tick means *exclude*, so a workset added
-  later is read rather than silently dropped.
+  names keep saved sets valid across projects. In the dialog a tick means *read*; the
+  dialog turns the unticked names in the list into the exclusions. To keep a workset
+  added later from being silently dropped, it remembers the ticked **and** the already
+  seen names (`last_included_worksets`, `last_known_worksets`): unseen names come up
+  ticked and flagged. A named set is applied exactly.
 - Design options: only the main model and primary options are read
   (`PRIMARY_OPTIONS_ONLY = True` in `mepqto_ui.py`; the UI checkbox was removed). The
   `CollectOptions.primary_only` logic is kept on purpose; the tool README ("Opzioni di
@@ -313,8 +316,13 @@ Rules that come with the pattern:
 | --- | --- | --- |
 | Shared price list | `.json` (`"format": "ESA_MEPQTO_PriceList"`) on a network path, or a read-only `.xlsx` / `.xlsm` / `.csv` | price list editor (`mepqto_pricelist_ui.py`) |
 | Project file | `<Model>_MEPQTO.json` next to the **central** model (`default_project_file()`); cloud / unsaved models pick a path, remembered in config | Save button |
-| Per-user settings | `script.get_config('ESA_MEPQTO')`: last phase, categories, category set, price list; `project_files` as `"<doc key>::<path>"` and `scope_links` as `"<doc key>::<uid>|<uid>"` strings, both capped at 50; `category_sets` as `"<name>::<key>,<key>"`, `workset_sets` as `"<name>::<ws>|<ws>"` (Revit forbids `|` and `:` in names); last excluded worksets and workset set | window close; scope and sets as soon as they are chosen / saved |
+| Per-user settings | `script.get_config('ESA_MEPQTO')`: last phase, categories, category set, price list; `project_files` as `"<doc key>::<path>"` and `scope_links` as `"<doc key>::<uid>|<uid>"` strings, both capped at 50; `category_sets` as `"<name>::<key>,<key>"`, `workset_include_sets` as `"<name>::<ws>|<ws>"` (worksets to read; Revit forbids `|` and `:` in names; the older `workset_sets` held exclusions and is ignored); last included / known worksets and workset set | window close; scope and sets as soon as they are chosen / saved |
 
+- Excel / CSV price lists are read **by position**, not by header (`EPU_COLUMNS`: A code,
+  B short description, C description, D unit, E unit price, F..I optional). The export's
+  EPU sheet uses the same order so it can be read back. `MergedItem.in_price_list` drives
+  the red rows of the EPU tab and the "Code not in the price list" issue (only when a
+  price list is loaded). Unit aliases (`n`, `nr`, `n°` -> `cad`) live in `UNIT_ALIASES`.
 - Window values = empty item, then non-empty price list fields, then non-empty project
   fields. An emptied field falls back to the price list; project values never flow back
   into the shared list.
@@ -327,7 +335,7 @@ Rules that come with the pattern:
   IronPython `ensure_ascii` trap); reads accept UTF-8 with BOM. A project file that is not
   valid JSON is never overwritten: the user is asked for another one.
 - **Adding a field to a price item** (as `short_description` was) touches: `FIELDS`,
-  `MergedItem.__slots__` / `__init__`, `HEADER_ALIASES` and `_rows_to_items()` in
+  `MergedItem.__slots__` / `__init__` and `EPU_COLUMNS` (positional Excel/CSV layout) in
   `mepqto_store.py`; `COLUMNS`, `FIELD_OF`, `_add_row()` and the import loop in
   `mepqto_pricelist_ui.py` plus its XAML column; `prices_table`, `PRICE_FIELDS`,
   `_write_price_values()` and the search in `mepqto_ui.py` plus the EPU tab column;

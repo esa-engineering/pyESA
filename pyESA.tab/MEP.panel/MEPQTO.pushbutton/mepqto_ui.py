@@ -227,8 +227,11 @@ class TakeoffForm(Window):
         # delle categorie. None finche' l'utente non ha confermato la prima scelta.
         self._scope_links = None
         self._scope_keys = None
-        # nomi dei workset i cui elementi non si leggono
+        # nomi dei workset i cui elementi non si leggono (in elenco ma non spuntati)
         self._scope_worksets = None
+        # workset spuntati e gia' visti, per riaprire la scelta come era
+        self._scope_included = None
+        self._scope_known = []
         # True se l'utente annulla la scelta iniziale: la finestra non si apre.
         self.cancelled = False
 
@@ -334,7 +337,8 @@ class TakeoffForm(Window):
             ("EpuItem", CLR_STRING), ("PriceBook", CLR_STRING),
             ("Code", CLR_STRING), ("ShortDescription", CLR_STRING),
             ("Description", CLR_STRING), ("Unit", CLR_STRING),
-            ("UnitPrice", CLR_STRING), ("NoDescription", CLR_BOOL)))
+            # NotInPriceList: codice assente dalla colonna A del listino: riga in rosso
+            ("UnitPrice", CLR_STRING), ("NotInPriceList", CLR_BOOL)))
         # Kind: "group" per la riga di totale di una combinazione WBS, "item" per le voci.
         # Group: numero della combinazione, sulla riga di totale e sulle sue voci (con i
         # filtri restano visibili solo le combinazioni con voci visibili).
@@ -541,11 +545,14 @@ class TakeoffForm(Window):
     def _save_category_sets(self, sets):
         self._save_named_sets('category_sets', u",", sets)
 
+    # I set di workset elencano quelli da leggere. La chiave e' nuova: i set salvati con
+    # la logica precedente ("workset_sets", workset da escludere) avrebbero il significato
+    # capovolto e non si leggono.
     def _workset_sets(self):
-        return self._named_sets('workset_sets', WORKSET_SEPARATOR)
+        return self._named_sets('workset_include_sets', WORKSET_SEPARATOR)
 
     def _save_workset_sets(self, sets):
-        self._save_named_sets('workset_sets', WORKSET_SEPARATOR, sets)
+        self._save_named_sets('workset_include_sets', WORKSET_SEPARATOR, sets)
 
     def _link_map(self):
         entries = self._cfg_get('scope_links', None) or []
@@ -573,7 +580,8 @@ class TakeoffForm(Window):
                                      for k, v in mapping.items()][-50:]
             self._cfg.last_categories = list(choice.category_keys)
             self._cfg.last_category_set = choice.set_name or u""
-            self._cfg.last_excluded_worksets = list(choice.excluded_worksets)
+            self._cfg.last_included_worksets = list(choice.included_worksets)
+            self._cfg.last_known_worksets = list(choice.known_worksets)
             self._cfg.last_workset_set = choice.workset_set_name or u""
             script.save_config()
         except Exception:
@@ -718,18 +726,23 @@ class TakeoffForm(Window):
     # ------------------------------------------------------------ ambito della lettura
 
     def _choose_scope(self, owner):
-        """Chiede link, workset esclusi e categorie da leggere; False se l'utente
-        annulla."""
+        """Chiede link, workset e categorie da leggere; False se l'utente annulla."""
         rules = [(key, label, kind) for key, label, kind, _ in qm.available_rules()]
         all_keys = [key for key, _, _ in rules]
+        legacy = []
         if self._scope_keys is not None:
             keys = list(self._scope_keys)
             link_ids = [link.unique_id for link in self._scope_links or []]
-            excluded = list(self._scope_worksets or [])
+            included = self._scope_included
+            known = list(self._scope_known)
         else:
             keys = self._cfg_get('last_categories', None) or all_keys
             link_ids = self._remembered_links()
-            excluded = self._cfg_get('last_excluded_worksets', None) or []
+            included = self._cfg_get('last_included_worksets', None)
+            known = self._cfg_get('last_known_worksets', None) or []
+            if included is None:
+                # Config salvata con la logica precedente (workset da escludere).
+                legacy = self._cfg_get('last_excluded_worksets', None) or []
         try:
             links = qm.list_links(self.doc)
         except Exception:
@@ -739,9 +752,11 @@ class TakeoffForm(Window):
             host_label, links, link_ids, rules, keys,
             self._category_sets(), self._cfg_get('last_category_set', u""),
             self._save_category_sets,
-            lambda chosen: qm.list_worksets(self.doc, host_label, chosen),
-            excluded, self._workset_sets(), self._cfg_get('last_workset_set', u""),
-            self._save_workset_sets)
+            list_worksets=lambda chosen: qm.list_worksets(self.doc, host_label, chosen),
+            included_worksets=included, known_worksets=known,
+            workset_sets=self._workset_sets(),
+            workset_set_name=self._cfg_get('last_workset_set', u""),
+            save_workset_sets=self._save_workset_sets, legacy_excluded_worksets=legacy)
         choice = show_scope_dialog(owner, settings)
         if choice is None:
             return False
@@ -749,6 +764,8 @@ class TakeoffForm(Window):
         self._scope_links = choice.links
         self._scope_keys = [key for key in all_keys if key in chosen]
         self._scope_worksets = list(choice.excluded_worksets)
+        self._scope_included = list(choice.included_worksets)
+        self._scope_known = list(choice.known_worksets)
         self._remember_scope(choice)
         self._build_category_boxes()
         return True
@@ -763,7 +780,7 @@ class TakeoffForm(Window):
             text += u"  ({} not read: see Issues)".format(len(skipped))
         excluded = list(self._scope_worksets or [])
         if excluded:
-            text += u"  |  {} workset{} excluded".format(len(excluded),
+            text += u"  |  {} workset{} not read".format(len(excluded),
                                                          u"" if len(excluded) == 1 else u"s")
         self.txt_models.Text = text
         lines = [u"Models read:"] + [u"  " + label for label in read]
@@ -772,7 +789,7 @@ class TakeoffForm(Window):
                                        for label, reason in skipped]
         if excluded:
             counts = getattr(self._collect, "skipped_worksets", {})
-            lines += [u"Worksets excluded (elements skipped):"] + [
+            lines += [u"Worksets not ticked, not read (elements skipped):"] + [
                 u"  {} ({})".format(name, counts.get(name, 0)) for name in excluded]
         self.txt_models.ToolTip = u"\n".join(lines)
 
@@ -827,7 +844,7 @@ class TakeoffForm(Window):
     def _refresh_issues(self):
         session = self.session
         session.issues = list(session.takeoff.issues) + list(session.bill_issues) + \
-            qm.description_issues(session.takeoff, session.items)
+            qm.description_issues(session.takeoff, session.items, self._price_list_loaded())
         if session.price_list_error:
             session.issues.insert(0, qm.Issue(u"Price list not loaded",
                                               session.price_list_path or u"",
@@ -857,6 +874,10 @@ class TakeoffForm(Window):
                 extra.add(item.unit)
         return [u""] + list(qs.UNITS) + sorted(extra)
 
+    def _price_list_loaded(self):
+        """True se un listino e' stato letto: solo allora un codice assente e' un'anomalia."""
+        return bool(self.session.price_list_path) and not self.session.price_list_error
+
     def _write_price_values(self, row, item):
         row["Chapter"] = item.chapter or u""
         row["Subchapter"] = item.subchapter or u""
@@ -866,7 +887,7 @@ class TakeoffForm(Window):
         row["Description"] = item.description or u""
         row["Unit"] = item.unit or u""
         row["UnitPrice"] = qs.format_decimal(item.price)
-        row["NoDescription"] = not item.description
+        row["NotInPriceList"] = self._price_list_loaded() and not item.in_price_list
 
     def _write_bill_values(self, row, item, quantity, unit):
         row["EpuItem"] = item.epu_item or u""
@@ -1011,7 +1032,7 @@ class TakeoffForm(Window):
             takeoff.instance_count, len(takeoff.groups), len(session.quantities))]
         skipped_ws = getattr(self._collect, "skipped_workset_count", 0)
         if skipped_ws:
-            parts.append(u"{} elements on excluded worksets skipped.".format(skipped_ws))
+            parts.append(u"{} elements on worksets not read skipped.".format(skipped_ws))
         if self._collect.skipped_options:
             parts.append(u"{} instances in secondary design options skipped.".format(
                 self._collect.skipped_options))
@@ -1336,7 +1357,7 @@ class TakeoffForm(Window):
                          u"OR ShortDescription LIKE '%{0}%' OR Chapter LIKE '%{0}%' OR Subchapter LIKE '%{0}%' "
                          u"OR EpuItem LIKE '%{0}%' OR PriceBook LIKE '%{0}%')".format(text))
         if self.chk_missing_only.IsChecked:
-            parts.append(u"NoDescription = true")
+            parts.append(u"NotInPriceList = true")
         return u" AND ".join(parts)
 
     def _apply_price_filter(self):

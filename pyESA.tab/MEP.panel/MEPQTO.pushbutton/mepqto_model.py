@@ -85,6 +85,7 @@ ISSUE_NO_TYPE_MARK = "No Type Mark"
 ISSUE_NO_CODE = "No price code"
 ISSUE_INCONSISTENT = "Inconsistent price codes"
 ISSUE_NO_DESCRIPTION = "Code without description"
+ISSUE_NOT_IN_PRICE_LIST = "Code not in the price list"
 ISSUE_NO_PARAMS = "Price code parameters not found"
 ISSUE_UNIT = "Unit not valid for the category"
 ISSUE_UNIT_FORCED = "Unit replaced"
@@ -1310,12 +1311,15 @@ def type_rows(collect_result, selected_keys):
         r.type_label.lower(), r.nested, order.get(r.model, 0)))
 
 
-def description_issues(takeoff, merged_items):
-    """Codici usati nel modello che non hanno descrizione ne' nel listino ne' nel progetto."""
+def description_issues(takeoff, merged_items, price_list_loaded=False):
+    """Codici del computo assenti dal listino caricato (la ricerca nella colonna A non li
+    trova) e codici senza descrizione ne' nel listino ne' nel progetto."""
     issues = []
     for code in takeoff.codes():
         item = merged_items.get(code)
-        if item is not None and item.description:
+        missing = price_list_loaded and (item is None or not item.in_price_list)
+        described = item is not None and bool(item.description)
+        if not missing and described:
             continue
         ids = []
         marks = []
@@ -1323,8 +1327,15 @@ def description_issues(takeoff, merged_items):
             if code in group.code_records:
                 ids.extend(r.ref for r in group.code_records[code])
                 marks.append(group.type_mark)
-        issues.append(Issue(
-            ISSUE_NO_DESCRIPTION, code,
-            u"Not in the price list and not described in the project file. "
-            u"Used by: {}.".format(u", ".join(marks)), ids))
+        if missing:
+            issues.append(Issue(
+                ISSUE_NOT_IN_PRICE_LIST, code,
+                u"Not found in column A of the price list{}. Used by: {}.".format(
+                    u" (described in the project file)" if described else u"",
+                    u", ".join(marks)), ids))
+        else:
+            issues.append(Issue(
+                ISSUE_NO_DESCRIPTION, code,
+                u"No description in the price list or in the project file. "
+                u"Used by: {}.".format(u", ".join(marks)), ids))
     return issues

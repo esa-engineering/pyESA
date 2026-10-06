@@ -100,9 +100,9 @@
                 <!-- SECTION: Worksets -->
                 <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
                     <StackPanel>
-                        <TextBlock Text="🗂️ WORKSETS TO EXCLUDE" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock Text="🗂️ WORKSETS TO READ" Style="{StaticResource SectionHeader}"/>
                         <TextBlock Style="{StaticResource HintText}"
-                                   Text="Elements on the ticked worksets are not read. The list joins the user worksets of the open model and of the ticked links, by name: a ticked name is excluded in every model that has it. Worksets not ticked, and new ones, are read."/>
+                                   Text="Only the elements on the ticked worksets are read. The list joins the user worksets of the open model and of the ticked links, by name: a ticked name is read in every model that has it. A workset that was not there last time appears ticked; a saved set ticks exactly its worksets."/>
 
                         <Grid Margin="0,5">
                             <Grid.ColumnDefinitions>
@@ -116,7 +116,7 @@
                                       ToolTip="Saved workset sets: pick one to tick its worksets, or type a new name"/>
                             <StackPanel Grid.Column="2" Orientation="Horizontal">
                                 <Button x:Name="btn_workset_set_save" Content="Save Set" Padding="10,3" Margin="5,2,0,2"
-                                        ToolTip="Save the ticked worksets under the name typed in Workset set (an existing set is replaced). A set with no worksets ticked excludes nothing."/>
+                                        ToolTip="Save the ticked worksets (the ones to read) under the name typed in Workset set (an existing set is replaced)"/>
                                 <Button x:Name="btn_workset_set_delete" Content="Delete Set" Padding="10,3" Margin="5,2,0,2"
                                         ToolTip="Delete the workset set named in Workset set"/>
                             </StackPanel>
@@ -216,7 +216,7 @@
                             <LineBreak/>
                             <Run Text="A linked model is read in the phase with the same name as the phase chosen in the takeoff window. A link without that phase is not read and is listed in the Issues tab. Links nested inside linked models are not read."/>
                             <LineBreak/>
-                            <Run Text="Excluding a workset leaves out only the elements that sit on it: an insulation on another workset than its duct or pipe is still read."/>
+                            <Run Text="A workset decides only for the elements that sit on it: an insulation on a ticked workset is read even if its duct or pipe is on a workset that is not."/>
                             <LineBreak/>
                             <Run Text="Category and workset sets are saved in your pyRevit settings: they are available in every project on this computer."/>
                         </TextBlock>

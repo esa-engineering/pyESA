@@ -26,7 +26,7 @@ ogni categoria. Le formule stanno in `mepqto_rules.py`.
 ## Modelli e categorie da leggere
 
 Prima di ogni lettura si apre la finestra **Models and categories** (modelli, workset da
-escludere, categorie): all'avvio del tool
+leggere, categorie): all'avvio del tool
 e dal pulsante **Models and Categories...** (riga Models nelle impostazioni). Annullando
 la scelta iniziale il tool non si apre.
 
@@ -39,19 +39,28 @@ la scelta iniziale il tool non si apre.
   finestra del computo. Se non ce l'ha non si legge e compare nella scheda Issues come
   "Linked model not read", così il computo non prende elementi di fasi sbagliate. Lo
   stesso vale per un link scaricato dopo la scelta.
-- **Workset da escludere:** l'elenco riunisce, per nome, i workset utente del modello
+- **Workset da leggere:** l'elenco riunisce, per nome, i workset utente del modello
   aperto e dei link spuntati, e si aggiorna quando cambiano le spunte dei link (il
-  tooltip di ogni riga dice in quali modelli c'è). Un workset spuntato si **esclude**: i
-  suoi elementi non si leggono, in tutti i modelli che hanno un workset con quel nome. I
-  workset non spuntati, e quelli nuovi comparsi dopo, si leggono: un set salvato non fa
-  sparire niente in silenzio. La spunta di un workset che non è in elenco (link non
-  spuntato) si conserva e torna visibile spuntando il link.
-  - Si esclude l'elemento che sta sul workset: un isolante su un workset diverso da
-    quello del suo canale o tubo si legge comunque.
+  tooltip di ogni riga dice in quali modelli c'è). Si leggono **solo gli elementi dei
+  workset spuntati**, in tutti i modelli che hanno un workset con quel nome; quelli dei
+  workset non spuntati si saltano. Serve almeno un workset spuntato.
+  - **Workset nuovi:** si ricordano i workset spuntati e quelli già visti. Un workset mai
+    visto prima (creato dopo, oppure di un link spuntato per la prima volta) compare
+    **spuntato**, e il conteggio sotto l'elenco lo segnala ("New since last time,
+    ticked: ..."): così un workset nuovo non sparisce dal computo senza che te ne
+    accorga. La prima volta sono tutti spuntati.
+  - La spunta di un workset che non è in elenco (link non spuntato) si conserva e torna
+    visibile spuntando il link.
+  - Decide il workset dell'elemento: un isolante su un workset spuntato si legge anche
+    se il suo canale o tubo sta su un workset non spuntato, e viceversa.
   - Gli elementi saltati si contano: il totale è nelle note della finestra, il dettaglio
     per workset nel tooltip della riga Models. L'intestazione del foglio Bill of
-    quantities elenca i workset esclusi.
-  - I modelli non condivisi non hanno workset: la sezione lo segnala e non esclude niente.
+    quantities elenca i workset non letti.
+  - I modelli non condivisi non hanno workset: la sezione lo segnala e si legge tutto.
+  - Fino alla versione precedente la spunta **escludeva**. Le esclusioni ricordate
+    diventano, alla prima apertura, workset non spuntati; i set di workset salvati con
+    quella logica (chiave `workset_sets`) non si riusano, perché il loro significato si
+    capovolgerebbe: vanno ricreati.
 - **Categorie:** si leggono solo quelle spuntate. Nella finestra del computo il pannello
   CATEGORIES mostra solo le categorie lette, tutte spuntate: togliendo una spunta la
   categoria esce dal computo senza rileggere i modelli.
@@ -60,13 +69,15 @@ la scelta iniziale il tool non si apre.
   correnti (un set con lo stesso nome si sostituisce, dopo conferma). Scegliendo un set
   dalla tendina se ne applicano le spunte; *Delete Set* cancella il set con il nome nella
   casella. Scrivere nella casella il nome di un set esistente non cambia le spunte: si
-  applica solo scegliendolo dalla tendina. Un set di workset vuoto ("non escludere
-  niente") è ammesso, uno di categorie no. I set stanno nella config pyRevit dell'utente
-  (`ESA_MEPQTO`, chiavi `category_sets` e `workset_sets`), quindi valgono per tutte le
-  commesse su quel PC ma non si condividono con i colleghi. I set di workset salvano i
-  nomi, quindi valgono anche fra commesse diverse.
-- **Cosa si ricorda:** le ultime categorie, gli ultimi workset esclusi e gli ultimi set
-  (`last_categories`, `last_excluded_worksets`, `last_category_set`, `last_workset_set`)
+  applica solo scegliendolo dalla tendina. Un set di workset elenca i workset **da
+  leggere** e si applica esattamente: si spuntano i suoi workset e solo quelli. Un set
+  vuoto non è ammesso. I set stanno nella config pyRevit dell'utente (`ESA_MEPQTO`,
+  chiavi `category_sets` e `workset_include_sets`), quindi valgono per tutte le commesse
+  su quel PC ma non si condividono con i colleghi. I set di workset salvano i nomi,
+  quindi valgono anche fra commesse diverse.
+- **Cosa si ricorda:** le ultime categorie, gli ultimi workset spuntati e quelli già
+  visti, gli ultimi set (`last_categories`, `last_included_worksets`,
+  `last_known_worksets`, `last_category_set`, `last_workset_set`)
   e, per ogni modello, i link scelti l'ultima volta (`scope_links`, per UniqueId
   dell'istanza, ultime 50 associazioni).
 - **Cambiare la scelta** rilegge i modelli, come un cambio di fase.
@@ -230,11 +241,21 @@ trovati su un campione di elementi, oppure se ne scrive il nome.
     (`Description`). Si comporta come la descrizione: arriva dal listino, si corregge qui
     e la correzione va nel file di progetto. È facoltativa: l'anomalia "Code without
     description" guarda solo la descrizione estesa.
+- **Ricerca nel listino e righe rosse.** Ogni codice della colonna `Price book code` si
+  cerca nella colonna A del listino (come un CERCA.VERT di Excel) e le altre colonne si
+  riempiono con i dati della riga trovata (vedi "Listino Excel / CSV"). Le righe il cui
+  codice **non c'è** nel listino sono in **rosso** (riempimento rosso chiaro, testo rosso
+  scuro) e compaiono nella scheda Issues come "Code not in the price list". La casella
+  *Only codes not in the price list* mostra solo quelle. Una descrizione scritta a mano
+  nella scheda non toglie il rosso: il codice resta assente dal listino. Senza un listino
+  caricato nessuna riga è rossa.
 - **L'unità** si sceglie da una tendina con `cad`, `m`, `kg`, `mq`, `mc`. La voce vuota
   torna al valore del listino.
 - **Le unità lette dal listino** vengono ricondotte ai valori della tendina quando sono
-  varianti note: `cad.`, `nr`, `pz` → `cad`; `ml` → `m`; `m2`, `m²` → `mq`; `m3`, `m³` →
-  `mc`. Le altre restano come sono e compaiono in fondo alla tendina.
+  varianti note: `n`, `nr`, `n°`, `cad.`, `pz` → `cad` (negli EPU `n` e `cad` compaiono
+  entrambe ma indicano la stessa unità); `ml` → `m`; `m2`, `m²` → `mq`; `m3`, `m³` → `mc`.
+  Maiuscole, punti e spazi non contano (`N.`, `Nr.` valgono come `n`, `nr`). Le altre
+  restano come sono e compaiono in fondo alla tendina.
 - **Il riepilogo Type Marks** è una matrice. Ogni tipo ha una riga di gruppo in
   grassetto con categoria, Type Mark, famiglia e tipo, annidata sì/no e modello (aperto o
   link: lo stesso tipo in due modelli ha due gruppi), seguita da una
@@ -386,7 +407,7 @@ Finestra: IM.01.001  description="Diffusore 600x600"  unit="cad"  price=118.0  e
 
 - **Quali codici:** solo quelli usati nel modello. Le voci del listino che il modello
   non usa non compaiono; un codice del modello assente dal listino compare con i campi
-  vuoti e l'anomalia "Code without description".
+  vuoti, in rosso, con l'anomalia "Code not in the price list".
 - **Modifiche nella scheda EPU:** vanno solo nel file di progetto, mai nel
   listino comune, e valgono per quella commessa. Le modifiche al listino comune si fanno
   con l'editor (Edit...) e valgono per tutte le commesse che lo usano.
@@ -455,29 +476,34 @@ salva.
 
 ### Listino Excel / CSV
 
-Si legge il primo foglio. Nelle prime 20 righe deve esserci una riga di intestazione che
-contenga almeno la colonna del codice. Le intestazioni riconosciute (maiuscole, spazi e
-punteggiatura non contano) sono:
+È l'elenco prezzi unitari (EPU) della commessa, preparato in Excel. Si legge il **primo
+foglio**, e le colonne contano per **posizione**, non per intestazione:
 
-| Campo | Intestazioni accettate |
-| --- | --- |
-| Codice prezzario | Code, Codice, Cod, Price code, Item code, Codice voce, Articolo, Tariffa, Codice prezzario, Price book code |
-| N. articolo EPU | N. articolo EPU, Nr. articolo EPU, Numero articolo EPU, Articolo EPU, N. EPU, EPU, EPU item No. |
-| Prezzario di riferimento | Prezzario di riferimento, Prezzario, Prezziario, Reference price book, Price book |
-| Descrizione breve | Short description, Short desc, Descrizione breve, Descrizione sintetica, Descrizione ridotta, Descrizione corta |
-| Descrizione | Description, Descrizione, Desc, Designazione, Designazione dei lavori |
-| Unità | Unit, UM, U.M., UoM, Unità di misura |
-| Prezzo | Price, Prezzo, Unit price, Prezzo unitario, P.U., Euro |
-| Capitolo | Chapter, Capitolo, WBS, Section, Sezione |
-| Sottocapitolo | Subchapter, Sottocapitolo, Subcapitolo, Subsection, Sottosezione |
+| Colonna | Contenuto | Note |
+| --- | --- | --- |
+| A | codice prezzo | la chiave: si confronta con `Price book code` della scheda EPU |
+| B | descrizione sintetica | va in `Short Description` |
+| C | descrizione completa | va in `Description` |
+| D | unità di misura | `n`, `nr`, `cad`... ricondotte alla tendina (vedi sopra) |
+| E | prezzo unitario | numero, oppure testo con virgola decimale o `€` (`1.234,50`) |
+| F..I | capitolo, sottocapitolo, n. articolo EPU, prezzario di riferimento | facoltative |
 
-Capitolo, sottocapitolo, n. articolo EPU, prezzario e descrizione breve sono
-facoltativi; le altre colonne
-vengono ignorate. Se un codice è ripetuto, vale la prima riga e le altre si contano come
-duplicati. Nei CSV il separatore (`;`, `,` o tab) si riconosce da solo e i prezzi
-accettano la virgola decimale (`1.234,56`). Le intestazioni del foglio EPU dell'export
-Excel sono riconosciute, quindi un export si può reimportare nell'editor (è il primo
-foglio del file).
+- **Righe saltate:** quelle senza codice in colonna A, la riga di intestazione (colonna A
+  "Codice", "Code", "Articolo"...) e le righe con la sola colonna A piena, come titoli e
+  intestazioni di capitolo. Righe vuote e titoli in testa al foglio non danno fastidio.
+- **Codice ripetuto:** vale la prima riga; le altre si contano come duplicati (le note
+  della finestra ne riportano il numero).
+- **Confronto dei codici:** esatto, maiuscole comprese. Gli spazi ai lati si tolgono. Un
+  codice numerico scritto come numero in Excel si legge senza decimali (`115004`, non
+  `115004.0`).
+- **Prezzo:** una cella non numerica lascia la voce senza prezzo.
+- **CSV:** stesse colonne; il separatore (`;`, `,` o tab) si riconosce da solo e i prezzi
+  accettano la virgola decimale (`1.234,56`).
+- **Export:** il foglio EPU dell'export Excel ha le colonne nello stesso ordine (A..E,
+  poi F..I), quindi un export si può usare di nuovo come listino o reimportare
+  nell'editor.
+- **Nessun codice trovato in colonna A:** il listino non si carica e la scheda Issues lo
+  segnala ("Price list not loaded").
 
 ### File di progetto
 
@@ -518,6 +544,10 @@ Listini e file di progetto già esistenti si aprono senza conversioni:
 
 - un listino senza `epu_item`, `price_book` o `short_description` si legge con quei campi
   vuoti;
+- **listini Excel / CSV preparati per la versione precedente**, che riconosceva le colonne
+  dal nome dell'intestazione: ora le colonne si leggono per posizione (A codice, B
+  descrizione sintetica, C descrizione, D unità, E prezzo). Un foglio con un altro ordine
+  va riordinato, altrimenti i campi finiscono nelle colonne sbagliate;
 - nella mappa dei parametri la chiave `piece_include` (vecchio Sì/No di tipo
   `e_DAT_BOQ_t`) non viene più letta. Resta nel file finché la mappa non si cambia con
   Parameters..., poi sparisce.
@@ -534,10 +564,11 @@ istanze prima di fare il computo.
 | No Type Mark | istanze il cui tipo non ha Type Mark: **escluse dal computo** |
 | No price code | Type Mark senza nessun codice (né di tipo né d'istanza), oppure elementi lineari senza alcun codice d'istanza (solo quelli, **non computati**) |
 | Inconsistent price codes | istanze a pezzo con lo stesso Type Mark ma codici di tipo diversi: ogni codice conta solo sulle istanze che lo portano. I codici d'istanza non contano per questo controllo (possono cambiare da elemento a elemento), quindi non vale per le lineari |
-| Code without description | codice usato nel computo che non ha descrizione né nel listino né nel progetto |
+| Code not in the price list | codice usato nel computo che non c'è nella colonna A del listino caricato: la riga della scheda EPU è rossa |
+| Code without description | codice presente nel listino (o computato senza listino) che non ha descrizione né nel listino né nel progetto |
 | Price code parameters not found | nessun elemento contato ha i parametri dei codici impostati con Parameters... |
 | Excluded from the bill | elementi tolti dal Sì/No di inclusione (No sull'istanza, tutte le categorie) |
-| Price list not loaded | il listino non si legge (file mancante, aperto e bloccato, intestazione non trovata) |
+| Price list not loaded | il listino non si legge (file mancante, aperto e bloccato, nessun codice in colonna A) |
 | Linked model not read | link scelto ma non letto: non caricato, oppure senza una fase con il nome di quella scelta |
 | Unit not valid for the category | la voce non ha un'unità ammessa per la categoria (es. canale con unità vuota o `cad`): **non computato** |
 | Unit replaced | passerella o conduit con una voce non in m: computato comunque in m |
@@ -554,12 +585,12 @@ chiusura della finestra non viene generato alcun report pyRevit.
 L'export scrive il file `.xlsx` direttamente, senza bisogno di Excel installato. Il nome
 di default è `YYMMDD_HHMMSS_MEPQTO_<Modello>.xlsx`. I fogli sono gli stessi delle schede:
 
-- **EPU** (in precedenza il foglio si chiamava *Price list*): capitolo,
-  sottocapitolo, n. articolo EPU, prezzario di riferimento, codice prezzario, descrizione
-  breve, descrizione, unità, prezzo unitario.
+- **EPU** (in precedenza il foglio si chiamava *Price list*): codice prezzario,
+  descrizione breve, descrizione, unità, prezzo unitario (colonne A..E, come il listino
+  Excel), poi capitolo, sottocapitolo, n. articolo EPU, prezzario di riferimento.
 - **Bill of quantities**: importo = `Quantità × Prezzo` come formula, totali per
   combinazione WBS e totale generale con `SUBTOTAL(9, ...)`, così il file resta corretto
-  se si corregge un prezzo in Excel. L'intestazione elenca i modelli letti e i workset
+  se si corregge un prezzo in Excel. L'intestazione elenca i modelli letti e i workset non letti
   esclusi. Stesse colonne della scheda: con la WBS attiva le
   prime sono i livelli, poi Type Mark, n. articolo EPU e codice prezzario. Le quantità
   delle voci con override della maggiorazione sono colorate, con una nota in testa al
@@ -583,7 +614,7 @@ di default è `YYMMDD_HHMMSS_MEPQTO_<Modello>.xlsx`. I fogli sono gli stessi del
 | `mepqto_ui.py` | finestra (griglie su `DataTable`, salvataggio, export) |
 | `MEPQTO_form.xaml` | layout della finestra |
 | `mepqto_grid_filter.py` | filtri per colonna in stile Excel sulle griglie legate a una `DataTable` |
-| `mepqto_scope_ui.py` | finestra di scelta dei modelli (link), dei workset da escludere e delle categorie da leggere, con i set di categorie e di workset |
+| `mepqto_scope_ui.py` | finestra di scelta dei modelli (link), dei workset e delle categorie da leggere, con i set di categorie e di workset |
 | `MEPQTO_scope.xaml` | layout della finestra di scelta |
 | `mepqto_wbs_ui.py` | finestra di scelta dei livelli WBS |
 | `MEPQTO_wbs.xaml` | layout della finestra WBS |

@@ -4,12 +4,14 @@ mepqto_scope_ui.py - scelta dei modelli, dei workset e delle categorie da legger
 
 Si apre prima di ogni lettura del modello: all'avvio del tool e dal pulsante Models
 and Categories... della finestra del computo. Il modello aperto si legge sempre; si
-scelgono le istanze di link da leggere in piu', i workset i cui elementi si escludono
-e le categorie.
+scelgono le istanze di link da leggere in piu', i workset da leggere e le categorie.
 
-I workset si escludono per nome, in tutti i modelli letti: l'elenco riunisce i workset
+I workset si scelgono per nome, in tutti i modelli letti: l'elenco riunisce i workset
 utente del modello aperto e dei link spuntati, e si aggiorna quando cambiano i link.
-Una spunta esclude: un workset nuovo, mai visto, si legge.
+Una spunta include. Perche' un workset nuovo non sparisca dal computo senza che
+l'utente se ne accorga, si ricordano anche i workset gia' visti: uno mai visto compare
+spuntato (e il conteggio lo segnala). Un set salvato invece si applica esattamente.
+Alla raccolta passano le esclusioni: i workset in elenco non spuntati.
 
 Le spunte delle categorie e quelle dei workset si possono salvare come set con nome
 (_SetPicker): i set stanno nella config pyRevit dell'utente e si scrivono subito,
@@ -58,14 +60,18 @@ class ScopeSettings(object):
     links: LinkSource del modello aperto; checked_link_ids: UniqueId spuntati;
     rules: (chiave, etichetta, tipo di misura); checked_keys: categorie spuntate;
     list_worksets(links) -> {nome workset: [modelli]} per il modello aperto e i link;
-    excluded_worksets: nomi spuntati (esclusi); *_sets: {nome set: [valori]};
+    included_worksets: nomi spuntati l'ultima volta (None = prima volta: tutti);
+    known_worksets: nomi gia' visti (quelli nuovi compaiono spuntati);
+    legacy_excluded_worksets: esclusioni salvate con la logica precedente, usate solo la
+    prima volta; *_sets: {nome set: [valori]} (i set di workset sono da includere);
     *_set_name: nome mostrato nella casella; save_*_sets(sets) salva nella config.
     """
 
     def __init__(self, host_label=u"", links=(), checked_link_ids=(), rules=(),
                  checked_keys=(), category_sets=None, category_set_name=u"",
-                 save_category_sets=None, list_worksets=None, excluded_worksets=(),
-                 workset_sets=None, workset_set_name=u"", save_workset_sets=None):
+                 save_category_sets=None, list_worksets=None, included_worksets=None,
+                 known_worksets=(), workset_sets=None, workset_set_name=u"",
+                 save_workset_sets=None, legacy_excluded_worksets=()):
         self.host_label = host_label
         self.links = list(links)
         self.checked_link_ids = list(checked_link_ids or [])
@@ -75,23 +81,31 @@ class ScopeSettings(object):
         self.category_set_name = category_set_name or u""
         self.save_category_sets = save_category_sets or (lambda sets: None)
         self.list_worksets = list_worksets or (lambda links: OrderedDict())
-        self.excluded_worksets = list(excluded_worksets or [])
+        self.included_worksets = None if included_worksets is None else list(included_worksets)
+        self.known_worksets = list(known_worksets or [])
+        self.legacy_excluded_worksets = list(legacy_excluded_worksets or [])
         self.workset_sets = OrderedDict(workset_sets or [])
         self.workset_set_name = workset_set_name or u""
         self.save_workset_sets = save_workset_sets or (lambda sets: None)
 
 
 class ScopeChoice(object):
-    """Esito della finestra: link da leggere, categorie, workset esclusi e i nomi dei
-    set rimasti nelle caselle."""
+    """Esito della finestra: link da leggere, categorie, workset e i nomi dei set rimasti
+    nelle caselle.
+
+    excluded_worksets: workset in elenco non spuntati, da passare alla raccolta;
+    included_worksets / known_worksets: stato da ricordare per la prossima apertura.
+    """
 
     def __init__(self, links, category_keys, set_name, excluded_worksets=(),
-                 workset_set_name=u""):
+                 workset_set_name=u"", included_worksets=(), known_worksets=()):
         self.links = list(links)
         self.category_keys = list(category_keys)
         self.set_name = set_name
         self.excluded_worksets = list(excluded_worksets)
         self.workset_set_name = workset_set_name
+        self.included_worksets = list(included_worksets)
+        self.known_worksets = list(known_worksets)
 
 
 class _SetPicker(object):
@@ -204,9 +218,14 @@ class ScopeForm(Window):
         self.result = None
         self._loading = True
         self._list_worksets = settings.list_worksets
-        # Nomi dei workset esclusi, anche di quelli non in elenco (link non spuntato):
+        # Nomi dei workset da leggere, anche di quelli non in elenco (link non spuntato):
         # rispuntando il link tornano spuntati.
-        self._excluded = set(settings.excluded_worksets)
+        self._first_time = settings.included_worksets is None
+        self._included = set(settings.included_worksets or [])
+        self._known = set(settings.known_worksets)
+        self._legacy_excluded = set(settings.legacy_excluded_worksets)
+        # workset mai visti prima, spuntati d'ufficio: il conteggio li segnala
+        self._new_worksets = set()
         self._workset_names = OrderedDict()
         self._workset_boxes = []
         self._load_xaml()
@@ -249,12 +268,12 @@ class ScopeForm(Window):
             self, self.cbo_sets, self.btn_set_save, self.btn_set_delete, u"category",
             settings.category_sets, settings.category_set_name, self._checked_keys,
             self._apply_category_set, settings.save_category_sets, allow_empty=False)
-        # Un set di workset vuoto ("non escludere niente") e' ammesso.
+        # Un set di workset elenca quelli da leggere: vuoto non avrebbe senso.
         self._workset_sets = _SetPicker(
             self, self.cbo_workset_sets, self.btn_workset_set_save,
             self.btn_workset_set_delete, u"workset", settings.workset_sets,
             settings.workset_set_name, self._checked_worksets, self._apply_workset_set,
-            settings.save_workset_sets, allow_empty=True)
+            settings.save_workset_sets, allow_empty=False)
         if not settings.links:
             self.txt_link_count.Text = u"This model has no Revit links."
         self._update_counts()
@@ -336,8 +355,12 @@ class ScopeForm(Window):
         return [box.Tag for box in self._category_boxes if box.IsChecked]
 
     def _checked_worksets(self):
-        """Workset esclusi fra quelli in elenco (modello aperto e link spuntati)."""
-        return [name for name in self._workset_names if name in self._excluded]
+        """Workset da leggere fra quelli in elenco (modello aperto e link spuntati)."""
+        return [name for name in self._workset_names if name in self._included]
+
+    def _unchecked_worksets(self):
+        """Workset in elenco non spuntati: le esclusioni passate alla raccolta."""
+        return [name for name in self._workset_names if name not in self._included]
 
     def _update_counts(self):
         loaded = [box for box in self._link_boxes if box.IsEnabled]
@@ -349,11 +372,15 @@ class ScopeForm(Window):
                 text += u" {} not loaded.".format(not_loaded)
             self.txt_link_count.Text = text
         if self._workset_names:
-            self.txt_workset_count.Text = u"{} of {} worksets excluded.".format(
+            text = u"{} of {} worksets ticked: their elements are read.".format(
                 len(self._checked_worksets()), len(self._workset_names))
+            new = [name for name in self._workset_names if name in self._new_worksets]
+            if new:
+                text += u" New since last time, ticked: {}.".format(u", ".join(new))
+            self.txt_workset_count.Text = text
         else:
             self.txt_workset_count.Text = (u"The models to read are not workshared: "
-                                           u"there are no worksets to exclude.")
+                                           u"there are no worksets to choose.")
         self.txt_category_count.Text = u"{} of {} categories ticked.".format(
             len(self._checked_keys()), len(self._category_boxes))
 
@@ -365,17 +392,18 @@ class ScopeForm(Window):
                     box.IsChecked = value
                     if box in self._workset_boxes:
                         self._mark_workset(box.Tag, value)
+                        self._new_worksets.discard(box.Tag)
         finally:
             self._loading = False
         self._update_counts()
 
     # ------------------------------------------------------------------ workset
 
-    def _mark_workset(self, name, excluded):
-        if excluded:
-            self._excluded.add(name)
+    def _mark_workset(self, name, included):
+        if included:
+            self._included.add(name)
         else:
-            self._excluded.discard(name)
+            self._included.discard(name)
 
     def _reload_worksets(self):
         """Elenco dei workset del modello aperto e dei link spuntati; le spunte si
@@ -384,6 +412,18 @@ class ScopeForm(Window):
             self._workset_names = self._list_worksets(self._checked_links())
         except Exception:
             self._workset_names = OrderedDict()
+        # Workset mai visti: si leggono. La prima volta tutti, tranne quelli esclusi con la
+        # logica precedente; dopo, compaiono spuntati e segnalati.
+        for name in self._workset_names:
+            if name in self._known:
+                continue
+            self._known.add(name)
+            if self._first_time:
+                if name not in self._legacy_excluded:
+                    self._included.add(name)
+            else:
+                self._included.add(name)
+                self._new_worksets.add(name)
         loading = self._loading
         self._loading = True
         try:
@@ -392,7 +432,7 @@ class ScopeForm(Window):
                 box = CheckBox()
                 box.Tag = name
                 _set_text(box, name)
-                box.IsChecked = name in self._excluded
+                box.IsChecked = name in self._included
                 box.ToolTip = u"Workset of: {}".format(u", ".join(models))
                 box.Checked += self.OnWorksetChanged
                 box.Unchecked += self.OnWorksetChanged
@@ -403,11 +443,13 @@ class ScopeForm(Window):
             self._loading = loading
 
     def _apply_workset_set(self, names):
-        self._excluded = set(names)
+        # Un set e' una scelta esplicita: si spuntano esattamente i suoi workset.
+        self._included = set(names)
+        self._new_worksets = set()
         self._loading = True
         try:
             for box in self._workset_boxes:
-                box.IsChecked = box.Tag in self._excluded
+                box.IsChecked = box.Tag in self._included
         finally:
             self._loading = False
         self._update_counts()
@@ -434,6 +476,7 @@ class ScopeForm(Window):
         if self._loading:
             return
         self._mark_workset(sender.Tag, bool(sender.IsChecked))
+        self._new_worksets.discard(sender.Tag)
         self._update_counts()
 
     def OnCategoryChanged(self, sender, args):
@@ -501,8 +544,12 @@ class ScopeForm(Window):
         if not keys:
             MessageBox.Show(u"Tick at least one category to read.", TITLE)
             return
+        if self._workset_names and not self._checked_worksets():
+            MessageBox.Show(u"Tick at least one workset to read.", TITLE)
+            return
         self.result = ScopeChoice(self._checked_links(), keys, self._category_sets.name,
-                                  self._checked_worksets(), self._workset_sets.name)
+                                  self._unchecked_worksets(), self._workset_sets.name,
+                                  sorted(self._included), sorted(self._known))
         self.Close()
 
     def OnCancel(self, sender, args):
@@ -511,8 +558,8 @@ class ScopeForm(Window):
 
 
 def show_scope_dialog(owner, settings):
-    """ScopeChoice con link, workset esclusi e categorie da leggere, oppure None se
-    annullata. settings: ScopeSettings."""
+    """ScopeChoice con link, workset e categorie da leggere, oppure None se annullata.
+    settings: ScopeSettings."""
     form = ScopeForm(settings)
     if owner is not None:
         form.Owner = owner

@@ -46,7 +46,9 @@ UNITS = (u"cad", u"m", u"kg", u"mq", u"mc")
 # Varianti frequenti nei listini, confrontate dopo _norm_unit (minuscolo, senza
 # punti ne' spazi, apici 2/3 come cifre).
 UNIT_ALIASES = {
+    # "n" e "nr" sono la stessa unita' di "cad": negli EPU compaiono entrambe.
     u"cad": u"cad", u"cadauno": u"cad", u"cada": u"cad", u"n": u"cad", u"nr": u"cad",
+    u"n\u00b0": u"cad", u"n\u00ba": u"cad", u"nro": u"cad", u"numero": u"cad",
     u"num": u"cad", u"pz": u"cad", u"pezzi": u"cad", u"pc": u"cad", u"pcs": u"cad",
     u"ea": u"cad", u"each": u"cad",
     u"m": u"m", u"ml": u"m", u"mt": u"m", u"m1": u"m", u"metri": u"m",
@@ -59,28 +61,17 @@ ORIGIN_PRICE_LIST = "Price list"
 ORIGIN_PROJECT = "Project"
 ORIGIN_MISSING = "Missing"
 
-# Intestazioni riconosciute nel listino, normalizzate con _norm_header (solo a-z0-9:
-# "Unita' di misura" con l'accento diventa "unitdimisura").
-HEADER_ALIASES = {
-    "code": ("code", "codice", "cod", "pricecode", "itemcode", "codicevoce",
-             "articolo", "tariffa", "codicetariffa", "codiceprezzario",
-             "codiceprezziario", "pricebookcode"),
-    "epu_item": ("narticoloepu", "nrarticoloepu", "numeroarticoloepu", "articoloepu",
-                 "nepu", "epu", "epuitem", "epuitemno", "epuitemnumber"),
-    "price_book": ("prezzariodiriferimento", "prezziariodiriferimento", "prezzario",
-                   "prezziario", "referencepricebook", "pricebook"),
-    "short_description": ("shortdescription", "shortdesc", "descrizionebreve",
-                          "descrizionesintetica", "descrizioneridotta", "descrizionecorta"),
-    "description": ("description", "descrizione", "desc", "designazione",
-                    "designazionedeilavori", "descrizionevoce", "itemdescription"),
-    "unit": ("unit", "um", "uom", "unitofmeasure", "unitdimisura", "unita",
-             "unitamisura", "unitadimisura"),
-    "chapter": ("chapter", "capitolo", "wbs", "section", "sezione"),
-    "subchapter": ("subchapter", "sottocapitolo", "subcapitolo", "subsection",
-                   "sottosezione", "subwbs"),
-    "price": ("price", "prezzo", "unitprice", "prezzounitario", "pu", "euro",
-              "prezzoeuro", "importounitario"),
-}
+# Listino Excel / CSV: colonne in posizione fissa, come un EPU (elenco prezzi unitari).
+# A codice, B descrizione sintetica, C descrizione completa, D unita', E prezzo unitario;
+# F..I facoltative (le scrive l'export, cosi' si puo' reimportare).
+EPU_COLUMNS = ("code", "short_description", "description", "unit", "price",
+               "chapter", "subchapter", "epu_item", "price_book")
+# Intestazioni della colonna A riconosciute come riga di titolo (normalizzate con
+# _norm_header: solo a-z0-9). Le altre righe senza un codice del modello sono innocue:
+# la ricerca parte dai codici del modello.
+CODE_HEADERS = ("code", "codice", "cod", "codici", "pricecode", "itemcode", "codicevoce",
+                "articolo", "art", "tariffa", "codicetariffa", "codiceprezzo",
+                "codiceprezzario", "codiceprezziario", "pricebookcode", "codiceepu")
 HEADER_SCAN_ROWS = 20
 EURO_SIGN = u"\u20ac"
 
@@ -132,7 +123,8 @@ class MergedItem(object):
     """Voce di computo vista dalla finestra: listino + override di progetto."""
 
     __slots__ = ("code", "chapter", "subchapter", "epu_item", "price_book",
-                 "short_description", "description", "unit", "price", "origin")
+                 "short_description", "description", "unit", "price", "origin",
+                 "in_price_list")
 
     def __init__(self, code):
         self.code = code
@@ -145,11 +137,14 @@ class MergedItem(object):
         self.unit = u""
         self.price = None
         self.origin = ORIGIN_MISSING
+        # True se il codice e' nel listino (colonna A dell'EPU Excel)
+        self.in_price_list = False
 
 
 def merge_item(code, price_list_items, project_items):
     item = MergedItem(code)
     base = price_list_items.get(code)
+    item.in_price_list = code in price_list_items
     override = project_items.get(code)
     overridden = False
     for source in (base, override):
@@ -190,67 +185,53 @@ def _norm_header(text):
     return re.sub(r"[^a-z0-9]", "", (text or u"").lower())
 
 
-def _map_header(cells):
-    """{campo: indice colonna} se la riga e' un'intestazione con almeno il codice."""
-    mapping = {}
-    for index, text in enumerate(cells):
-        key = _norm_header(text)
-        if not key:
-            continue
-        for field, aliases in HEADER_ALIASES.items():
-            if field not in mapping and key in aliases:
-                mapping[field] = index
-                break
-    return mapping if "code" in mapping else None
+def _parse_price(text, numeric_prices):
+    """Prezzo di una cella: numero grezzo dell'xlsx ("12.5") oppure testo con virgola
+    decimale o simbolo dell'euro ("12,50", "€ 1.234,56"); None se vuoto o non numerico."""
+    if not text:
+        return None
+    if numeric_prices:
+        try:
+            return float(text)
+        except ValueError:
+            pass
+    try:
+        return parse_decimal(text)
+    except ValueError:
+        return None
 
 
 def _rows_to_items(rows, price_list, numeric_prices):
-    header = None
-    start = 0
-    for index, cells in enumerate(rows[:HEADER_SCAN_ROWS]):
-        header = _map_header(cells)
-        if header is not None:
-            start = index + 1
-            break
-    if header is None:
-        raise PriceListError(
-            "No 'Code' column found in the first {} rows. The header row must name "
-            "the columns, e.g. Chapter, Subchapter, EPU item No., Reference price book, "
-            "Code, Short Description, Description, Unit, Price (Italian names such as "
-            "Capitolo, Sottocapitolo, N. articolo EPU, Prezzario di riferimento, Codice "
-            "prezzario, Descrizione breve, Descrizione, UM, Prezzo are recognised too).".format(HEADER_SCAN_ROWS))
+    """Voci dalle righe del foglio, per posizione (EPU_COLUMNS: A codice, B descrizione
+    sintetica, C descrizione, D unita', E prezzo, F..I facoltative).
 
-    def cell(cells, field):
-        index = header.get(field)
-        if index is None or index >= len(cells):
-            return u""
-        return (cells[index] or u"").strip()
+    Si saltano: le righe senza codice in colonna A, la riga di intestazione (colonna A
+    "Codice", "Code"...) e le righe con la sola colonna A piena (titoli, capitoli), che
+    non hanno ne' descrizioni ne' unita' ne' prezzo. Un codice ripetuto: vale la prima
+    riga.
+    """
+    for cells in rows:
+        def cell(index):
+            return (cells[index] or u"").strip() if index < len(cells) else u""
 
-    for cells in rows[start:]:
-        code = cell(cells, "code")
-        if not code:
+        code = cell(0)
+        if not code or _norm_header(code) in CODE_HEADERS:
+            continue
+        if not any(cell(index) for index in range(1, 5)):
             continue
         if code in price_list.items:
             price_list.duplicates += 1
             continue
-        price_text = cell(cells, "price")
-        try:
-            if numeric_prices:
-                price = float(price_text) if price_text else None
-            else:
-                price = parse_decimal(price_text)
-        except ValueError:
-            price = None
-        price_list.items[code] = {
-            "chapter": cell(cells, "chapter"),
-            "subchapter": cell(cells, "subchapter"),
-            "epu_item": cell(cells, "epu_item"),
-            "price_book": cell(cells, "price_book"),
-            "short_description": cell(cells, "short_description"),
-            "description": cell(cells, "description"),
-            "unit": normalize_unit(cell(cells, "unit")),
-            "price": price,
-        }
+        values = dict((field, cell(index)) for index, field in enumerate(EPU_COLUMNS))
+        values["unit"] = normalize_unit(values["unit"])
+        values["price"] = _parse_price(values["price"], numeric_prices)
+        del values["code"]
+        price_list.items[code] = values
+    if not price_list.items:
+        raise PriceListError(
+            "No price codes found in column A of the first worksheet. The price list must "
+            "have the price codes in column A, the short description in B, the description "
+            "in C, the unit in D and the unit price in E.")
 
 
 # --- xlsx: zip + xml, senza Excel (stesso approccio di WorksetCreate) ---------

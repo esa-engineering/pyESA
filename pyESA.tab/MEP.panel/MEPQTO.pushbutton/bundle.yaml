@@ -13,12 +13,15 @@ tooltip: >
   single items of the bill.
 
   CLICK: first asks which linked models (besides the open model) and which categories to
-  read, and which worksets to leave out (by name, in every model read); category and
+  read, and which worksets to read (by name, in every model read); category and
   workset selections can be saved as named sets for next time. Then opens the
   takeoff window, which sums the open model and the chosen links (Models and Categories...
   changes the choice and reads again). Choose the phase and link the shared
   price list: a .json price list, created and edited with the Edit button (an Excel or CSV
-  list can be imported), or an .xlsx / .csv file read as it is. WBS Levels: pick the
+  list can be imported), or an .xlsx / .csv unit price list (EPU) read as it is: column A
+  price code, B short description, C description, D unit (n = cad), E unit price. Every
+  price code of the model is looked up in column A; codes that are not there are red in
+  the EPU tab. WBS Levels: pick the
   parameter of up to 15 WBS levels; the bill of quantities then starts with one column per
   level and shows one total row for every combination of levels, followed by its items.
   EPU tab: complete chapters, EPU item numbers, reference price books, short descriptions,

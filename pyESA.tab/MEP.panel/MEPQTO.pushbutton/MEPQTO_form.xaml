@@ -105,7 +105,7 @@
                         <TextBlock Grid.Row="0" Text="Price list:" Style="{StaticResource FieldLabel}"/>
                         <TextBox x:Name="txt_price_list" Grid.Row="0" Grid.Column="1" Padding="5,3" Margin="0,2"
                                  IsReadOnly="True" Background="#F8F8F8"
-                                 ToolTip="Shared price list: .json (editable with Edit...) or .xlsx / .csv (read only, maintained in Excel)."/>
+                                 ToolTip="Shared price list: .json (editable with Edit...) or .xlsx / .csv (read only, maintained in Excel: column A price code, B short description, C description, D unit, E unit price)."/>
                         <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal">
                             <Button x:Name="btn_price_list" Content="Browse..." Padding="10,3" Margin="5,2,0,2"/>
                             <Button x:Name="btn_price_edit" Content="Edit..." Padding="10,3" Margin="5,2,0,2"
@@ -208,7 +208,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
-                               Text="Unit prices of the price codes used in the model, sorted by chapter and subchapter. Chapter, Subchapter, EPU item No., Reference price book, Short Description, Description, Unit and Unit price are editable (decimal comma or point): changes go to the project file, never to the model. A cleared field falls back to the shared price list. Red rows have no description. The funnel in a column header filters the rows by the values of that column."/>
+                               Text="Unit prices of the price codes used in the model, sorted by chapter and subchapter. Chapter, Subchapter, EPU item No., Reference price book, Short Description, Description, Unit and Unit price are editable (decimal comma or point): changes go to the project file, never to the model. A cleared field falls back to the shared price list. Every code is looked up in column A of the price list (Excel: A code, B short description, C description, D unit, E unit price): red rows have a code that is not there. The funnel in a column header filters the rows by the values of that column."/>
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -223,7 +223,7 @@
                         <Button x:Name="btn_clear_prices" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0"
                                 ToolTip="Clear search"/>
                         <CheckBox x:Name="chk_missing_only" Grid.Column="3" Margin="15,0,0,0" VerticalAlignment="Center"
-                                  Content="Only codes without description"/>
+                                  Content="Only codes not in the price list"/>
                         <Button x:Name="btn_clear_filters_prices" Grid.Column="4" Content="Clear Filters" Padding="10,3" Margin="15,0,0,0"
                                 IsEnabled="False" ToolTip="Remove the filters set on the columns"/>
                     </Grid>
@@ -231,8 +231,11 @@
                         <DataGrid.RowStyle>
                             <Style TargetType="DataGridRow">
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding NoDescription}" Value="True">
-                                        <Setter Property="Background" Value="#FDECEA"/>
+                                    <!-- Codice assente dalla colonna A del listino: rosso come
+                                         la formattazione "riempimento rosso chiaro" di Excel. -->
+                                    <DataTrigger Binding="{Binding NotInPriceList}" Value="True">
+                                        <Setter Property="Background" Value="#FFC7CE"/>
+                                        <Setter Property="Foreground" Value="#9C0006"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

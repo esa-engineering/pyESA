@@ -282,17 +282,19 @@ def _header(sheet, headers):
 
 
 def _price_list_sheet(session):
+    # Stesso ordine dell'EPU Excel letto dal tool (A codice ... E prezzo, poi F..I):
+    # l'export si puo' usare di nuovo come listino.
     sheet = Sheet("EPU")
-    sheet.widths = [18, 18, 14, 24, 18, 36, 80, 8, 14]
-    _header(sheet, (u"Chapter", u"Subchapter", u"EPU item No.", u"Reference price book",
-                    u"Price book code", u"Short Description", u"Description", u"Unit",
-                    u"Unit price"))
+    sheet.widths = [18, 36, 80, 8, 14, 18, 18, 14, 24]
+    _header(sheet, (u"Price book code", u"Short Description", u"Description", u"Unit",
+                    u"Unit price", u"Chapter", u"Subchapter", u"EPU item No.",
+                    u"Reference price book"))
     for code in session.price_codes:
         item = session.items[code]
-        sheet.add_row([item.chapter, item.subchapter, item.epu_item, item.price_book, code,
-                       Cell(item.short_description, STYLE_WRAP),
+        sheet.add_row([code, Cell(item.short_description, STYLE_WRAP),
                        Cell(item.description, STYLE_WRAP), item.unit,
-                       Cell(item.price, STYLE_MONEY)])
+                       Cell(item.price, STYLE_MONEY), item.chapter, item.subchapter,
+                       item.epu_item, item.price_book])
     return sheet
 
 
@@ -304,7 +306,7 @@ def _bill_sheet(session):
     sheet.add_row([Cell(u"MEP Bill of Quantities - {}".format(session.model_name), STYLE_TITLE)])
     sheet.add_row([u"Phase: {}    Categories: {}    Generated: {}".format(
         session.phase_label, session.categories_label, session.generated_at)])
-    sheet.add_row([u"Models: {}    Excluded worksets: {}".format(
+    sheet.add_row([u"Models: {}    Worksets not read: {}".format(
         getattr(session, "models_label", u"") or session.model_name,
         getattr(session, "worksets_label", u"") or u"none")])
     sheet.add_row([u"Price list: {}    Project file: {}".format(

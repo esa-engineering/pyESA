@@ -14,7 +14,7 @@ Plumbing Fixtures, Sprinklers, Specialty Equipment.
 
 Before reading, a window asks which Revit links to read besides the
 open model (every placed link instance is counted), which worksets
-to exclude (by name, in every model read) and which categories.
+to read (by name, in every model read) and which categories.
 Category and workset selections can be saved as named sets in the
 pyRevit settings. A link is read in the phase with the same name; a
 link without it is skipped and listed in the Issues tab.
