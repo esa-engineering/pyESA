@@ -46,7 +46,7 @@ type), Rules (editable), Issues.
 WBS Levels...: up to 15 levels, one parameter each (read on the
 instance, then the type, then the host). Levels left empty are
 skipped. Save writes the project file, Export Excel writes the same
-four tables to a workbook.
+five tabs to a workbook, one sheet each.
 
 The model is only read, never modified.
 _____________________________________________________________________

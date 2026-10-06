@@ -2,9 +2,11 @@
 """
 mepqto_ui.py - finestra XAML del computo MEP.
 
-Quattro schede: elenco prezzi (l'unica modificabile: descrizione, unita' da
-tendina, prezzo unitario), computo compilato in automatico, riepilogo Type Mark
-con i 10 codici e le loro descrizioni, anomalie. La finestra resta aperta mentre
+Cinque schede: elenco prezzi (modificabile: capitolo, sottocapitolo, n. articolo
+EPU, prezzario, descrizione, unita' da tendina, prezzo unitario), computo
+compilato in automatico (si modifica solo l'override della maggiorazione delle
+voci), riepilogo Type Mark con i codici di tipo e d'istanza 1..10 e le loro
+descrizioni, regole di misura (modificabili), anomalie. La finestra resta aperta mentre
 l'utente completa l'elenco prezzi: Save scrive il file di progetto senza
 chiuderla, Export Excel produce il computo in qualsiasi momento. Il modello
 Revit viene solo letto.
