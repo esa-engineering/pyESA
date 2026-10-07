@@ -1,0 +1,7 @@
+title: Overpass
+tooltip: >-
+  Makes a straight horizontal run of pipe, duct, cable tray or conduit go up or down between two points you click,
+  with two vertical or inclined legs and four elbows. The offset is relative to the current run and the leg angle
+  is measured from the horizontal. A report lists the result.
+  The new parts keep the parameters and the insulation of the starting element.
+author: Matteo Maiorano
