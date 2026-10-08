@@ -210,10 +210,11 @@ class InstanceRecord(object):
     """Un elemento computabile, ridotto ai soli dati che servono al computo."""
 
     __slots__ = ("element_id", "source", "ref", "category_key", "kind", "type_mark",
-                 "type_label", "slots", "codes", "nested", "geometry", "wbs")
+                 "type_label", "slots", "codes", "nested", "geometry", "wbs",
+                 "type_from_instance")
 
     def __init__(self, element_id, category_key, type_mark, type_label, slots, nested,
-                 geometry=None, wbs=(), source=0, ref=None):
+                 geometry=None, wbs=(), source=0, ref=None, type_from_instance=()):
         # element_id vale nel documento della sorgente (CollectResult.docs[source]):
         # 0 e' il modello aperto, gli altri sono i link letti.
         self.element_id = element_id
@@ -235,6 +236,9 @@ class InstanceRecord(object):
         self.geometry = geometry
         # wbs: un valore per ogni livello WBS attivo ("" se l'elemento non ne ha)
         self.wbs = tuple(wbs)
+        # posizioni di tipo (0..9) lette dal parametro d'istanza con lo stesso nome, perche'
+        # il tipo non ha il parametro: nel riepilogo Type Mark sono parametri d'istanza
+        self.type_from_instance = frozenset(type_from_instance)
 
 
 def _names_label(names):
@@ -832,8 +836,10 @@ def _collect_source(doc, source, link_label, phase, bic_list, key_by_cat_id, opt
                             result.params_found = True
                     nested = element.SuperComponent is not None
                     slots = _read_slots(type_info, element) + instance_slots
+                    type_from_instance = [index for index, _ in type_info.instance_names]
                 else:
                     slots = (u"",) * CODE_SLOTS + instance_slots
+                    type_from_instance = ()
                     if kind in (qr.KIND_DUCT_INSULATION, qr.KIND_PIPE_INSULATION):
                         geometry = _insulation_geometry(doc, element, key_by_cat_id, host_cache)
                     else:
@@ -845,7 +851,7 @@ def _collect_source(doc, source, link_label, phase, bic_list, key_by_cat_id, opt
 
                 result.records.append(InstanceRecord(
                     element.Id, key, type_info.type_mark, type_info.label,
-                    slots, nested, geometry, wbs, source, ref))
+                    slots, nested, geometry, wbs, source, ref, type_from_instance))
             except Exception:
                 continue
     finally:
@@ -1228,6 +1234,168 @@ def outline_group_end(entries, index):
     return end
 
 
+# --- raggruppamento della scheda Bill of quantities --------------------------
+# La scheda raggruppa le voci per livelli scelti dall'utente (fino a tre); l'export
+# Excel resta sulle combinazioni WBS di bill_outline.
+
+GROUP_CHAPTER = "chapter"
+GROUP_SUBCHAPTER = "subchapter"
+GROUP_TYPE_MARK = "type_mark"
+GROUP_UNIT = "unit"
+GROUP_WBS_PREFIX = "wbs:"
+GROUP_LEVELS = 3
+DEFAULT_GROUP_BY = (GROUP_CHAPTER, GROUP_SUBCHAPTER)
+
+NO_CHAPTER = u"(no chapter)"
+NO_SUBCHAPTER = u"(no subchapter)"
+NO_UNIT = u"(no unit)"
+_GROUP_PLACEHOLDERS = (NO_CHAPTER, NO_SUBCHAPTER, NO_UNIT, WBS_NOT_SET, u"")
+
+
+def group_options(wbs_labels):
+    """[(chiave, etichetta)] dei livelli di raggruppamento: campi della voce e livelli WBS
+    attivi (la chiave WBS e' la posizione del livello, "wbs:0")."""
+    options = [(GROUP_CHAPTER, u"Chapter"), (GROUP_SUBCHAPTER, u"Subchapter"),
+               (GROUP_TYPE_MARK, u"Type Mark"), (GROUP_UNIT, u"Unit")]
+    for index, label in enumerate(wbs_labels):
+        options.append((u"{}{}".format(GROUP_WBS_PREFIX, index), u"WBS: {}".format(label)))
+    return options
+
+
+def wbs_level_index(key):
+    """Posizione del livello WBS di una chiave "wbs:N"; None per gli altri campi."""
+    if key and key.startswith(GROUP_WBS_PREFIX):
+        try:
+            return int(key[len(GROUP_WBS_PREFIX):])
+        except ValueError:
+            return None
+    return None
+
+
+class GroupedEntry(object):
+    """Riga della scheda raggruppata: kind "group" (intestazione di un gruppo) o "item"
+    (voce Type Mark x codice, per combinazione dei livelli WBS sulle righe).
+
+    path: valori dei livelli fino a questa riga (per un gruppo, il gruppo stesso);
+    ancestors: path dei gruppi che la contengono, dal piu' esterno;
+    cells: valori WBS della voce, uno per livello ("" per i livelli sulle colonne);
+    columns: {chiave di colonna: quantita'} per i livelli WBS sulle colonne.
+    """
+
+    __slots__ = ("kind", "level", "label", "path", "ancestors", "cells", "type_mark",
+                 "code", "quantity", "columns")
+
+    def __init__(self, kind, level, path, ancestors, label=u"", cells=(), type_mark=u"",
+                 code=u"", quantity=0.0, columns=None):
+        self.kind = kind
+        self.level = level
+        self.path = path
+        self.ancestors = ancestors
+        self.label = label
+        self.cells = cells
+        self.type_mark = type_mark
+        self.code = code
+        self.quantity = quantity
+        self.columns = columns or {}
+
+
+def _group_value(group_key, line, items, units):
+    cells, type_mark, code = line[0], line[1], line[2]
+    item = items.get(code)
+    if group_key == GROUP_CHAPTER:
+        return (item.chapter if item is not None else u"") or NO_CHAPTER
+    if group_key == GROUP_SUBCHAPTER:
+        return (item.subchapter if item is not None else u"") or NO_SUBCHAPTER
+    if group_key == GROUP_TYPE_MARK:
+        return type_mark
+    if group_key == GROUP_UNIT:
+        return units.get(code) or (item.unit if item is not None else u"") or NO_UNIT
+    index = wbs_level_index(group_key)
+    if index is not None:
+        return (cells[index] if index < len(cells) else u"") or WBS_NOT_SET
+    return u""
+
+
+def _item_sort_key(type_mark, code, cells):
+    """Ordine delle voci nella scheda: codice (come un computo per voci EPU), poi Type
+    Mark, poi i livelli WBS in successione."""
+    return (code.lower(), code, type_mark.lower(), type_mark, _wbs_sort_key(cells))
+
+
+def _group_sort_key(value):
+    # i valori mancanti ("(no chapter)", "(not set)") in fondo
+    return (value in _GROUP_PLACEHOLDERS, value.lower(), value)
+
+
+def pivot_bill(bill, items, units, wbs_count, group_by, column_levels=()):
+    """Righe della scheda Bill of quantities e chiavi delle colonne.
+
+    group_by: chiavi dei livelli sulle righe (group_options), nell'ordine; ogni gruppo ha
+    una riga d'intestazione seguita dai sottogruppi o dalle voci, ordinate per codice,
+    Type Mark e livelli WBS. column_levels: chiavi "wbs:N" dei livelli WBS sulle colonne,
+    nell'ordine: le voci non si dividono piu' per quei livelli e la loro quantita' si
+    ripartisce sulle colonne, una per combinazione di valori.
+
+    Restituisce (righe, chiavi di colonna); una chiave di colonna e' la tupla dei valori
+    dei livelli sulle colonne ("(not set)" per un valore mancante).
+    """
+    if bill is None:
+        return [], []
+    column_index = [wbs_level_index(key) for key in column_levels]
+    column_index = [index for index in column_index if index is not None and index < wbs_count]
+    on_columns = set(column_index)
+    group_by = [key for key in group_by if key and wbs_level_index(key) not in on_columns]
+
+    # Voci: (valori WBS delle righe, Type Mark, codice) -> quantita' e ripartizione.
+    merged = OrderedDict()
+    column_keys = set()
+    for key, per_line in bill.wbs_quantities.items():
+        cells = wbs_cells(key, wbs_count)
+        row_cells = tuple(u"" if index in on_columns else cells[index]
+                          for index in range(wbs_count))
+        column_key = tuple(cells[index] or WBS_NOT_SET for index in column_index)
+        if column_index:
+            column_keys.add(column_key)
+        for (type_mark, code), quantity in per_line.items():
+            entry = merged.setdefault((row_cells, type_mark, code), [0.0, OrderedDict()])
+            entry[0] += quantity
+            if column_index:
+                entry[1][column_key] = entry[1].get(column_key, 0.0) + quantity
+    lines = [(cells, type_mark, code, quantity, columns)
+             for (cells, type_mark, code), (quantity, columns) in merged.items()]
+
+    def path_of(line):
+        return tuple(_group_value(group_key, line, items, units) for group_key in group_by)
+
+    decorated = sorted(((path_of(line), line) for line in lines), key=lambda pair: (
+        tuple(_group_sort_key(value) for value in pair[0]),
+        _item_sort_key(pair[1][1], pair[1][2], pair[1][0])))
+
+    entries = []
+    current = ()
+    for path, line in decorated:
+        common = 0
+        while common < min(len(path), len(current)) and path[common] == current[common]:
+            common += 1
+        for level in range(common, len(path)):
+            entries.append(GroupedEntry(
+                "group", level, path[:level + 1],
+                tuple(path[:index + 1] for index in range(level)), label=path[level]))
+        current = path
+        cells, type_mark, code, quantity, columns = line
+        entries.append(GroupedEntry(
+            "item", len(path), path, tuple(path[:index + 1] for index in range(len(path))),
+            cells=cells, type_mark=type_mark, code=code, quantity=quantity, columns=columns))
+    ordered_columns = sorted(column_keys,
+                             key=lambda key: tuple(_group_sort_key(value) for value in key))
+    return entries, ordered_columns
+
+
+def grouped_bill(bill, items, units, wbs_count, group_by):
+    """Solo le righe, senza livelli sulle colonne (vedi pivot_bill)."""
+    return pivot_bill(bill, items, units, wbs_count, group_by)[0]
+
+
 def model_codes(collect_result):
     """Codici usati nel modello (tutte le categorie raccolte, solo elementi con Type Mark),
     ordinati: sono le righe dell'elenco prezzi."""
@@ -1244,9 +1412,9 @@ class TypeRow(object):
     seguita da una riga per codice."""
 
     __slots__ = ("category_key", "type_mark", "type_label", "nested", "model", "slots",
-                 "element_ids")
+                 "element_ids", "type_from_instance", "param_map")
 
-    def __init__(self, record, model=u""):
+    def __init__(self, record, model=u"", param_map=None):
         self.category_key = record.category_key
         self.type_mark = record.type_mark
         self.type_label = record.type_label
@@ -1255,19 +1423,23 @@ class TypeRow(object):
         self.model = model
         self.slots = record.slots
         self.element_ids = []
+        self.type_from_instance = getattr(record, "type_from_instance", frozenset())
+        # mappa dei parametri con cui il modello e' stato letto (nomi nel riepilogo)
+        self.param_map = param_map
 
     @property
     def category(self):
         return category_label(self.category_key)
 
     def code_entries(self):
-        """(etichetta della posizione, codice) dei codici valorizzati: prima quelli di
-        tipo, poi quelli d'istanza. L'etichetta conserva il numero della posizione, cosi'
-        un buco (codice 1 vuoto, codice 3 pieno) resta visibile."""
+        """(parametro, codice) dei codici valorizzati: prima quelli di tipo, poi quelli
+        d'istanza. Il parametro e' il nome letto con la sua natura, "e_DAT_PriceCode_1 (T)"
+        o "e_DAT_PriceCode_i_1 (I)" (parameter_label); senza mappa, la posizione."""
         entries = []
         for index, code in enumerate(self.slots):
             if code:
-                entries.append((slot_label(index), code))
+                entries.append((parameter_label(index, self.param_map,
+                                                self.type_from_instance), code))
         return entries
 
 
@@ -1281,6 +1453,25 @@ def slot_label(index):
     if index < INSTANCE_SLOT_OFFSET:
         return u"{} {}".format(SLOT_TYPE, index + 1)
     return u"{} {}".format(SLOT_INSTANCE, index - INSTANCE_SLOT_OFFSET + 1)
+
+
+PARAMETER_TYPE = u"(T)"
+PARAMETER_INSTANCE = u"(I)"
+
+
+def parameter_label(index, param_map, type_from_instance=()):
+    """Nome del parametro da cui viene il codice in posizione index, con "(T)" se e' di
+    tipo e "(I)" se e' d'istanza. Una posizione di tipo letta sull'istanza (il tipo non ha
+    il parametro) e' d'istanza. Senza mappa o nome, la posizione ("Type 1")."""
+    if param_map is None:
+        return slot_label(index)
+    if index < INSTANCE_SLOT_OFFSET:
+        name = param_map.piece_codes[index]
+        kind = PARAMETER_INSTANCE if index in type_from_instance else PARAMETER_TYPE
+    else:
+        name = param_map.linear_codes[index - INSTANCE_SLOT_OFFSET]
+        kind = PARAMETER_INSTANCE
+    return u"{} {}".format(name or slot_label(index), kind)
 
 
 def type_rows(collect_result, selected_keys):
@@ -1301,7 +1492,7 @@ def type_rows(collect_result, selected_keys):
         row = rows.get(key)
         if row is None:
             model = sources[record.source] if record.source < len(sources) else u""
-            row = TypeRow(record, model)
+            row = TypeRow(record, model, getattr(collect_result, "param_map", None))
             rows[key] = row
         row.element_ids.append(record.ref)
     # Il modello aperto (sorgente 0) prima dei link, a parita' di tipo.

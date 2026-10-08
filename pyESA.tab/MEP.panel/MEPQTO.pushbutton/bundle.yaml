@@ -18,16 +18,19 @@ tooltip: >
   takeoff window, which sums the open model and the chosen links (Models and Categories...
   changes the choice and reads again). Choose the phase and link the shared
   price list: a .json price list, created and edited with the Edit button (an Excel or CSV
-  list can be imported), or an .xlsx / .csv unit price list (EPU) read as it is: column A
-  price code, B short description, C description, D unit (n = cad), E unit price. Every
-  price code of the model is looked up in column A; codes that are not there are red in
-  the EPU tab. WBS Levels: pick the
-  parameter of up to 15 WBS levels; the bill of quantities then starts with one column per
-  level and shows one total row for every combination of levels, followed by its items.
-  EPU tab: complete chapters, EPU item numbers, reference price books, short descriptions,
-  descriptions, units (cad, m, kg, mq, mc) and unit prices. Bill of quantities tab: filled automatically;
-  right click (or Allowance Override...) to give the selected items an allowance of their
-  own, their quantity is highlighted. Type Marks tab: type and instance price codes 1..10
+  list can be imported), or an .xlsx / .csv unit price list (EPU) read as it is: choose its
+  sheet and the column of every field (price code, short description, description, unit,
+  unit price...) with Columns..., saved in the project file. Every price code of the model
+  is looked up in the code column; codes that are not there are red in the EPU tab. WBS Levels: pick the
+  parameter of up to 15 WBS levels; the bill of quantities then has one column per level
+  after Amount. EPU tab: complete chapters, subchapters, short descriptions, descriptions, units (cad, m, kg, mq, mc) and unit prices. Bill of
+  quantities tab: filled automatically; Layout... chooses the grouping levels of the rows
+  (chapter and subchapter by default, or type mark, unit, WBS levels) and the WBS levels
+  shown as columns, like a pivot table, in the order they are added. Every group has its
+  total; click the triangle or double click a group to collapse or expand it. Right click (or
+  Allowance Override...) to give the selected items an allowance of their own, their
+  quantity is highlighted. CME tab: the same bill laid out as the Excel export (WBS
+  columns first, one total row per WBS combination). Type Marks tab: type and instance price codes 1..10
   and their descriptions for every family type. Rules tab: allowances, duct sheet weight per
   size band, pipe steel density per Type Mark. Everything typed in the window is saved to a
   project file (<Model>_MEPQTO.json next to the central model), never to the model. Export

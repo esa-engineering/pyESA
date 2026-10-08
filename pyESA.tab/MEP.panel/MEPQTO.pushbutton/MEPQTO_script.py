@@ -41,13 +41,14 @@ editor - Edit... button - or .xlsx / .csv, read only) and from a
 project file <Model>_MEPQTO.json next to the central model, which
 keeps everything typed in the window.
 
-Tabs: EPU (editable: chapter, subchapter, EPU item No.,
-reference price book, short description, description, unit from a
+Tabs: EPU (editable: chapter, subchapter, short description,
+description, unit from a
 drop-down list, unit price; the price book code is the code read from
 the model), Bill of
 quantities (filled automatically, grouped by WBS when WBS levels are
 set; right click or Allowance Override... sets the allowance of the
-selected items, whose quantity is then highlighted), Type Marks (type
+selected items, whose quantity is then highlighted), CME (the same bill
+laid out as the Bill of quantities sheet of the Excel export), Type Marks (type
 and instance price codes 1..10 and their descriptions for each family
 type), Rules (editable), Issues.
 

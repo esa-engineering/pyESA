@@ -38,6 +38,7 @@ from Microsoft.Win32 import OpenFileDialog, SaveFileDialog
 from pyrevit import script
 
 import mepqto_store as qs
+from mepqto_columns_ui import show_columns_dialog
 
 XAML_FILE_NAME = 'MEPQTO_pricelist.xaml'
 TITLE = "Price list editor"
@@ -83,7 +84,7 @@ def item_sort_key(entry):
 
 class PriceListEditor(Window):
 
-    def __init__(self, path=None, import_path=None, user_name=u""):
+    def __init__(self, path=None, import_path=None, user_name=u"", import_layout=None):
         self.saved_path = None
         self._user = user_name
         self._updating = False
@@ -100,7 +101,7 @@ class PriceListEditor(Window):
         else:
             self._new()
         if import_path:
-            self._import(import_path, ask=False)
+            self._import(import_path, ask=False, layout=import_layout)
 
     # ------------------------------------------------------------------ setup
 
@@ -339,9 +340,15 @@ class PriceListEditor(Window):
 
     # ------------------------------------------------------------ import
 
-    def _import(self, path, ask=True):
+    def _import(self, path, ask=True, layout=None):
+        # Excel / CSV: foglio e colonne si scelgono prima di leggere (se non arrivano gia'
+        # dalla finestra del computo). Una finestra non ancora mostrata non fa da Owner.
+        if qs.is_table_file(path) and layout is None:
+            layout = show_columns_dialog(self if self.IsVisible else None, path)
+            if layout is None:
+                return
         try:
-            source = qs.load_price_list(path)
+            source = qs.load_price_list(path, layout)
         except qs.PriceListError as error:
             MessageBox.Show(u"{}".format(error), TITLE, MessageBoxButton.OK,
                             MessageBoxImage.Warning)
@@ -577,9 +584,11 @@ class PriceListEditor(Window):
             args.Cancel = True
 
 
-def show_pricelist_editor(owner, path=None, import_path=None, user_name=u""):
-    """Apre l'editor; restituisce il percorso dell'ultimo listino salvato, o None."""
-    form = PriceListEditor(path, import_path, user_name)
+def show_pricelist_editor(owner, path=None, import_path=None, user_name=u"",
+                          import_layout=None):
+    """Apre l'editor; restituisce il percorso dell'ultimo listino salvato, o None.
+    import_layout: foglio e colonne del listino Excel / CSV da importare."""
+    form = PriceListEditor(path, import_path, user_name, import_layout)
     if owner is not None:
         form.Owner = owner
         form.WindowStartupLocation = WindowStartupLocation.CenterOwner

@@ -17,6 +17,7 @@ modificabile e' una colonna stringa convertita a mano in ColumnChanging: il
 binding WPF usa la cultura en-US e leggerebbe "12,5" come 125.
 """
 
+import json
 import os
 from collections import OrderedDict
 from datetime import datetime
@@ -33,13 +34,15 @@ from System.Data import DataTable, DataRowState, DataView, DataViewRowState
 from System.Diagnostics import Process
 from System.IO import FileStream, FileMode
 from System.Windows import (Window, MessageBox, MessageBoxButton, MessageBoxImage,
-                            MessageBoxResult, Visibility)
-from System.Windows.Controls import (CheckBox, ContextMenu, DataGridEditingUnit,
-                                     DataGridLength, DataGridTextColumn, MenuItem)
+                            MessageBoxResult, Visibility, Style, Setter, FrameworkElement,
+                            HorizontalAlignment, Thickness, TextWrapping)
+from System.Windows.Controls import (CheckBox, ContextMenu, DataGridCell,
+                                     DataGridEditingUnit, DataGridLength, DataGridRow,
+                                     DataGridTextColumn, MenuItem, TextBlock)
 from System.Windows.Data import Binding
 from System.Windows.Input import Cursors
 from System.Windows.Markup import XamlReader
-from System.Windows.Media import SolidColorBrush, Colors
+from System.Windows.Media import SolidColorBrush, Colors, VisualTreeHelper
 from System.Windows.Threading import DispatcherPriority
 from Microsoft.Win32 import OpenFileDialog, SaveFileDialog
 
@@ -55,12 +58,17 @@ from mepqto_pricelist_ui import show_pricelist_editor
 from mepqto_allowance_ui import show_allowance_dialog
 from mepqto_scope_ui import show_scope_dialog, ScopeSettings, SET_NAME_SEPARATOR
 from mepqto_grid_filter import GridFilters
+from mepqto_layout_ui import show_layout_dialog
+from mepqto_columns_ui import show_columns_dialog
 
 XAML_FILE_NAME = 'MEPQTO_form.xaml'
 CONFIG_SECTION = 'ESA_MEPQTO'
 TITLE = "MEP Quantity Takeoff"
 EURO = u"\u20ac"
 CONFIG_SEPARATOR = u"::"
+# Triangolini delle righe di gruppo del computo: aperto / chiuso.
+GLYPH_EXPANDED = u"\u25be"
+GLYPH_COLLAPSED = u"\u25b8"
 # Separatore dei nomi dei workset nella config: Revit non ammette '|' nei nomi.
 # Si computano solo il modello principale e le opzioni di progetto primarie: la casella
 # che lo rendeva modificabile e' stata tolta dalla finestra (vedi README, "Opzioni di
@@ -217,6 +225,17 @@ class TakeoffForm(Window):
         self._store = qs.ProjectStore(None)
         self._price_rows = {}
         self._bill_rows = {}
+        # scheda computo raggruppata: (riga, GroupedEntry) e path dei gruppi chiusi
+        self._bill_entries = []
+        self._collapsed = set()
+        self._gid_paths = {}
+        # disposizione del computo: chiavi dei livelli sulle righe e dei WBS sulle colonne
+        self._layout_rows = None
+        # foglio e colonne del listino Excel / CSV in uso (PriceListLayout), None = A..I
+        self._price_layout = None
+        self._layout_columns = None
+        # colonne create per i livelli WBS sulle colonne: (colonna della griglia, nome)
+        self._pivot_columns = []
         # codice -> [(riga del riepilogo, colonna DescN)] da aggiornare quando cambia
         # la descrizione
         self._mark_cells = {}
@@ -273,17 +292,21 @@ class TakeoffForm(Window):
         self.ResizeMode = root.ResizeMode
 
         for name in ("txt_price_list", "btn_price_list", "btn_price_edit", "btn_price_reload",
+                     "btn_price_columns",
                      "btn_price_clear",
                      "txt_project_file", "btn_project_file",
                      "cbo_phase", "cbo_phase_status", "txt_settings_hint",
                      "txt_wbs", "btn_wbs", "txt_params", "btn_params",
                      "txt_models", "btn_scope",
                      "lst_categories", "btn_select_all", "btn_select_none",
-                     "tabs", "tab_prices", "tab_bill", "tab_marks", "tab_issues",
+                     "tabs", "tab_prices", "tab_bill", "tab_cme", "tab_marks", "tab_issues",
                      "txt_search_prices", "btn_clear_prices", "chk_missing_only", "dg_prices",
                      "btn_clear_filters_prices",
                      "txt_search_bill", "btn_clear_bill", "btn_allowance", "dg_bill",
-                     "btn_clear_filters_bill",
+                     "btn_clear_filters_bill", "txt_layout", "btn_layout",
+                     "btn_expand_all", "btn_collapse_all",
+                     "txt_search_cme", "btn_clear_cme", "btn_clear_filters_cme",
+                     "btn_allowance_cme", "dg_cme",
                      "txt_search_marks", "btn_clear_marks", "dg_marks", "dg_issues",
                      "tab_rules", "dg_allowance", "dg_duct_weight", "dg_density",
                      "btn_density_add", "btn_density_remove", "btn_rules_defaults",
@@ -293,6 +316,7 @@ class TakeoffForm(Window):
         self.btn_price_list.Click += self.OnBrowsePriceList
         self.btn_price_reload.Click += self.OnReloadPriceList
         self.btn_price_edit.Click += self.OnEditPriceList
+        self.btn_price_columns.Click += self.OnPriceColumns
         self.btn_price_clear.Click += self.OnClearPriceList
         self.btn_project_file.Click += self.OnChangeProjectFile
         self.cbo_phase.SelectionChanged += self.OnCollectOptionsChanged
@@ -306,16 +330,22 @@ class TakeoffForm(Window):
         self.txt_search_bill.TextChanged += self.OnBillFilterChanged
         self.btn_clear_bill.Click += self.OnClearBillSearch
         self.btn_allowance.Click += self.OnAllowanceOverride
-        # Menu del tasto destro sulle voci del computo: la cella cliccata viene
-        # selezionata dalla griglia prima che il menu si apra.
-        menu = ContextMenu()
-        for header, handler in ((u"Allowance override...", self.OnAllowanceOverride),
-                                (u"Remove allowance override", self.OnRemoveAllowanceOverride)):
-            item = MenuItem()
-            item.Header = header
-            item.Click += handler
-            menu.Items.Add(item)
-        self.dg_bill.ContextMenu = menu
+        # Menu del tasto destro sulle voci del computo (Bill of quantities e CME): la cella
+        # cliccata viene selezionata dalla griglia prima che il menu si apra.
+        for grid in (self.dg_bill, self.dg_cme):
+            menu = ContextMenu()
+            for header, handler in ((u"Allowance override...", self.OnAllowanceOverride),
+                                    (u"Remove allowance override",
+                                     self.OnRemoveAllowanceOverride)):
+                item = MenuItem()
+                item.Header = header
+                item.Click += handler
+                menu.Items.Add(item)
+            grid.ContextMenu = menu
+        self.txt_search_cme.TextChanged += self.OnCmeFilterChanged
+        self.btn_clear_cme.Click += self.OnClearCmeSearch
+        self.btn_clear_filters_cme.Click += self.OnClearCmeFilters
+        self.btn_allowance_cme.Click += self.OnAllowanceOverride
         self.txt_search_marks.TextChanged += self.OnMarkFilterChanged
         self.btn_clear_marks.Click += self.OnClearMarkSearch
         self.btn_close.Click += self.OnCloseClick
@@ -329,6 +359,12 @@ class TakeoffForm(Window):
         self.btn_scope.Click += self.OnScope
         self.btn_clear_filters_prices.Click += self.OnClearPriceFilters
         self.btn_clear_filters_bill.Click += self.OnClearBillFilters
+        self.btn_layout.Click += self.OnLayout
+        self.btn_expand_all.Click += self.OnExpandAll
+        self.btn_collapse_all.Click += self.OnCollapseAll
+        # Un clic sul triangolino o un doppio clic su una riga di gruppo la apre o chiude.
+        self.dg_bill.PreviewMouseLeftButtonUp += self.OnBillMouseUp
+        self.dg_bill.MouseDoubleClick += self.OnBillDoubleClick
         self.Closing += self.OnWindowClosing
 
     def _build_tables(self):
@@ -339,28 +375,68 @@ class TakeoffForm(Window):
             ("Description", CLR_STRING), ("Unit", CLR_STRING),
             # NotInPriceList: codice assente dalla colonna A del listino: riga in rosso
             ("UnitPrice", CLR_STRING), ("NotInPriceList", CLR_BOOL)))
-        # Kind: "group" per la riga di totale di una combinazione WBS, "item" per le voci.
-        # Group: numero della combinazione, sulla riga di totale e sulle sue voci (con i
-        # filtri restano visibili solo le combinazioni con voci visibili).
+        # Kind: "group" per l'intestazione di un gruppo, "item" per le voci.
+        # Gid: numero del gruppo (righe di gruppo); Anc: "|1|4|", i gruppi che contengono la
+        # riga (con i filtri restano visibili solo i gruppi con voci visibili).
+        # Level / Shade: profondita' e fondo della riga di gruppo; Toggle: triangolino;
+        # Hidden: riga dentro un gruppo chiuso.
         # W1..W15: valori dei livelli WBS attivi.
         self.bill_table = new_table("bill", [
-            ("Kind", CLR_STRING), ("Group", CLR_INT)] + [("W{}".format(i + 1), CLR_STRING)
+            ("Kind", CLR_STRING), ("Gid", CLR_INT), ("Anc", CLR_STRING),
+            ("Level", CLR_INT), ("Shade", CLR_STRING), ("Toggle", CLR_STRING),
+            ("Hidden", CLR_BOOL)] + [("W{}".format(i + 1), CLR_STRING)
                                      for i in range(qm.WBS_LEVELS)] + [
             ("TypeMark", CLR_STRING), ("EpuItem", CLR_STRING), ("Code", CLR_STRING),
             ("Description", CLR_STRING), ("Unit", CLR_STRING), ("Quantity", CLR_DOUBLE),
             ("UnitPrice", CLR_DOUBLE), ("Amount", CLR_DOUBLE),
             # voce con override della maggiorazione: la quantita' si colora
             ("AllowanceOverride", CLR_BOOL), ("AllowanceTip", CLR_STRING)])
-        # Colonne WBS in testa alla griglia, una per livello, nascoste finche' non servono:
-        # l'intestazione e' il nome del parametro, quindi si creano qui e non nell'XAML.
+        # Colonne WBS in coda alla griglia, dopo Amount, una per livello, nascoste finche'
+        # non servono: l'intestazione e' il nome del parametro, quindi si creano qui e non
+        # nell'XAML.
         self._wbs_columns = []
         for index in range(qm.WBS_LEVELS):
             column = DataGridTextColumn()
             column.Binding = Binding("W{}".format(index + 1))
             column.Width = DataGridLength(90)
             column.Visibility = Visibility.Collapsed
-            self.dg_bill.Columns.Insert(index, column)
+            self.dg_bill.Columns.Add(column)
             self._wbs_columns.append(column)
+        # Colonna del triangolino dei gruppi, la prima a sinistra.
+        self._toggle_column = DataGridTextColumn()
+        self._toggle_column.Binding = Binding("Toggle")
+        self._toggle_column.Width = DataGridLength(26)
+        self._toggle_column.Header = u""
+        self._toggle_column.CanUserSort = False
+        glyph_style = Style(clr.GetClrType(TextBlock))
+        glyph_style.Setters.Add(Setter(TextBlock.FontSizeProperty, 14.0))
+        glyph_style.Setters.Add(Setter(TextBlock.HorizontalAlignmentProperty,
+                                       HorizontalAlignment.Center))
+        glyph_style.Setters.Add(Setter(FrameworkElement.CursorProperty, Cursors.Hand))
+        self._toggle_column.ElementStyle = glyph_style
+        self.dg_bill.Columns.Insert(0, self._toggle_column)
+        # Scheda CME: la vista per combinazioni WBS, come il foglio dell'export Excel.
+        # Kind: "group" per la riga di totale di una combinazione WBS, "item" per le voci;
+        # Group: numero della combinazione, sulla riga di totale e sulle sue voci.
+        self.cme_table = new_table("cme", [
+            ("Kind", CLR_STRING), ("Group", CLR_INT)] + [("W{}".format(i + 1), CLR_STRING)
+                                     for i in range(qm.WBS_LEVELS)] + [
+            ("TypeMark", CLR_STRING), ("EpuItem", CLR_STRING), ("Code", CLR_STRING),
+            ("Description", CLR_STRING), ("Unit", CLR_STRING), ("Quantity", CLR_DOUBLE),
+            ("UnitPrice", CLR_DOUBLE), ("Amount", CLR_DOUBLE),
+            ("AllowanceOverride", CLR_BOOL), ("AllowanceTip", CLR_STRING)])
+        # Colonne WBS in testa, come nell'export.
+        self._cme_wbs_columns = []
+        for index in range(qm.WBS_LEVELS):
+            column = DataGridTextColumn()
+            column.Binding = Binding("W{}".format(index + 1))
+            column.Width = DataGridLength(90)
+            column.Visibility = Visibility.Collapsed
+            self.dg_cme.Columns.Insert(index, column)
+            self._cme_wbs_columns.append(column)
+        # Restano ferme mentre si scorre: tutte le colonne WBS (quelle spente non occupano
+        # spazio), Type Mark e Price book code.
+        self.dg_cme.FrozenColumnCount = qm.WBS_LEVELS + 2
         # Riepilogo Type Mark a matrice: una riga "group" per tipo (categoria, Type Mark,
         # famiglia e tipo, annidata) seguita da una riga "code" per codice. Search, nascosta,
         # porta i dati del gruppo anche sulle righe dei codici, cosi' la ricerca di un Type
@@ -379,6 +455,7 @@ class TakeoffForm(Window):
 
         self.dg_prices.ItemsSource = self.prices_table.DefaultView
         self.dg_bill.ItemsSource = self.bill_table.DefaultView
+        self.dg_cme.ItemsSource = self.cme_table.DefaultView
         self.dg_marks.ItemsSource = self.marks_table.DefaultView
         self.dg_issues.ItemsSource = self.issues_table.DefaultView
 
@@ -412,6 +489,13 @@ class TakeoffForm(Window):
         self.bill_filters = GridFilters(
             self.dg_bill, self.bill_table, self._apply_bill_filter,
             context=self._bill_search_expression, rows_filter=u"Kind = 'item'",
+            skip_fields=("Toggle",),
+            formatters={"Quantity": lambda v: u"{:,.2f}".format(v),
+                        "UnitPrice": lambda v: u"{:,.2f}".format(v),
+                        "Amount": lambda v: u"{:,.2f}".format(v)})
+        self.cme_filters = GridFilters(
+            self.dg_cme, self.cme_table, self._apply_cme_filter,
+            context=self._cme_search_expression, rows_filter=u"Kind = 'item'",
             formatters={"Quantity": lambda v: u"{:,.2f}".format(v),
                         "UnitPrice": lambda v: u"{:,.2f}".format(v),
                         "Amount": lambda v: u"{:,.2f}".format(v)})
@@ -467,11 +551,26 @@ class TakeoffForm(Window):
         path = self._remembered_project_file() or qs.default_project_file(self.doc)
         self._open_project_file(path)
         price_path = self._store.price_list_path or self._cfg_get('last_price_list', None)
+        if self._store.price_list_path:
+            layout = qs.PriceListLayout.from_dict(self._store.price_list_layout)
+        else:
+            layout = self._config_layout()
         if price_path and not self._store.price_list_path:
-            # Il percorso preso dalla config entra nel file al prossimo salvataggio,
-            # senza segnare modifiche non salvate.
+            # Percorso e colonne presi dalla config entrano nel file al prossimo
+            # salvataggio, senza segnare modifiche non salvate.
             self._store.price_list_path = price_path
-        self._load_price_list(price_path, show_errors=False)
+            self._store.price_list_layout = layout.to_dict() if layout else None
+        self._load_price_list(price_path, show_errors=False, layout=layout)
+
+    def _config_layout(self):
+        """Foglio e colonne dell'ultimo listino Excel / CSV, dalla config (testo JSON)."""
+        text = self._cfg_get('last_price_list_layout', None)
+        if not text:
+            return None
+        try:
+            return qs.PriceListLayout.from_dict(json.loads(text))
+        except Exception:
+            return None
 
     # ------------------------------------------------------------ config
 
@@ -596,6 +695,10 @@ class TakeoffForm(Window):
             if self._scope_keys:
                 self._cfg.last_categories = list(self._scope_keys)
             self._cfg.last_price_list = self.session.price_list_path or u""
+            # ensure_ascii=False: in IronPython l'escape fallisce sulle lettere accentate
+            self._cfg.last_price_list_layout = json.dumps(
+                self._price_layout.to_dict(), ensure_ascii=False) \
+                if self._price_layout is not None else u""
             script.save_config()
         except Exception:
             pass
@@ -627,17 +730,27 @@ class TakeoffForm(Window):
         else:
             self.txt_project_file.Text = u"(not set: choose it with Change... before saving)"
 
-    def _load_price_list(self, path, show_errors):
+    def _load_price_list(self, path, show_errors, layout=None):
+        """Legge il listino; layout: foglio e colonne di un listino Excel / CSV (None =
+        A..I sul primo foglio)."""
         self.session.price_list_path = path or None
         self.session.price_list_error = None
+        table_file = bool(path) and qs.is_table_file(path)
+        self._price_layout = layout if table_file else None
         self.txt_price_list.Text = path or u""
+        self.btn_price_columns.IsEnabled = table_file
+        self.txt_price_list.ToolTip = (
+            u"Excel / CSV price list, {}".format(
+                (layout or qs.PriceListLayout.default()).describe()) if table_file else
+            u"Shared price list: .json (editable with Edit...) or .xlsx / .csv (read only, "
+            u"maintained in Excel: sheet and columns chosen with Columns...).")
         if not path:
             self._price_list = qs.PriceList()
             self.session.price_list_count = 0
             return
         self.Cursor = Cursors.Wait
         try:
-            self._price_list = qs.load_price_list(path)
+            self._price_list = qs.load_price_list(path, self._price_layout)
         except qs.PriceListError as error:
             self._price_list = qs.PriceList(path)
             self.session.price_list_error = u"{}".format(error)
@@ -838,6 +951,7 @@ class TakeoffForm(Window):
         session.wbs_labels = self._wbs_labels()
         session.rules = self._rules
         self._fill_bill_table()
+        self._fill_cme_table()
         self._refresh_issues()
         self._update_totals()
 
@@ -919,20 +1033,158 @@ class TakeoffForm(Window):
             self._updating = False
 
     def _fill_bill_table(self):
-        """Computo per codice o, con i livelli WBS, raggruppato con i subtotali."""
+        """Computo raggruppato per i livelli sulle righe, con i totali dei gruppi, e con
+        una colonna per ogni combinazione dei livelli WBS sulle colonne."""
         session = self.session
         labels = list(session.wbs_labels)
-        outline = qm.bill_outline(session.bill, labels)
+        rows_layout, columns_layout = self._bill_layout(labels)
+        on_columns = set(qm.wbs_level_index(key) for key in columns_layout)
         for index, column in enumerate(self._wbs_columns):
             if index < len(labels):
                 self.bill_filters.set_title(column, labels[index])
+            # un livello sulle colonne non ha un valore per riga
+            column.Visibility = Visibility.Visible \
+                if index < len(labels) and index not in on_columns else Visibility.Collapsed
+        # Un filtro su un livello WBS spento o spostato sulle colonne non avrebbe una
+        # colonna per toglierlo.
+        self.bill_filters.clear_missing_columns(
+            set(["W{}".format(i + 1) for i in range(len(labels)) if i not in on_columns] +
+                ["TypeMark", "Code", "Description", "Unit", "Quantity",
+                 "UnitPrice", "Amount"]))
+        self._update_layout_text(labels, rows_layout, columns_layout)
+        entries, column_keys = qm.pivot_bill(session.bill, session.items, session.bill_units,
+                                             len(labels), rows_layout, columns_layout)
+
+        # Totali dei gruppi: importo di tutte le loro voci, in totale e per colonna.
+        totals = {}
+        column_totals = {}
+        for entry in entries:
+            if entry.kind != "item":
+                continue
+            price = session.items[entry.code].price
+            amount = entry.quantity * price if price is not None else 0.0
+            for ancestor in entry.ancestors:
+                totals[ancestor] = totals.get(ancestor, 0.0) + amount
+                for column_key, quantity in entry.columns.items():
+                    key = (ancestor, column_key)
+                    column_totals[key] = column_totals.get(key, 0.0) + \
+                        (quantity * price if price is not None else 0.0)
+
+        self._bill_rows = {}
+        self._bill_entries = []
+        self._gid_paths = {}
+        gids = {}
+        self._updating = True
+        try:
+            self.bill_table.Rows.Clear()
+            names = self._rebuild_pivot_columns(column_keys)
+            for entry in entries:
+                row = self.bill_table.NewRow()
+                row["Kind"] = entry.kind
+                row["Level"] = entry.level
+                row["Hidden"] = False
+                row["Anc"] = u"|" + u"".join(u"{}|".format(gids[path])
+                                             for path in entry.ancestors)
+                if entry.kind == "group":
+                    gid = len(gids) + 1
+                    gids[entry.path] = gid
+                    self._gid_paths[gid] = entry.path
+                    row["Gid"] = gid
+                    row["Shade"] = u"g{}".format(min(entry.level, 2))
+                    row["Toggle"] = GLYPH_EXPANDED
+                    # Rientro per livello: la gerarchia si legge anche senza i colori.
+                    row["Description"] = u"    " * entry.level + entry.label
+                    row["Amount"] = totals.get(entry.path, 0.0)
+                    for column_key, name in zip(column_keys, names):
+                        value = column_totals.get((entry.path, column_key))
+                        row[name] = value if value is not None else DBNull.Value
+                else:
+                    row["Gid"] = 0
+                    row["Shade"] = u""
+                    row["Toggle"] = u""
+                    for level, value in enumerate(entry.cells):
+                        row["W{}".format(level + 1)] = value
+                    row["TypeMark"] = entry.type_mark
+                    row["Code"] = entry.code
+                    self._write_bill_values(row, session.items[entry.code], entry.quantity,
+                                            session.bill_units.get(entry.code, u""))
+                    line_key = (entry.type_mark, entry.code)
+                    overridden = line_key in session.bill.overridden
+                    row["AllowanceOverride"] = overridden
+                    row["AllowanceTip"] = self._allowance_tip(line_key) if overridden else u""
+                    # Importo della voce in ogni combinazione: quantita' x prezzo unitario
+                    # (vuoto se la voce non ha prezzo, come la colonna Amount).
+                    price = session.items[entry.code].price
+                    for column_key, name in zip(column_keys, names):
+                        quantity = entry.columns.get(column_key)
+                        row[name] = quantity * price \
+                            if quantity is not None and price is not None else DBNull.Value
+                    self._bill_rows.setdefault(entry.code, row)
+                self.bill_table.Rows.Add(row)
+                self._bill_entries.append((row, entry))
+        finally:
+            self._updating = False
+        # I gruppi chiusi restano chiusi dopo un ricalcolo (si riconoscono dal path).
+        self._collapsed &= set(gids)
+        self._apply_collapse()
+        # Con i gruppi l'ordine delle righe e' la struttura: niente riordino per colonna.
+        self.dg_bill.CanUserSortColumns = not rows_layout
+        self._toggle_column.Visibility = Visibility.Visible if rows_layout else Visibility.Collapsed
+        has_groups = bool(gids)
+        self.btn_expand_all.IsEnabled = has_groups
+        self.btn_collapse_all.IsEnabled = has_groups
+        # I gruppi visibili dipendono dalle righe appena scritte.
+        self._apply_bill_filter()
+
+    def _rebuild_pivot_columns(self, column_keys):
+        """Una colonna della tabella e della griglia per ogni combinazione dei livelli WBS
+        sulle colonne, dopo le colonne WBS. Da chiamare a tabella vuota."""
+        for column, name in self._pivot_columns:
+            self.dg_bill.Columns.Remove(column)
+            if self.bill_table.Columns.Contains(name):
+                self.bill_table.Columns.Remove(name)
+        self._pivot_columns = []
+        names = []
+        number_style = Style(clr.GetClrType(TextBlock))
+        number_style.Setters.Add(Setter(TextBlock.HorizontalAlignmentProperty,
+                                        HorizontalAlignment.Right))
+        number_style.Setters.Add(Setter(FrameworkElement.MarginProperty, Thickness(4, 0, 4, 0)))
+        for index, column_key in enumerate(column_keys):
+            name = u"P{}".format(index + 1)
+            self.bill_table.Columns.Add(name, CLR_DOUBLE)
+            column = DataGridTextColumn()
+            binding = Binding(name)
+            binding.StringFormat = u"N2"
+            column.Binding = binding
+            column.ElementStyle = number_style
+            column.Width = DataGridLength(95)
+            header = TextBlock()
+            header.Text = u"\n".join(column_key)
+            header.TextWrapping = TextWrapping.Wrap
+            header.ToolTip = u"{}\nAmount in this combination (items and group rows).".format(
+                u" \u203a ".join(column_key))
+            column.Header = header
+            self.dg_bill.Columns.Add(column)
+            self._pivot_columns.append((column, name))
+            names.append(name)
+        return names
+
+    def _fill_cme_table(self):
+        """Scheda CME: computo per codice o, con i livelli WBS, raggruppato per combinazione
+        con i subtotali, come il foglio Bill of quantities dell'export Excel."""
+        session = self.session
+        labels = list(session.wbs_labels)
+        outline = qm.bill_outline(session.bill, labels)
+        for index, column in enumerate(self._cme_wbs_columns):
+            if index < len(labels):
+                self.cme_filters.set_title(column, labels[index])
                 column.Visibility = Visibility.Visible
             else:
                 column.Visibility = Visibility.Collapsed
         # Un filtro su un livello WBS spento non avrebbe una colonna per toglierlo.
-        self.bill_filters.clear_missing_columns(
+        self.cme_filters.clear_missing_columns(
             set(["W{}".format(i + 1) for i in range(len(labels))] +
-                ["TypeMark", "EpuItem", "Code", "Description", "Unit", "Quantity",
+                ["TypeMark", "Code", "Description", "Unit", "Quantity",
                  "UnitPrice", "Amount"]))
         amounts = []
         for entry in outline:
@@ -940,13 +1192,12 @@ class TakeoffForm(Window):
             amounts.append(entry.quantity * item.price
                            if item is not None and item.price is not None else 0.0)
 
-        self._bill_rows = {}
         self._updating = True
         group_number = 0
         try:
-            self.bill_table.Rows.Clear()
+            self.cme_table.Rows.Clear()
             for index, entry in enumerate(outline):
-                row = self.bill_table.NewRow()
+                row = self.cme_table.NewRow()
                 if entry.kind == "group":
                     group_number += 1
                 row["Group"] = group_number
@@ -967,13 +1218,130 @@ class TakeoffForm(Window):
                     overridden = line_key in session.bill.overridden
                     row["AllowanceOverride"] = overridden
                     row["AllowanceTip"] = self._allowance_tip(line_key) if overridden else u""
-                    self._bill_rows.setdefault(entry.code, row)
-                self.bill_table.Rows.Add(row)
+                self.cme_table.Rows.Add(row)
         finally:
             self._updating = False
         # Con la WBS l'ordine delle righe e' la struttura: niente riordino per colonna.
-        self.dg_bill.CanUserSortColumns = not session.wbs_labels
-        # Le combinazioni visibili dipendono dalle righe appena scritte.
+        self.dg_cme.CanUserSortColumns = not session.wbs_labels
+        self._apply_cme_filter()
+
+    # ------------------------------------------------------------ gruppi del computo
+
+    def _bill_layout(self, labels):
+        """(chiavi delle righe, chiavi WBS delle colonne) valide per i livelli WBS attivi.
+        La prima volta si leggono dalla config (default: Chapter, Subchapter; nessuna
+        colonna)."""
+        if self._layout_rows is None:
+            saved_rows = self._cfg_get('bill_group_by', None)
+            self._layout_rows = list(qm.DEFAULT_GROUP_BY) if saved_rows is None \
+                else [key for key in saved_rows if key]
+            self._layout_columns = [key for key in
+                                    (self._cfg_get('bill_column_levels', None) or []) if key]
+        valid = set(key for key, _ in qm.group_options(labels))
+        columns = []
+        for key in self._layout_columns:
+            if key in valid and qm.wbs_level_index(key) is not None and key not in columns:
+                columns.append(key)
+        rows = []
+        for key in self._layout_rows:
+            if key in valid and key not in columns and key not in rows:
+                rows.append(key)
+        return rows, columns
+
+    def _bill_group_by(self):
+        """Chiavi dei livelli sulle righe, nell'ordine."""
+        return self._bill_layout(list(self.session.wbs_labels))[0]
+
+    def _update_layout_text(self, labels, rows, columns):
+        names = dict(qm.group_options(labels))
+        text = u"Rows: {}".format(u" \u203a ".join(names[key] for key in rows) or u"(none)")
+        if columns:
+            text += u"    |    Columns: {}".format(u" \u203a ".join(names[key] for key in columns))
+        self.txt_layout.Text = text
+        self.txt_layout.ToolTip = text
+
+    def OnLayout(self, sender, args):
+        labels = list(self.session.wbs_labels)
+        rows, columns = self._bill_layout(labels)
+        result = show_layout_dialog(self, qm.group_options(labels), rows, columns)
+        if result is None:
+            return
+        self._layout_rows, self._layout_columns = list(result[0]), list(result[1])
+        if self._cfg is not None:
+            try:
+                self._cfg.bill_group_by = list(self._layout_rows)
+                self._cfg.bill_column_levels = list(self._layout_columns)
+                script.save_config()
+            except Exception:
+                pass
+        self._collapsed = set()
+        self._fill_bill_table()
+
+    def _apply_collapse(self):
+        """Nasconde le righe dentro i gruppi chiusi e aggiorna i triangolini."""
+        collapsed = self._collapsed
+        self._updating = True
+        try:
+            for row, entry in self._bill_entries:
+                hidden = any(path in collapsed for path in entry.ancestors)
+                if bool(row["Hidden"]) != hidden:
+                    row["Hidden"] = hidden
+                if entry.kind == "group":
+                    glyph = GLYPH_COLLAPSED if entry.path in collapsed else GLYPH_EXPANDED
+                    if cell_text(row["Toggle"]) != glyph:
+                        row["Toggle"] = glyph
+        finally:
+            self._updating = False
+
+    def _toggle_group(self, row):
+        try:
+            path = self._gid_paths.get(int(row["Gid"]))
+        except Exception:
+            path = None
+        if path is None:
+            return
+        if path in self._collapsed:
+            self._collapsed.discard(path)
+        else:
+            self._collapsed.add(path)
+        self._apply_collapse()
+        self._apply_bill_filter()
+
+    @staticmethod
+    def _visual_parent(source, wanted):
+        node = source
+        while node is not None and not isinstance(node, wanted):
+            try:
+                node = VisualTreeHelper.GetParent(node)
+            except Exception:
+                return None
+        return node
+
+    def OnBillMouseUp(self, sender, args):
+        cell = self._visual_parent(args.OriginalSource, DataGridCell)
+        if cell is None or cell.Column is not self._toggle_column:
+            return
+        view = cell.DataContext
+        if hasattr(view, "Row") and cell_text(view.Row["Kind"]) == u"group":
+            self._toggle_group(view.Row)
+
+    def OnBillDoubleClick(self, sender, args):
+        grid_row = self._visual_parent(args.OriginalSource, DataGridRow)
+        if grid_row is None:
+            return
+        view = grid_row.Item
+        if hasattr(view, "Row") and cell_text(view.Row["Kind"]) == u"group":
+            self._toggle_group(view.Row)
+
+    def OnExpandAll(self, sender, args):
+        self._collapsed = set()
+        self._apply_collapse()
+        self._apply_bill_filter()
+
+    def OnCollapseAll(self, sender, args):
+        self._collapsed = set(entry.path for _, entry in self._bill_entries
+                              if entry.kind == "group")
+        self._apply_collapse()
         self._apply_bill_filter()
 
     def _fill_marks_table(self):
@@ -1354,8 +1722,8 @@ class TakeoffForm(Window):
         text = escape_like((self.txt_search_prices.Text or u"").strip())
         if text:
             parts.append(u"(Code LIKE '%{0}%' OR Description LIKE '%{0}%' "
-                         u"OR ShortDescription LIKE '%{0}%' OR Chapter LIKE '%{0}%' OR Subchapter LIKE '%{0}%' "
-                         u"OR EpuItem LIKE '%{0}%' OR PriceBook LIKE '%{0}%')".format(text))
+                         u"OR ShortDescription LIKE '%{0}%' OR Chapter LIKE '%{0}%' "
+                         u"OR Subchapter LIKE '%{0}%')".format(text))
         if self.chk_missing_only.IsChecked:
             parts.append(u"NotInPriceList = true")
         return u" AND ".join(parts)
@@ -1381,30 +1749,72 @@ class TakeoffForm(Window):
         text = escape_like((self.txt_search_bill.Text or u"").strip())
         if not text:
             return u""
-        columns = ["TypeMark", "EpuItem", "Code", "Description"] + ["W{}".format(i + 1)
+        columns = ["TypeMark", "Code", "Description"] + ["W{}".format(i + 1)
                                              for i in range(len(self.session.wbs_labels))]
         return u"(" + u" OR ".join(u"{} LIKE '%{}%'".format(column, text)
                                    for column in columns) + u")"
 
     def _apply_bill_filter(self):
-        """Ricerca e filtri valgono sulle voci; una riga di totale resta visibile se la sua
-        combinazione ha almeno una voce visibile (il totale resta quello di tutte le voci)."""
+        """Ricerca e filtri valgono sulle voci; un gruppo resta visibile se contiene almeno
+        una voce visibile (il totale resta quello di tutte le voci). Le righe dentro un
+        gruppo chiuso sono nascoste (Hidden)."""
         parts = [part for part in (self._bill_search_expression(),
                                    self.bill_filters.expression()) if part]
         self.btn_clear_filters_bill.IsEnabled = self.bill_filters.active
         if not parts:
-            self.bill_table.DefaultView.RowFilter = u""
+            self.bill_table.DefaultView.RowFilter = u"Hidden = false"
             return
         items = u"Kind = 'item' AND " + u" AND ".join(parts)
         groups = set()
         for row_view in DataView(self.bill_table, items, u"", DataViewRowState.CurrentRows):
+            for gid in cell_text(row_view["Anc"]).split(u"|"):
+                if gid:
+                    groups.add(int(gid))
+        shown = u"({})".format(items)
+        if groups:
+            shown += u" OR (Kind = 'group' AND Gid IN ({}))".format(
+                u", ".join(str(gid) for gid in sorted(groups)))
+        self.bill_table.DefaultView.RowFilter = u"Hidden = false AND ({})".format(shown)
+
+    def _cme_search_expression(self):
+        """Ricerca sulle voci della CME, anche sui valori WBS."""
+        text = escape_like((self.txt_search_cme.Text or u"").strip())
+        if not text:
+            return u""
+        columns = ["TypeMark", "Code", "Description"] + ["W{}".format(i + 1)
+                                             for i in range(len(self.session.wbs_labels))]
+        return u"(" + u" OR ".join(u"{} LIKE '%{}%'".format(column, text)
+                                   for column in columns) + u")"
+
+    def _apply_cme_filter(self):
+        """Ricerca e filtri valgono sulle voci; una riga di totale resta visibile se la sua
+        combinazione ha almeno una voce visibile (il totale resta quello di tutte le voci)."""
+        parts = [part for part in (self._cme_search_expression(),
+                                   self.cme_filters.expression()) if part]
+        self.btn_clear_filters_cme.IsEnabled = self.cme_filters.active
+        if not parts:
+            self.cme_table.DefaultView.RowFilter = u""
+            return
+        items = u"Kind = 'item' AND " + u" AND ".join(parts)
+        groups = set()
+        for row_view in DataView(self.cme_table, items, u"", DataViewRowState.CurrentRows):
             groups.add(int(row_view["Group"]))
-        has_groups = any(cell_text(row["Kind"]) == u"group" for row in self.bill_table.Rows)
+        has_groups = any(cell_text(row["Kind"]) == u"group" for row in self.cme_table.Rows)
         if has_groups and groups:
-            self.bill_table.DefaultView.RowFilter = u"({}) OR (Kind = 'group' AND [Group] IN ({}))".format(
-                items, u", ".join(str(number) for number in sorted(groups)))
+            self.cme_table.DefaultView.RowFilter = \
+                u"({}) OR (Kind = 'group' AND [Group] IN ({}))".format(
+                    items, u", ".join(str(number) for number in sorted(groups)))
         else:
-            self.bill_table.DefaultView.RowFilter = items
+            self.cme_table.DefaultView.RowFilter = items
+
+    def OnCmeFilterChanged(self, sender, args):
+        self._apply_cme_filter()
+
+    def OnClearCmeSearch(self, sender, args):
+        self.txt_search_cme.Text = u""
+
+    def OnClearCmeFilters(self, sender, args):
+        self.cme_filters.clear()
 
     def OnBillFilterChanged(self, sender, args):
         self._apply_bill_filter()
@@ -1418,11 +1828,13 @@ class TakeoffForm(Window):
     # ------------------------------------------------------------ override maggiorazione
 
     def _selected_bill_lines(self):
-        """(Type Mark, codice) delle voci selezionate nel computo, senza le righe di
-        totale WBS e senza ripetizioni (con la WBS una voce compare in piu' righe)."""
-        views = [cell.Item for cell in self.dg_bill.SelectedCells]
-        if not views and self.dg_bill.CurrentCell.Item is not None:
-            views = [self.dg_bill.CurrentCell.Item]
+        """(Type Mark, codice) delle voci selezionate nel computo (Bill of quantities o CME,
+        secondo la scheda aperta), senza le righe di gruppo e senza ripetizioni (con la WBS
+        una voce compare in piu' righe)."""
+        grid = self.dg_cme if self.tabs.SelectedItem is self.tab_cme else self.dg_bill
+        views = [cell.Item for cell in grid.SelectedCells]
+        if not views and grid.CurrentCell.Item is not None:
+            views = [grid.CurrentCell.Item]
         lines = OrderedDict()
         for view in views:
             if not hasattr(view, "Row"):
@@ -1554,11 +1966,23 @@ class TakeoffForm(Window):
                 dialog.InitialDirectory = folder
         if dialog.ShowDialog(self) != True:
             return
-        self._use_price_list(dialog.FileName)
+        path = dialog.FileName
+        layout = None
+        if qs.is_table_file(path):
+            # Excel / CSV: foglio e colonne prima di leggere (la mappatura attuale se e' lo
+            # stesso file).
+            same = self.session.price_list_path and \
+                os.path.normcase(self.session.price_list_path) == os.path.normcase(path)
+            layout = show_columns_dialog(self, path, self._price_layout if same else None)
+            if layout is None:
+                return
+        self._use_price_list(path, layout)
 
-    def _use_price_list(self, path):
-        self._load_price_list(path, show_errors=True)
+    def _use_price_list(self, path, layout=None):
+        self._load_price_list(path, show_errors=True, layout=layout)
         self._store.set_price_list_path(path)
+        self._store.set_price_list_layout(self._price_layout.to_dict()
+                                          if self._price_layout is not None else None)
         self._mark_dirty()
         self._save_settings()
         self._refresh()
@@ -1571,11 +1995,12 @@ class TakeoffForm(Window):
         saved = show_pricelist_editor(
             self, path=current if is_json else None,
             import_path=current if current and not is_json and os.path.isfile(current) else None,
-            user_name=self.doc.Application.Username)
+            user_name=self.doc.Application.Username,
+            import_layout=self._price_layout or qs.PriceListLayout.default())
         if not saved:
             return
         if current and os.path.normcase(saved) == os.path.normcase(current):
-            self._load_price_list(current, show_errors=True)
+            self._load_price_list(current, show_errors=True, layout=self._price_layout)
             self._refresh()
             self._set_status(u"Price list reloaded after editing.", False)
             return
@@ -1585,7 +2010,25 @@ class TakeoffForm(Window):
             self._use_price_list(saved)
 
     def OnReloadPriceList(self, sender, args):
-        self._load_price_list(self.session.price_list_path, show_errors=True)
+        self._load_price_list(self.session.price_list_path, show_errors=True,
+                              layout=self._price_layout)
+        self._refresh()
+
+    def OnPriceColumns(self, sender, args):
+        """Foglio e colonne del listino Excel / CSV in uso: si salvano nel file di progetto
+        e il listino si rilegge."""
+        path = self.session.price_list_path
+        if not path or not qs.is_table_file(path) or not os.path.isfile(path):
+            MessageBox.Show(u"Columns... applies to an Excel or CSV price list that exists on "
+                            u"disk.", TITLE, MessageBoxButton.OK, MessageBoxImage.Information)
+            return
+        layout = show_columns_dialog(self, path, self._price_layout)
+        if layout is None:
+            return
+        self._load_price_list(path, show_errors=True, layout=layout)
+        self._store.set_price_list_layout(layout.to_dict())
+        self._mark_dirty()
+        self._save_settings()
         self._refresh()
 
     def OnClearPriceList(self, sender, args):
@@ -1593,6 +2036,7 @@ class TakeoffForm(Window):
             return
         self._load_price_list(None, show_errors=False)
         self._store.set_price_list_path(None)
+        self._store.set_price_list_layout(None)
         self._mark_dirty()
         self._refresh()
 
@@ -1612,9 +2056,13 @@ class TakeoffForm(Window):
         previous_price_list = self.session.price_list_path
         self._open_project_file(path)
         if self._store.price_list_path and self._store.price_list_path != previous_price_list:
-            self._load_price_list(self._store.price_list_path, show_errors=True)
+            self._load_price_list(self._store.price_list_path, show_errors=True,
+                                  layout=qs.PriceListLayout.from_dict(
+                                      self._store.price_list_layout))
         elif not self._store.price_list_path:
             self._store.price_list_path = previous_price_list
+            self._store.price_list_layout = self._price_layout.to_dict() \
+                if self._price_layout is not None else None
         self._remember_project_file(path)
         self._set_status(u"Project file: {}".format(path), False)
         # Il nuovo file puo' avere altri livelli WBS: i valori si rileggono dal modello.

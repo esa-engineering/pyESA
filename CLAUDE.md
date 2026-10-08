@@ -318,9 +318,12 @@ Rules that come with the pattern:
 | Project file | `<Model>_MEPQTO.json` next to the **central** model (`default_project_file()`); cloud / unsaved models pick a path, remembered in config | Save button |
 | Per-user settings | `script.get_config('ESA_MEPQTO')`: last phase, categories, category set, price list; `project_files` as `"<doc key>::<path>"` and `scope_links` as `"<doc key>::<uid>|<uid>"` strings, both capped at 50; `category_sets` as `"<name>::<key>,<key>"`, `workset_include_sets` as `"<name>::<ws>|<ws>"` (worksets to read; Revit forbids `|` and `:` in names; the older `workset_sets` held exclusions and is ignored); last included / known worksets and workset set | window close; scope and sets as soon as they are chosen / saved |
 
-- Excel / CSV price lists are read **by position**, not by header (`EPU_COLUMNS`: A code,
-  B short description, C description, D unit, E unit price, F..I optional). The export's
-  EPU sheet uses the same order so it can be read back. `MergedItem.in_price_list` drives
+- Excel / CSV price lists are read through a `PriceListLayout` (sheet + `{field: column
+  index}`), chosen in the Price list columns window (`mepqto_columns_ui`) and stored in the
+  project file as `price_list_layout` (column letters), with the path. No layout = first
+  sheet, positional `EPU_COLUMNS` (A code, B short description, C description, D unit,
+  E unit price, F..I optional), which is also the order of the export's EPU sheet.
+  `guess_layout()` proposes a mapping from known header names. `MergedItem.in_price_list` drives
   the red rows of the EPU tab and the "Code not in the price list" issue (only when a
   price list is loaded). Unit aliases (`n`, `nr`, `n°` -> `cad`) live in `UNIT_ALIASES`.
 - Window values = empty item, then non-empty price list fields, then non-empty project
@@ -335,7 +338,7 @@ Rules that come with the pattern:
   IronPython `ensure_ascii` trap); reads accept UTF-8 with BOM. A project file that is not
   valid JSON is never overwritten: the user is asked for another one.
 - **Adding a field to a price item** (as `short_description` was) touches: `FIELDS`,
-  `MergedItem.__slots__` / `__init__` and `EPU_COLUMNS` (positional Excel/CSV layout) in
+  `MergedItem.__slots__` / `__init__`, `EPU_COLUMNS`, `LAYOUT_FIELDS` and `HEADER_GUESSES` in
   `mepqto_store.py`; `COLUMNS`, `FIELD_OF`, `_add_row()` and the import loop in
   `mepqto_pricelist_ui.py` plus its XAML column; `prices_table`, `PRICE_FIELDS`,
   `_write_price_values()` and the search in `mepqto_ui.py` plus the EPU tab column;
@@ -358,6 +361,20 @@ these two modules when another tool needs .xlsx I/O instead of introducing COM i
 - Grids are bound to `System.Data.DataTable` (`grid.ItemsSource = table.DefaultView`): .NET
   handles two-way binding, so no IronPython `INotifyPropertyChanged` objects. Search uses
   `DefaultView.RowFilter` with `LIKE`, escaped by `escape_like()`.
+- The Bill of quantities tab is an **outline**, not WPF grouping: `qm.pivot_bill()` (pure
+  Python) returns group and item entries for the row levels chosen in the Layout dialog
+  (`mepqto_layout_ui`; `group_options()`: chapter, subchapter, type mark, unit, `wbs:N`)
+  plus the column keys of the WBS levels put on the columns. Pivot columns are rebuilt on
+  every fill (`_rebuild_pivot_columns()`, table columns `P1..Pn`, removed and re-added
+  with the table empty): items carry quantities, group rows amounts. The window writes
+  them as rows of one DataTable with hidden `Kind`, `Gid`, `Anc` ("|1|4|"), `Level`,
+  `Shade`, `Toggle` and `Hidden` columns. Collapsing sets `Hidden` on the rows under a
+  group (state keyed by the group path, so it survives a recompute); filters run on the
+  items and keep the groups listed in their `Anc`. Group totals sit in the Amount column,
+  aligned with the items. The Excel export still uses `bill_outline()` (WBS combinations),
+  and so does the **CME** tab (`cme_table`, `_fill_cme_table()`), the pre-grouping view kept
+  as a flat mirror of the export. Both grids share the allowance-override handlers:
+  `_selected_bill_lines()` reads the grid of the selected tab.
 - Excel-style column filters come from `mepqto_grid_filter.GridFilters`: it replaces each
   bound column's `Header` with title + funnel button, builds the value popup in code and
   only *returns* a RowFilter fragment (`expression()`); the window ANDs it with its search

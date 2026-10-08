@@ -195,26 +195,80 @@ trovati su un campione di elementi, oppure se ne scrive il nome.
 
 | Scheda | Contenuto | Modificabile |
 | --- | --- | --- |
-| EPU | capitolo, sottocapitolo, n. articolo EPU, prezzario di riferimento, codice prezzario, descrizione breve, descrizione, unità, prezzo unitario dei codici usati nel modello | sì: tutto tranne il codice prezzario (unità da tendina) |
-| Bill of quantities | Type Mark, n. articolo EPU, codice prezzario, descrizione, unità, quantità, prezzo unitario, importo, con il totale sotto; una riga per Type Mark e codice; con la WBS, colonne dei livelli in testa e una riga di totale per combinazione | no, si compila da sola; si può solo dare a una voce una maggiorazione propria |
-| Type Marks | matrice: una riga di gruppo per tipo e modello (categoria, Type Mark, famiglia e tipo, annidata sì/no, modello), seguita da una riga per codice con posizione (`Type 1..10`, `Instance 1..10`), codice prezzario e descrizione | no |
+| EPU | capitolo, sottocapitolo, codice prezzario, descrizione breve, descrizione, unità, prezzo unitario dei codici usati nel modello | sì: tutto tranne il codice prezzario (unità da tendina) |
+| Bill of quantities | Type Mark, codice prezzario, descrizione, unità, quantità, prezzo unitario, importo, con il totale sotto; una riga per Type Mark e codice (per combinazione WBS, con le colonne dei livelli dopo Amount); voci raggruppate per i livelli scelti con Layout... (default capitolo › sottocapitolo), con il totale di ogni gruppo e gruppi da aprire e chiudere; livelli WBS anche sulle colonne, come una tabella pivot | no, si compila da sola; si può solo dare a una voce una maggiorazione propria |
+| CME | computo metrico estimativo nella forma del foglio Bill of quantities dell'export Excel: colonne WBS in testa, una riga di totale in grassetto per ogni combinazione WBS seguita dalle sue voci, ordinate per Type Mark e codice | no, come Bill of quantities (override della maggiorazione compreso) |
+| Type Marks | matrice: una riga di gruppo per tipo e modello (categoria, Type Mark, famiglia e tipo, annidata sì/no, modello), seguita da una riga per codice con il parametro che lo porta (`e_DAT_PriceCode_1 (T)`, `e_DAT_PriceCode_i_1 (I)`), codice prezzario e descrizione | no |
 | Rules | maggiorazioni per categoria, kg/mq della lamiera dei canali, densità dei tubi | sì |
 | Issues | anomalie (vedi sotto) | no |
 
 - **Bill of quantities** ha una riga per ogni coppia Type Mark e codice. Un codice usato
   da più Type Mark compare una volta per ognuno, con la sua quantità, così si vede da
-  quale tipo arriva. Le righe sono ordinate per Type Mark e poi per codice. Una voce che
+  quale tipo arriva. Le righe sono ordinate per codice, poi Type Mark, poi livelli WBS in
+  successione (nell'export Excel: Type Mark, poi codice). Una voce che
   non si può misurare (unità o dimensioni mancanti) resta in elenco con quantità 0 e la
   sua anomalia. Il totale per codice resta quello della somma delle righe. Una voce può
   avere una maggiorazione propria (vedi "Override della maggiorazione").
+- **CME** mostra lo stesso computo del Bill of quantities nella forma dell'export Excel
+  (era la vista del Bill of quantities prima del raggruppamento): colonne WBS in testa,
+  una riga `Total` in grassetto per ogni combinazione di valori WBS con il totale delle
+  sue voci, poi le voci ordinate per Type Mark e codice. Senza livelli WBS è una lista
+  semplice, ordinabile cliccando le intestazioni. Ha la sua ricerca e i suoi filtri sulle
+  colonne, indipendenti da quelli del Bill of quantities; una combinazione resta visibile
+  se ha almeno una voce visibile. Tasto destro e *Allowance Override...* agiscono sulle
+  voci selezionate nella scheda aperta. Si aggiorna insieme al computo. Come nel Bill of
+  quantities, le colonne si allargano trascinandone il bordo e la tabella scorre in
+  orizzontale; restano ferme le colonne WBS, Type Mark e Price book code,
+  così le righe `Total` si riconoscono dai valori WBS anche scorrendo.
+- **Disposizione del Bill of quantities** (riga *Layout* sopra la griglia, pulsante
+  **Layout...**): come una tabella pivot, si scelgono i livelli sulle **righe** e i
+  livelli WBS sulle **colonne**. La finestra ha tre elenchi: campi disponibili, Rows e
+  Columns. Un campo si aggiunge in coda (*Add to Rows*, *Add to Columns*, doppio clic =
+  righe): **l'ordine di inserimento è l'ordine di raggruppamento**, e *Up* / *Down* lo
+  cambiano. Sulle righe vanno Chapter, Subchapter (quelli della scheda EPU), Type Mark,
+  Unit e i livelli WBS; sulle colonne solo i livelli WBS. Default: righe Chapter ›
+  Subchapter, nessuna colonna (*Restore Default*). La scelta si ricorda nella config
+  pyRevit (`bill_group_by` per le righe, `bill_column_levels` per le colonne).
+  - **Righe.** Ogni gruppo ha una riga in grassetto, rientrata per livello e con il fondo
+    più scuro ai livelli alti, con il nome del gruppo nella colonna Description e il
+    **totale dell'importo** di tutte le sue voci nella colonna Amount. Seguono i
+    sottogruppi o le voci, ordinate per codice, poi Type Mark, poi livelli WBS. I valori
+    mancanti stanno in fondo: `(no chapter)`, `(no subchapter)`, `(no unit)`, `(not set)`
+    per la WBS. Senza livelli sulle righe la griglia è una lista semplice e ordinabile.
+  - **Colonne.** Ogni combinazione di valori dei livelli WBS sulle colonne diventa una
+    colonna, dopo le colonne WBS, nell'ordine dei livelli (con due livelli l'intestazione
+    è su due righe, es. `GEN` / `P00`). Una voce non si divide più per quei livelli: ha una
+    riga sola e in ogni colonna il suo **importo** in quella combinazione (quantità ×
+    prezzo unitario; vuoto se la voce non ha prezzo), come le righe di gruppo. Quantity e
+    Amount restano i totali, e la somma delle colonne di una riga dà il suo Amount. La colonna WBS di un livello sulle
+    colonne si nasconde. Un livello non può stare sia sulle righe sia sulle colonne.
+  - **Aprire e chiudere:** clic sul triangolino a sinistra o doppio clic sulla riga del
+    gruppo; *Expand All* / *Collapse All* per tutti. Un gruppo chiuso resta chiuso
+    quando il computo si ricalcola (cambio di prezzi, unità, regole); cambiando la
+    disposizione si riapre tutto.
+  - Con almeno un livello sulle righe le colonne non si riordinano, perché l'ordine delle
+    righe è la struttura.
+  - **Larghezza e scorrimento:** le colonne hanno larghezza fissa (Description 380 px) e si
+    allargano trascinandone il bordo nell'intestazione; la tabella allora scorre in
+    orizzontale invece di stringere le altre colonne. Il triangolino, Type Mark e Price
+    book code restano fermi mentre si scorre. Le larghezze non si salvano:
+    alla riapertura tornano quelle di default. Il nome di un gruppo sta nella colonna
+    Description, quindi scorrendo molto a destra non si vede più.
+  - I livelli WBS che non sono sulle colonne dividono le voci: una riga per ogni
+    combinazione di valori, con i valori nelle colonne WBS, anche quando non sono fra i
+    livelli delle righe.
+  - Le colonne della disposizione non hanno l'imbuto dei filtri; i filtri sulle altre
+    colonne valgono come sempre.
+  - È solo la vista della scheda: l'export Excel mantiene la struttura per combinazioni
+    WBS descritta in "WBS", la stessa della scheda CME.
 - **EPU** (elenco prezzi unitari; in precedenza la scheda si chiamava *Price list*) mostra tutti i codici usati nel modello nella fase scelta, anche quelli
   delle categorie non spuntate. Il computo invece segue le categorie spuntate. Le righe
   sono ordinate per capitolo, sottocapitolo e codice; i codici senza capitolo stanno in
   fondo. Una modifica di capitolo non riordina subito la griglia: l'ordine si aggiorna al
   ricalcolo successivo (cambio di fase o categorie, riapertura). Cliccando un'intestazione
   si può comunque riordinare per quella colonna. La ricerca guarda capitolo,
-  sottocapitolo, n. articolo EPU, prezzario, codice, descrizione breve e descrizione.
-- **Filtri sulle colonne** (schede EPU e Bill of quantities), in stile Excel:
+  sottocapitolo, codice, descrizione breve e descrizione.
+- **Filtri sulle colonne** (schede EPU, Bill of quantities e CME), in stile Excel:
   l'imbuto nell'intestazione apre l'elenco dei valori della colonna, con caselle di
   spunta, una ricerca, *(Select All)* e *(Blanks)* per le celle vuote. L'elenco mostra
   solo i valori delle righe che passano la ricerca e gli altri filtri; con una ricerca
@@ -224,17 +278,18 @@ trovati su un campione di elementi, oppure se ne scrive il nome.
   - I filtri si combinano fra loro e con la ricerca e restano attivi quando il computo si
     ricalcola (cambio di categorie, unità, prezzi). Un filtro su un livello WBS che si
     spegne si toglie.
-  - Nel Bill of quantities si filtrano le voci. Una riga di combinazione WBS resta visibile
-    se ha almeno una voce visibile e mostra comunque il totale di tutte le sue voci; lo
-    stesso vale ora per la ricerca.
+  - Nel Bill of quantities si filtrano le voci. Una riga di gruppo resta visibile se ha
+    almeno una voce visibile e mostra comunque il totale di tutte le sue voci; lo stesso
+    vale per la ricerca. Un gruppo chiuso resta chiuso anche con i filtri.
   - I filtri cambiano solo cosa si vede: il totale in fondo alla finestra e l'export Excel
     comprendono tutte le voci. I filtri non si salvano.
   - Il codice sta in `mepqto_grid_filter.py` (`GridFilters`), riusabile su qualsiasi
     griglia legata a una `DataTable`.
-- **Colonne della scheda EPU** (intestazioni in inglese nella finestra):
-  - `EPU item No.`: numero dell'articolo nell'elenco prezzi unitari (EPU) di progetto;
-  - `Reference price book`: prezzario da cui viene la voce (es. Prezzario Regione
-    Lombardia 2026);
+- **Colonne della scheda EPU** (intestazioni in inglese nella finestra). N. articolo EPU
+  (`epu_item`) e prezzario di riferimento (`price_book`) non sono più colonne delle
+  schede EPU, Bill of quantities e CME: restano campi della voce, quindi si leggono dal
+  listino (anche con *Columns...*), si modificano nell'editor del listino, si conservano
+  nel file di progetto e compaiono nell'export Excel.
   - `Price book code`: il codice della voce nel prezzario, cioè il valore dei parametri
     `e_DAT_PriceCode_*` del modello. È la chiave della voce e non si modifica qui;
   - `Short Description`: descrizione breve della voce, accanto a quella estesa
@@ -261,9 +316,12 @@ trovati su un campione di elementi, oppure se ne scrive il nome.
   link: lo stesso tipo in due modelli ha due gruppi), seguita da una
   riga per ogni codice valorizzato, con la sua descrizione. Prima vengono i codici di
   tipo, poi quelli d'istanza. Un tipo senza codici ha solo la riga di gruppo.
-  - **Code slot:** `Type N` è l'N-esimo parametro di tipo impostato con Parameters...
-    (solo categorie a pezzo), `Instance N` l'N-esimo parametro d'istanza (tutte le
-    categorie). Un buco (codice 1 vuoto, codice 3 pieno) resta visibile dal numero.
+  - **Parameter** (prima *Code slot*): il nome del parametro che porta il codice, secondo
+    la mappa di Parameters..., seguito da `(T)` se è un parametro di tipo e da `(I)` se è
+    d'istanza. I codici di tipo valgono solo per le categorie a pezzo; quando il tipo non
+    ha il parametro e il codice si legge sul parametro d'istanza con lo stesso nome, la
+    riga riporta `(I)`. Un buco (codice 1 vuoto, codice 3 pieno) si vede dai nomi. Il
+    foglio Type Marks dell'export ha la stessa colonna.
   - Un tipo le cui istanze portano codici d'istanza diversi ha un gruppo per ogni
     combinazione (ad esempio uno per diametro).
   - Gli elementi senza Type Mark compaiono in fondo alla loro categoria.
@@ -285,22 +343,21 @@ stesso parametro non può stare su due livelli.
   tipo, poi sul "genitore" e sul suo tipo. Il genitore è la famiglia che contiene
   un'annidata condivisa, oppure il canale o tubo rivestito da un isolante. Cambiando i
   livelli, i valori si rileggono dal modello.
-- **Raggruppamento:** nella scheda Bill of quantities le prime colonne sono i livelli
-  WBS attivi, una per livello, con il nome del parametro come intestazione.
-  - Ogni combinazione di valori ha **una sola riga in grassetto** con i valori dei
-    livelli e il totale dell'importo (`Total`), seguita dalle sue voci. Anche le voci
-    riportano i valori WBS.
+- **Nella scheda Bill of quantities:** dopo la colonna Amount c'è una colonna per ogni
+  livello WBS attivo, con il nome del parametro come intestazione; le voci hanno una riga per ogni
+  combinazione di valori. Ogni livello WBS si può mettere sulle righe o sulle colonne
+  (*Layout...*, vedi "Le schede della finestra").
   - La combinazione di un elemento arriva fino al suo **ultimo livello valorizzato**: se
     ha i livelli 1 e 2 ma non il 3, la colonna del livello 3 resta vuota.
   - Un livello vuoto in mezzo (1 e 3 pieni, 2 vuoto) compare come `(not set)`, e così
     anche un elemento senza alcun valore WBS.
-  - Con la WBS attiva le colonne non si riordinano, perché l'ordine delle righe è la
-    struttura.
-  - La ricerca vale anche sui valori WBS e lascia visibili le righe di totale.
+  - La ricerca vale anche sui valori WBS.
 - **Salvataggio:** i livelli si salvano nel file di progetto (`wbs`), quindi valgono per
   tutta la commessa. Se due utenti li cambiano insieme, vince l'ultimo che salva.
-- **Excel:** il foglio Bill of quantities ha la stessa struttura, colonne WBS in testa
-  comprese. Le righe di totale e il totale generale usano `SUBTOTAL(9, ...)`, che non
+- **Excel:** il foglio Bill of quantities ha colonne WBS in testa e, per ogni
+  combinazione di valori, **una riga in grassetto** con il totale (`Total`) seguita dalle
+  sue voci (il raggruppamento scelto nella scheda non cambia l'export). Le righe di
+  totale e il totale generale usano `SUBTOTAL(9, ...)`, che non
   conta due volte le righe di combinazione. I valori WBS sulle voci permettono di filtrare
   il foglio o di metterlo in pivot.
 
@@ -476,34 +533,63 @@ salva.
 
 ### Listino Excel / CSV
 
-È l'elenco prezzi unitari (EPU) della commessa, preparato in Excel. Si legge il **primo
-foglio**, e le colonne contano per **posizione**, non per intestazione:
+È l'elenco prezzi unitari (EPU) della commessa, preparato in Excel. **Foglio e colonne si
+scelgono** nella finestra **Price list columns**, che si apre:
 
-| Colonna | Contenuto | Note |
-| --- | --- | --- |
-| A | codice prezzo | la chiave: si confronta con `Price book code` della scheda EPU |
-| B | descrizione sintetica | va in `Short Description` |
-| C | descrizione completa | va in `Description` |
-| D | unità di misura | `n`, `nr`, `cad`... ricondotte alla tendina (vedi sopra) |
-| E | prezzo unitario | numero, oppure testo con virgola decimale o `€` (`1.234,50`) |
-| F..I | capitolo, sottocapitolo, n. articolo EPU, prezzario di riferimento | facoltative |
+- quando si sceglie un listino `.xlsx`, `.xlsm` o `.csv` con *Browse...* (annullando, il
+  listino non cambia);
+- dal pulsante **Columns...** accanto al listino, attivo solo per i listini Excel / CSV;
+- nell'editor del listino, prima di importare un Excel o un CSV (dalla finestra del
+  computo arriva la mappatura già scelta).
 
-- **Righe saltate:** quelle senza codice in colonna A, la riga di intestazione (colonna A
-  "Codice", "Code", "Articolo"...) e le righe con la sola colonna A piena, come titoli e
-  intestazioni di capitolo. Righe vuote e titoli in testa al foglio non danno fastidio.
+La finestra ha:
+
+- **Sheet:** i fogli del file, nell'ordine; per un CSV non c'è scelta.
+- **Columns:** una tendina per campo con le colonne del foglio, mostrate con la lettera e
+  l'intestazione (es. `C - Descrizione`). Il codice prezzo è obbligatorio, gli altri campi
+  possono restare `(none)`. Una colonna non può servire a due campi.
+
+  | Campo | Va nella scheda EPU in |
+  | --- | --- |
+  | Price book code | la chiave: si confronta con `Price book code` |
+  | Short Description, Description | `Short Description`, `Description` |
+  | Unit | `Unit` (`n`, `nr`, `cad`... ricondotte alla tendina, vedi sopra) |
+  | Unit price | `Unit price` (numero, oppure testo con virgola decimale o `€`, `1.234,50`) |
+  | Chapter, Subchapter, EPU item No., Reference price book | le colonne omonime |
+
+- **Preview:** le prime 40 righe del foglio scelto, con le lettere delle colonne.
+- *Detect from Headers* mappa le colonne con un'intestazione nota (Codice, Descrizione,
+  Descrizione breve, UM, Prezzo unitario, Capitolo, N. articolo EPU...); *A to E* rimette
+  la disposizione fissa A codice, B descrizione sintetica, C descrizione, D unità, E
+  prezzo (F..I capitolo, sottocapitolo, n. articolo EPU, prezzario).
+- **Proposta iniziale:** la mappatura già salvata per quel file; altrimenti quella
+  ricavata dalle intestazioni; altrimenti A..E. Cambiando foglio si ripropone.
+
+**Dove si salva.** Foglio e colonne vanno nel **file di progetto** insieme al percorso
+del listino (`price_list_layout`, colonne come lettere: `{"sheet": "EPU", "columns":
+{"code": "B", "description": "D", ...}}`), quindi valgono per tutto il team della
+commessa; si ricordano anche nella config pyRevit (`last_price_list_layout`) per i
+modelli senza file di progetto. *Reload* rilegge il listino con la stessa mappatura. Un
+file di progetto senza mappatura legge il primo foglio con le colonne A..E, come le
+versioni precedenti.
+
+- **Righe saltate:** quelle senza codice, la riga di intestazione (codice "Codice",
+  "Code", "Articolo"...) e le righe con il solo codice e nessun altro campo mappato, come
+  titoli e intestazioni di capitolo. Un'intestazione con un nome diverso resta una voce
+  che nessun codice del modello trova.
 - **Codice ripetuto:** vale la prima riga; le altre si contano come duplicati (le note
   della finestra ne riportano il numero).
 - **Confronto dei codici:** esatto, maiuscole comprese. Gli spazi ai lati si tolgono. Un
   codice numerico scritto come numero in Excel si legge senza decimali (`115004`, non
   `115004.0`).
 - **Prezzo:** una cella non numerica lascia la voce senza prezzo.
-- **CSV:** stesse colonne; il separatore (`;`, `,` o tab) si riconosce da solo e i prezzi
-  accettano la virgola decimale (`1.234,56`).
-- **Export:** il foglio EPU dell'export Excel ha le colonne nello stesso ordine (A..E,
-  poi F..I), quindi un export si può usare di nuovo come listino o reimportare
-  nell'editor.
-- **Nessun codice trovato in colonna A:** il listino non si carica e la scheda Issues lo
-  segnala ("Price list not loaded").
+- **CSV:** il separatore (`;`, `,` o tab) si riconosce da solo e i prezzi accettano la
+  virgola decimale (`1.234,56`).
+- **Export:** il foglio EPU dell'export Excel ha le colonne nell'ordine A..E, poi F..I,
+  quindi si rilegge con *A to E*.
+- **Errori:** un foglio che non c'è più o una colonna del codice senza codici lasciano il
+  listino non caricato, con il motivo nella scheda Issues ("Price list not loaded"):
+  si corregge con *Columns...*.
 
 ### File di progetto
 
@@ -516,6 +602,8 @@ Contenuto:
 
 - `price_list_path`: percorso del listino. Se manca, si usa l'ultimo listino ricordato
   nella config di pyRevit;
+- `price_list_layout`: foglio e colonne del listino Excel / CSV (vedi "Listino Excel /
+  CSV"); si salva con il percorso;
 - `items`: voci corrette, solo i campi modificati (`chapter`, `subchapter`, `epu_item`,
   `price_book`, `short_description`, `description`, `unit`, `price`);
 - `rules`: regole di misura, solo se modificate o salvate dalla scheda Rules;
@@ -614,6 +702,10 @@ di default è `YYMMDD_HHMMSS_MEPQTO_<Modello>.xlsx`. I fogli sono gli stessi del
 | `mepqto_ui.py` | finestra (griglie su `DataTable`, salvataggio, export) |
 | `MEPQTO_form.xaml` | layout della finestra |
 | `mepqto_grid_filter.py` | filtri per colonna in stile Excel sulle griglie legate a una `DataTable` |
+| `mepqto_layout_ui.py` | finestra Layout del Bill of quantities: livelli sulle righe e livelli WBS sulle colonne |
+| `MEPQTO_layout.xaml` | layout della finestra Layout |
+| `mepqto_columns_ui.py` | finestra Price list columns: foglio e colonne di un listino Excel / CSV, con anteprima |
+| `MEPQTO_columns.xaml` | layout della finestra Price list columns |
 | `mepqto_scope_ui.py` | finestra di scelta dei modelli (link), dei workset e delle categorie da leggere, con i set di categorie e di workset |
 | `MEPQTO_scope.xaml` | layout della finestra di scelta |
 | `mepqto_wbs_ui.py` | finestra di scelta dei livelli WBS |

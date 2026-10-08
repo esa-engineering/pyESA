@@ -105,9 +105,12 @@
                         <TextBlock Grid.Row="0" Text="Price list:" Style="{StaticResource FieldLabel}"/>
                         <TextBox x:Name="txt_price_list" Grid.Row="0" Grid.Column="1" Padding="5,3" Margin="0,2"
                                  IsReadOnly="True" Background="#F8F8F8"
-                                 ToolTip="Shared price list: .json (editable with Edit...) or .xlsx / .csv (read only, maintained in Excel: column A price code, B short description, C description, D unit, E unit price)."/>
+                                 ToolTip="Shared price list: .json (editable with Edit...) or .xlsx / .csv (read only, maintained in Excel: sheet and columns chosen with Columns...)."/>
                         <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal">
                             <Button x:Name="btn_price_list" Content="Browse..." Padding="10,3" Margin="5,2,0,2"/>
+                            <Button x:Name="btn_price_columns" Content="Columns..." Padding="10,3" Margin="5,2,0,2"
+                                    IsEnabled="False"
+                                    ToolTip="Excel / CSV price list: choose the sheet and the column of every field"/>
                             <Button x:Name="btn_price_edit" Content="Edit..." Padding="10,3" Margin="5,2,0,2"
                                     ToolTip="Edit the price list (.json). An Excel or CSV price list is imported into a new .json price list."/>
                             <Button x:Name="btn_price_reload" Content="Reload" Padding="10,3" Margin="5,2,0,2"
@@ -208,7 +211,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
-                               Text="Unit prices of the price codes used in the model, sorted by chapter and subchapter. Chapter, Subchapter, EPU item No., Reference price book, Short Description, Description, Unit and Unit price are editable (decimal comma or point): changes go to the project file, never to the model. A cleared field falls back to the shared price list. Every code is looked up in column A of the price list (Excel: A code, B short description, C description, D unit, E unit price): red rows have a code that is not there. The funnel in a column header filters the rows by the values of that column."/>
+                               Text="Unit prices of the price codes used in the model, sorted by chapter and subchapter. Chapter, Subchapter, Short Description, Description, Unit and Unit price are editable (decimal comma or point): changes go to the project file, never to the model. A cleared field falls back to the shared price list. Every code is looked up in column A of the price list (Excel: A code, B short description, C description, D unit, E unit price): red rows have a code that is not there. The funnel in a column header filters the rows by the values of that column."/>
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -219,7 +222,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <TextBox x:Name="txt_search_prices" Grid.Column="1" Padding="5,3"
-                                 ToolTip="Filter by chapter, subchapter, EPU item No., price book, code, short description or description"/>
+                                 ToolTip="Filter by chapter, subchapter, code, short description or description"/>
                         <Button x:Name="btn_clear_prices" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0"
                                 ToolTip="Clear search"/>
                         <CheckBox x:Name="chk_missing_only" Grid.Column="3" Margin="15,0,0,0" VerticalAlignment="Center"
@@ -245,9 +248,6 @@
                                                 ElementStyle="{StaticResource WrapCell}"/>
                             <DataGridTextColumn Header="Subchapter" Binding="{Binding Subchapter}" Width="110"
                                                 ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="EPU item No." Binding="{Binding EpuItem}" Width="90"/>
-                            <DataGridTextColumn Header="Reference price book" Binding="{Binding PriceBook}" Width="130"
-                                                ElementStyle="{StaticResource WrapCell}"/>
                             <DataGridTextColumn Header="Price book code" Binding="{Binding Code}" Width="120" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Short Description" Binding="{Binding ShortDescription}" Width="180"
                                                 ElementStyle="{StaticResource WrapCell}"/>
@@ -267,10 +267,11 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
-                               Text="Filled automatically from the model, the price list and the Rules tab. Pieces are counted; ducts, pipes, flex, cable trays, conduits and insulation are measured in the unit of the code, allowance for fittings included. One row per Type Mark and code. Elements without Type Mark are excluded. Right click (or Allowance Override...) to give the selected items an allowance of their own: their quantity is highlighted. With WBS levels set (WBS Levels... button), the first columns are the WBS levels and every combination has one bold row with its total, followed by its items. The funnel in a column header filters the items by the values of that column: a combination row stays visible while it has visible items and keeps the total of all its items. Filters only change what is shown: the total below and Export Excel include every item."/>
+                               Text="Filled automatically from the model, the price list and the Rules tab. One row per Type Mark and code (per WBS combination when WBS levels are set, with one column per level after Amount), sorted by code, Type Mark and WBS levels. Layout...: grouping levels of the rows (Chapter, Subchapter, Type Mark, Unit, WBS levels) and WBS levels shown as columns, in the order they are added; every group has a bold row with the total of its items. With WBS levels on the columns, every combination of their values is a column after the WBS columns, with the amount of every item and group row. Click the triangle or double click a group row to collapse or expand it. Drag a column border to widen it: the table scrolls sideways and the first columns (Type Mark, price book code) stay in place. The funnel in a column header filters the items; a group stays visible while it has visible items and keeps the total of all its items. Right click (or Allowance Override...) to give the selected items an allowance of their own. Export Excel keeps its own layout."/>
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -281,7 +282,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <TextBox x:Name="txt_search_bill" Grid.Column="1" Padding="5,3"
-                                 ToolTip="Filter by Type Mark, EPU item No., price book code, description or WBS value"/>
+                                 ToolTip="Filter by Type Mark, price book code, description or WBS value"/>
                         <Button x:Name="btn_clear_bill" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0"
                                 ToolTip="Clear search"/>
                         <Button x:Name="btn_clear_filters_bill" Grid.Column="3" Content="Clear Filters" Padding="10,3" Margin="15,0,0,0"
@@ -289,7 +290,114 @@
                         <Button x:Name="btn_allowance" Grid.Column="4" Content="Allowance Override..." Padding="10,3" Margin="15,0,0,0"
                                 ToolTip="Set or remove the allowance of the selected items (also with a right click on the grid). Quantities with an override are highlighted."/>
                     </Grid>
-                    <DataGrid x:Name="dg_bill" Grid.Row="2" Style="{StaticResource GridStyle}" IsReadOnly="True">
+                    <!-- Disposizione: livelli sulle righe e livelli WBS sulle colonne (Layout...) -->
+                    <Grid Grid.Row="2" Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Layout:" Style="{StaticResource FieldLabel}"/>
+                        <TextBlock x:Name="txt_layout" Grid.Column="1" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" Text=""/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Button x:Name="btn_layout" Content="Layout..." Padding="10,3" Margin="5,2,0,2"
+                                    ToolTip="Choose the grouping levels of the rows and the WBS levels shown as columns"/>
+                            <Button x:Name="btn_expand_all" Content="Expand All" Padding="10,3" Margin="15,2,0,2"/>
+                            <Button x:Name="btn_collapse_all" Content="Collapse All" Padding="10,3" Margin="5,2,0,2"/>
+                        </StackPanel>
+                    </Grid>
+                    <!-- Colonne a larghezza fissa e scorrimento orizzontale: allargando una colonna la
+                         tabella scorre invece di stringere le altre. Le prime tre (triangolino,
+                         Type Mark, Price book code) restano ferme. -->
+                    <DataGrid x:Name="dg_bill" Grid.Row="3" Style="{StaticResource GridStyle}" IsReadOnly="True"
+                              HorizontalScrollBarVisibility="Auto" CanUserResizeColumns="True"
+                              FrozenColumnCount="3">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <!-- Righe di gruppo: grassetto, fondo piu' scuro ai livelli alti -->
+                                    <DataTrigger Binding="{Binding Kind}" Value="group">
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                        <Setter Property="Background" Value="#F0F4F8"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Shade}" Value="g0">
+                                        <Setter Property="Background" Value="#C9D6E3"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Shade}" Value="g1">
+                                        <Setter Property="Background" Value="#DFE7EF"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Type Mark" Binding="{Binding TypeMark}" Width="90"/>
+                            <DataGridTextColumn Header="Price book code" Binding="{Binding Code}" Width="150"/>
+                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="380" MinWidth="120"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="60"/>
+                            <DataGridTextColumn Header="Quantity" Binding="{Binding Quantity, StringFormat={}{0:0.##}}" Width="85"
+                                                ElementStyle="{StaticResource NumberCell}">
+                                <!-- Voce con override della maggiorazione: cella colorata e
+                                     tooltip con il valore; la selezione resta visibile. -->
+                                <DataGridTextColumn.CellStyle>
+                                    <Style TargetType="DataGridCell">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AllowanceOverride}" Value="True">
+                                                <Setter Property="Background" Value="#FFE3A3"/>
+                                                <Setter Property="ToolTip" Value="{Binding AllowanceTip}"/>
+                                            </DataTrigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.CellStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Unit price" Binding="{Binding UnitPrice, StringFormat=N2}" Width="100"
+                                                ElementStyle="{StaticResource NumberCell}"/>
+                            <DataGridTextColumn Header="Amount" Binding="{Binding Amount, StringFormat=N2}" Width="115"
+                                                ElementStyle="{StaticResource NumberCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- TAB: CME (computo metrico estimativo): la vista per combinazioni WBS,
+                 come il foglio Bill of quantities dell'export Excel -->
+            <TabItem x:Name="tab_cme" Header="🧾 CME">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
+                               Text="Computo metrico estimativo, laid out as the Bill of quantities sheet of Export Excel. Drag a column border to widen it: the table scrolls sideways and the WBS columns, Type Mark and price book code stay in place. Filled automatically from the model, the price list and the Rules tab. Pieces are counted; ducts, pipes, flex, cable trays, conduits and insulation are measured in the unit of the code, allowance for fittings included. One row per Type Mark and code. Elements without Type Mark are excluded. Right click (or Allowance Override...) to give the selected items an allowance of their own: their quantity is highlighted. With WBS levels set (WBS Levels... button), the first columns are the WBS levels and every combination has one bold row with its total, followed by its items. The funnel in a column header filters the items by the values of that column: a combination row stays visible while it has visible items and keeps the total of all its items. Filters only change what is shown: the total below and Export Excel include every item."/>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox x:Name="txt_search_cme" Grid.Column="1" Padding="5,3"
+                                 ToolTip="Filter by Type Mark, price book code, description or WBS value"/>
+                        <Button x:Name="btn_clear_cme" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0"
+                                ToolTip="Clear search"/>
+                        <Button x:Name="btn_clear_filters_cme" Grid.Column="3" Content="Clear Filters" Padding="10,3" Margin="15,0,0,0"
+                                IsEnabled="False" ToolTip="Remove the filters set on the columns"/>
+                        <Button x:Name="btn_allowance_cme" Grid.Column="4" Content="Allowance Override..." Padding="10,3" Margin="15,0,0,0"
+                                ToolTip="Set or remove the allowance of the selected items (also with a right click on the grid). Quantities with an override are highlighted."/>
+                    </Grid>
+                    <!-- Colonne a larghezza fissa e scorrimento orizzontale, come il Bill of
+                         quantities. Le colonne ferme (WBS, Type Mark, Price book code)
+                         si impostano nel codice, perche' le colonne WBS si creano li'. -->
+                    <DataGrid x:Name="dg_cme" Grid.Row="2" Style="{StaticResource GridStyle}" IsReadOnly="True"
+                              HorizontalScrollBarVisibility="Auto" CanUserResizeColumns="True">
                         <DataGrid.RowStyle>
                             <Style TargetType="DataGridRow">
                                 <Style.Triggers>
@@ -302,9 +410,8 @@
                         </DataGrid.RowStyle>
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Type Mark" Binding="{Binding TypeMark}" Width="90"/>
-                            <DataGridTextColumn Header="EPU item No." Binding="{Binding EpuItem}" Width="90"/>
                             <DataGridTextColumn Header="Price book code" Binding="{Binding Code}" Width="150"/>
-                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="250"
+                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="380" MinWidth="120"
                                                 ElementStyle="{StaticResource WrapCell}"/>
                             <DataGridTextColumn Header="Unit" Binding="{Binding Unit}" Width="60"/>
                             <DataGridTextColumn Header="Quantity" Binding="{Binding Quantity, StringFormat={}{0:0.##}}" Width="85"
@@ -344,7 +451,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
-                               Text="One bold row per category, Type Mark, family type, nesting, model and set of codes, followed by one row per price code with its description. Code slot 'Type N' is the N-th type parameter set with Parameters... (piece categories only); 'Instance N' is the N-th instance parameter, read on every category. Both are counted. Types whose instances carry different instance codes (e.g. ducts and pipes by size) appear once per set of codes. Searching a Type Mark shows all its codes; searching a code also shows the row of its type."/>
+                               Text="One bold row per category, Type Mark, family type, nesting, model and set of codes, followed by one row per price code with its description. Parameter: the parameter that holds the code, set with Parameters..., followed by (T) for a type parameter or (I) for an instance parameter (a type parameter missing on the type is read on the instance and shows (I)). Both are counted. Types whose instances carry different instance codes (e.g. ducts and pipes by size) appear once per set of codes. Searching a Type Mark shows all its codes; searching a code also shows the row of its type."/>
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -379,7 +486,7 @@
                             <DataGridTextColumn Header="Nested" Binding="{Binding Nested}" Width="60"/>
                             <DataGridTextColumn Header="Model" Binding="{Binding Model}" Width="140"
                                                 ElementStyle="{StaticResource WrapCell}"/>
-                            <DataGridTextColumn Header="Code slot" Binding="{Binding Slot}" Width="80"/>
+                            <DataGridTextColumn Header="Parameter" Binding="{Binding Slot}" Width="190"/>
                             <DataGridTextColumn Header="Price book code" Binding="{Binding Code}" Width="160"/>
                             <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="250"
                                                 ElementStyle="{StaticResource WrapCell}"/>

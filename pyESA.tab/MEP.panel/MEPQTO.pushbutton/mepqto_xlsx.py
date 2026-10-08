@@ -373,9 +373,9 @@ def _bill_sheet(session):
 def _type_marks_sheet(session):
     """Come nella scheda: una riga di gruppo per tipo, poi una riga per codice."""
     sheet = Sheet("Type Marks")
-    sheet.widths = [24, 16, 40, 9, 24, 12, 20, 80]
+    sheet.widths = [24, 16, 40, 9, 24, 30, 20, 80]
     headers = (u"Category", u"Type Mark", u"Family and Type", u"Nested", u"Model",
-               u"Code slot", u"Price book code", u"Description")
+               u"Parameter", u"Price book code", u"Description")
     _header(sheet, headers)
     for row in session.type_rows:
         # Tutte le celle con lo stile del gruppo, cosi' il fondo copre la riga intera.

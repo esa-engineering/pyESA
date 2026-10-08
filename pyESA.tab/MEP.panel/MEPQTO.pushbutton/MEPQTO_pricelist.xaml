@@ -118,7 +118,7 @@
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Text="💶 ITEMS" Style="{StaticResource SectionHeader}"/>
                 <TextBlock Grid.Row="1" Style="{StaticResource HintText}"
-                           Text="Every column is editable; the price book code must be unique. Unit price accepts a decimal comma or point. Import reads another .json price list, or an .xlsx, .xlsm or .csv file with the price code in column A, the short description in B, the description in C, the unit in D and the unit price in E (optional: chapter in F, subchapter in G, EPU item No. in H, reference price book in I)."/>
+                           Text="Every column is editable; the price book code must be unique. Unit price accepts a decimal comma or point. Import reads another .json price list, or an .xlsx, .xlsm or .csv file: choose its sheet and the column of every field before importing."/>
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
