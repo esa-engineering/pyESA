@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 __title__ = "Branch"
 __doc__ = """Version = 0.1
 Date    = 08.10.2026
@@ -26,6 +26,14 @@ Instruction:
 The branch keeps the type and size of the riser. If a fitting does not
 fit, that riser is left unchanged and the report says why.
 The new parts keep the parameters and the insulation of the starting element.
+
+SHIFT + CLICK: Y branch on vertical pipes with the fitting family
+e_PP.GG.JN_Y Branch. Choose the side, the angle (15, 30, 45 or 60
+degrees), the elevation of the horizontal run (level + offset), its
+distance from the riser axis and its length. The horizontal run is drawn
+first (it is mandatory), then the inclined run joined to it with an
+elbow, then the Y branch is placed on the riser, below the horizontal
+run. If that point is outside the pipe, the pipe is extended first.
 ________________________________________________________________
 Author(s): Matteo Maiorano
 """
@@ -114,6 +122,20 @@ class VerticalRunFilter(ISelectionFilter):
 
     def AllowReference(self, reference, point):
         return False
+
+
+def is_vertical_pipe(element):
+    return isinstance(element, Pipe) and is_vertical_run(element)
+
+
+class VerticalPipeFilter(VerticalRunFilter):
+    """Solo tubi verticali (stacco con braga)."""
+
+    def AllowElement(self, element):
+        try:
+            return is_vertical_pipe(element)
+        except Exception:
+            return False
 
 
 def category_name(element):
@@ -614,14 +636,19 @@ def process(riser, settings, z, wanted, beyond_choice):
     return result
 
 
-def get_selection():
+def get_selection(pipes_only=False):
+    accept = is_vertical_pipe if pipes_only else is_vertical_run
     selected = [doc.GetElement(i) for i in uidoc.Selection.GetElementIds()]
-    risers = [e for e in selected if is_vertical_run(e)]
+    risers = [e for e in selected if accept(e)]
     if risers:
         return risers
+    if pipes_only:
+        selection_filter, prompt = VerticalPipeFilter(), "Select the vertical pipes, then press Finish"
+    else:
+        selection_filter = VerticalRunFilter()
+        prompt = "Select the vertical pipes, ducts or cable trays, then press Finish"
     try:
-        refs = uidoc.Selection.PickObjects(ObjectType.Element, VerticalRunFilter(),
-                                           "Select the vertical pipes, ducts or cable trays, then press Finish")
+        refs = uidoc.Selection.PickObjects(ObjectType.Element, selection_filter, prompt)
     except OperationCanceledException:
         script.exit()
     return [doc.GetElement(r.ElementId) for r in refs]
@@ -715,4 +742,259 @@ def main():
         print_report(results, settings, level, note)
 
 
-main()
+# ----------------------------------------------------------------------------------------------------------------
+# SHIFT + CLICK: stacco con braga di una famiglia specifica
+# ----------------------------------------------------------------------------------------------------------------
+Y_FAMILY_NAME = "e_PP.GG.JN_Y Branch"
+Y_XAML_FILE_NAME = "BranchY_form.xaml"
+Y_EXTEND_MARGIN_MM = 300.0  # tratto di tubo lasciato oltre la braga quando il montante viene prolungato
+Y_DEFAULTS = {"direction": "right", "level": "", "offset_mm": 1000.0, "length_mm": 500.0, "angle_deg": 45.0,
+              "horizontal_mm": 500.0}
+
+
+def symbol_name(symbol):
+    param = symbol.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM)
+    return param.AsString() if param is not None else ""
+
+
+def find_y_symbols():
+    """Tipi della famiglia della braga caricati nel modello, in ordine di nome."""
+    found = [s for s in DB.FilteredElementCollector(doc).OfClass(DB.FamilySymbol)
+             .OfCategory(DB.BuiltInCategory.OST_PipeFitting)
+             if s.Family.Name == Y_FAMILY_NAME]
+    return sorted(found, key=symbol_name)
+
+
+def check_all_connected(fitting, name):
+    for c in connector_manager(fitting).Connectors:
+        if c.ConnectorType in PHYSICAL_TYPES and not c.IsConnected:
+            raise BranchError("The {} is not connected on all sides".format(name))
+
+
+def place_y_fitting(riser, symbol, conn_a, conn_b, branch_conn):
+    """NewTeeFitting sceglie il raccordo dalle Routing Preferences del tipo: la braga viene messa per prima tra le
+    giunzioni con una regola temporanea, che viene tolta subito dopo (non resta nel modello)."""
+    if not symbol.IsActive:
+        symbol.Activate()
+        doc.Regenerate()
+    manager = doc.GetElement(riser.GetTypeId()).RoutingPreferenceManager
+    group = DB.RoutingPreferenceRuleGroupType.Junctions
+    rule = DB.RoutingPreferenceRule(symbol.Id, "pyESA temporary Y branch")
+    rule.AddCriterion(DB.PrimarySizeCriterion.All())
+    previous = manager.PreferredJunctionType
+    try:
+        manager.AddRule(group, rule, 0)
+    except Exception as ex:
+        raise BranchError("{} cannot be used as a junction of the pipe type: {}".format(Y_FAMILY_NAME, ex))
+    manager.PreferredJunctionType = DB.PreferredJunctionType.Tee
+    fitting, error = None, None
+    try:
+        fitting = doc.Create.NewTeeFitting(conn_a, conn_b, branch_conn)
+    except Exception as ex:
+        error = ex
+    # ripristino delle preferenze: se fallisce, l'eccezione annulla l'intera transazione
+    manager.RemoveRule(group, 0)
+    manager.PreferredJunctionType = previous
+    if fitting is None:
+        raise BranchError("The Y branch could not be placed at the chosen angle: {}".format(error))
+    if fitting.Symbol.Family.Name != Y_FAMILY_NAME:
+        raise BranchError("Revit placed {} instead of {}".format(fitting.Symbol.Family.Name, Y_FAMILY_NAME))
+    return fitting
+
+
+def y_drop(settings):
+    """Dislivello tra la braga e il tubo orizzontale: il tratto inclinato forma l'angolo scelto con l'asse del
+    montante, la distanza orizzontale tra montante e tubo orizzontale e' "length"."""
+    return settings["length_mm"] / MM_PER_FT / math.tan(math.radians(settings["angle_deg"]))
+
+
+def extend_riser_to(riser, z_point, disconnected):
+    """Prolunga il montante fino alla quota z_point (piu' il margine per il raccordo) se questa cade fuori."""
+    where, low, high = classify(riser, z_point)
+    if where == "inside":
+        return
+    tip = high if where == "top" else low
+    sign = 1.0 if where == "top" else -1.0
+    STAGE[0] = "extending the riser at the {} end".format(where)
+    conn, refs = tip_refs(riser, where)
+    for ref in refs:
+        disconnected.append("{} {}".format(ref.Owner.Category.Name if ref.Owner.Category else "element",
+                                           ref.Owner.Id))
+        conn.DisconnectFrom(ref)
+    move_end(riser, tip, DB.XYZ(tip.X, tip.Y, z_point + sign * Y_EXTEND_MARGIN_MM / MM_PER_FT))
+    if classify(riser, z_point)[0] != "inside":
+        raise BranchError("The riser could not be extended to the elevation of the Y branch")
+
+
+def build_y_branch(riser, settings, z, level_id, wanted, symbol):
+    """Prima il tubo orizzontale, poi il tratto inclinato con la sua curva, infine la braga sul montante.
+    Ritorna (caso, tratto inclinato, nuovi elementi, raccordi, elementi scollegati)."""
+    distance = settings["length_mm"] / MM_PER_FT
+    axis = classify(riser, z)[1]                                    # il montante e' verticale: X e Y fissi
+    q = DB.XYZ(axis.X, axis.Y, z - y_drop(settings))                # braga sul montante
+    p0 = DB.XYZ(axis.X, axis.Y, z).Add(wanted.Multiply(distance))  # inizio del tubo orizzontale
+    p1 = p0.Add(wanted.Multiply(settings["horizontal_mm"] / MM_PER_FT))
+
+    disconnected = []
+    extend_riser_to(riser, q.Z, disconnected)
+
+    STAGE[0] = "drawing the horizontal run"
+    horizontal = create_branch(riser, p0, p1, level_id, None)
+    STAGE[0] = "drawing the inclined run"
+    inclined = create_branch(riser, q, p0, level_id, None)
+    STAGE[0] = "joining the inclined run to the horizontal run"
+    elbow = doc.Create.NewElbowFitting(nearest_connector(inclined, p0), nearest_connector(horizontal, p0))
+    STAGE[0] = "placing the Y branch on the riser"
+    conn_a, conn_b, other = split_riser(riser, q)
+    fitting = place_y_fitting(riser, symbol, conn_a, conn_b, nearest_connector(inclined, q))
+    check_all_connected(fitting, "Y branch")
+    check_remaining_space([("riser", riser), ("riser past the Y branch", other), ("inclined run", inclined),
+                           ("horizontal run", horizontal)])
+    case = "Y branch {:g} degrees + horizontal run".format(settings["angle_deg"])
+    return case, inclined, [other, inclined, horizontal], [fitting, elbow], disconnected
+
+
+def process_y(riser, settings, z, wanted, symbol):
+    result = {"element": riser, "category": category_name(riser), "case": "", "branch": None,
+              "fittings": 0, "status": ""}
+    level_id = get_level_id(riser)
+    if level_id is None:
+        result["status"] = "Unchanged. No reference level on the riser"
+        return result
+    transaction = DB.Transaction(doc, "Y Branch")
+    transaction.Start()
+    try:
+        case, branch, new_elements, fittings, disconnected = build_y_branch(
+            riser, settings, z, level_id, wanted, symbol)
+        STAGE[0] = "copying parameters and insulation"
+        note = inherit(riser, new_elements, fittings)
+        transaction.Commit()
+    except BranchError as ex:
+        transaction.RollBack()
+        result["status"] = "Unchanged. {}".format(ex)
+        return result
+    except Exception as ex:
+        transaction.RollBack()
+        result["status"] = "Unchanged. The Y branch could not be built (step: {}): {}".format(STAGE[0], ex)
+        result["detail"] = traceback.format_exc() if traceback else ""
+        return result
+    status = "Created ({})".format(note)
+    if disconnected:
+        status += ". Riser extended, disconnected from: {}".format(", ".join(disconnected))
+    result.update({"case": case, "branch": branch, "fittings": len(fittings), "status": status})
+    return result
+
+
+def pipes_elevations_text(risers, level, offset_mm, length_mm, angle_deg):
+    """Quote iniziale e finale di ogni tubo, riferite al livello scelto, e cosa succede alla quota della braga."""
+    base = level_elevation(level)
+    drop_mm = length_mm / math.tan(math.radians(angle_deg))
+    z = base + (offset_mm - drop_mm) / MM_PER_FT   # quota della braga sul montante
+    lines = ["Elevations in mm relative to level {}. Horizontal run at {:+g}, Y branch on the riser at {:+.0f}".format(
+        level.Name, offset_mm, offset_mm - drop_mm)]
+    for i, riser in enumerate(risers, 1):
+        curve = riser.Location.Curve
+        start, end = curve.GetEndPoint(0), curve.GetEndPoint(1)
+        line = "#{} (id {}): start {:+.0f} | end {:+.0f}".format(
+            i, riser.Id, (start.Z - base) * MM_PER_FT, (end.Z - base) * MM_PER_FT)
+        where = classify(riser, z)[0]
+        if where != "inside":
+            line += " -> will be extended at the {} end".format(where)
+            refs = tip_refs(riser, where)[1]
+            if refs:
+                line += " and disconnected from {}".format(
+                    ", ".join("{} {}".format(r.Owner.Category.Name if r.Owner.Category else "element", r.Owner.Id)
+                              for r in refs))
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def load_y_settings(config):
+    """Le impostazioni della braga stanno nella stessa configurazione, con il prefisso y_."""
+    settings = dict(Y_DEFAULTS)
+    try:
+        for key in ("direction", "level"):
+            settings[key] = config.get_option("y_" + key, Y_DEFAULTS[key])
+        for key in ("offset_mm", "length_mm", "angle_deg", "horizontal_mm"):
+            settings[key] = float(config.get_option("y_" + key, Y_DEFAULTS[key]))
+    except Exception:
+        pass
+    return settings
+
+
+def save_y_settings(config, settings):
+    try:
+        for key in Y_DEFAULTS:
+            setattr(config, "y_" + key, settings[key])
+        script.save_config()
+    except Exception:
+        pass
+
+
+def print_y_report(results, settings, level, note, symbol):
+    output.print_md("# Y Branch report")
+    output.print_md("Fitting **{}: {}** | side **{}** (on screen) | horizontal run at level **{}** {:+g} mm | "
+                    "angle **{:g} degrees** | distance from the riser **{:g} mm** | horizontal run length "
+                    "**{:g} mm**".format(
+                        Y_FAMILY_NAME, symbol_name(symbol), settings["direction"], level.Name,
+                        settings["offset_mm"], settings["angle_deg"], settings["length_mm"],
+                        settings["horizontal_mm"]))
+    if note:
+        output.print_md("**View:** {}".format(note))
+    done = [r for r in results if r["status"].startswith("Created")]
+    output.print_md("Risers: **{}** | branches created: **{}** | left unchanged: **{}**".format(
+        len(results), len(done), len(results) - len(done)))
+    rows = [[i, output.linkify(r["element"].Id), r["case"],
+             output.linkify(r["branch"].Id) if r["branch"] is not None else "", r["fittings"] or "", r["status"]]
+            for i, r in enumerate(results, 1)]
+    output.print_table(table_data=rows, columns=["#", "Riser", "Case", "Branch", "Fittings", "Status"])
+    for i, r in enumerate(results, 1):
+        if r.get("detail"):
+            output.print_md("**Technical detail for riser #{}**".format(i))
+            output.print_code(r["detail"])
+
+
+def main_y():
+    symbols = find_y_symbols()
+    if not symbols:
+        forms.alert("The fitting family '{}' is not loaded in the model. Load it, then run the command "
+                    "again.".format(Y_FAMILY_NAME), exitscript=True)
+    symbol = symbols[0]
+
+    risers = get_selection(pipes_only=True)
+    if not risers:
+        script.exit()
+
+    levels = sorted(DB.FilteredElementCollector(doc).OfClass(DB.Level), key=level_elevation)
+    names = [lv.Name for lv in levels]
+    config = script.get_config(CONFIG_NAME)
+    settings = load_y_settings(config)
+    if settings["level"] not in names:
+        own = doc.GetElement(get_level_id(risers[0])) if get_level_id(risers[0]) is not None else None
+        settings["level"] = own.Name if own is not None else (names[0] if names else "")
+    axes = view_axes()
+    note = rotation_note(axes)
+
+    def pipes_info(level_name, offset_mm, length_mm, angle_deg):
+        return pipes_elevations_text(risers, levels[names.index(level_name)], offset_mm, length_mm, angle_deg)
+
+    settings = Branch_ui.YBranchWindow(script.get_bundle_file(Y_XAML_FILE_NAME), len(risers), names, settings,
+                                       note, Y_FAMILY_NAME, pipes_info).show()
+    if settings is None:
+        script.exit()
+    save_y_settings(config, settings)
+
+    level = levels[names.index(settings["level"])]
+    z = level_elevation(level) + settings["offset_mm"] / MM_PER_FT  # quota del tubo orizzontale
+    wanted = screen_direction(settings["direction"], axes)
+
+    results = [process_y(r, settings, z, wanted, symbol) for r in risers]
+    problems = len([r for r in results if not r["status"].startswith("Created")])
+    if want_report(len(results), problems, "Y branches created"):
+        print_y_report(results, settings, level, note, symbol)
+
+
+if __shiftclick__:  # noqa: F821
+    main_y()
+else:
+    main()

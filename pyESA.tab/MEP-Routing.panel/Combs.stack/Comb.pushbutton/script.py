@@ -3,12 +3,6 @@ __title__ = "Comb"
 __doc__ = """Version = 0.4
 Date    = 08.10.2026
 ________________________________________________________________
-CLICK: bends the selected parallel horizontal pipes, ducts or cable trays to the left or
-right by a chosen angle, keeping their spacing. Select the pipes,
-then click the point where the bend starts, on the side the pipes
-must turn to. The part of each pipe beyond the bend is replaced.
-
-SHIFT + CLICK (comb, pipes only):
 Turns a row of horizontal pipes heading to a wall into a comb at the
 wall: each pipe reaches the wall, goes up or down with an elbow to
 its own elevation, then turns 90 degrees and runs along the wall.
@@ -781,7 +775,4 @@ def comb_main():
         print_report(results, geo, settings, detail)
 
 
-if __shiftclick__:  # noqa: F821
-    comb_main()
-else:
-    bend_main()
+comb_main()

@@ -1,0 +1,9 @@
+title: "Check Type Mark\nDuplicates"
+tooltip: >
+  Select categories, choose a type parameter and check it for duplicate values. Duplicates are shown in an editable
+  table; select rows to select their instances in Revit, or press Refresh to read the model again.
+
+  CLICK: starts with the Type Mark parameter.
+
+  SHIFT + CLICK: starts with the type parameter e_IDA_TypeMark_1.
+author: ESA Engineering

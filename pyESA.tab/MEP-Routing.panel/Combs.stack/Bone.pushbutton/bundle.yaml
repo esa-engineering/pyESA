@@ -1,0 +1,5 @@
+title: Comb
+tooltip: >-
+  CLICK: bends the selected parallel horizontal pipes, ducts or cable trays to the left or right by a chosen angle, keeping their spacing.
+  Select the pipes, then click the point where the bend starts, on the side the pipes must turn to.
+author: Matteo Maiorano

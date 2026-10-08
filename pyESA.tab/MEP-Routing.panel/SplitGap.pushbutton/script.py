@@ -14,6 +14,11 @@ Instruction:
 3. The report lists the elements, the gap length and what could not
    be cut. An element that cannot be cut is left unchanged
 
+SHIFT + CLICK: vertical mode. Only vertical straight elements are processed
+and the two points define the bottom and the top of the gap. Run it in a
+section, elevation or 3D view (in 3D a temporary vertical work plane facing
+the camera is used; the view must not look straight up or down).
+
 Pipes and ducts are split with BreakCurve, so their insulation is
 kept. Cable trays and conduits are split by copy.
 ________________________________________________________________
@@ -22,6 +27,7 @@ Author(s): Matteo Maiorano
 __author__ = "Matteo Maiorano"
 
 import clr
+import math
 clr.AddReference("RevitAPI")
 clr.AddReference("RevitAPIUI")
 from Autodesk.Revit.DB.Plumbing import Pipe, PlumbingUtils
@@ -30,7 +36,7 @@ from Autodesk.Revit.DB.Electrical import CableTray, Conduit
 from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
 from Autodesk.Revit.Exceptions import OperationCanceledException
 
-from pyrevit import revit, script, DB
+from pyrevit import revit, script, DB, forms
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -127,11 +133,52 @@ def get_selection():
     return [doc.GetElement(r.ElementId) for r in refs]
 
 
+VERTICAL_TOL_DEG = 5.0  # scostamento massimo dall'asse Z per considerare verticale un elemento
+
+
+def get_vertical_elements(elements):
+    """Tiene solo i tratti rettilinei verticali (asse entro VERTICAL_TOL_DEG dalla verticale)."""
+    min_dz = math.cos(math.radians(VERTICAL_TOL_DEG))
+    vertical = []
+    for element in elements:
+        curve = getattr(element.Location, "Curve", None)
+        if isinstance(curve, DB.Line) and abs(curve.Direction.Z) >= min_dz:
+            vertical.append(element)
+    return vertical
+
+
 def pick(prompt):
     try:
         return uidoc.Selection.PickPoint(prompt)
     except OperationCanceledException:
         script.exit()
+    except Exception as ex:
+        forms.alert("The point could not be picked in this view: {}".format(ex), title="Split Gap")
+        script.exit()
+
+
+def set_vertical_work_plane(view, element):
+    """Vista 3D: imposta un piano di lavoro verticale per l'asse dell'elemento, rivolto verso la camera, cosi' i click
+    hanno una quota Z corretta. La transazione resta aperta e va annullata (RollBack) dopo i click. Ritorna la
+    transazione, o None se non serve."""
+    if not isinstance(view, DB.View3D):
+        return None
+    view_dir = view.ViewDirection
+    horizontal = DB.XYZ(view_dir.X, view_dir.Y, 0.0)
+    if horizontal.GetLength() < 0.05:
+        forms.alert("The view looks straight down or up: rotate the 3D view so that the vertical elements are seen "
+                    "from the side.", title="Split Gap")
+        script.exit()
+    origin = element.Location.Curve.GetEndPoint(0)
+    plane = DB.Plane.CreateByNormalAndOrigin(horizontal.Normalize(), origin)
+    transaction = DB.Transaction(doc, "Split gap work plane")
+    transaction.Start()
+    try:
+        view.SketchPlane = DB.SketchPlane.Create(doc, plane)
+    except Exception:
+        transaction.RollBack()
+        raise
+    return transaction
 
 
 def midpoint(element):
@@ -225,8 +272,31 @@ def main():
     elements = get_selection()
     if not elements:
         script.exit()
-    click1 = pick("Click the FIRST point of the gap")
-    click2 = pick("Click the SECOND point of the gap")
+    
+    vertical_mode = __shiftclick__  # noqa: F821
+    if vertical_mode:
+        elements = get_vertical_elements(elements)
+        if not elements:
+            forms.alert("No vertical straight element in the selection.", title="Split Gap")
+            script.exit()
+
+    if vertical_mode:
+        prompt_1, prompt_2 = "Click the bottom of the gap", "Click the top of the gap"
+    else:
+        prompt_1, prompt_2 = "Click the first point of the gap", "Click the second point of the gap"
+    plane_transaction = None
+    try:
+        if vertical_mode:
+            plane_transaction = set_vertical_work_plane(uidoc.ActiveView, elements[0])
+        click1 = pick(prompt_1)
+        click2 = pick(prompt_2)
+    finally:
+        if plane_transaction is not None:
+            plane_transaction.RollBack()  # il piano di lavoro serve solo per i click, nel modello non resta nulla
+    if vertical_mode and abs(click1.Z - click2.Z) < MIN_GAP_MM / MM_PER_FT:
+        forms.alert("The two points have the same height. For vertical elements run the command in a section, "
+                    "elevation or 3D view and click the two heights on the element.", title="Split Gap")
+        script.exit()
 
     rows, done = [], 0
     for element in elements:
