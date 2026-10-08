@@ -469,6 +469,7 @@ maggiorazione diversa da quella della sua categoria:
 | --- | --- | --- |
 | Listino comune | `.json` su percorso di rete | il tool, con l'editor del listino (pulsante Edit...) |
 | Listino comune (alternativa) | `.xlsx` / `.xlsm` / `.csv` su percorso di rete | chi gestisce l'elenco prezzi, in Excel. Il tool lo legge soltanto |
+| Listino comune (alternativa) | file PriMus `.xpwe` | chi tiene l'elenco prezzi in PriMus (ACCA). Il tool ne legge soltanto l'elenco prezzi |
 | Progetto | `<Modello>_MEPQTO.json` accanto al modello centrale | il tool, con il pulsante Save |
 
 ### Come si fondono listino e progetto
@@ -504,14 +505,14 @@ Finestra: IM.01.001  description="Diffusore 600x600"  unit="cad"  price=118.0  e
 
 Il pulsante **Edit...** accanto al listino apre l'editor:
 
-- **Listino in uso:** se è un `.json` si apre direttamente; se è un Excel o un CSV
-  viene importato in un listino nuovo, da salvare come `.json`.
+- **Listino in uso:** se è un `.json` si apre direttamente; se è un Excel, un CSV o un
+  file PriMus viene importato in un listino nuovo, da salvare come `.json`.
 - **Griglia:** Chapter, Subchapter, EPU item No., Reference price book, Price book code,
   Short Description, Description, Unit (tendina), Unit price, con ricerca, Add Row, Duplicate e Remove
   Selected. Il codice prezzario deve essere unico e non vuoto; il prezzo accetta la
   virgola decimale.
 - **File:** New / Open / Save / Save As, nome e valuta del listino.
-- **Import:** legge `.xlsx`, `.xlsm`, `.csv` o un altro listino `.json`. Se alcuni codici
+- **Import:** legge `.xlsx`, `.xlsm`, `.csv`, `.xpwe` o un altro listino `.json`. Se alcuni codici
   ci sono già, chiede se sovrascriverli o aggiungere solo i nuovi.
 - **Dopo il salvataggio:** se il file è il listino in uso, la finestra del computo lo
   ricarica; altrimenti chiede se usarlo.
@@ -563,7 +564,8 @@ scelgono** nella finestra **Price list columns**, che si apre:
 
 - quando si sceglie un listino `.xlsx`, `.xlsm` o `.csv` con *Browse...* (annullando, il
   listino non cambia);
-- dal pulsante **Columns...** accanto al listino, attivo solo per i listini Excel / CSV;
+- dal pulsante **Columns...** accanto al listino, attivo solo per i listini Excel / CSV
+  e PriMus (vedi "Listino PriMus (.xpwe)");
 - nell'editor del listino, prima di importare un Excel o un CSV (dalla finestra del
   computo arriva la mappatura già scelta).
 
@@ -616,6 +618,47 @@ versioni precedenti.
   listino non caricato, con il motivo nella scheda Issues ("Price list not loaded"):
   si corregge con *Columns...*.
 
+### Listino PriMus (.xpwe)
+
+Il file `.xpwe` è il formato di interscambio XML di **PriMus** (ACCA). Si sceglie con
+*Browse...* come un Excel e si legge **solo l'elenco prezzi** (`PweElencoPrezzi`): le
+voci di computo e le misure del file (`PweVociComputo`) non si leggono, le quantità
+restano quelle del modello e della scheda Manual items.
+
+L'elenco prezzi si presenta alla finestra **Price list columns** come un foglio unico,
+con queste colonne (la scelta del foglio non c'è):
+
+| Colonna | Intestazione | Tag PriMus |
+| --- | --- | --- |
+| A | Code | `Tariffa` |
+| B | Short description | `DesBreve`; se è vuota, `DesRidotta` (la descrizione accorciata da PriMus, con `...`) |
+| C | Description | `DesEstesa` |
+| D | Unit | `UnMisura` (ricondotta alla tendina come per l'Excel) |
+| E | Price 1 | `Prezzo1` |
+| F | Chapter | capitolo della voce (`IDCap` → `DGCapitoliItem`, `DesSintetica`) |
+| G | Subchapter | sottocapitolo (`IDSbCap` → `DGSubCapitoliItem`) |
+| H | EPU item No. | numero d'ordine della voce nell'elenco prezzi del file |
+| I | Price book | supercapitolo (`IDSpCap` → `DGSuperCapitoliItem`): nei nostri file è il prezzario d'origine, es. `LisLazio_LLPP_2023` |
+| J..M | Price 2 .. Price 5 | `Prezzo2` .. `Prezzo5` |
+| N | Source article | `Articolo` |
+
+- **Proposta iniziale:** A..I, quindi il campo *Unit price* è `Price 1`. Per usare un
+  altro dei cinque prezzi di PriMus si sceglie la colonna J..M in *Unit price*; la scelta
+  si salva come le colonne di un Excel (`price_list_layout`).
+- **Capitoli:** un ID `0` (voce senza capitolo, sottocapitolo o supercapitolo) lascia il
+  campo vuoto. Se nel file la struttura è diversa (per esempio i capitoli nelle categorie),
+  basta mappare *Chapter* / *Subchapter* su un'altra colonna o lasciarli `(none)`.
+- **Numeri e testo:** i prezzi di PriMus hanno il punto decimale (`19.36`). Le entità XML
+  (`&apos;`) e gli a capo delle descrizioni estese si leggono come testo normale. Un file
+  senza dichiarazione di codifica si legge in UTF-8, con ripiego sulla codepage di
+  sistema.
+- **Codice ripetuto:** vale la prima voce, come nell'Excel.
+- **Errori:** un file che non è di PriMus (radice diversa da `PweDocumento`) o senza voci
+  nell'elenco prezzi lascia il listino non caricato, con il motivo nella scheda Issues.
+- **Aggiornamento:** il tool non scrive nel `.xpwe`. Dopo una modifica in PriMus si
+  riesporta il file e si usa *Reload*; le correzioni fatte nella finestra restano nel file
+  di progetto, come per l'Excel.
+
 ### File di progetto
 
 Per i modelli condivisi il file sta accanto al **centrale**, così tutti gli utenti della
@@ -627,8 +670,8 @@ Contenuto:
 
 - `price_list_path`: percorso del listino. Se manca, si usa l'ultimo listino ricordato
   nella config di pyRevit;
-- `price_list_layout`: foglio e colonne del listino Excel / CSV (vedi "Listino Excel /
-  CSV"); si salva con il percorso;
+- `price_list_layout`: foglio e colonne del listino Excel / CSV / PriMus (vedi
+  "Listino Excel / CSV" e "Listino PriMus"); si salva con il percorso;
 - `items`: voci corrette, solo i campi modificati (`chapter`, `subchapter`, `epu_item`,
   `price_book`, `short_description`, `description`, `unit`, `price`);
 - `rules`: regole di misura, solo se modificate o salvate dalla scheda Rules;

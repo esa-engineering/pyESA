@@ -5,7 +5,7 @@ mepqto_pricelist_ui.py - editor del listino comune in formato JSON.
 Il listino si apre, si modifica in una griglia (capitolo, sottocapitolo, n. articolo
 EPU, prezzario di riferimento, codice prezzario, descrizione, unita' da tendina,
 prezzo) e si salva in un file .json (struttura in mepqto_store.PriceListDocument).
-Si puo' partire da un Excel / CSV con Import.
+Si puo' partire da un Excel / CSV o da un file PriMus .xpwe con Import.
 
 Le modifiche si ricostruiscono al salvataggio confrontando la griglia con l'istantanea
 dell'ultimo caricamento: cosi' al documento arrivano solo i codici aggiunti, cambiati o
@@ -48,7 +48,8 @@ FIELD_OF = {"Chapter": "chapter", "Subchapter": "subchapter", "EpuItem": "epu_it
             "PriceBook": "price_book", "ShortDescription": "short_description",
             "Description": "description", "Unit": "unit", "UnitPrice": "price"}
 JSON_FILTER = "MEP QTO price list (*.json)|*.json"
-IMPORT_FILTER = ("Price list (*.xlsx;*.xlsm;*.csv;*.json)|*.xlsx;*.xlsm;*.csv;*.json"
+IMPORT_FILTER = ("Price list (*.xlsx;*.xlsm;*.csv;*.xpwe;*.json)"
+                 "|*.xlsx;*.xlsm;*.csv;*.xpwe;*.json"
                  "|All files (*.*)|*.*")
 
 GRAY_BRUSH = SolidColorBrush(Colors.Gray)

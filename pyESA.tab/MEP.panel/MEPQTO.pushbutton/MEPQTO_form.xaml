@@ -105,14 +105,14 @@
                         <TextBlock Grid.Row="0" Text="Price list:" Style="{StaticResource FieldLabel}"/>
                         <TextBox x:Name="txt_price_list" Grid.Row="0" Grid.Column="1" Padding="5,3" Margin="0,2"
                                  IsReadOnly="True" Background="#F8F8F8"
-                                 ToolTip="Shared price list: .json (editable with Edit...) or .xlsx / .csv (read only, maintained in Excel: sheet and columns chosen with Columns...)."/>
+                                 ToolTip="Shared price list: .json (editable with Edit...), .xlsx / .csv (read only, maintained in Excel) or a PriMus .xpwe file (read only); sheet and columns are chosen with Columns..."/>
                         <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal">
                             <Button x:Name="btn_price_list" Content="Browse..." Padding="10,3" Margin="5,2,0,2"/>
                             <Button x:Name="btn_price_columns" Content="Columns..." Padding="10,3" Margin="5,2,0,2"
                                     IsEnabled="False"
-                                    ToolTip="Excel / CSV price list: choose the sheet and the column of every field"/>
+                                    ToolTip="Excel / CSV / PriMus price list: choose the sheet and the column of every field (for a PriMus file, also which of its five prices to use)"/>
                             <Button x:Name="btn_price_edit" Content="Edit..." Padding="10,3" Margin="5,2,0,2"
-                                    ToolTip="Edit the price list (.json). An Excel or CSV price list is imported into a new .json price list."/>
+                                    ToolTip="Edit the price list (.json). An Excel, CSV or PriMus price list is imported into a new .json price list."/>
                             <Button x:Name="btn_price_reload" Content="Reload" Padding="10,3" Margin="5,2,0,2"
                                     ToolTip="Read the price list again (after editing it in Excel or by someone else)"/>
                             <Button x:Name="btn_price_clear" Content="✕" Width="25" Margin="5,2,0,2"

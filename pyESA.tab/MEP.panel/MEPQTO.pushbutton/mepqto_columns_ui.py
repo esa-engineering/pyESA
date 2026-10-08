@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_columns_ui.py - foglio e colonne di un listino Excel / CSV.
+mepqto_columns_ui.py - foglio e colonne di un listino Excel / CSV / PriMus.
 
-Si apre quando si sceglie un listino .xlsx / .xlsm / .csv (Browse... ed editor del
+Un .xpwe si presenta come un foglio unico (mepqto_store.XPWE_HEADERS): qui si sceglie
+fra l'altro quale dei cinque prezzi di PriMus usare.
+
+Si apre quando si sceglie un listino .xlsx / .xlsm / .csv / .xpwe (Browse... ed editor del
 listino) e dal pulsante Columns... della finestra del computo. Per ogni campo si sceglie
 una colonna del foglio, con l'anteprima delle prime righe. La proposta iniziale e' la
 mappatura gia' salvata per lo stesso file, altrimenti quella ricavata dalle intestazioni
@@ -57,7 +60,8 @@ class ColumnsForm(Window):
             self.cbo_sheet.SelectedItem = initial_sheet if initial_sheet in self._sheets \
                 else self._sheets[0]
         else:
-            self.cbo_sheet.ItemsSource = [u"(CSV file: one sheet)"]
+            self.cbo_sheet.ItemsSource = [u"(PriMus file: the price list)"
+                                          if qs.is_xpwe_file(path) else u"(CSV file: one sheet)"]
             self.cbo_sheet.SelectedIndex = 0
             self.cbo_sheet.IsEnabled = False
         self._build_fields()

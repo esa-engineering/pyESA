@@ -272,7 +272,7 @@ Read it before changing behaviour, and keep it in sync with the code.
 | `MEPQTO_script.py` | entry point only: document checks, then `show_takeoff_window(doc)` |
 | `mepqto_model.py` | the **only** module that reads Revit. `list_links()` lists the link instances; `collect_records()` reads the open model plus the chosen links, only the chosen categories, and reduces elements to plain `InstanceRecord`s (geometry already in mm / m); aggregation, bill, Type Mark summary and issues are pure Python on those records. `CATEGORY_RULES` lists the categories and their measure kind |
 | `mepqto_rules.py` | measurement formulas, allowances, duct sheet kg/mq bands, pipe densities. No Revit imports |
-| `mepqto_store.py` | price list readers (JSON, .xlsx, .csv), unit aliases, project file, field-by-field merge (`merge_item`) |
+| `mepqto_store.py` | price list readers (JSON, .xlsx, .csv, PriMus .xpwe), unit aliases, project file, field-by-field merge (`merge_item`) |
 | `mepqto_xlsx.py` | minimal .xlsx writer and the export sheets |
 | `mepqto_ui.py` + `MEPQTO_form.xaml` | main window (`TakeoffForm`, `Session`) |
 | `mepqto_<x>_ui.py` + `MEPQTO_<x>.xaml` | one pair per sub-dialog: `scope` (models, worksets and categories to read, shown before every read; its `_SetPicker` handles both kinds of named sets), `wbs`, `params`, `allowance`, `pricelist` (price list editor) |
@@ -314,10 +314,16 @@ Rules that come with the pattern:
 
 | Data | Where | Written by |
 | --- | --- | --- |
-| Shared price list | `.json` (`"format": "ESA_MEPQTO_PriceList"`) on a network path, or a read-only `.xlsx` / `.xlsm` / `.csv` | price list editor (`mepqto_pricelist_ui.py`) |
+| Shared price list | `.json` (`"format": "ESA_MEPQTO_PriceList"`) on a network path, or a read-only `.xlsx` / `.xlsm` / `.csv` / PriMus `.xpwe` | price list editor (`mepqto_pricelist_ui.py`) |
 | Project file | `<Model>_MEPQTO.json` next to the **central** model (`default_project_file()`); cloud / unsaved models pick a path, remembered in config | Save button |
 | Per-user settings | `script.get_config('ESA_MEPQTO')`: last phase, categories, category set, price list; `project_files` as `"<doc key>::<path>"` and `scope_links` as `"<doc key>::<uid>|<uid>"` strings, both capped at 50; `category_sets` as `"<name>::<key>,<key>"`, `workset_include_sets` as `"<name>::<ws>|<ws>"` (worksets to read; Revit forbids `|` and `:` in names; the older `workset_sets` held exclusions and is ignored); last included / known worksets and workset set | window close; scope and sets as soon as they are chosen / saved |
 
+- PriMus `.xpwe` files (XML, root `PweDocumento`) are a third table format:
+  `_read_xpwe_rows()` turns `PweElencoPrezzi/EPItem` into rows with the `XPWE_HEADERS`
+  columns (A..I in `EPU_COLUMNS` order, so the default layout fits; J..M `Prezzo2..5`),
+  resolving chapters and price book by ID from `PweDGCapitoliCategorie`. Everything else
+  (Columns..., layout in the project file, `_rows_to_items`) is the Excel path.
+  `PweVociComputo` (the PriMus bill) is not read.
 - Excel / CSV price lists are read through a `PriceListLayout` (sheet + `{field: column
   index}`), chosen in the Price list columns window (`mepqto_columns_ui`) and stored in the
   project file as `price_list_layout` (column letters), with the path. No layout = first

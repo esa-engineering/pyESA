@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 __title__ = "MEP\nQTO"
 
-__doc__ = """Version = 1.3
-Date    = 06.10.2026
+__doc__ = """Version = 1.4
+Date    = 08.10.2026
 _____________________________________________________________________
 Quantity takeoff of the MEP model, driven by the Type Mark.
 
@@ -37,7 +37,7 @@ Parameters... and are stored in the project file.
 
 Descriptions, units and unit prices are NOT stored in the model: they
 come from a shared price list (.json, edited with the price list
-editor - Edit... button - or .xlsx / .csv, read only) and from a
+editor - Edit... button - or .xlsx / .csv / PriMus .xpwe, read only) and from a
 project file <Model>_MEPQTO.json next to the central model, which
 keeps everything typed in the window.
 

@@ -784,10 +784,12 @@ class TakeoffForm(Window):
         self.txt_price_list.Text = path or u""
         self.btn_price_columns.IsEnabled = table_file
         self.txt_price_list.ToolTip = (
-            u"Excel / CSV price list, {}".format(
+            u"{} price list, {}".format(
+                u"PriMus" if qs.is_xpwe_file(path) else u"Excel / CSV",
                 (layout or qs.PriceListLayout.default()).describe()) if table_file else
-            u"Shared price list: .json (editable with Edit...) or .xlsx / .csv (read only, "
-            u"maintained in Excel: sheet and columns chosen with Columns...).")
+            u"Shared price list: .json (editable with Edit...), .xlsx / .csv (read only, "
+            u"maintained in Excel) or a PriMus .xpwe file (read only); sheet and columns "
+            u"are chosen with Columns...")
         if not path:
             self._price_list = qs.PriceList()
             self.session.price_list_count = 0
@@ -2196,8 +2198,9 @@ class TakeoffForm(Window):
     def OnBrowsePriceList(self, sender, args):
         dialog = OpenFileDialog()
         dialog.Title = "Shared price list"
-        dialog.Filter = ("Price list (*.json;*.xlsx;*.xlsm;*.csv)|*.json;*.xlsx;*.xlsm;*.csv"
-                         "|All files (*.*)|*.*")
+        dialog.Filter = ("Price list (*.json;*.xlsx;*.xlsm;*.csv;*.xpwe)"
+                         "|*.json;*.xlsx;*.xlsm;*.csv;*.xpwe"
+                         "|PriMus file (*.xpwe)|*.xpwe|All files (*.*)|*.*")
         if self.session.price_list_path:
             folder = os.path.dirname(self.session.price_list_path)
             if os.path.isdir(folder):
@@ -2207,8 +2210,8 @@ class TakeoffForm(Window):
         path = dialog.FileName
         layout = None
         if qs.is_table_file(path):
-            # Excel / CSV: foglio e colonne prima di leggere (la mappatura attuale se e' lo
-            # stesso file).
+            # Excel / CSV / PriMus: foglio e colonne prima di leggere (la mappatura attuale
+            # se e' lo stesso file).
             same = self.session.price_list_path and \
                 os.path.normcase(self.session.price_list_path) == os.path.normcase(path)
             layout = show_columns_dialog(self, path, self._price_layout if same else None)
@@ -2257,8 +2260,9 @@ class TakeoffForm(Window):
         e il listino si rilegge."""
         path = self.session.price_list_path
         if not path or not qs.is_table_file(path) or not os.path.isfile(path):
-            MessageBox.Show(u"Columns... applies to an Excel or CSV price list that exists on "
-                            u"disk.", TITLE, MessageBoxButton.OK, MessageBoxImage.Information)
+            MessageBox.Show(u"Columns... applies to an Excel, CSV or PriMus price list that "
+                            u"exists on disk.", TITLE, MessageBoxButton.OK,
+                            MessageBoxImage.Information)
             return
         layout = show_columns_dialog(self, path, self._price_layout)
         if layout is None:

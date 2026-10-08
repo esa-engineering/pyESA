@@ -5,8 +5,8 @@ mepqto_store.py - archivio delle voci di computo, fuori dal modello Revit.
 Due livelli, fusi campo per campo (il progetto vince):
 
 * listino comune: file .json (PriceListDocument, modificabile con l'editor del
-  listino) oppure .xlsx / .xlsm / .csv mantenuto in Excel, che il tool legge
-  soltanto.
+  listino) oppure .xlsx / .xlsm / .csv mantenuto in Excel, oppure l'elenco prezzi di un
+  file PriMus .xpwe, che il tool legge soltanto.
 * file di progetto <Modello>_MEPQTO.json accanto al modello centrale: descrizioni,
   unita' e prezzi aggiunti o corretti nella finestra, regole, WBS, parametri.
 
@@ -100,7 +100,7 @@ HEADER_GUESSES = {
     "unit": ("unit", "um", "uom", "udm", "unita", "unitamisura", "unitadimisura",
              "unitdimisura", "unitofmeasure"),
     "price": ("price", "prezzo", "unitprice", "prezzounitario", "pu", "euro", "prezzoeuro",
-              "importounitario"),
+              "importounitario", "price1", "prezzo1"),
     "chapter": ("chapter", "capitolo", "wbs", "section", "sezione"),
     "subchapter": ("subchapter", "sottocapitolo", "subcapitolo", "subsection", "sottosezione"),
     "epu_item": ("narticoloepu", "nrarticoloepu", "numeroarticoloepu", "articoloepu", "nepu",
@@ -529,8 +529,11 @@ def list_sheets(path):
 
 
 def read_sheet_rows(path, sheet=u""):
-    """(nome del foglio, righe) di un .xlsx / .xlsm (foglio vuoto = il primo) o di un
-    .csv (nome vuoto). Serve all'anteprima della finestra Columns..."""
+    """(nome del foglio, righe) di un .xlsx / .xlsm (foglio vuoto = il primo), di un
+    .csv o dell'elenco prezzi di un .xpwe (nome vuoto). Serve all'anteprima della
+    finestra Columns..."""
+    if is_xpwe_file(path):
+        return u"", _read_xpwe_rows(path)
     if os.path.splitext(path or u"")[1].lower() in (".xlsx", ".xlsm"):
         price_list = PriceList(path)
         rows = _read_xlsx_rows(path, price_list, sheet)
@@ -596,9 +599,97 @@ def _read_csv_rows(path):
     return [list(row) for row in csv.reader(lines, delimiter=str(delimiter))]
 
 
+# --- PriMus .xpwe (ACCA): XML, elenco prezzi in PweMisurazioni/PweElencoPrezzi/EPItem --
+
+XPWE_EXTENSIONS = (".xpwe",)
+# L'elenco prezzi di un .xpwe si presenta come un foglio con queste colonne. A..I sono
+# nell'ordine di EPU_COLUMNS, cosi' la mappatura di default (e Detect from Headers) lo
+# legge senza cambiare nulla; J..M sono gli altri prezzi di PriMus (Prezzo2..Prezzo5),
+# N l'articolo del prezzario d'origine. Da tag PriMus a colonna:
+#   A Tariffa   B DesBreve, o DesRidotta se vuota   C DesEstesa   D UnMisura   E Prezzo1
+#   F capitolo (IDCap)   G sottocapitolo (IDSbCap)   H numero d'ordine nell'elenco
+#   I supercapitolo (IDSpCap: nei file ESA e' il prezzario, es. "LisLazio_LLPP_2023")
+# Capitoli e supercapitoli si leggono per ID dalle tabelle di PweDGCapitoliCategorie
+# (DesSintetica; ID 0 = nessuno). Le voci di computo (PweVociComputo) non si leggono.
+XPWE_HEADERS = (u"Code", u"Short description", u"Description", u"Unit", u"Price 1",
+                u"Chapter", u"Subchapter", u"EPU item No.", u"Price book",
+                u"Price 2", u"Price 3", u"Price 4", u"Price 5", u"Source article")
+
+
+def is_xpwe_file(path):
+    return os.path.splitext(path or u"")[1].lower() in XPWE_EXTENSIONS
+
+
+def _xpwe_text(node, name):
+    """Testo del primo figlio name di node, senza spazi ai lati e con gli a capo come "\\n"
+    (XmlDocument conserva i CRLF del file); u"" se manca."""
+    for child in _children(node, name):
+        return (child.InnerText or u"").replace(u"\r\n", u"\n").replace(u"\r", u"\n").strip()
+    return u""
+
+
+def _xpwe_names(document, item_name):
+    """{ID: DesSintetica (o Codice)} di una tabella dei dati generali."""
+    names = {}
+    for node in document.GetElementsByTagName(item_name):
+        ident = (node.GetAttribute('ID') or u"").strip()
+        if ident:
+            names[ident] = _xpwe_text(node, 'DesSintetica') or _xpwe_text(node, 'Codice')
+    return names
+
+
+def _load_xpwe_document(path):
+    document = XmlDocument()
+    try:
+        # Load legge BOM e dichiarazione di codifica; senza dichiarazione assume UTF-8.
+        document.Load(path)
+    except Exception:
+        # File senza dichiarazione salvato nella codepage di sistema.
+        document = XmlDocument()
+        document.LoadXml(read_text_file(path))
+    root = document.DocumentElement
+    if root is None or root.LocalName != 'PweDocumento':
+        raise PriceListError(u"Not a PriMus file: the root element is '{}', not "
+                             u"PweDocumento.".format(root.LocalName if root is not None else u""))
+    return document
+
+
+def _read_xpwe_rows(path):
+    """Righe dell'elenco prezzi di un .xpwe, con XPWE_HEADERS come prima riga."""
+    document = _load_xpwe_document(path)
+    supers = _xpwe_names(document, 'DGSuperCapitoliItem')
+    chapters = _xpwe_names(document, 'DGCapitoliItem')
+    subchapters = _xpwe_names(document, 'DGSubCapitoliItem')
+    rows = [list(XPWE_HEADERS)]
+    for price_list_node in document.GetElementsByTagName('PweElencoPrezzi'):
+        for item in _children(price_list_node, 'EPItem'):
+            rows.append([
+                _xpwe_text(item, 'Tariffa'),
+                _xpwe_text(item, 'DesBreve') or _xpwe_text(item, 'DesRidotta'),
+                _xpwe_text(item, 'DesEstesa'),
+                _xpwe_text(item, 'UnMisura'),
+                _xpwe_text(item, 'Prezzo1'),
+                chapters.get(_xpwe_text(item, 'IDCap'), u""),
+                subchapters.get(_xpwe_text(item, 'IDSbCap'), u""),
+                u"{}".format(len(rows)),
+                supers.get(_xpwe_text(item, 'IDSpCap'), u""),
+                _xpwe_text(item, 'Prezzo2'),
+                _xpwe_text(item, 'Prezzo3'),
+                _xpwe_text(item, 'Prezzo4'),
+                _xpwe_text(item, 'Prezzo5'),
+                _xpwe_text(item, 'Articolo'),
+            ])
+    if len(rows) == 1:
+        raise PriceListError(u"The PriMus file has no price list items "
+                             u"(PweElencoPrezzi / EPItem).")
+    return rows
+
+
 def is_table_file(path):
-    """True per i listini Excel / CSV, che si leggono con una mappatura delle colonne."""
-    return os.path.splitext(path or u"")[1].lower() in (".xlsx", ".xlsm", ".csv", ".txt")
+    """True per i listini Excel / CSV / PriMus, che si leggono con una mappatura delle
+    colonne."""
+    return os.path.splitext(path or u"")[1].lower() in \
+        (".xlsx", ".xlsm", ".csv", ".txt") + XPWE_EXTENSIONS
 
 
 def load_price_list(path, layout=None):
@@ -621,10 +712,13 @@ def load_price_list(path, layout=None):
             _rows_to_items(rows, price_list, True, layout)
         elif extension in (".csv", ".txt"):
             _rows_to_items(_read_csv_rows(path), price_list, False, layout)
+        elif extension in XPWE_EXTENSIONS:
+            # Prezzi PriMus con il punto decimale, come i numeri grezzi dell'xlsx.
+            _rows_to_items(_read_xpwe_rows(path), price_list, True, layout)
         else:
             raise PriceListError(
-                "Unsupported price list format '{}': use .json, .xlsx, .xlsm or .csv.".format(
-                    extension))
+                "Unsupported price list format '{}': use .json, .xlsx, .xlsm, .csv or "
+                ".xpwe.".format(extension))
     except PriceListError:
         raise
     except IOError as error:
