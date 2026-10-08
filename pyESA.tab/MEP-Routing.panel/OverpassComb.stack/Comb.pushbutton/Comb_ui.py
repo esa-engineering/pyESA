@@ -90,3 +90,34 @@ class CombWindow(object):
     def show(self):
         self.window.ShowDialog()
         return self.result
+
+
+class BendWindow(object):
+    """Finestra modale: angolo e lunghezza del tratto dopo la curva."""
+
+    def __init__(self, xaml_path, side_label, settings):
+        self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
+        self.angle_box = self.window.FindName("AngleBox")
+        self.leg_box = self.window.FindName("LegBox")
+        self.window.FindName("SideText").Text = (
+            "{} elements will bend to the {}, towards the side of your click.".format(side_label[0], side_label[1]))
+        self.window.FindName("OkButton").Click += self._on_ok
+        self.angle_box.Text = "{:g}".format(settings["angle_deg"])
+        self.leg_box.Text = "{:g}".format(settings["leg_mm"])
+        self.result = None
+
+    def _on_ok(self, sender, args):
+        ok, angle = parse_number(self.angle_box.Text)
+        if not ok or angle < 5 or angle > 90:
+            MessageBox.Show("The angle must be a number between 5 and 90 degrees.", "Comb")
+            return
+        ok, leg = parse_number(self.leg_box.Text)
+        if not ok or leg < 50:
+            MessageBox.Show("The length after the bend must be a number of at least 50 mm.", "Comb")
+            return
+        self.result = {"angle_deg": angle, "leg_mm": leg}
+        self.window.DialogResult = True
+
+    def show(self):
+        self.window.ShowDialog()
+        return self.result

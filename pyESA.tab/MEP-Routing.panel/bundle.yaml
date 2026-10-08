@@ -2,6 +2,9 @@ layout:
   - Riser
   - Turn
   - Stub
-  - Comb
-  - Overpass
+  - Branch
+  - SplitGap
+  - OverpassComb
+  - CreateSimilar
   - WorksetViews
+  - ReportMode

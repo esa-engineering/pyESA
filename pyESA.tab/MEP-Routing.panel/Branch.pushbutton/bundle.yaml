@@ -1,0 +1,8 @@
+title: Branch
+tooltip: >-
+  Creates a horizontal or inclined branch from vertical runs of pipe, duct or cable tray (cable trays: only from the
+  narrow side). Select the risers, then choose the side as seen on screen in the plan view, the elevation (level +
+  offset), the length and the angle of the branch. Along the riser a tee is placed; above or below its end you choose
+  between an elbow and extending the riser with a tee.
+  A report lists the result. The new parts keep the parameters and the insulation of the starting element.
+author: Matteo Maiorano

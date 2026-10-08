@@ -25,6 +25,28 @@ from pyrevit import revit, script, forms, DB
 doc = revit.doc
 output = script.get_output()
 
+
+REPORT_CONFIG = "ESA_Report"  # impostazione condivisa da tutti i pulsanti, cambiata col pulsante Report
+
+
+def want_report(total, problems, noun):
+    """True se va stampato il report completo. Modalita' "problems" (predefinita): solo se qualcosa non e' andato a
+    buon fine; "always": sempre; "never": mai, resta la notifica. Altrimenti notifica breve (e nessuna finestra)."""
+    try:
+        mode = script.get_config(REPORT_CONFIG).get_option("mode", "problems")
+    except Exception:
+        mode = "problems"
+    if mode == "always" or (mode == "problems" and problems):
+        return True
+    if not total:
+        return False
+    text = "{} {}".format(total - problems, noun) + (", {} not done".format(problems) if problems else "")
+    try:
+        script.toast(text, title="pyESA")
+    except Exception:
+        return problems > 0  # notifica non disponibile: con dei problemi meglio il report che niente
+    return False
+
 VIEW_PREFIX = "102_WRK_Workset_"
 VIEW_SUFFIX = " Control"
 VIEW_PARAMETERS = (
@@ -195,7 +217,10 @@ def main():
                 sub.RollBack()
                 rows.append([ws.Name, name, "Failed", "-", str(ex)])
 
-    print_report(rows, template, template_warning)
+    problems = len([r for r in rows if r[2] not in ("Created", "Updated")])
+    # l avviso sul template va sempre letto: in quel caso il report si mostra comunque
+    if template_warning or want_report(len(rows), problems, "views created or updated"):
+        print_report(rows, template, template_warning)
 
 
 main()

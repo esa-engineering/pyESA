@@ -50,6 +50,28 @@ doc = revit.doc
 uidoc = revit.uidoc
 output = script.get_output()
 
+
+REPORT_CONFIG = "ESA_Report"  # impostazione condivisa da tutti i pulsanti, cambiata col pulsante Report
+
+
+def want_report(total, problems, noun):
+    """True se va stampato il report completo. Modalita' "problems" (predefinita): solo se qualcosa non e' andato a
+    buon fine; "always": sempre; "never": mai, resta la notifica. Altrimenti notifica breve (e nessuna finestra)."""
+    try:
+        mode = script.get_config(REPORT_CONFIG).get_option("mode", "problems")
+    except Exception:
+        mode = "problems"
+    if mode == "always" or (mode == "problems" and problems):
+        return True
+    if not total:
+        return False
+    text = "{} {}".format(total - problems, noun) + (", {} not done".format(problems) if problems else "")
+    try:
+        script.toast(text, title="pyESA")
+    except Exception:
+        return problems > 0  # notifica non disponibile: con dei problemi meglio il report che niente
+    return False
+
 MM_PER_FT = 304.8
 MIN_LENGTH_FT = 0.01  # l'API rifiuta tratti piu' corti di 1/10 pollice
 STRAIGHT_TOL = 0.999
@@ -551,7 +573,9 @@ def main():
             break
         results.append(process_pick(reference, settings))
 
-    print_report(results, settings)
+    problems = len([r for r in results if not r["ok"]])
+    if want_report(len(results), problems, "risers created"):
+        print_report(results, settings)
 
 
 main()

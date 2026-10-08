@@ -1,0 +1,6 @@
+title: Split Gap
+tooltip: >-
+  Opens a gap in straight pipes, ducts, cable trays and conduits. Select the elements, then click two points: between
+  them each element is cut and the piece in between is removed. Each element is cut where the two points project on its
+  axis. Elements that cannot be cut are left unchanged, and a report lists the result.
+author: Matteo Maiorano

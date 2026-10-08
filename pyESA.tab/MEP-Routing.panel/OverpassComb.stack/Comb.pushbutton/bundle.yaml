@@ -1,6 +1,8 @@
 title: Comb
 tooltip: >-
-  Turns a row of horizontal pipes heading to a wall into a comb at the wall: each pipe reaches the wall, goes up or down
+  CLICK: bends the selected parallel horizontal pipes, ducts or cable trays to the left or right by a chosen angle, keeping their spacing.
+  Select the pipes, then click the point where the bend starts, on the side the pipes must turn to.
+  SHIFT + CLICK (pipes only): turns a row of horizontal pipes heading to a wall into a comb at the wall: each pipe reaches the wall, goes up or down
   with an elbow to its own elevation, then turns 90 degrees and runs along the wall, forming a stack with aligned ends.
   Select the pipes of the row, click the wall to the left or right of the row (it sets the direction of the runs), then
   choose the elevations: below the row, above the row, or keeping the shortest-run pipe at its elevation (the others all go up or all down).

@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
 __title__ = "Comb"
-__doc__ = """Version = 0.3
-Date    = 07.10.2026
+__doc__ = """Version = 0.4
+Date    = 08.10.2026
 ________________________________________________________________
-Description:
+CLICK: bends the selected parallel horizontal pipes, ducts or cable trays to the left or
+right by a chosen angle, keeping their spacing. Select the pipes,
+then click the point where the bend starts, on the side the pipes
+must turn to. The part of each pipe beyond the bend is replaced.
+
+SHIFT + CLICK (comb, pipes only):
 Turns a row of horizontal pipes heading to a wall into a comb at the
 wall: each pipe reaches the wall, goes up or down with an elbow to
 its own elevation, then turns 90 degrees and runs along the wall.
@@ -27,6 +32,8 @@ Author(s): Matteo Maiorano
 """
 __author__ = "Matteo Maiorano"
 
+import math
+
 try:
     import traceback
 except ImportError:
@@ -36,6 +43,8 @@ import clr
 clr.AddReference("RevitAPI")
 clr.AddReference("RevitAPIUI")
 from Autodesk.Revit.DB.Plumbing import Pipe, PipeInsulation
+from Autodesk.Revit.DB.Mechanical import Duct, DuctInsulation, DuctLining
+from Autodesk.Revit.DB.Electrical import CableTray
 from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
 from Autodesk.Revit.Exceptions import OperationCanceledException
 
@@ -44,12 +53,36 @@ from pyrevit import revit, script, DB
 import Comb_ui
 
 XAML_FILE_NAME = "Comb_form.xaml"
+BEND_XAML_FILE_NAME = "Bend_form.xaml"
 CONFIG_NAME = "ESA_Comb"
+BEND_DEFAULTS = {"angle_deg": 90.0, "leg_mm": 1500.0}
 DEFAULTS = {"mode": "below", "side": "Up", "factor": 3.0, "standoff_mm": 100.0, "length_mm": 1500.0}
 
 doc = revit.doc
 uidoc = revit.uidoc
 output = script.get_output()
+
+
+REPORT_CONFIG = "ESA_Report"  # impostazione condivisa da tutti i pulsanti, cambiata col pulsante Report
+
+
+def want_report(total, problems, noun):
+    """True se va stampato il report completo. Modalita' "problems" (predefinita): solo se qualcosa non e' andato a
+    buon fine; "always": sempre; "never": mai, resta la notifica. Altrimenti notifica breve (e nessuna finestra)."""
+    try:
+        mode = script.get_config(REPORT_CONFIG).get_option("mode", "problems")
+    except Exception:
+        mode = "problems"
+    if mode == "always" or (mode == "problems" and problems):
+        return True
+    if not total:
+        return False
+    text = "{} {}".format(total - problems, noun) + (", {} not done".format(problems) if problems else "")
+    try:
+        script.toast(text, title="pyESA")
+    except Exception:
+        return problems > 0  # notifica non disponibile: con dei problemi meglio il report che niente
+    return False
 
 MM_PER_FT = 304.8
 STRAIGHT_TOL = 0.999
@@ -70,6 +103,16 @@ class CombError(Exception):
 class PipeFilter(ISelectionFilter):
     def AllowElement(self, element):
         return isinstance(element, Pipe)
+
+    def AllowReference(self, reference, point):
+        return False
+
+
+class CurveFilter(ISelectionFilter):
+    """Tubi, canali e passerelle (solo per la curva in orizzontale)."""
+
+    def AllowElement(self, element):
+        return isinstance(element, (Pipe, Duct, CableTray))
 
     def AllowReference(self, reference, point):
         return False
@@ -127,13 +170,41 @@ def find_fitting(conn, element):
     return None
 
 
+SIZE_PARAMS = (DB.BuiltInParameter.RBS_CURVE_WIDTH_PARAM, DB.BuiltInParameter.RBS_CURVE_HEIGHT_PARAM,
+               DB.BuiltInParameter.RBS_CURVE_DIAMETER_PARAM, DB.BuiltInParameter.RBS_CABLETRAY_WIDTH_PARAM,
+               DB.BuiltInParameter.RBS_CABLETRAY_HEIGHT_PARAM)
+
+
+def copy_size(source, target):
+    """Sezione di canali e passerelle: il nuovo tratto deve avere le stesse dimensioni del tratto di partenza."""
+    for bip in SIZE_PARAMS:
+        src, dest = source.get_Parameter(bip), target.get_Parameter(bip)
+        if src is None or dest is None or dest.IsReadOnly or not src.HasValue:
+            continue
+        if abs(dest.AsDouble() - src.AsDouble()) > 1e-9:
+            dest.Set(src.AsDouble())
+
+
+def create_curve(source, conn, end_point, type_id, level_id):
+    """Crea un tratto dello stesso tipo di source (tubo, canale o passerella) da conn a end_point."""
+    if isinstance(source, CableTray):
+        new = CableTray.Create(doc, type_id, conn.Origin, end_point, level_id)
+    elif isinstance(source, Duct):
+        new = Duct.Create(doc, type_id, level_id, conn, end_point)
+    else:
+        return Pipe.Create(doc, type_id, level_id, conn, end_point)
+    doc.Regenerate()
+    copy_size(source, new)
+    return new
+
+
 def extend(owner, conn, end_point, type_id, level_id):
     """Aggiunge un tubo da conn a end_point con il gomito. Ritorna (tubo, connettore libero all'estremo, gomito)."""
     direction = end_point.Subtract(conn.Origin).Normalize()
     dot = conn.CoordinateSystem.BasisZ.DotProduct(direction)
     if dot < -STRAIGHT_TOL:
         raise CombError("A new run would fold back onto the previous pipe")
-    new_pipe = Pipe.Create(doc, type_id, level_id, conn, end_point)
+    new_pipe = create_curve(owner, conn, end_point, type_id, level_id)
     new_conn = nearest_connector(new_pipe, conn.Origin)
     fitting = None
     if dot > STRAIGHT_TOL:
@@ -194,6 +265,9 @@ def insulation_specs(source):
     """Isolamento (e rivestimento interno dei condotti) del tratto di partenza: [(classe, id tipo, spessore)]."""
     if isinstance(source, Pipe):
         kinds = ((PipeInsulation, DB.InsulationLiningBase.GetInsulationIds),)
+    elif isinstance(source, Duct):
+        kinds = ((DuctInsulation, DB.InsulationLiningBase.GetInsulationIds),
+                 (DuctLining, DB.InsulationLiningBase.GetLiningIds))
     else:
         return []
     specs = []
@@ -244,9 +318,9 @@ def check_remaining_space(parts):
                             "(minimum {:.0f} mm)".format(name, remaining, MIN_REMAINING_MM))
 
 
-def pick_pipes(prompt):
+def pick_pipes(prompt, selection_filter=None):
     try:
-        refs = uidoc.Selection.PickObjects(ObjectType.Element, PipeFilter(), prompt)
+        refs = uidoc.Selection.PickObjects(ObjectType.Element, selection_filter or PipeFilter(), prompt)
     except OperationCanceledException:
         script.exit()
     return [doc.GetElement(r.ElementId) for r in refs]
@@ -264,19 +338,25 @@ def ends_of(pipe):
     return curve.GetEndPoint(0), curve.GetEndPoint(1)
 
 
-def analyse(pipes, wall, wall_click):
-    """Geometria di partenza, senza toccare il modello. Ritorna (piani dei tubi in ordine di corsa, dati comuni)."""
+def check_straight_parallel(pipes):
+    """Tubi rettilinei, orizzontali e paralleli. Ritorna la direzione del primo."""
     first_dir = None
     for pipe in pipes:
         curve = pipe.Location.Curve
         if not isinstance(curve, DB.Line):
-            raise CombError("Pipe {} is not straight".format(pipe.Id))
+            raise CombError("Element {} is not straight".format(pipe.Id))
         if abs(curve.Direction.Z) > HORIZONTAL_TOL:
-            raise CombError("Pipe {} is not horizontal".format(pipe.Id))
+            raise CombError("Element {} is not horizontal".format(pipe.Id))
         if first_dir is None:
             first_dir = curve.Direction
         elif first_dir.CrossProduct(curve.Direction).GetLength() > PARALLEL_TOL:
-            raise CombError("Pipe {} is not parallel to the others".format(pipe.Id))
+            raise CombError("Element {} is not parallel to the others".format(pipe.Id))
+    return first_dir
+
+
+def analyse(pipes, wall, wall_click):
+    """Geometria di partenza, senza toccare il modello. Ritorna (piani dei tubi in ordine di corsa, dati comuni)."""
+    check_straight_parallel(pipes)
     zs = [ends_of(p)[0].Z for p in pipes]
     if max(zs) - min(zs) > SAME_Z_TOL_FT:
         raise CombError("The pipes of the row must be at the same elevation")
@@ -493,7 +573,180 @@ def stop(message):
     script.exit()
 
 
-def main():
+def analyse_bend(pipes, click):
+    """Geometria di partenza della curva, senza toccare il modello. Ritorna (piani dei tubi, dati comuni)."""
+    d0 = check_straight_parallel(pipes)
+    d0 = DB.XYZ(d0.X, d0.Y, 0).Normalize()
+    anchor = min(pipes, key=lambda p: abs(DB.XYZ(-d0.Y, d0.X, 0).DotProduct(ends_of(p)[0].Subtract(click))))
+    a0, a1 = ends_of(anchor)
+    mid = a0.Add(a1).Multiply(0.5)
+    # verso della curva: la parte del tubo oltre il click viene sostituita
+    d = d0 if click.Subtract(mid).DotProduct(d0) >= 0 else d0.Negate()
+    left = DB.XYZ(-d.Y, d.X, 0)
+    lats = [ends_of(p)[0].Subtract(click).DotProduct(left) for p in pipes]
+    click_left = -sum(lats) / len(lats)
+    if abs(click_left) < CLICK_TOL_FT:
+        raise CombError("Click clearly to the left or to the right of the row of pipes")
+    n = left.Multiply(1 if click_left > 0 else -1)
+    base = min(ends_of(anchor), key=lambda e: e.DotProduct(d))
+    items = []
+    for pipe in pipes:
+        back, forward = sorted(ends_of(pipe), key=lambda e: e.DotProduct(d))
+        items.append({"element": pipe, "back": back, "forward": forward,
+                      "w": back.Subtract(base).DotProduct(n),
+                      "u0": click.Subtract(back).DotProduct(d)})
+    geo = {"d": d, "n": n, "left": click_left > 0}
+    return items, geo
+
+
+def compute_bend(plans, geo, settings):
+    """Angolo di curva di ogni tubo: gli angoli stanno sulla bisettrice, cosi' l'interasse si conserva."""
+    theta = math.radians(settings["angle_deg"])
+    d, n = geo["d"], geo["n"]
+    d_new = d.Multiply(math.cos(theta)).Add(n.Multiply(math.sin(theta)))
+    geo["d_new"] = d_new
+    min_ft = MIN_REMAINING_MM / MM_PER_FT
+    for plan in plans:
+        u = plan["u0"] - plan["w"] * math.tan(theta / 2.0)
+        if u < min_ft:
+            raise CombError("The bend of pipe {} falls outside the pipe, too close to its start. "
+                            "Click farther along the pipes".format(plan["element"].Id))
+        plan["corner"] = plan["back"].Add(d.Multiply(u))
+        plan["q"] = plan["corner"].DotProduct(d_new)
+    q_end = max(p["q"] for p in plans) + settings["leg_mm"] / MM_PER_FT
+    for plan in plans:
+        plan["leg"] = q_end - plan["q"]
+        plan["leg_end"] = plan["corner"].Add(d_new.Multiply(plan["leg"]))
+
+
+def build_bend_pipe(plan):
+    """Taglia il tubo alla curva e aggiunge il tratto dopo il gomito. Ritorna (nuovo tubo, raccordo, scollegati)."""
+    element = plan["element"]
+    type_id = element.GetTypeId()
+    level_id = get_level_id(element)
+    if level_id is None:
+        raise CombError("No reference level on pipe {}".format(element.Id))
+
+    STAGE[0] = "disconnecting the end of pipe {}".format(element.Id)
+    end_conn = nearest_connector(element, plan["forward"])
+    refs = physical_refs(end_conn, element)
+    for ref in refs:
+        end_conn.DisconnectFrom(ref)
+
+    STAGE[0] = "cutting pipe {} at the bend".format(element.Id)
+    element.Location.Curve = DB.Line.CreateBound(plan["back"], plan["corner"])
+    doc.Regenerate()
+    conn = nearest_connector(element, plan["corner"])
+
+    STAGE[0] = "new leg of pipe {}".format(element.Id)
+    leg, conn, fitting = extend(element, conn, plan["leg_end"], type_id, level_id)
+    return leg, fitting, len(refs)
+
+
+def build_bend(plans, geo):
+    results = [{"element": p["element"], "new": [], "elbows": 0, "freed": 0, "status": ""} for p in plans]
+    transaction = DB.Transaction(doc, "Comb bend")
+    transaction.Start()
+    try:
+        checks = []
+        for plan, res in zip(plans, results):
+            leg, fitting, freed = build_bend_pipe(plan)
+            plan["created"], plan["fittings"] = [leg], [f for f in [fitting] if f is not None]
+            checks += [("pipe before the bend", plan["element"]), ("new leg", leg)]
+            res.update({"new": [leg], "elbows": len(plan["fittings"]), "freed": freed, "status": "Created"})
+        STAGE[0] = "checking the remaining space"
+        check_remaining_space(checks)
+        STAGE[0] = "copying parameters and insulation"
+        for plan, res in zip(plans, results):
+            res["status"] = "Created ({})".format(inherit(plan["element"], plan["created"], plan["fittings"]))
+        transaction.Commit()
+    except Exception as ex:
+        transaction.RollBack()
+        detail = ""
+        if isinstance(ex, CombError):
+            message = "Unchanged. {}".format(ex)
+        else:
+            message = ("Unchanged. The bend could not be built (step: {}). If an elbow does not fit, "
+                       "increase the length after the bend or reduce the angle: {}".format(STAGE[0], ex))
+            detail = traceback.format_exc() if traceback else ""
+        for res in results:
+            res.update({"new": [], "elbows": 0, "freed": 0, "status": message})
+        return results, detail
+    return results, ""
+
+
+def print_bend_report(results, geo, settings, detail):
+    output.print_md("# Comb bend report")
+    output.print_md("Bend to the **{}** | angle **{:g} deg** | length after the bend **{:g} mm**".format(
+        "left" if geo["left"] else "right", settings["angle_deg"], settings["leg_mm"]))
+    done = [r for r in results if r["status"].startswith("Created")]
+    output.print_md("Pipes: **{}** | bent: **{}** | new pipes: **{}** | elbows: **{}**".format(
+        len(results), len(done), sum(len(r["new"]) for r in done), sum(r["elbows"] for r in done)))
+    freed = sum(r["freed"] for r in done)
+    if freed:
+        output.print_md("**Note:** {} connections at the far end of the pipes were removed, "
+                        "because the part beyond the bend was replaced.".format(freed))
+    rows = [[output.linkify(r["element"].Id), ", ".join(output.linkify(p.Id) for p in r["new"]),
+             r["elbows"], r["status"]] for r in results]
+    output.print_table(table_data=rows, columns=["Pipe", "New pipes", "Elbows", "Status"])
+    if detail:
+        output.print_md("**Technical detail**")
+        output.print_code(detail)
+
+
+def load_bend_settings(config):
+    settings = dict(BEND_DEFAULTS)
+    try:
+        for key in BEND_DEFAULTS:
+            settings[key] = float(config.get_option(key, BEND_DEFAULTS[key]))
+    except Exception:
+        pass
+    return settings
+
+
+def save_bend_settings(config, settings):
+    try:
+        for key in BEND_DEFAULTS:
+            setattr(config, key, settings[key])
+        script.save_config()
+    except Exception:
+        pass
+
+
+def bend_main():
+    pipes = pick_pipes("Step 1 of 2: select the pipes, ducts or cable trays to bend, then press Finish", CurveFilter())
+    if not pipes:
+        script.exit()
+    try:
+        click = uidoc.Selection.PickPoint("Step 2 of 2: click where the bend starts, on the side the pipes "
+                                          "must turn to (left or right of the row)")
+    except OperationCanceledException:
+        script.exit()
+    try:
+        plans, geo = analyse_bend(pipes, click)
+    except CombError as ex:
+        stop(ex)
+
+    config = script.get_config(CONFIG_NAME + "_Bend")
+    settings = Comb_ui.BendWindow(script.get_bundle_file(BEND_XAML_FILE_NAME),
+                                  (len(plans), "left" if geo["left"] else "right"),
+                                  load_bend_settings(config)).show()
+    if settings is None:
+        script.exit()
+    save_bend_settings(config, settings)
+
+    try:
+        compute_bend(plans, geo, settings)
+    except CombError as ex:
+        stop(ex)
+
+    results, detail = build_bend(plans, geo)
+    problems = len([r for r in results if not r["status"].startswith("Created")])
+    if want_report(len(results), problems, "elements bent"):
+        print_bend_report(results, geo, settings, detail)
+
+
+def comb_main():
     pipes = pick_pipes("Step 1 of 2: select the pipes of the row, heading to the wall, then press Finish")
     if not pipes:
         script.exit()
@@ -523,7 +776,12 @@ def main():
         stop(ex)
 
     results, detail = build_comb(plans, geo)
-    print_report(results, geo, settings, detail)
+    problems = len([r for r in results if not r["status"].startswith("Created")])
+    if want_report(len(results), problems, "pipes combed"):
+        print_report(results, geo, settings, detail)
 
 
-main()
+if __shiftclick__:  # noqa: F821
+    comb_main()
+else:
+    bend_main()
