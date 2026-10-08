@@ -197,6 +197,7 @@ trovati su un campione di elementi, oppure se ne scrive il nome.
 | --- | --- | --- |
 | EPU | capitolo, sottocapitolo, codice prezzario, descrizione breve, descrizione, unità, prezzo unitario dei codici usati nel modello | sì: tutto tranne il codice prezzario (unità da tendina) |
 | Bill of quantities | Type Mark, codice prezzario, descrizione, unità, quantità, prezzo unitario, importo, con il totale sotto; una riga per Type Mark e codice (per combinazione WBS, con le colonne dei livelli dopo Amount); voci raggruppate per i livelli scelti con Layout... (default capitolo › sottocapitolo), con il totale di ogni gruppo e gruppi da aprire e chiudere; livelli WBS anche sulle colonne, come una tabella pivot | no, si compila da sola; si può solo dare a una voce una maggiorazione propria |
+| Manual items | voci non modellate: WBS, Type Mark, codice, descrizione, unità, quantità, prezzo unitario, importo | sì: tutto tranne l'importo; descrizione, unità e prezzo sono quelli della voce EPU |
 | CME | computo metrico estimativo nella forma del foglio Bill of quantities dell'export Excel: colonne WBS in testa, una riga di totale in grassetto per ogni combinazione WBS seguita dalle sue voci, ordinate per Type Mark e codice | no, come Bill of quantities (override della maggiorazione compreso) |
 | Type Marks | matrice: una riga di gruppo per tipo e modello (categoria, Type Mark, famiglia e tipo, annidata sì/no, modello), seguita da una riga per codice con il parametro che lo porta (`e_DAT_PriceCode_1 (T)`, `e_DAT_PriceCode_i_1 (I)`), codice prezzario e descrizione | no |
 | Rules | maggiorazioni per categoria, kg/mq della lamiera dei canali, densità dei tubi | sì |
@@ -220,6 +221,30 @@ trovati su un campione di elementi, oppure se ne scrive il nome.
   quantities, le colonne si allargano trascinandone il bordo e la tabella scorre in
   orizzontale; restano ferme le colonne WBS, Type Mark e Price book code,
   così le righe `Total` si riconoscono dai valori WBS anche scorrendo.
+- **Manual items** (voci non modellate): oggetti che nel modello non ci sono, scritti a
+  mano. Ogni riga ha i valori dei livelli WBS attivi, Type Mark, codice prezzario,
+  descrizione, unità, quantità e prezzo unitario; l'importo si calcola. *Add Row*,
+  *Duplicate* (righe selezionate), *Remove Selected*.
+  - **Descrizione, unità e prezzo sono quelli del codice**, come nella scheda EPU: scritti
+    qui vanno nel file di progetto come correzioni della voce EPU (e viceversa), e un
+    codice del listino porta i suoi valori. Un codice ha quindi sempre un solo prezzo in
+    tutto il computo. Prima del codice non si possono scrivere.
+  - Quantità e prezzo accettano la virgola decimale. Una riga senza codice o senza
+    quantità è **arancione** e non entra nel computo.
+  - **Nelle altre schede:** i codici delle voci manuali entrano nella scheda EPU (colonna
+    **Source**: `Model`, `Manual`, `Model + Manual`) e le loro righe sono in **lavanda e
+    corsivo**; il rosso del codice assente dal listino prevale sul fondo. Nel Bill of
+    quantities e nella CME ogni voce manuale è una riga distinta, in lavanda e corsivo,
+    anche quando ha lo stesso Type Mark e codice di una voce del modello; la quantità si
+    somma ai totali così com'è, senza maggiorazione, e l'override della maggiorazione non
+    vale per queste righe. Un codice manuale assente dal listino compare negli Issues
+    ("Code not in the price list", con "Manual items" fra gli usi).
+  - **WBS:** i valori si scrivono nelle colonne dei livelli attivi e si salvano per nome
+    del parametro, così restano se i livelli cambiano ordine.
+  - **Salvataggio:** nel file di progetto (`manual_items`), in blocco come regole e livelli
+    WBS: se due utenti li cambiano insieme, vince l'ultimo che salva.
+  - **Export Excel:** le quantità manuali sono nel foglio Bill of quantities con il fondo
+    lavanda (e una nota in testa), e un foglio **Manual items** le elenca.
 - **Disposizione del Bill of quantities** (riga *Layout* sopra la griglia, pulsante
   **Layout...**): come una tabella pivot, si scelgono i livelli sulle **righe** e i
   livelli WBS sulle **colonne**. La finestra ha tre elenchi: campi disponibili, Rows e
@@ -612,6 +637,8 @@ Contenuto:
   (codici di tipo), `linear_codes` (codici d'istanza, tutte le categorie) e
   `linear_include` (Sì/No d'istanza, tutte le categorie): i nomi restano quelli storici
   per non rompere i file già salvati;
+- `manual_items`: voci non modellate della scheda Manual items
+  (`{"type_mark": "MAN1", "code": "M.001", "quantity": 2.5, "wbs": {"Zona": "Z2"}}`);
 - `allowance_overrides`: override della maggiorazione sulle voci del computo, una riga
   per voce (`{"type_mark": "CS01", "code": "IM.02.010", "allowance": 0.15}`, maggiorazione
   come frazione);

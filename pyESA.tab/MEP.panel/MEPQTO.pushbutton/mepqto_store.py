@@ -887,6 +887,9 @@ class ProjectStore(object):
         # allowance_overrides: {(Type Mark, codice): frazione} che sostituisce la
         # maggiorazione della categoria su quella voce del computo
         self.allowance_overrides = {}
+        # manual_items: voci non modellate della scheda Manual items (dict di
+        # mepqto_model.ManualItem.to_dict()), salvate in blocco
+        self.manual_items = []
         self.updated_by = u""
         self.updated_at = u""
         self._loaded_mtime = None
@@ -896,6 +899,7 @@ class ProjectStore(object):
         self._dirty_rules = False
         self._dirty_wbs = False
         self._dirty_parameters = False
+        self._dirty_manual = False
 
     # ------------------------------------------------------------ lettura
 
@@ -909,6 +913,7 @@ class ProjectStore(object):
         self.wbs = []
         self.parameters = None
         self.allowance_overrides = {}
+        self.manual_items = []
         self._loaded_mtime = None
         if not self.path or not os.path.isfile(self.path):
             return
@@ -935,6 +940,9 @@ class ProjectStore(object):
         parameters = data.get("parameters")
         self.parameters = parameters if isinstance(parameters, dict) else None
         self.allowance_overrides = _read_overrides(data.get("allowance_overrides"))
+        manual = data.get("manual_items")
+        self.manual_items = [dict(entry) for entry in manual if isinstance(entry, dict)] \
+            if isinstance(manual, list) else []
         self.updated_by = data.get("updated_by") or u""
         self.updated_at = data.get("updated_at") or u""
 
@@ -943,7 +951,8 @@ class ProjectStore(object):
     @property
     def is_dirty(self):
         return bool(self._dirty_fields or self._dirty_price_list or self._dirty_rules or
-                    self._dirty_wbs or self._dirty_parameters or self._dirty_overrides)
+                    self._dirty_wbs or self._dirty_parameters or self._dirty_overrides or
+                    self._dirty_manual)
 
     def set_item_field(self, code, field, value):
         self.items.setdefault(code, {})[field] = value
@@ -968,6 +977,11 @@ class ProjectStore(object):
         """I livelli WBS si salvano in blocco, come le regole."""
         self.wbs = list(names)
         self._dirty_wbs = True
+
+    def set_manual_items(self, items):
+        """Voci non modellate (lista di dict): si salvano in blocco, come WBS e regole."""
+        self.manual_items = [dict(item) for item in items]
+        self._dirty_manual = True
 
     def set_parameters(self, parameters_dict):
         """La mappa dei parametri si salva in blocco, come WBS e regole."""
@@ -1006,6 +1020,7 @@ class ProjectStore(object):
         local_wbs = self.wbs
         local_parameters = self.parameters
         local_overrides = self.allowance_overrides
+        local_manual = self.manual_items
         self._apply_data(data)
 
         for code, field in self._dirty_fields:
@@ -1025,6 +1040,8 @@ class ProjectStore(object):
             self.wbs = local_wbs
         if self._dirty_parameters:
             self.parameters = local_parameters
+        if self._dirty_manual:
+            self.manual_items = local_manual
         return True
 
     def save(self, user_name):
@@ -1056,6 +1073,7 @@ class ProjectStore(object):
             "wbs": self.wbs,
             "parameters": self.parameters,
             "allowance_overrides": _write_overrides(self.allowance_overrides),
+            "manual_items": self.manual_items,
             "updated_by": self.updated_by,
             "updated_at": self.updated_at,
         }
@@ -1072,4 +1090,5 @@ class ProjectStore(object):
         self._dirty_rules = False
         self._dirty_wbs = False
         self._dirty_parameters = False
+        self._dirty_manual = False
         return merged

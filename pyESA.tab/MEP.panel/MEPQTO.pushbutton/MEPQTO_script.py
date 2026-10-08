@@ -48,7 +48,9 @@ the model), Bill of
 quantities (filled automatically, grouped by WBS when WBS levels are
 set; right click or Allowance Override... sets the allowance of the
 selected items, whose quantity is then highlighted), CME (the same bill
-laid out as the Bill of quantities sheet of the Excel export), Type Marks (type
+laid out as the Bill of quantities sheet of the Excel export), Manual items
+(items not in the model, written by hand and added to the bill in
+lavender italics), Type Marks (type
 and instance price codes 1..10 and their descriptions for each family
 type), Rules (editable), Issues.
 

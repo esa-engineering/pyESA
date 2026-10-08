@@ -69,6 +69,12 @@ CONFIG_SEPARATOR = u"::"
 # Triangolini delle righe di gruppo del computo: aperto / chiuso.
 GLYPH_EXPANDED = u"\u25be"
 GLYPH_COLLAPSED = u"\u25b8"
+# Colonna Source della scheda EPU: da dove arriva il codice.
+SOURCE_MODEL = u"Model"
+SOURCE_MANUAL = u"Manual"
+SOURCE_BOTH = u"Model + Manual"
+# Colonne della scheda Manual items che sono campi della voce EPU del codice.
+MANUAL_ITEM_FIELDS = {"Description": "description", "Unit": "unit", "UnitPrice": "price"}
 # Separatore dei nomi dei workset nella config: Revit non ammette '|' nei nomi.
 # Si computano solo il modello principale e le opzioni di progetto primarie: la casella
 # che lo rendeva modificabile e' stata tolta dalla finestra (vedi README, "Opzioni di
@@ -189,6 +195,8 @@ class Session(object):
         self.price_list_count = 0
         self.price_list_error = None
         self.exported_paths = []
+        # voci non modellate (mepqto_model.ManualItem), per l'export
+        self.manual_items = []
         self.saved = False
         self.unsaved_on_close = False
 
@@ -307,6 +315,8 @@ class TakeoffForm(Window):
                      "btn_expand_all", "btn_collapse_all",
                      "txt_search_cme", "btn_clear_cme", "btn_clear_filters_cme",
                      "btn_allowance_cme", "dg_cme",
+                     "tab_manual", "dg_manual", "btn_manual_add", "btn_manual_duplicate",
+                     "btn_manual_remove", "txt_manual_count",
                      "txt_search_marks", "btn_clear_marks", "dg_marks", "dg_issues",
                      "tab_rules", "dg_allowance", "dg_duct_weight", "dg_density",
                      "btn_density_add", "btn_density_remove", "btn_rules_defaults",
@@ -346,6 +356,9 @@ class TakeoffForm(Window):
         self.btn_clear_cme.Click += self.OnClearCmeSearch
         self.btn_clear_filters_cme.Click += self.OnClearCmeFilters
         self.btn_allowance_cme.Click += self.OnAllowanceOverride
+        self.btn_manual_add.Click += self.OnManualAdd
+        self.btn_manual_duplicate.Click += self.OnManualDuplicate
+        self.btn_manual_remove.Click += self.OnManualRemove
         self.txt_search_marks.TextChanged += self.OnMarkFilterChanged
         self.btn_clear_marks.Click += self.OnClearMarkSearch
         self.btn_close.Click += self.OnCloseClick
@@ -374,7 +387,9 @@ class TakeoffForm(Window):
             ("Code", CLR_STRING), ("ShortDescription", CLR_STRING),
             ("Description", CLR_STRING), ("Unit", CLR_STRING),
             # NotInPriceList: codice assente dalla colonna A del listino: riga in rosso
-            ("UnitPrice", CLR_STRING), ("NotInPriceList", CLR_BOOL)))
+            ("UnitPrice", CLR_STRING), ("NotInPriceList", CLR_BOOL),
+            # Source: Model / Manual / Model + Manual; Manual: codice usato da voci manuali
+            ("Source", CLR_STRING), ("Manual", CLR_BOOL)))
         # Kind: "group" per l'intestazione di un gruppo, "item" per le voci.
         # Gid: numero del gruppo (righe di gruppo); Anc: "|1|4|", i gruppi che contengono la
         # riga (con i filtri restano visibili solo i gruppi con voci visibili).
@@ -390,7 +405,9 @@ class TakeoffForm(Window):
             ("Description", CLR_STRING), ("Unit", CLR_STRING), ("Quantity", CLR_DOUBLE),
             ("UnitPrice", CLR_DOUBLE), ("Amount", CLR_DOUBLE),
             # voce con override della maggiorazione: la quantita' si colora
-            ("AllowanceOverride", CLR_BOOL), ("AllowanceTip", CLR_STRING)])
+            ("AllowanceOverride", CLR_BOOL), ("AllowanceTip", CLR_STRING),
+            # voce non modellata (scheda Manual items): riga evidenziata
+            ("Manual", CLR_BOOL)])
         # Colonne WBS in coda alla griglia, dopo Amount, una per livello, nascoste finche'
         # non servono: l'intestazione e' il nome del parametro, quindi si creano qui e non
         # nell'XAML.
@@ -424,7 +441,9 @@ class TakeoffForm(Window):
             ("TypeMark", CLR_STRING), ("EpuItem", CLR_STRING), ("Code", CLR_STRING),
             ("Description", CLR_STRING), ("Unit", CLR_STRING), ("Quantity", CLR_DOUBLE),
             ("UnitPrice", CLR_DOUBLE), ("Amount", CLR_DOUBLE),
-            ("AllowanceOverride", CLR_BOOL), ("AllowanceTip", CLR_STRING)])
+            ("AllowanceOverride", CLR_BOOL), ("AllowanceTip", CLR_STRING),
+            # voce non modellata (scheda Manual items): riga evidenziata
+            ("Manual", CLR_BOOL)])
         # Colonne WBS in testa, come nell'export.
         self._cme_wbs_columns = []
         for index in range(qm.WBS_LEVELS):
@@ -434,6 +453,30 @@ class TakeoffForm(Window):
             column.Visibility = Visibility.Collapsed
             self.dg_cme.Columns.Insert(index, column)
             self._cme_wbs_columns.append(column)
+        # Scheda Manual items: righe scritte a mano. Id lega la riga alla ManualItem;
+        # Incomplete: senza codice o quantita', non entra nel computo. Quantita' e prezzo
+        # sono testo convertito a mano (virgola decimale), come nella scheda EPU.
+        self.manual_table = new_table("manual", [
+            ("Id", CLR_INT), ("Incomplete", CLR_BOOL)] + [("W{}".format(i + 1), CLR_STRING)
+                                                          for i in range(qm.WBS_LEVELS)] + [
+            ("TypeMark", CLR_STRING), ("Code", CLR_STRING), ("Description", CLR_STRING),
+            ("Unit", CLR_STRING), ("Quantity", CLR_STRING), ("UnitPrice", CLR_STRING),
+            ("Amount", CLR_DOUBLE)])
+        self._manual_wbs_columns = []
+        for index in range(qm.WBS_LEVELS):
+            column = DataGridTextColumn()
+            column.Binding = Binding("W{}".format(index + 1))
+            column.Width = DataGridLength(90)
+            column.Visibility = Visibility.Collapsed
+            self.dg_manual.Columns.Insert(index, column)
+            self._manual_wbs_columns.append(column)
+        self.manual_table.ColumnChanging += self.OnManualChanging
+        self.manual_table.ColumnChanged += self.OnManualChanged
+        self.dg_manual.ItemsSource = self.manual_table.DefaultView
+        self.col_manual_unit = None
+        for column in self.dg_manual.Columns:
+            if cell_text(column.Header) == u"Unit":
+                self.col_manual_unit = column
         # Restano ferme mentre si scorre: tutte le colonne WBS (quelle spente non occupano
         # spazio), Type Mark e Price book code.
         self.dg_cme.FrozenColumnCount = qm.WBS_LEVELS + 2
@@ -716,6 +759,7 @@ class TakeoffForm(Window):
             # Mai sovrascrivere un file illeggibile: si riparte senza percorso.
             store = qs.ProjectStore(None)
         self._store = store
+        self._manual = qm.manual_items_from_list(store.manual_items)
         self._rules = qr.Rules.from_dict(store.rules)
         self.session.rules = self._rules
         self._fill_rules_tables()
@@ -911,14 +955,19 @@ class TakeoffForm(Window):
             self._collect_model()
             self._refresh()
 
-    def _refresh(self):
-        """Ricalcola computo e griglie dai record gia' raccolti."""
+    def _refresh(self, rebuild_manual=True):
+        """Ricalcola computo e griglie dai record gia' raccolti e dalle voci manuali.
+        rebuild_manual=False lascia com'e' la griglia delle voci manuali (durante una sua
+        modifica) e ne aggiorna solo le colonne calcolate."""
         self._commit_edits()
         session = self.session
         selected = self._selected_keys()
         session.takeoff = qm.aggregate(self._collect, selected)
-        session.price_codes = sorted(set(qm.model_codes(self._collect)) |
-                                     set(session.takeoff.codes()))
+        model_codes = set(qm.model_codes(self._collect)) | set(session.takeoff.codes())
+        self._manual_code_set = set(qm.manual_codes(self._manual))
+        self._model_code_set = model_codes
+        session.manual_items = list(self._manual)
+        session.price_codes = sorted(model_codes | self._manual_code_set)
         session.items = qs.merge_items(session.price_codes,
                                        self._price_list.items, self._store.items)
         session.price_codes.sort(key=lambda code: price_sort_key(session.items[code]))
@@ -936,13 +985,18 @@ class TakeoffForm(Window):
         self._fill_prices_table()
         self._fill_marks_table()
         self._recompute_bill()
+        if rebuild_manual:
+            self._fill_manual_table()
+        else:
+            self._update_manual_derived()
         self._update_hint()
 
     def _recompute_bill(self):
         """Quantita' del computo dalle unita' delle voci e dalle regole correnti."""
         session = self.session
         bill = qm.compute_bill(session.takeoff, session.items, self._rules,
-                               self._store.allowance_overrides)
+                               self._store.allowance_overrides, self._manual,
+                               self._wbs_labels())
         session.lines = bill.lines
         session.quantities = bill.quantities
         session.bill_units = bill.units
@@ -958,7 +1012,8 @@ class TakeoffForm(Window):
     def _refresh_issues(self):
         session = self.session
         session.issues = list(session.takeoff.issues) + list(session.bill_issues) + \
-            qm.description_issues(session.takeoff, session.items, self._price_list_loaded())
+            qm.description_issues(session.takeoff, session.items, self._price_list_loaded(),
+                                  qm.manual_codes(self._manual))
         if session.price_list_error:
             session.issues.insert(0, qm.Issue(u"Price list not loaded",
                                               session.price_list_path or u"",
@@ -1002,6 +1057,11 @@ class TakeoffForm(Window):
         row["Unit"] = item.unit or u""
         row["UnitPrice"] = qs.format_decimal(item.price)
         row["NotInPriceList"] = self._price_list_loaded() and not item.in_price_list
+        manual = item.code in getattr(self, "_manual_code_set", ())
+        model = item.code in getattr(self, "_model_code_set", ())
+        row["Manual"] = manual
+        row["Source"] = SOURCE_BOTH if manual and model else \
+            (SOURCE_MANUAL if manual else SOURCE_MODEL)
 
     def _write_bill_values(self, row, item, quantity, unit):
         row["EpuItem"] = item.epu_item or u""
@@ -1109,9 +1169,10 @@ class TakeoffForm(Window):
                     self._write_bill_values(row, session.items[entry.code], entry.quantity,
                                             session.bill_units.get(entry.code, u""))
                     line_key = (entry.type_mark, entry.code)
-                    overridden = line_key in session.bill.overridden
+                    overridden = line_key in session.bill.overridden and not entry.manual
                     row["AllowanceOverride"] = overridden
                     row["AllowanceTip"] = self._allowance_tip(line_key) if overridden else u""
+                    row["Manual"] = entry.manual
                     # Importo della voce in ogni combinazione: quantita' x prezzo unitario
                     # (vuoto se la voce non ha prezzo, come la colonna Amount).
                     price = session.items[entry.code].price
@@ -1215,9 +1276,10 @@ class TakeoffForm(Window):
                     self._write_bill_values(row, session.items[entry.code], entry.quantity,
                                             session.bill_units.get(entry.code, u""))
                     line_key = (entry.type_mark, entry.code)
-                    overridden = line_key in session.bill.overridden
+                    overridden = line_key in session.bill.overridden and not entry.manual
                     row["AllowanceOverride"] = overridden
                     row["AllowanceTip"] = self._allowance_tip(line_key) if overridden else u""
+                    row["Manual"] = entry.manual
                 self.cme_table.Rows.Add(row)
         finally:
             self._updating = False
@@ -1379,11 +1441,12 @@ class TakeoffForm(Window):
             self._updating = False
 
     def _commit_edits(self):
-        try:
-            self.dg_prices.CommitEdit(DataGridEditingUnit.Cell, True)
-            self.dg_prices.CommitEdit(DataGridEditingUnit.Row, True)
-        except Exception:
-            pass
+        for grid in (self.dg_prices, self.dg_manual):
+            try:
+                grid.CommitEdit(DataGridEditingUnit.Cell, True)
+                grid.CommitEdit(DataGridEditingUnit.Row, True)
+            except Exception:
+                pass
 
     def _update_totals(self):
         session = self.session
@@ -1398,6 +1461,9 @@ class TakeoffForm(Window):
         takeoff = session.takeoff
         parts = [u"{} elements counted, {} Type Marks, {} price codes in the bill.".format(
             takeoff.instance_count, len(takeoff.groups), len(session.quantities))]
+        counted_manual = len([item for item in self._manual if item.counted])
+        if counted_manual:
+            parts.append(u"{} manual rows added to the bill.".format(counted_manual))
         skipped_ws = getattr(self._collect, "skipped_workset_count", 0)
         if skipped_ws:
             parts.append(u"{} elements on worksets not read skipped.".format(skipped_ws))
@@ -1491,6 +1557,178 @@ class TakeoffForm(Window):
             self._updating = False
         # L'unita' decide come si misurano le categorie lineari: si ricalcola il computo.
         self._recompute_bill()
+        self._update_manual_derived()
+
+    # ------------------------------------------------------------ voci manuali
+
+    def _manual_by_id(self, item_id):
+        for item in self._manual:
+            if item.item_id == item_id:
+                return item
+        return None
+
+    def _next_manual_id(self):
+        return max([item.item_id for item in self._manual] + [0]) + 1
+
+    def _store_manual(self):
+        self._store.set_manual_items([item.to_dict() for item in self._manual])
+        self._mark_dirty()
+
+    def _fill_manual_table(self):
+        """Righe della scheda Manual items dalle voci manuali (valori WBS per nome del
+        livello attivo)."""
+        labels = self._wbs_labels()
+        for index, column in enumerate(self._manual_wbs_columns):
+            if index < len(labels):
+                column.Header = labels[index]
+                column.Visibility = Visibility.Visible
+            else:
+                column.Visibility = Visibility.Collapsed
+        if self.col_manual_unit is not None:
+            self.col_manual_unit.ItemsSource = self._unit_choices()
+        self._manual_rows = {}
+        self._updating = True
+        try:
+            self.manual_table.Rows.Clear()
+            for item in self._manual:
+                row = self.manual_table.NewRow()
+                row["Id"] = item.item_id
+                for index, label in enumerate(labels):
+                    row["W{}".format(index + 1)] = item.wbs.get(label, u"")
+                row["TypeMark"] = item.type_mark
+                row["Code"] = item.code
+                row["Quantity"] = qs.format_decimal(item.quantity)
+                self._write_manual_derived(row, item)
+                self.manual_table.Rows.Add(row)
+                self._manual_rows[item.item_id] = row
+        finally:
+            self._updating = False
+        self._update_manual_count()
+
+    def _write_manual_derived(self, row, item):
+        """Descrizione, unita' e prezzo dalla voce EPU del codice; importo calcolato."""
+        merged = self.session.items.get(item.code) if item.code else None
+        row["Description"] = merged.description if merged is not None else u""
+        row["Unit"] = merged.unit if merged is not None else u""
+        row["UnitPrice"] = qs.format_decimal(merged.price) if merged is not None else u""
+        price = merged.price if merged is not None else None
+        row["Amount"] = item.quantity * price \
+            if item.quantity is not None and price is not None else DBNull.Value
+        row["Incomplete"] = not item.counted
+
+    def _update_manual_derived(self):
+        self._updating = True
+        try:
+            for item in self._manual:
+                row = getattr(self, "_manual_rows", {}).get(item.item_id)
+                if row is not None:
+                    self._write_manual_derived(row, item)
+        finally:
+            self._updating = False
+        self._update_manual_count()
+
+    def _update_manual_count(self):
+        counted = len([item for item in self._manual if item.counted])
+        self.txt_manual_count.Text = u"{} rows, {} counted in the bill.".format(
+            len(self._manual), counted)
+        self.tab_manual.Header = u"\u270d\ufe0f Manual items ({})".format(len(self._manual)) \
+            if self._manual else u"\u270d\ufe0f Manual items"
+
+    def OnManualChanging(self, sender, args):
+        if self._updating:
+            return
+        name = args.Column.ColumnName
+        text = cell_text(args.ProposedValue)
+        if name in ("Quantity", "UnitPrice"):
+            try:
+                value = qs.parse_decimal(text)
+            except ValueError:
+                value = -1
+            if value is not None and value < 0:
+                args.ProposedValue = args.Row[name]
+                self._warn_later(u"'{}' is not a valid {}.".format(
+                    text, u"quantity" if name == "Quantity" else u"unit price"))
+                return
+            text = qs.format_decimal(value)
+        if name in MANUAL_ITEM_FIELDS and not cell_text(args.Row["Code"]):
+            # descrizione, unita' e prezzo appartengono al codice
+            args.ProposedValue = args.Row[name]
+            self._warn_later(u"Enter the price book code first: description, unit and unit "
+                             u"price belong to the code, as in the EPU tab.")
+            return
+        args.ProposedValue = text
+
+    def OnManualChanged(self, sender, args):
+        if self._updating:
+            return
+        name = args.Column.ColumnName
+        item = self._manual_by_id(int(args.Row["Id"]))
+        if item is None:
+            return
+        text = cell_text(args.Row[name])
+        if name.startswith("W") and name[1:].isdigit():
+            labels = self._wbs_labels()
+            index = int(name[1:]) - 1
+            if index < len(labels):
+                item.wbs[labels[index]] = text
+        elif name == "TypeMark":
+            item.type_mark = text
+        elif name == "Code":
+            item.code = text
+        elif name == "Quantity":
+            item.quantity = qs.parse_decimal(text)
+        elif name in MANUAL_ITEM_FIELDS:
+            field = MANUAL_ITEM_FIELDS[name]
+            value = qs.parse_decimal(text) if field == "price" else text
+            self._store.set_item_field(item.code, field, value)
+        else:
+            return
+        self._store_manual()
+        # Dopo il commit della cella: computo, EPU e CME si ricalcolano.
+        self._defer(lambda: self._refresh(rebuild_manual=False))
+
+    def _selected_manual_items(self):
+        ids = []
+        for cell in self.dg_manual.SelectedCells:
+            view = cell.Item
+            if hasattr(view, "Row"):
+                item_id = int(view.Row["Id"])
+                if item_id not in ids:
+                    ids.append(item_id)
+        return [item for item in self._manual if item.item_id in ids]
+
+    def OnManualAdd(self, sender, args):
+        self._commit_edits()
+        self._manual.append(qm.ManualItem(self._next_manual_id()))
+        self._store_manual()
+        self._refresh()
+        self.dg_manual.ScrollIntoView(self.dg_manual.Items[self.dg_manual.Items.Count - 1])
+
+    def OnManualDuplicate(self, sender, args):
+        self._commit_edits()
+        chosen = self._selected_manual_items()
+        if not chosen:
+            self._set_status(u"Select the manual rows to duplicate.", False)
+            return
+        for item in chosen:
+            self._manual.append(item.copy(self._next_manual_id()))
+        self._store_manual()
+        self._refresh()
+
+    def OnManualRemove(self, sender, args):
+        self._commit_edits()
+        chosen = self._selected_manual_items()
+        if not chosen:
+            self._set_status(u"Select the manual rows to remove.", False)
+            return
+        answer = MessageBox.Show(u"Remove {} manual rows?".format(len(chosen)), TITLE,
+                                 MessageBoxButton.YesNo, MessageBoxImage.Question)
+        if answer != MessageBoxResult.Yes:
+            return
+        removed = set(item.item_id for item in chosen)
+        self._manual = [item for item in self._manual if item.item_id not in removed]
+        self._store_manual()
+        self._refresh()
 
     # ------------------------------------------------------------ parametri
 
@@ -1840,7 +2078,7 @@ class TakeoffForm(Window):
             if not hasattr(view, "Row"):
                 continue
             row = view.Row
-            if cell_text(row["Kind"]) != u"item":
+            if cell_text(row["Kind"]) != u"item" or row["Manual"] is True:
                 continue
             lines[(cell_text(row["TypeMark"]), cell_text(row["Code"]))] = True
         return list(lines.keys())

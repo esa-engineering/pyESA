@@ -94,6 +94,8 @@ ISSUE_DENSITY = "No pipe density"
 ISSUE_HOST = "Insulation on fittings not measured"
 ISSUE_EXCLUDED = "Excluded from the bill"
 ISSUE_LINK_SKIPPED = "Linked model not read"
+# Etichetta delle voci non modellate nelle anomalie e nella colonna Source della scheda EPU.
+MANUAL_SOURCE = u"Manual items"
 
 # WBS: fino a 15 livelli, ognuno legato a un parametro scelto dall'utente.
 WBS_LEVELS = 15
@@ -1046,6 +1048,69 @@ class DetailLine(object):
         self.quantity = quantity
 
 
+class ManualItem(object):
+    """Voce non modellata, scritta a mano nella scheda Manual items.
+
+    Ha Type Mark, codice, quantita' e valori WBS ({nome del parametro WBS: valore}, cosi'
+    i valori restano se i livelli cambiano ordine). Descrizione, unita' e prezzo sono
+    quelli della voce EPU del codice: non stanno qui.
+    """
+
+    __slots__ = ("item_id", "type_mark", "code", "quantity", "wbs")
+
+    def __init__(self, item_id, type_mark=u"", code=u"", quantity=None, wbs=None):
+        self.item_id = item_id
+        self.type_mark = type_mark or u""
+        self.code = code or u""
+        self.quantity = quantity
+        self.wbs = dict(wbs or {})
+
+    def copy(self, item_id):
+        return ManualItem(item_id, self.type_mark, self.code, self.quantity, self.wbs)
+
+    @classmethod
+    def from_dict(cls, data, item_id):
+        if not isinstance(data, dict):
+            return None
+        quantity = data.get("quantity")
+        try:
+            quantity = float(quantity) if quantity is not None else None
+        except (TypeError, ValueError):
+            quantity = None
+        wbs = data.get("wbs") if isinstance(data.get("wbs"), dict) else {}
+        return cls(item_id, u"{}".format(data.get("type_mark") or u"").strip(),
+                   u"{}".format(data.get("code") or u"").strip(), quantity,
+                   dict((u"{}".format(k), u"{}".format(v or u"")) for k, v in wbs.items()))
+
+    def to_dict(self):
+        return {"type_mark": self.type_mark, "code": self.code, "quantity": self.quantity,
+                "wbs": dict((k, v) for k, v in self.wbs.items() if v)}
+
+    @property
+    def counted(self):
+        """Entra nel computo solo con codice e quantita'."""
+        return bool(self.code) and self.quantity is not None
+
+
+def manual_items_from_list(data):
+    """[ManualItem] dalla lista del file di progetto; le voci non valide si saltano."""
+    items = []
+    for entry in data if isinstance(data, list) else []:
+        item = ManualItem.from_dict(entry, len(items) + 1)
+        if item is not None:
+            items.append(item)
+    return items
+
+
+def manual_codes(manual_items):
+    """Codici usati dalle voci manuali, in ordine."""
+    found = OrderedDict()
+    for item in manual_items or []:
+        if item.code:
+            found[item.code] = True
+    return list(found.keys())
+
+
 class Bill(object):
     def __init__(self):
         self.lines = []
@@ -1062,6 +1127,9 @@ class Bill(object):
         self.line_categories = OrderedDict()
         # (Type Mark, codice) -> maggiorazione dell'override applicato (frazione)
         self.overridden = {}
+        # voci manuali: combinazione WBS -> {(Type Mark, codice): quantita'}, a parte
+        # rispetto a quelle del modello (nelle schede restano righe distinte)
+        self.manual_quantities = OrderedDict()
 
 
 def _problem_issue(problem, code, unit, record):
@@ -1110,11 +1178,14 @@ def _wbs_sort_key(key):
     return tuple((value == u"", value.lower()) for value in key)
 
 
-def compute_bill(takeoff, items, rules, overrides=None):
+def compute_bill(takeoff, items, rules, overrides=None, manual_items=(), wbs_names=()):
     """Quantita' per codice secondo l'unita' della voce, con le maggiorazioni.
 
     overrides: {(Type Mark, codice): frazione} che sostituisce la maggiorazione della
     categoria sugli elementi lineari di quella voce. Le categorie a pezzo restano a 1.
+    manual_items: voci non modellate (ManualItem): la loro quantita' si somma cosi' com'e',
+    senza maggiorazione, nella combinazione WBS dei loro valori (wbs_names: parametri dei
+    livelli WBS attivi).
     """
     bill = Bill()
     problems = OrderedDict()
@@ -1164,7 +1235,25 @@ def compute_bill(takeoff, items, rules, overrides=None):
 
     for (kind, subject, _), (detail, ids) in problems.items():
         bill.issues.append(Issue(kind, subject, detail, ids))
+
+    for manual in manual_items or ():
+        if not manual.counted:
+            continue
+        key = wbs_key(tuple(manual.wbs.get(name, u"") for name in wbs_names)) \
+            if wbs_names else ()
+        per_line = bill.manual_quantities.setdefault(key, OrderedDict())
+        line_key = (manual.type_mark, manual.code)
+        per_line[line_key] = per_line.get(line_key, 0.0) + manual.quantity
+        bill.quantities[manual.code] = bill.quantities.get(manual.code, 0.0) + manual.quantity
+        item = items.get(manual.code)
+        bill.units.setdefault(manual.code, item.unit if item is not None else u"")
     return bill
+
+
+def _bill_sources(bill):
+    """(quantita' per combinazione, manuale?) del modello e delle voci manuali."""
+    return ((bill.wbs_quantities, False),
+            (getattr(bill, "manual_quantities", None) or OrderedDict(), True))
 
 
 COMBINATION_TOTAL = u"Total"
@@ -1180,14 +1269,15 @@ class OutlineGroup(object):
 
 
 class OutlineItem(object):
-    """Voce del computo dentro una combinazione WBS."""
+    """Voce del computo dentro una combinazione WBS (manual: voce non modellata)."""
     kind = "item"
 
-    def __init__(self, key, type_mark, code, quantity):
+    def __init__(self, key, type_mark, code, quantity, manual=False):
         self.key = key
         self.type_mark = type_mark
         self.code = code
         self.quantity = quantity
+        self.manual = manual
 
 
 def wbs_cells(key, level_count):
@@ -1208,19 +1298,29 @@ def bill_outline(bill, labels):
     livelli WBS, solo le voci."""
     if bill is None:
         return []
+    sources = _bill_sources(bill)
     if not labels:
         merged = OrderedDict()
-        for per_line in bill.wbs_quantities.values():
-            for line_key, quantity in per_line.items():
-                merged[line_key] = merged.get(line_key, 0.0) + quantity
-        return [OutlineItem((), line_key[0], line_key[1], merged[line_key])
-                for line_key in sorted(merged, key=_line_sort_key)]
+        for quantities, manual in sources:
+            for per_line in quantities.values():
+                for line_key, quantity in per_line.items():
+                    key = line_key + (manual,)
+                    merged[key] = merged.get(key, 0.0) + quantity
+        return [OutlineItem((), key[0], key[1], merged[key], key[2])
+                for key in sorted(merged, key=lambda k: (_line_sort_key(k[:2]), k[2]))]
     entries = []
-    for key in sorted(bill.wbs_quantities, key=_wbs_sort_key):
+    keys = set()
+    for quantities, _ in sources:
+        keys.update(quantities.keys())
+    for key in sorted(keys, key=_wbs_sort_key):
         entries.append(OutlineGroup(key))
-        per_line = bill.wbs_quantities[key]
-        for line_key in sorted(per_line, key=_line_sort_key):
-            entries.append(OutlineItem(key, line_key[0], line_key[1], per_line[line_key]))
+        lines = []
+        for quantities, manual in sources:
+            for line_key, quantity in (quantities.get(key) or {}).items():
+                lines.append((line_key, manual, quantity))
+        for line_key, manual, quantity in sorted(
+                lines, key=lambda line: (_line_sort_key(line[0]), line[1])):
+            entries.append(OutlineItem(key, line_key[0], line_key[1], quantity, manual))
     return entries
 
 
@@ -1283,10 +1383,10 @@ class GroupedEntry(object):
     """
 
     __slots__ = ("kind", "level", "label", "path", "ancestors", "cells", "type_mark",
-                 "code", "quantity", "columns")
+                 "code", "quantity", "columns", "manual")
 
     def __init__(self, kind, level, path, ancestors, label=u"", cells=(), type_mark=u"",
-                 code=u"", quantity=0.0, columns=None):
+                 code=u"", quantity=0.0, columns=None, manual=False):
         self.kind = kind
         self.level = level
         self.path = path
@@ -1297,6 +1397,8 @@ class GroupedEntry(object):
         self.code = code
         self.quantity = quantity
         self.columns = columns or {}
+        # voce non modellata (scheda Manual items)
+        self.manual = manual
 
 
 def _group_value(group_key, line, items, units):
@@ -1349,27 +1451,30 @@ def pivot_bill(bill, items, units, wbs_count, group_by, column_levels=()):
     # Voci: (valori WBS delle righe, Type Mark, codice) -> quantita' e ripartizione.
     merged = OrderedDict()
     column_keys = set()
-    for key, per_line in bill.wbs_quantities.items():
-        cells = wbs_cells(key, wbs_count)
-        row_cells = tuple(u"" if index in on_columns else cells[index]
-                          for index in range(wbs_count))
-        column_key = tuple(cells[index] or WBS_NOT_SET for index in column_index)
-        if column_index:
-            column_keys.add(column_key)
-        for (type_mark, code), quantity in per_line.items():
-            entry = merged.setdefault((row_cells, type_mark, code), [0.0, OrderedDict()])
-            entry[0] += quantity
+    for quantities, manual in _bill_sources(bill):
+        for key, per_line in quantities.items():
+            cells = wbs_cells(key, wbs_count)
+            row_cells = tuple(u"" if index in on_columns else cells[index]
+                              for index in range(wbs_count))
+            column_key = tuple(cells[index] or WBS_NOT_SET for index in column_index)
             if column_index:
-                entry[1][column_key] = entry[1].get(column_key, 0.0) + quantity
-    lines = [(cells, type_mark, code, quantity, columns)
-             for (cells, type_mark, code), (quantity, columns) in merged.items()]
+                column_keys.add(column_key)
+            for (type_mark, code), quantity in per_line.items():
+                # le voci manuali restano righe distinte da quelle del modello
+                entry = merged.setdefault((row_cells, type_mark, code, manual),
+                                          [0.0, OrderedDict()])
+                entry[0] += quantity
+                if column_index:
+                    entry[1][column_key] = entry[1].get(column_key, 0.0) + quantity
+    lines = [(cells, type_mark, code, quantity, columns, manual)
+             for (cells, type_mark, code, manual), (quantity, columns) in merged.items()]
 
     def path_of(line):
         return tuple(_group_value(group_key, line, items, units) for group_key in group_by)
 
     decorated = sorted(((path_of(line), line) for line in lines), key=lambda pair: (
         tuple(_group_sort_key(value) for value in pair[0]),
-        _item_sort_key(pair[1][1], pair[1][2], pair[1][0])))
+        _item_sort_key(pair[1][1], pair[1][2], pair[1][0]), pair[1][5]))
 
     entries = []
     current = ()
@@ -1382,10 +1487,11 @@ def pivot_bill(bill, items, units, wbs_count, group_by, column_levels=()):
                 "group", level, path[:level + 1],
                 tuple(path[:index + 1] for index in range(level)), label=path[level]))
         current = path
-        cells, type_mark, code, quantity, columns = line
+        cells, type_mark, code, quantity, columns, manual = line
         entries.append(GroupedEntry(
             "item", len(path), path, tuple(path[:index + 1] for index in range(len(path))),
-            cells=cells, type_mark=type_mark, code=code, quantity=quantity, columns=columns))
+            cells=cells, type_mark=type_mark, code=code, quantity=quantity, columns=columns,
+            manual=manual))
     ordered_columns = sorted(column_keys,
                              key=lambda key: tuple(_group_sort_key(value) for value in key))
     return entries, ordered_columns
@@ -1502,11 +1608,15 @@ def type_rows(collect_result, selected_keys):
         r.type_label.lower(), r.nested, order.get(r.model, 0)))
 
 
-def description_issues(takeoff, merged_items, price_list_loaded=False):
+def description_issues(takeoff, merged_items, price_list_loaded=False, manual=()):
     """Codici del computo assenti dal listino caricato (la ricerca nella colonna A non li
-    trova) e codici senza descrizione ne' nel listino ne' nel progetto."""
+    trova) e codici senza descrizione ne' nel listino ne' nel progetto. manual: codici
+    delle voci non modellate, controllati allo stesso modo."""
     issues = []
-    for code in takeoff.codes():
+    codes = list(takeoff.codes())
+    codes += [code for code in manual if code not in codes]
+    manual = set(manual)
+    for code in codes:
         item = merged_items.get(code)
         missing = price_list_loaded and (item is None or not item.in_price_list)
         described = item is not None and bool(item.description)
@@ -1518,6 +1628,8 @@ def description_issues(takeoff, merged_items, price_list_loaded=False):
             if code in group.code_records:
                 ids.extend(r.ref for r in group.code_records[code])
                 marks.append(group.type_mark)
+        if code in manual:
+            marks.append(MANUAL_SOURCE)
         if missing:
             issues.append(Issue(
                 ISSUE_NOT_IN_PRICE_LIST, code,

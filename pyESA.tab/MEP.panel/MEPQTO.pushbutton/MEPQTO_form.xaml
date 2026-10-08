@@ -211,7 +211,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
-                               Text="Unit prices of the price codes used in the model, sorted by chapter and subchapter. Chapter, Subchapter, Short Description, Description, Unit and Unit price are editable (decimal comma or point): changes go to the project file, never to the model. A cleared field falls back to the shared price list. Every code is looked up in column A of the price list (Excel: A code, B short description, C description, D unit, E unit price): red rows have a code that is not there. The funnel in a column header filters the rows by the values of that column."/>
+                               Text="Unit prices of the price codes used in the model and in the Manual items tab, sorted by chapter and subchapter. Source tells where a code is used; codes of manual items are in lavender italics. Chapter, Subchapter, Short Description, Description, Unit and Unit price are editable (decimal comma or point): changes go to the project file, never to the model. A cleared field falls back to the shared price list. Every code is looked up in column A of the price list (Excel: A code, B short description, C description, D unit, E unit price): red rows have a code that is not there. The funnel in a column header filters the rows by the values of that column."/>
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -236,6 +236,11 @@
                                 <Style.Triggers>
                                     <!-- Codice assente dalla colonna A del listino: rosso come
                                          la formattazione "riempimento rosso chiaro" di Excel. -->
+                                    <!-- Voce non modellata (scheda Manual items): lavanda e corsivo -->
+                                    <DataTrigger Binding="{Binding Manual}" Value="True">
+                                        <Setter Property="Background" Value="#EDE7F6"/>
+                                        <Setter Property="FontStyle" Value="Italic"/>
+                                    </DataTrigger>
                                     <DataTrigger Binding="{Binding NotInPriceList}" Value="True">
                                         <Setter Property="Background" Value="#FFC7CE"/>
                                         <Setter Property="Foreground" Value="#9C0006"/>
@@ -256,6 +261,7 @@
                             <DataGridComboBoxColumn x:Name="col_unit" Header="Unit" SelectedItemBinding="{Binding Unit}" Width="80"/>
                             <DataGridTextColumn Header="Unit price" Binding="{Binding UnitPrice}" Width="110"
                                                 ElementStyle="{StaticResource NumberCell}"/>
+                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="120" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -271,7 +277,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
-                               Text="Filled automatically from the model, the price list and the Rules tab. One row per Type Mark and code (per WBS combination when WBS levels are set, with one column per level after Amount), sorted by code, Type Mark and WBS levels. Layout...: grouping levels of the rows (Chapter, Subchapter, Type Mark, Unit, WBS levels) and WBS levels shown as columns, in the order they are added; every group has a bold row with the total of its items. With WBS levels on the columns, every combination of their values is a column after the WBS columns, with the amount of every item and group row. Click the triangle or double click a group row to collapse or expand it. Drag a column border to widen it: the table scrolls sideways and the first columns (Type Mark, price book code) stay in place. The funnel in a column header filters the items; a group stays visible while it has visible items and keeps the total of all its items. Right click (or Allowance Override...) to give the selected items an allowance of their own. Export Excel keeps its own layout."/>
+                               Text="Filled automatically from the model, the price list and the Rules tab. One row per Type Mark and code (per WBS combination when WBS levels are set, with one column per level after Amount), sorted by code, Type Mark and WBS levels. Layout...: grouping levels of the rows (Chapter, Subchapter, Type Mark, Unit, WBS levels) and WBS levels shown as columns, in the order they are added; every group has a bold row with the total of its items. With WBS levels on the columns, every combination of their values is a column after the WBS columns, with the amount of every item and group row. Click the triangle or double click a group row to collapse or expand it. Drag a column border to widen it: the table scrolls sideways and the first columns (Type Mark, price book code) stay in place. The funnel in a column header filters the items; a group stays visible while it has visible items and keeps the total of all its items. Right click (or Allowance Override...) to give the selected items an allowance of their own. Rows in lavender italics are manual items, entered by hand and not taken from the model. Export Excel keeps its own layout."/>
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -327,6 +333,11 @@
                                     <DataTrigger Binding="{Binding Shade}" Value="g1">
                                         <Setter Property="Background" Value="#DFE7EF"/>
                                     </DataTrigger>
+                                    <!-- Voce non modellata (scheda Manual items): lavanda e corsivo -->
+                                    <DataTrigger Binding="{Binding Manual}" Value="True">
+                                        <Setter Property="Background" Value="#EDE7F6"/>
+                                        <Setter Property="FontStyle" Value="Italic"/>
+                                    </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </DataGrid.RowStyle>
@@ -374,7 +385,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
-                               Text="Computo metrico estimativo, laid out as the Bill of quantities sheet of Export Excel. Drag a column border to widen it: the table scrolls sideways and the WBS columns, Type Mark and price book code stay in place. Filled automatically from the model, the price list and the Rules tab. Pieces are counted; ducts, pipes, flex, cable trays, conduits and insulation are measured in the unit of the code, allowance for fittings included. One row per Type Mark and code. Elements without Type Mark are excluded. Right click (or Allowance Override...) to give the selected items an allowance of their own: their quantity is highlighted. With WBS levels set (WBS Levels... button), the first columns are the WBS levels and every combination has one bold row with its total, followed by its items. The funnel in a column header filters the items by the values of that column: a combination row stays visible while it has visible items and keeps the total of all its items. Filters only change what is shown: the total below and Export Excel include every item."/>
+                               Text="Computo metrico estimativo, laid out as the Bill of quantities sheet of Export Excel. Rows in lavender italics are manual items, entered by hand and not taken from the model. Drag a column border to widen it: the table scrolls sideways and the WBS columns, Type Mark and price book code stay in place. Filled automatically from the model, the price list and the Rules tab. Pieces are counted; ducts, pipes, flex, cable trays, conduits and insulation are measured in the unit of the code, allowance for fittings included. One row per Type Mark and code. Elements without Type Mark are excluded. Right click (or Allowance Override...) to give the selected items an allowance of their own: their quantity is highlighted. With WBS levels set (WBS Levels... button), the first columns are the WBS levels and every combination has one bold row with its total, followed by its items. The funnel in a column header filters the items by the values of that column: a combination row stays visible while it has visible items and keeps the total of all its items. Filters only change what is shown: the total below and Export Excel include every item."/>
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -404,6 +415,11 @@
                                     <DataTrigger Binding="{Binding Kind}" Value="group">
                                         <Setter Property="FontWeight" Value="Bold"/>
                                         <Setter Property="Background" Value="#EEF3F8"/>
+                                    </DataTrigger>
+                                    <!-- Voce non modellata (scheda Manual items): lavanda e corsivo -->
+                                    <DataTrigger Binding="{Binding Manual}" Value="True">
+                                        <Setter Property="Background" Value="#EDE7F6"/>
+                                        <Setter Property="FontStyle" Value="Italic"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -437,6 +453,53 @@
                                                 ElementStyle="{StaticResource NumberCell}"/>
                             <DataGridTextColumn Header="Amount" Binding="{Binding Amount, StringFormat=N2}" Width="115"
                                                 ElementStyle="{StaticResource NumberCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- TAB: Manual items (voci non modellate, scritte a mano) -->
+            <TabItem x:Name="tab_manual" Header="✍️ Manual items">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Style="{StaticResource HintText}"
+                               Text="Items that are not in the model, written by hand: WBS values, Type Mark, price book code, description, unit, quantity and unit price (decimal comma or point). Description, unit and unit price belong to the code, as in the EPU tab: changing them here changes them there, and a code of the price list brings its own values. Rows with a code and a quantity are added to the EPU, Bill of quantities and CME tabs, in lavender italics; orange rows are not counted yet. Save writes them to the project file."/>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,5">
+                        <Button x:Name="btn_manual_add" Content="Add Row" Padding="10,3" Margin="0,0,5,0"/>
+                        <Button x:Name="btn_manual_duplicate" Content="Duplicate" Padding="10,3" Margin="0,0,5,0"
+                                ToolTip="Copy the selected rows"/>
+                        <Button x:Name="btn_manual_remove" Content="Remove Selected" Padding="10,3"/>
+                        <TextBlock x:Name="txt_manual_count" Style="{StaticResource HintText}" VerticalAlignment="Center"
+                                   Margin="15,0,0,0" Text=""/>
+                    </StackPanel>
+                    <DataGrid x:Name="dg_manual" Grid.Row="2" Style="{StaticResource GridStyle}"
+                              HorizontalScrollBarVisibility="Auto" CanUserResizeColumns="True" CanUserSortColumns="False">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <!-- Senza codice o quantita': non entra nel computo -->
+                                    <DataTrigger Binding="{Binding Incomplete}" Value="True">
+                                        <Setter Property="Background" Value="#FFF0D9"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Type Mark" Binding="{Binding TypeMark}" Width="90"/>
+                            <DataGridTextColumn Header="Price book code" Binding="{Binding Code}" Width="150"/>
+                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="380" MinWidth="120"
+                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridComboBoxColumn Header="Unit" SelectedItemBinding="{Binding Unit}" Width="70"/>
+                            <DataGridTextColumn Header="Quantity" Binding="{Binding Quantity}" Width="85"
+                                                ElementStyle="{StaticResource NumberCell}"/>
+                            <DataGridTextColumn Header="Unit price" Binding="{Binding UnitPrice}" Width="100"
+                                                ElementStyle="{StaticResource NumberCell}"/>
+                            <DataGridTextColumn Header="Amount" Binding="{Binding Amount, StringFormat=N2}" Width="115"
+                                                ElementStyle="{StaticResource NumberCell}" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>

@@ -35,6 +35,8 @@ STYLE_WRAP = 8
 STYLE_NUMBER_OVERRIDE = 9
 # riga di gruppo del riepilogo Type Mark: grassetto su fondo chiaro, a capo automatico
 STYLE_GROUP = 10
+# quantita' di una voce non modellata (scheda Manual items): lavanda come nella finestra
+STYLE_NUMBER_MANUAL = 11
 
 _INVALID_XML = re.compile(u"[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f]")
 MAX_CELL_TEXT = 32000
@@ -172,19 +174,20 @@ _STYLES = (
     u'<font><b/><sz val="10"/><name val="Arial"/></font>'
     u'<font><b/><sz val="13"/><name val="Arial"/></font>'
     u'</fonts>'
-    u'<fills count="5">'
+    u'<fills count="6">'
     u'<fill><patternFill patternType="none"/></fill>'
     u'<fill><patternFill patternType="gray125"/></fill>'
     u'<fill><patternFill patternType="solid"><fgColor rgb="FFD9E2EC"/><bgColor indexed="64"/></patternFill></fill>'
     u'<fill><patternFill patternType="solid"><fgColor rgb="FFFFE3A3"/><bgColor indexed="64"/></patternFill></fill>'
     u'<fill><patternFill patternType="solid"><fgColor rgb="FFEEF3F8"/><bgColor indexed="64"/></patternFill></fill>'
+    u'<fill><patternFill patternType="solid"><fgColor rgb="FFEDE7F6"/><bgColor indexed="64"/></patternFill></fill>'
     u'</fills>'
     u'<borders count="2">'
     u'<border><left/><right/><top/><bottom/><diagonal/></border>'
     u'<border><left/><right/><top/><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border>'
     u'</borders>'
     u'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    u'<cellXfs count="11">'
+    u'<cellXfs count="12">'
     u'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
     u'<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>'
     u'<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
@@ -198,6 +201,7 @@ _STYLES = (
     u'<xf numFmtId="164" fontId="0" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1"/>'
     u'<xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" '
     u'applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>'
+    u'<xf numFmtId="164" fontId="0" fillId="5" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1"/>'
     u'</cellXfs>'
     u'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
     u'</styleSheet>')
@@ -315,6 +319,9 @@ def _bill_sheet(session):
     if overridden:
         sheet.add_row([Cell(u"Highlighted quantities have an allowance of their own "
                             u"(see the Rules sheet).", STYLE_NUMBER_OVERRIDE)])
+    if any(item.counted for item in getattr(session, "manual_items", None) or []):
+        sheet.add_row([Cell(u"Lavender quantities are entered by hand, not taken from the "
+                            u"model (see the Manual items sheet).", STYLE_NUMBER_MANUAL)])
     sheet.add_row([])
     # Come nella scheda: le colonne WBS in testa, una riga di totale per combinazione
     # (SUBTOTAL sulle sue voci) e le voci con i valori WBS ripetuti, cosi' il foglio si
@@ -354,8 +361,9 @@ def _bill_sheet(session):
             entry.type_mark, item.epu_item, entry.code,
             Cell(item.description or u"", STYLE_WRAP),
             session.bill_units.get(entry.code, item.unit),
-            Cell(entry.quantity, STYLE_NUMBER_OVERRIDE
-                 if (entry.type_mark, entry.code) in overridden else STYLE_NUMBER),
+            Cell(entry.quantity, STYLE_NUMBER_MANUAL if getattr(entry, "manual", False)
+                 else STYLE_NUMBER_OVERRIDE if (entry.type_mark, entry.code) in overridden
+                 else STYLE_NUMBER),
             Cell(item.price, STYLE_MONEY),
             Cell(amounts[index], STYLE_MONEY,
                  u"{0}{2}*{1}{2}".format(quantity_col, price_col, row)),
@@ -386,6 +394,27 @@ def _type_marks_sheet(session):
             item = session.items.get(code)
             sheet.add_row([None, None, None, None, None, label, code,
                            Cell(item.description if item else u"", STYLE_WRAP)])
+    return sheet
+
+
+def _manual_sheet(session):
+    """Voci non modellate, come nella scheda Manual items (valori WBS per livello attivo)."""
+    labels = list(session.wbs_labels or [])
+    sheet = Sheet("Manual items")
+    sheet.widths = [16] * len(labels) + [14, 18, 70, 8, 12, 14, 16]
+    _header(sheet, labels + [u"Type Mark", u"Price book code", u"Description", u"Unit",
+                             u"Quantity", u"Unit price", u"Amount"])
+    for manual in session.manual_items:
+        item = session.items.get(manual.code) if manual.code else None
+        price = item.price if item is not None else None
+        amount = manual.quantity * price \
+            if manual.quantity is not None and price is not None else None
+        sheet.add_row([manual.wbs.get(label, u"") for label in labels] + [
+            manual.type_mark, manual.code,
+            Cell(item.description if item is not None else u"", STYLE_WRAP),
+            item.unit if item is not None else u"",
+            Cell(manual.quantity, STYLE_NUMBER_MANUAL), Cell(price, STYLE_MONEY),
+            Cell(amount, STYLE_MONEY)])
     return sheet
 
 
@@ -460,6 +489,8 @@ def _rules_sheet(session, category_label, linear_keys):
 def export_takeoff(path, session, id_value, category_label=None, linear_keys=()):
     """Stessi contenuti delle schede: elenco prezzi, computo, Type Mark, anomalie."""
     sheets = [_price_list_sheet(session), _bill_sheet(session), _type_marks_sheet(session)]
+    if getattr(session, "manual_items", None):
+        sheets.append(_manual_sheet(session))
     if category_label is not None:
         sheets.append(_rules_sheet(session, category_label, linear_keys))
     sheets.append(_issues_sheet(session, id_value))

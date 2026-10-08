@@ -375,6 +375,13 @@ these two modules when another tool needs .xlsx I/O instead of introducing COM i
   and so does the **CME** tab (`cme_table`, `_fill_cme_table()`), the pre-grouping view kept
   as a flat mirror of the export. Both grids share the allowance-override handlers:
   `_selected_bill_lines()` reads the grid of the selected tab.
+- **Manual items** (`qm.ManualItem`, project file key `manual_items`) are rows typed in
+  their own tab. They carry only WBS values (by parameter name), Type Mark, code and
+  quantity; description, unit and price are the EPU fields of the code (edits go through
+  `ProjectStore.set_item_field`). `compute_bill()` keeps them in `bill.manual_quantities`,
+  separate from `wbs_quantities`, so `pivot_bill()` / `bill_outline()` emit them as their
+  own rows with `manual=True` (hidden `Manual` column -> lavender italics; skipped by the
+  allowance override). Their codes join `session.price_codes` (EPU `Source` column).
 - Excel-style column filters come from `mepqto_grid_filter.GridFilters`: it replaces each
   bound column's `Header` with title + funnel button, builds the value popup in code and
   only *returns* a RowFilter fragment (`expression()`); the window ANDs it with its search

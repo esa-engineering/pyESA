@@ -30,7 +30,9 @@ tooltip: >
   total; click the triangle or double click a group to collapse or expand it. Right click (or
   Allowance Override...) to give the selected items an allowance of their own, their
   quantity is highlighted. CME tab: the same bill laid out as the Excel export (WBS
-  columns first, one total row per WBS combination). Type Marks tab: type and instance price codes 1..10
+  columns first, one total row per WBS combination). Manual items tab: items that are not
+  modelled, written by hand (WBS values, Type Mark, code, description, unit, quantity, unit
+  price); they are added to the EPU, Bill of quantities and CME tabs in lavender italics. Type Marks tab: type and instance price codes 1..10
   and their descriptions for every family type. Rules tab: allowances, duct sheet weight per
   size band, pipe steel density per Type Mark. Everything typed in the window is saved to a
   project file (<Model>_MEPQTO.json next to the central model), never to the model. Export
