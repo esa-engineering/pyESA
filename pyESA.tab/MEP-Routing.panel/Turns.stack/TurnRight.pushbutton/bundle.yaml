@@ -1,7 +1,0 @@
-title: Turn Right
-tooltip: >-
-  CLICK: adds a run that turns right from the free end nearest to your click, with an elbow, using the saved settings
-  (default 1000 mm, 90 degrees, same slope as the original run).
-  SHIFT + CLICK: change length, turn angle and slope option. Settings are shared with Turn Left.
-  The new parts keep the parameters and the insulation of the starting element.
-author: Matteo Maiorano
