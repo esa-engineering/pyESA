@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 __title__ = "Comb"
-__doc__ = """Version = 0.4
-Date    = 08.10.2026
+__doc__ = """Version = 0.5
+Date    = 09.10.2026
 ________________________________________________________________
-Turns a row of horizontal pipes heading to a wall into a comb at the
-wall: each pipe reaches the wall, goes up or down with an elbow to
+Turns a row of horizontal pipes heading to a wall (or a beam, a column,
+a curtain wall) into a comb at it: each pipe reaches the wall, goes up or down with an elbow to
 its own elevation, then turns 90 degrees and runs along the wall.
 The pipes end up stacked one above the other, with aligned ends.
 
@@ -12,7 +12,9 @@ Instruction:
 1. Select the pipes of the row (horizontal, same elevation, side by
    side, heading to the wall) and press Finish
 2. Click the wall, to the left or right of the row: the side sets the
-   direction of the runs along the wall
+   direction of the runs along the wall. It can be in the host model or
+   in a linked model (RVT or IFC): walls, curtain walls, beams and
+   columns are accepted
 3. Choose the elevations of the stack: below the row, above the row,
    or keeping the shortest-run pipe at its elevation, with all the
    others going up or all down
@@ -20,6 +22,10 @@ Instruction:
 The pipe with the longest run takes the farthest elevation, so the
 risers never cross the runs. If anything does not fit, nothing is
 changed. Pipes only, straight, with a straight wall.
+A wall with a straight axis is read from its axis and thickness. For
+anything else (curtain wall, beam, column, IFC element) the flat vertical
+face nearest to the click is used, and the thickness is measured on the
+geometry: curved walls and round columns are not supported.
 The new parts keep the parameters and the insulation of the starting element.
 ________________________________________________________________
 Author(s): Matteo Maiorano
@@ -41,6 +47,8 @@ from Autodesk.Revit.DB.Mechanical import Duct, DuctInsulation, DuctLining
 from Autodesk.Revit.DB.Electrical import CableTray
 from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
 from Autodesk.Revit.Exceptions import OperationCanceledException
+
+from System.Collections.Generic import List
 
 from pyrevit import revit, script, DB
 
@@ -112,12 +120,42 @@ class CurveFilter(ISelectionFilter):
         return False
 
 
+OBSTACLE_CATEGORIES = (DB.BuiltInCategory.OST_Walls, DB.BuiltInCategory.OST_Columns,
+                       DB.BuiltInCategory.OST_StructuralColumns, DB.BuiltInCategory.OST_StructuralFraming,
+                       DB.BuiltInCategory.OST_CurtainWallPanels, DB.BuiltInCategory.OST_CurtainWallMullions)
+OBSTACLE_CATEGORY_IDS = [int(c) for c in OBSTACLE_CATEGORIES]
+LINK_SEARCH_TOL_FT = 0.5     # raggio di ricerca attorno al click, nel link (circa 150 mm)
+LINK_MAX_DISTANCE_FT = 0.33  # oltre questa distanza dalla faccia (circa 100 mm) l'elemento non e' quello cliccato
+VERTICAL_FACE_TOL = 0.1      # |componente Z della normale| massima per considerare verticale una faccia
+
+
+def id_value(eid):
+    if hasattr(eid, "Value"):
+        return eid.Value          # Revit 2026+
+    return eid.IntegerValue       # Revit <= 2025
+
+
 class WallFilter(ISelectionFilter):
+    """Muri, curtain wall, travi, pilastri del modello e istanze di link (il link va cliccato sull'elemento)."""
+
     def AllowElement(self, element):
-        return isinstance(element, DB.Wall)
+        if isinstance(element, DB.RevitLinkInstance):
+            return True
+        return element.Category is not None and id_value(element.Category.Id) in OBSTACLE_CATEGORY_IDS
 
     def AllowReference(self, reference, point):
-        return False
+        # selezione con PointOnElement: per i link si controlla la categoria dell'elemento nel link
+        host = doc.GetElement(reference.ElementId)
+        if isinstance(host, DB.RevitLinkInstance):
+            link_doc = host.GetLinkDocument()
+            if link_doc is None:
+                return False
+            if reference.LinkedElementId == DB.ElementId.InvalidElementId:
+                return True  # elemento non identificato: lo si cerca dopo vicino al punto
+            element = link_doc.GetElement(reference.LinkedElementId)
+            return element is not None and element.Category is not None and \
+                id_value(element.Category.Id) in OBSTACLE_CATEGORY_IDS
+        return host is not None and self.AllowElement(host)
 
 
 def level_elevation(level):
@@ -348,6 +386,148 @@ def check_straight_parallel(pipes):
     return first_dir
 
 
+def solids_of(element):
+    """Solidi dell'elemento (anche dentro le istanze di geometria), nelle coordinate del suo documento."""
+    options = DB.Options()
+    options.DetailLevel = DB.ViewDetailLevel.Fine
+    geometry = element.get_Geometry(options)
+    solids = []
+    if geometry is None:
+        return solids
+    for item in geometry:
+        if isinstance(item, DB.GeometryInstance):
+            solids.extend(s for s in item.GetInstanceGeometry() if isinstance(s, DB.Solid))
+        elif isinstance(item, DB.Solid):
+            solids.append(item)
+    return [s for s in solids if s.Volume > 0]
+
+
+def distance_to_faces(element, point):
+    """Distanza minima da point (coordinate del documento dell'elemento) alle facce dell'elemento."""
+    best = None
+    for solid in solids_of(element):
+        for face in solid.Faces:
+            try:
+                projection = face.Project(point)
+            except Exception:
+                continue
+            if projection is not None and (best is None or projection.Distance < best):
+                best = projection.Distance
+    return best
+
+
+def element_in_link_near(link_instance, click):
+    """Muro, trave, pilastro o pannello del link piu' vicino al punto cliccato (coordinate host)."""
+    link_doc = link_instance.GetLinkDocument()
+    if link_doc is None:
+        raise CombError("The linked model is not loaded")
+    point = link_instance.GetTotalTransform().Inverse.OfPoint(click)
+    tol = DB.XYZ(LINK_SEARCH_TOL_FT, LINK_SEARCH_TOL_FT, LINK_SEARCH_TOL_FT)
+    found = (DB.FilteredElementCollector(link_doc)
+             .WherePasses(DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](OBSTACLE_CATEGORIES)))
+             .WhereElementIsNotElementType()
+             .WherePasses(DB.BoundingBoxIntersectsFilter(DB.Outline(point.Subtract(tol), point.Add(tol)))))
+    best, best_distance = None, None
+    for element in found:
+        distance = distance_to_faces(element, point)
+        if distance is not None and (best is None or distance < best_distance):
+            best, best_distance = element, distance
+    if best is None or best_distance > LINK_MAX_DISTANCE_FT:
+        raise CombError("No wall, curtain wall, beam or column found at the click in the linked model {}. Click "
+                        "directly on its surface".format(link_doc.Title))
+    return best
+
+
+def geometry_obstacle(element, transform, click, label):
+    """Elemento senza asse rettilineo (curtain wall, trave, pilastro, IFC): si usa la faccia verticale piana piu'
+    vicina al click. Lo spessore e' l'ingombro dell'elemento perpendicolare alla faccia; l'asse equivalente sta a
+    meta' spessore dentro l'elemento."""
+    point = transform.Inverse.OfPoint(click)
+    solids = solids_of(element)
+    best, best_distance = None, None
+    for solid in solids:
+        for face in solid.Faces:
+            if not isinstance(face, DB.PlanarFace) or abs(face.FaceNormal.Z) > VERTICAL_FACE_TOL:
+                continue
+            try:
+                projection = face.Project(point)
+            except Exception:
+                continue
+            if projection is not None and (best is None or projection.Distance < best_distance):
+                best, best_distance = (face, projection.XYZPoint), projection.Distance
+    if best is None:
+        raise CombError("No flat vertical face found on the clicked element: curved walls and round columns are "
+                        "not supported")
+    face, face_point = best
+    normal = transform.OfVector(face.FaceNormal)
+    normal = DB.XYZ(normal.X, normal.Y, 0).Normalize()
+    face_point = transform.OfPoint(face_point)
+    depth = []
+    for solid in solids:
+        for edge in solid.Edges:
+            depth.extend(transform.OfPoint(q).DotProduct(normal) for q in edge.Tessellate())
+    half = (max(depth) - min(depth)) / 2.0 if depth else 0.0
+    return {"pw": face_point.Subtract(normal.Multiply(half)), "tau": DB.XYZ(-normal.Y, normal.X, 0),
+            "half": half, "label": label}
+
+
+def describe_obstacle(element, transform, click, label):
+    """Dati che servono al comando: punto sull'asse (pw), direzione orizzontale lungo la parete (tau), mezzo
+    spessore, descrizione per il report. Muro con asse rettilineo: asse e spessore del muro; altrimenti la
+    geometria."""
+    if isinstance(element, DB.Wall) and getattr(element, "CurtainGrid", None) is None:
+        curve = getattr(element.Location, "Curve", None)
+        if isinstance(curve, DB.Line):
+            a, b = transform.OfPoint(curve.GetEndPoint(0)), transform.OfPoint(curve.GetEndPoint(1))
+            tau = DB.XYZ(b.X - a.X, b.Y - a.Y, 0)
+            if tau.GetLength() > 1e-6:
+                return {"pw": a, "tau": tau.Normalize(), "half": element.Width / 2.0, "label": label}
+    return geometry_obstacle(element, transform, click, label)
+
+
+def category_label(element):
+    return element.Category.Name if element.Category is not None else "Element"
+
+
+def pick_obstacle(prompt):
+    """Click su muro, curtain wall, trave o pilastro, nel modello o in un link (RVT o IFC)."""
+    # PointOnElement (non Element): sui link restituisce il punto cliccato e l'elemento del link (LinkedElementId);
+    # con Element si otterrebbe solo l'istanza di link intera, senza punto
+    try:
+        ref = uidoc.Selection.PickObject(ObjectType.PointOnElement, WallFilter(), prompt)
+    except OperationCanceledException:
+        script.exit()
+    picked = doc.GetElement(ref.ElementId)
+    click = ref.GlobalPoint
+    if isinstance(picked, DB.RevitLinkInstance):
+        if click is None:
+            raise CombError("The click point on the linked model could not be read")
+        element = None
+        if ref.LinkedElementId != DB.ElementId.InvalidElementId:
+            element = picked.GetLinkDocument().GetElement(ref.LinkedElementId)
+        if element is None:
+            element = element_in_link_near(picked, click)
+        label = "{} {} (linked model {})".format(category_label(element), element.Id,
+                                                 picked.GetLinkDocument().Title)
+        return with_click(describe_obstacle(element, picked.GetTotalTransform(), click, label), click)
+    if click is None:
+        box = picked.get_BoundingBox(None)
+        click = box.Min.Add(box.Max).Multiply(0.5)
+    label = "{} {}".format(category_label(picked), output.linkify(picked.Id))
+    return with_click(describe_obstacle(picked, DB.Transform.Identity, click, label), click)
+
+
+def with_click(obstacle, click):
+    obstacle["click"] = click
+    return obstacle
+
+
+def pick_wall(prompt):
+    """(descrittore, punto cliccato in coordinate host)."""
+    obstacle = pick_obstacle(prompt)
+    return obstacle, obstacle["click"]
+
+
 def analyse(pipes, wall, wall_click):
     """Geometria di partenza, senza toccare il modello. Ritorna (piani dei tubi in ordine di corsa, dati comuni)."""
     check_straight_parallel(pipes)
@@ -355,12 +535,9 @@ def analyse(pipes, wall, wall_click):
     if max(zs) - min(zs) > SAME_Z_TOL_FT:
         raise CombError("The pipes of the row must be at the same elevation")
 
-    wall_curve = wall.Location.Curve
-    if not isinstance(wall_curve, DB.Line):
-        raise CombError("Only straight walls are supported")
-    tau = DB.XYZ(wall_curve.Direction.X, wall_curve.Direction.Y, 0).Normalize()
+    tau = wall["tau"]  # wall: descrittore di pick_obstacle (asse, direzione, mezzo spessore, etichetta)
     normal = DB.XYZ(-tau.Y, tau.X, 0)
-    pw = wall_curve.GetEndPoint(0)
+    pw = wall["pw"]
     side = sum(pipe.Location.Curve.Evaluate(0.5, True).Subtract(pw).DotProduct(normal) for pipe in pipes)
     n_away = normal.Multiply(1 if side >= 0 else -1)  # normale della parete verso i tubi
 
@@ -385,8 +562,8 @@ def analyse(pipes, wall, wall_click):
         raise CombError("Click the wall clearly to the left or to the right of the row of pipes")
     p_sign = 1 if along > 0 else -1
     items.sort(key=lambda i: p_sign * i["x"])  # #1 = corsa piu' lunga
-    geo = {"tau": tau, "n_away": n_away, "pw": pw, "half": wall.Width / 2.0, "p_sign": p_sign,
-           "p_dir": tau.Multiply(p_sign), "zc": sum(zs) / len(zs), "wall": wall}
+    geo = {"tau": tau, "n_away": n_away, "pw": pw, "half": wall["half"], "p_sign": p_sign,
+           "p_dir": tau.Multiply(p_sign), "zc": sum(zs) / len(zs), "wall": wall["label"]}
     return items, geo
 
 
@@ -520,7 +697,7 @@ def print_report(results, geo, settings, detail):
                settings["reference_index"] + 1, "up" if settings["side"] == "Up" else "down")}[settings["mode"]]
     output.print_md("Wall: {} | **{}** | spacing **{:g} x diameter** | distance from the wall **{:g} mm** | "
                     "length along the wall **{:g} mm**".format(
-                        output.linkify(geo["wall"].Id), how, settings["factor"],
+                        geo["wall"], how, settings["factor"],
                         settings["standoff_mm"], settings["length_mm"]))
     done = [r for r in results if r["status"].startswith("Created")]
     output.print_md("Pipes: **{}** | combed: **{}** | new pipes: **{}** | elbows: **{}**".format(
@@ -744,12 +921,10 @@ def comb_main():
     pipes = pick_pipes("Step 1 of 2: select the pipes of the row, heading to the wall, then press Finish")
     if not pipes:
         script.exit()
-    wall_ref = pick_one(WallFilter(), "Step 2 of 2: click the wall, to the left or right of the row "
-                                      "(the side sets the direction of the runs)")
-    wall = doc.GetElement(wall_ref.ElementId)
-    wall_click = wall_ref.GlobalPoint or wall.Location.Curve.Evaluate(0.5, True)
-
     try:
+        wall, wall_click = pick_wall("Step 2 of 2: click the wall (or beam, column, curtain wall; in this model or "
+                                     "in a link), to the left or right of the row (the side sets the direction of "
+                                     "the runs)")
         plans, geo = analyse(pipes, wall, wall_click)
     except CombError as ex:
         stop(ex)

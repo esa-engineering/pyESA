@@ -1,0 +1,15 @@
+title: Openings
+tooltip: >-
+  Provision-for-void openings where pipes, ducts, cable trays and conduits cross walls, floors and structural
+  elements, in this model and in linked RVT and IFC models.
+
+  Use them in this order: Links (types to check), Setup (families, sizes, REI rules, parameters), then Place to create
+  the openings and Refresh at every revision. Links and Setup are saved in the model, so they are the same for
+  everyone working on the project.
+author: Matteo Maiorano
+
+layout:
+  - Links
+  - Setup
+  - Place
+  - Refresh

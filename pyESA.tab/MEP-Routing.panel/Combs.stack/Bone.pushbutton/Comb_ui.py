@@ -99,11 +99,17 @@ class BendWindow(object):
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
         self.angle_box = self.window.FindName("AngleBox")
         self.leg_box = self.window.FindName("LegBox")
-        self.window.FindName("SideText").Text = (
-            "{} elements will bend to the {}, towards the side of your click.".format(side_label[0], side_label[1]))
+        if side_label is None:
+            side_text = "Next you select the elements, click where the bend starts, then click on the side to turn to."
+        else:
+            side_text = "{} elements will bend to the {}, towards the side of your click.".format(
+                side_label[0], side_label[1])
+        self.window.FindName("SideText").Text = side_text
         self.window.FindName("OkButton").Click += self._on_ok
         self.angle_box.Text = "{:g}".format(settings["angle_deg"])
         self.leg_box.Text = "{:g}".format(settings["leg_mm"])
+        self.ask_angle = self.window.FindName("AskAngle")
+        self.ask_angle.IsChecked = bool(settings.get("ask_angle", False))
         self.result = None
 
     def _on_ok(self, sender, args):
@@ -115,7 +121,54 @@ class BendWindow(object):
         if not ok or leg < 50:
             MessageBox.Show("The length after the bend must be a number of at least 50 mm.", "Comb")
             return
-        self.result = {"angle_deg": angle, "leg_mm": leg}
+        self.result = {"angle_deg": angle, "leg_mm": leg, "ask_angle": bool(self.ask_angle.IsChecked)}
+        self.window.DialogResult = True
+
+    def show(self):
+        self.window.ShowDialog()
+        return self.result
+
+
+class AngleWindow(object):
+    """Finestra modale per scegliere l'angolo al volo: pulsanti con gli angoli piu' usati e un campo libero.
+    Sostituisce forms.CommandSwitchWindow, che si chiude appena perde il focus (subito dopo un clic nel modello)."""
+
+    def __init__(self, xaml_path, title, saved_deg, angles, min_deg, max_deg):
+        from System.Windows.Controls import Button
+        from System.Windows import Thickness
+        self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
+        self.window.Title = title
+        self.min_deg, self.max_deg = min_deg, max_deg
+        self.window.FindName("TitleText").Text = title.upper()
+        self.window.FindName("SavedText").Text = "Click an angle, or type a custom one. Saved angle: {:g} degrees.".format(
+            saved_deg)
+        self.window.FindName("RangeText").Text = "degrees ({:g} to {:g})".format(min_deg, max_deg)
+        self.custom_box = self.window.FindName("CustomBox")
+        self.custom_box.Text = "{:g}".format(saved_deg)
+        panel = self.window.FindName("AnglePanel")
+        for angle in angles:
+            button = Button()
+            button.Content = u"{:g}\u00b0".format(angle)
+            button.Width, button.Height = 60, 30
+            button.Margin = Thickness(0, 0, 6, 6)
+            button.Click += self._picker(angle)
+            panel.Children.Add(button)
+        self.window.FindName("OkButton").Click += self._on_ok
+        self.result = None
+
+    def _picker(self, angle):
+        def handler(sender, args):
+            self.result = angle
+            self.window.DialogResult = True
+        return handler
+
+    def _on_ok(self, sender, args):
+        ok, value = parse_number(self.custom_box.Text)
+        if not ok or value < self.min_deg or value > self.max_deg:
+            MessageBox.Show("The angle must be a number from {:g} to {:g} degrees.".format(
+                self.min_deg, self.max_deg), self.window.Title)
+            return
+        self.result = value
         self.window.DialogResult = True
 
     def show(self):

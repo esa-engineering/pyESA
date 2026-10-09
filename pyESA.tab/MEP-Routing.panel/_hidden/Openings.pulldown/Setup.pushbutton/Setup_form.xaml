@@ -1,0 +1,281 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Openings Setup"
+        Width="980" Height="820"
+        MinWidth="720" MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip">
+
+    <Window.Resources>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="NameField" TargetType="TextBox">
+            <Setter Property="Width" Value="220"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="⚙ OPENINGS SETUP (THIS PROJECT)" FontSize="16" FontWeight="Bold"
+                   HorizontalAlignment="Center" Margin="0,0,0,10"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- FAMIGLIE -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="🧩 FAMILIES"/>
+                        <RadioButton x:Name="ModeSimple" GroupName="Mode" Margin="0,3"
+                                     Content="Simple: one family per shape, geometry only (no difference for REI or structural)"/>
+                        <RadioButton x:Name="ModeMatrix" GroupName="Mode" Margin="0,3"
+                                     Content="Matrix: a family for each MEP type and case (wall / floor, normal / REI / structural)"/>
+                        <TextBlock Style="{StaticResource HintText}" Margin="20,3,0,8"
+                                   Text="Wall families are used for horizontal runs (through walls, beams, columns): X = width along the element, Y = depth through it, Z = height. Floor families for vertical runs (through floors, roofs, foundations, beams): X, Y = plan size, Z = depth. Families must be non-hosted (level based), Generic Models, with the origin at the centre of the hole."/>
+
+                        <StackPanel x:Name="SimplePanel" Margin="20,0,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="250"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Wall, rectangular:"/>
+                                <ComboBox Grid.Row="0" Grid.Column="1" x:Name="SimpleHRect" Style="{StaticResource ComboStyle}" Margin="0,3"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Wall, round (optional):"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" x:Name="SimpleHRound" Style="{StaticResource ComboStyle}" Margin="0,3"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Floor, rectangular:"/>
+                                <ComboBox Grid.Row="2" Grid.Column="1" x:Name="SimpleVRect" Style="{StaticResource ComboStyle}" Margin="0,3"/>
+                                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Floor, round (optional):"/>
+                                <ComboBox Grid.Row="3" Grid.Column="1" x:Name="SimpleVRound" Style="{StaticResource ComboStyle}" Margin="0,3"/>
+                            </Grid>
+                            <TextBlock Style="{StaticResource HintText}" Margin="0,4,0,0"
+                                       Text="The round family is used for a single round element (pipe, conduit, round duct); merged openings and the other elements use the rectangular one."/>
+                        </StackPanel>
+
+                        <StackPanel x:Name="MatrixPanel" Margin="20,0,0,0">
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <Grid x:Name="MatrixGrid"/>
+                            </ScrollViewer>
+                            <TextBlock Style="{StaticResource HintText}" Margin="0,4,0,0"
+                                       Text="(none) = no opening for that case: the crossing is only listed in the report. Merged opening is used when more elements share one hole. Priority: structural, then REI, then normal."/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- PARAMETRI DIMENSIONALI -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="📏 SIZE PARAMETERS (INSTANCE)"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Height:"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="DimHeight" Style="{StaticResource NameField}" Margin="0,3"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Width:"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="DimWidth" Style="{StaticResource NameField}" Margin="0,3"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Depth:"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" x:Name="DimDepth" Style="{StaticResource NameField}" Margin="0,3"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Diameter:"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" x:Name="DimDiameter" Style="{StaticResource NameField}" Margin="0,3"/>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button x:Name="CheckFamiliesButton" Content="Check families" Width="130" Height="26"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource HintText}" Margin="0,4,0,0"
+                                   Text="Names of the instance parameters of the opening families. A family with the diameter parameter gets diameter and depth; the others width, height and depth. If a parameter is not found as instance parameter, the family is only placed and oriented. Check families opens each chosen family and lists which parameters it has."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- REGOLE REI -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="🔥 REI WALLS: RULES"/>
+                        <StackPanel x:Name="ReiRulesPanel"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button x:Name="AddRuleButton" Content="Add rule" Width="100" Height="26" Margin="0,0,8,0"/>
+                            <Button x:Name="TestReiButton" Content="Test" Width="100" Height="26"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource HintText}" Margin="0,4,0,0"
+                                   Text="An element is REI if at least one rule is true: parameter name (as in the model or in the link, IFC properties included), where to read it, condition and value (not case sensitive). A type forced REI / Not REI in Links wins over the rules. Test counts the matching elements in each model."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- DIMENSIONAMENTO -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="📐 SIZING RULES (mm)"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="110"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource UnitLabel}" Text="Clearance / side"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource UnitLabel}" Text="Rounding step"/>
+                            <TextBlock Grid.Row="0" Grid.Column="3" Style="{StaticResource UnitLabel}" Text="Merge within"/>
+                            <TextBlock Grid.Row="0" Grid.Column="4" Style="{StaticResource UnitLabel}" Text="Minimum size"/>
+                            <TextBlock Grid.Row="0" Grid.Column="5" Style="{StaticResource UnitLabel}" Text="Extra depth / side"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Normal:"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="Sz_normal_clearance" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="1" Grid.Column="2" x:Name="Sz_normal_rounding" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="1" Grid.Column="3" x:Name="Sz_normal_merge" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="1" Grid.Column="4" x:Name="Sz_normal_min" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="1" Grid.Column="5" x:Name="Sz_normal_extra_depth" Style="{StaticResource InputField}" Margin="6,3"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="REI:"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" x:Name="Sz_rei_clearance" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="2" Grid.Column="2" x:Name="Sz_rei_rounding" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="2" Grid.Column="3" x:Name="Sz_rei_merge" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="2" Grid.Column="4" x:Name="Sz_rei_min" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="2" Grid.Column="5" x:Name="Sz_rei_extra_depth" Style="{StaticResource InputField}" Margin="6,3"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Structural:"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" x:Name="Sz_struct_clearance" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="3" Grid.Column="2" x:Name="Sz_struct_rounding" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="3" Grid.Column="3" x:Name="Sz_struct_merge" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="3" Grid.Column="4" x:Name="Sz_struct_min" Style="{StaticResource InputField}" Margin="6,3"/>
+                            <TextBox Grid.Row="3" Grid.Column="5" x:Name="Sz_struct_extra_depth" Style="{StaticResource InputField}" Margin="6,3"/>
+                        </Grid>
+                        <TextBlock Style="{StaticResource HintText}" Margin="0,4,0,0"
+                                   Text="Size = outer size of the crossing (insulation included, oblique crossings included) + clearance on each side, rounded up to the step (0 = no rounding). Crossings of the same element closer than Merge within become one hole (0 = never). Crossings smaller than Minimum size get no opening. Depth = thickness of the element + extra depth on each side."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- CATEGORIE MEP -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="🔧 MEP ELEMENTS TO CHECK"/>
+                        <WrapPanel>
+                            <CheckBox x:Name="MepPipe" Content="Pipes" Margin="0,3,20,3"/>
+                            <CheckBox x:Name="MepDuct" Content="Ducts" Margin="0,3,20,3"/>
+                            <CheckBox x:Name="MepTray" Content="Cable trays" Margin="0,3,20,3"/>
+                            <CheckBox x:Name="MepConduit" Content="Conduits" Margin="0,3,20,3"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- PARAMETRI DESCRITTIVI -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="🏷 PARAMETERS TO FILL"/>
+                        <Grid x:Name="ParamsGrid">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="250"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                        </Grid>
+                        <TextBlock Style="{StaticResource HintText}" Margin="0,4,0,0"
+                                   Text="Names of existing instance parameters of the opening families (no parameter is added to the project). Leave empty to skip. Text parameters get the text; number parameters get the number where it makes sense."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- OBSOLETI, WORKSET, ABACHI -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="📁 REFRESH, WORKSET, SCHEDULE, FILTERS"/>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Openings no longer needed (Refresh):"/>
+                        <RadioButton x:Name="ObsoleteMark" GroupName="Obsolete" Margin="20,3,0,0"
+                                     Content="Mark them as Obsolete (Status parameter and internal data)"/>
+                        <RadioButton x:Name="ObsoleteDelete" GroupName="Obsolete" Margin="20,3,0,6"
+                                     Content="Delete them (after confirmation in Refresh)"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="250"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Workset of the openings:"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="WorksetBox" Style="{StaticResource NameField}" Margin="0,3"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Schedule name:"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="ScheduleBox" Style="{StaticResource NameField}" Margin="0,3"/>
+                        </Grid>
+                        <CheckBox x:Name="FiltersCheck" Margin="0,6,0,0"
+                                  Content="View filters by status (Openings - New / Modified / Obsolete)"/>
+                        <CheckBox x:Name="ApplyNowCheck" Margin="0,6,0,0" FontWeight="Bold"
+                                  Content="On OK, create what is missing: workset, schedule, view filters"/>
+                        <TextBlock Style="{StaticResource HintText}" Margin="20,3,0,0"
+                                   Text="Existing items with the same name are not changed. Schedule fields and view filters need shared or project parameters: family-only parameters cannot be scheduled or filtered."/>
+                    </StackPanel>
+                </Border>
+
+                <Border BorderBrush="#E8E8E8" BorderThickness="1" CornerRadius="5"
+                        Background="#F8F8F8" Padding="10" Margin="0,0,0,10">
+                    <TextBlock Style="{StaticResource HintText}"
+                               Text="The setup is saved in this model and is the same for everyone who opens it. Export saves it to a file (the list of Links is not included) and Import loads it, to start a new project from another one or from an ESA standard. Order: Links, Setup, then Place and Refresh."/>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="2" Margin="0,5,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button x:Name="ExportButton" Content="Export..." Width="90" Height="30" Margin="0,0,8,0"/>
+                <Button x:Name="ImportButton" Content="Import..." Width="90" Height="30"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="CancelButton" Content="Cancel" Width="80" Height="30" Margin="0,0,10,0" IsCancel="True"/>
+                <Button x:Name="OkButton" Content="OK" Width="100" Height="30" IsDefault="True"
+                        Background="#2D5A8A" Foreground="White"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

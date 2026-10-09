@@ -1,7 +1,11 @@
-title: Turn Left
+title: Turn
 tooltip: >-
-  CLICK: adds a run that turns left from the free end nearest to your click, with an elbow, using the saved settings
-  (default 1000 mm, 90 degrees, same slope as the original run).
-  SHIFT + CLICK: change length, turn angle and slope option. Settings are shared with Turn Right.
-  The new parts keep the parameters and the insulation of the starting element.
+  CLICK: one window with the turn angle (common angles or a custom one), the length of the new run, the slope (keep it
+  or make the new run horizontal) and the clash option; the last used are proposed and saved. Then for each element
+  click near its free end and then on the side the new run must turn to (ESC on this click skips the element): a run
+  turning left or right is added, with an elbow. The options hold for all the clicks until ESC. With the clash option
+  the new run follows the walls, curtain walls, beams and columns it hits, also in linked RVT and IFC models.
+
+  A report lists the result. The new parts keep the parameters and the insulation of the starting element; cable trays
+  keep the orientation of their section (a tray on edge stays on edge).
 author: Matteo Maiorano

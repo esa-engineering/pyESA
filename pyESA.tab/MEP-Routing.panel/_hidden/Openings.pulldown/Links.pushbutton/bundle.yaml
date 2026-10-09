@@ -1,0 +1,12 @@
+title: Links
+tooltip: >-
+  First step, once per project and again after links are added or reloaded. Lists the types of walls, floors, roofs
+  and structural elements (categories starting with Structural) in this model and in the loaded RVT and IFC links,
+  plus the generic models of the links (IFC elements often arrive as generic models; they start unticked).
+
+  Tick the types to check for openings. REI: Auto uses the REI rules of Setup (the window shows how many elements
+  match), or force REI / Not REI for the whole type. Structural is taken from the category.
+
+  Saved in the model. A report lists the types per model, the new types and the ones no longer found (their settings
+  are kept, in case a link is only unloaded).
+author: Matteo Maiorano

@@ -1,0 +1,11 @@
+title: Place
+tooltip: >-
+  Creates the openings for the selected elements, the active view or the whole model. Each crossing of a pipe, duct,
+  cable tray or conduit through a type ticked in Links gets the family set in Setup for its case: wall family for
+  horizontal runs, floor family for vertical runs, chosen by class (normal, REI, structural). The family is placed at
+  the centre of the crossing, turned along the element and sized with the clearance and rounding of its class; nearby
+  crossings of the same element are merged when the rules allow it.
+
+  A preview report comes first, then you confirm. Crossings that already have an opening are skipped (use Refresh);
+  size parameters not found in the family are skipped, the family is only placed and oriented.
+author: Matteo Maiorano

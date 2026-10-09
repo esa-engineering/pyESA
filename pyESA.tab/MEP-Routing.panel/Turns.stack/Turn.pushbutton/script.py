@@ -1,22 +1,34 @@
 # -*- coding: utf-8 -*-
-__title__ = "Turn Left"
-__doc__ = """Version = 0.1
-Date    = 07.10.2026
+__title__ = "Turn"
+__doc__ = """Version = 0.4
+Date    = 09.10.2026
 ________________________________________________________________
 Description:
-Adds a run that turns left from the free end of a pipe, duct,
-cable tray or conduit, with an elbow.
+Adds a run that turns left or right from the free end of a pipe, duct,
+cable tray or conduit, with an elbow. Replaces Turn Left and Turn Right.
 
 Instruction:
-- CLICK: uses the saved settings (default: 1000 mm, 90 degrees,
-  keep the slope of the original run)
-- SHIFT + CLICK: change length, turn angle and slope option
-- Click each element near the free end you want to extend
+- CLICK: one window with all the options, the last used are proposed
+  and saved; they hold for all the clicks of this run of the command:
+  - turn angle (common angles or a custom one)
+  - length of the new run (default 1000 mm) and slope (keep the slope
+    of the original run, or make the new run horizontal)
+  - clashes: if the new run hits a wall (columns, beams and curtain
+    walls too, also in linked RVT and IFC models) the angle is adjusted
+    to run parallel to it. A wall, beam or column with a straight axis
+    is followed along its axis; anything else (curtain wall panel, IFC
+    element, column) along the face that was hit
+- Click each element near the free end you want to extend, then click
+  on the side the new run must turn to (ESC on this click skips the
+  element)
 - Press ESC to finish: a report lists the new elements
 
-Right and left are relative to the direction of travel, looking
-from the element towards the clicked end. Vertical ends are skipped.
+The side is taken from the second click, as seen from above, relative
+to the direction of travel (from the element towards the clicked end).
+Vertical ends are skipped.
 The new parts keep the parameters and the insulation of the starting element.
+Cable trays keep the orientation of their section (a tray on edge stays
+on edge after the turn).
 ________________________________________________________________
 Author(s): Matteo Maiorano
 """
@@ -32,17 +44,17 @@ from Autodesk.Revit.DB.Mechanical import Duct, DuctInsulation, DuctLining
 from Autodesk.Revit.DB.Electrical import CableTray, Conduit
 from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
 from Autodesk.Revit.Exceptions import OperationCanceledException
+from System.Collections.Generic import List
 
 from pyrevit import revit, script, forms, DB
 
 import Turn_ui
 
-# unica differenza tra TurnRight e TurnLeft: tenere i due script allineati
-TURN_SIDE = "left"
-
-XAML_FILE_NAME = "Turn_form.xaml"
-CONFIG_NAME = "ESA_MEPTurn"  # condiviso tra Turn Right e Turn Left
-DEFAULTS = {"length_mm": 1000.0, "angle_deg": 90.0, "keep_slope": True}
+CONFIG_NAME = "ESA_MEPTurn"  # stessa configurazione dei vecchi Turn Right e Turn Left: le impostazioni restano
+DEFAULTS = {"length_mm": 1000.0, "angle_deg": 90.0, "keep_slope": True, "avoid_clash": False}
+ANGLE_XAML_FILE_NAME = "Angle_form.xaml"
+QUICK_ANGLES = (10.0, 15.0, 22.5, 30.0, 45.0, 60.0, 90.0)
+MIN_ANGLE, MAX_ANGLE = 0.1, 90.0
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -185,29 +197,222 @@ def run_direction_at(element, conn):
     return b.Subtract(a).Normalize()
 
 
-def turn_direction(travel, angle_deg, keep_slope):
-    """Direzione del nuovo tratto. None se il tratto e' verticale (destra/sinistra non definite)."""
+def signed_turn_deg(angle_deg, side):
+    """Angolo di curva con segno: positivo = antiorario visto dall'alto (sinistra)."""
+    return angle_deg if side == "left" else -angle_deg
+
+
+def side_of(travel, origin, click):
+    """Lato del clic rispetto alla direzione di percorrenza, visto dall'alto: "left", "right" o None se il clic e'
+    in linea con il tratto (in pianta conta solo XY)."""
+    cross = travel.X * (click.Y - origin.Y) - travel.Y * (click.X - origin.X)
+    horizontal_len = math.sqrt(travel.X ** 2 + travel.Y ** 2)
+    if abs(cross) / horizontal_len < 1.0 / MM_PER_FT:  # meno di 1 mm dalla linea del tratto
+        return None
+    return "left" if cross > 0 else "right"
+
+
+def turn_direction(travel, signed_deg, keep_slope):
+    """Direzione del nuovo tratto, ruotando la direzione di percorrenza di signed_deg attorno a Z (positivo =
+    sinistra). None se il tratto e' verticale (destra/sinistra non definite)."""
     if abs(travel.Z) > VERTICAL_TOL:
         return None
     horizontal_len = math.sqrt(travel.X ** 2 + travel.Y ** 2)
     forward = DB.XYZ(travel.X / horizontal_len, travel.Y / horizontal_len, 0)
-    right = DB.XYZ(forward.Y, -forward.X, 0)  # forward x asse Z
-    side = right if TURN_SIDE == "right" else right.Negate()
-    angle = math.radians(angle_deg)
-    new_dir = forward.Multiply(math.cos(angle)).Add(side.Multiply(math.sin(angle)))
+    left = DB.XYZ(-forward.Y, forward.X, 0)  # asse Z x forward
+    angle = math.radians(signed_deg)
+    new_dir = forward.Multiply(math.cos(angle)).Add(left.Multiply(math.sin(angle)))
     if keep_slope:
         # stessa pendenza: stessa salita per unita' di percorso orizzontale
         new_dir = DB.XYZ(new_dir.X, new_dir.Y, travel.Z / horizontal_len).Normalize()
     return new_dir
 
 
-def create_segment(element, conn, end_point, level_id):
+# ----------------------------------------------------------------------------------------------------------------
+# Interferenze: il nuovo tratto che colpisce un muro (anche in un link) viene girato parallelo al muro
+# ----------------------------------------------------------------------------------------------------------------
+CLASH_CATEGORIES = (DB.BuiltInCategory.OST_Walls, DB.BuiltInCategory.OST_Columns,
+                    DB.BuiltInCategory.OST_StructuralColumns, DB.BuiltInCategory.OST_StructuralFraming,
+                    DB.BuiltInCategory.OST_CurtainWallPanels, DB.BuiltInCategory.OST_CurtainWallMullions)
+VERTICAL_FACE_TOL = 0.1  # sotto questa componente orizzontale la normale della faccia colpita non da' una direzione
+MIN_ADJUSTED_DEG = 5.0  # sotto questo angolo la curva parallela al muro non e' piu' una curva
+
+
+def clash_view():
+    """Vista 3D per il ReferenceIntersector: quella attiva se 3D, altrimenti la prima 3D non modello."""
+    view = doc.ActiveView
+    if isinstance(view, DB.View3D) and not view.IsTemplate:
+        return view
+    views = [v for v in DB.FilteredElementCollector(doc).OfClass(DB.View3D) if not v.IsTemplate]
+    default = [v for v in views if v.Name == "{3D}"]
+    return (default or views or [None])[0]
+
+
+def hit_face_normal(reference, element, link_instance):
+    """Normale (coordinate host) della faccia piana colpita, o None se non e' leggibile. Per gli elementi di un link
+    la faccia si legge dal documento del link e la normale si porta nel modello host."""
+    try:
+        if link_instance is not None:
+            face = element.GetGeometryObjectFromReference(reference.CreateReferenceInLink())
+        else:
+            face = element.GetGeometryObjectFromReference(reference)
+        if not isinstance(face, DB.PlanarFace):
+            return None
+        normal = face.FaceNormal
+        return link_instance.GetTotalTransform().OfVector(normal) if link_instance is not None else normal
+    except Exception:
+        return None
+
+
+def category_value(element):
+    cat_id = element.Category.Id
+    return cat_id.Value if hasattr(cat_id, "Value") else cat_id.IntegerValue  # Revit 2026+ / <= 2025
+
+
+def find_clash(view3d, origin, direction, length):
+    """Primo muro / pilastro / trave / curtain wall lungo il nuovo tratto (asse), anche nei link RVT e IFC.
+    Ritorna (elemento, transform del link o None, distanza dall'origine, nome del modello, punto colpito, normale
+    della faccia colpita o None) o None."""
+    categories = List[DB.BuiltInCategory]()
+    for cat in CLASH_CATEGORIES:
+        categories.Add(cat)
+    # con FindReferencesInRevitLinks il filtro vale anche per l'istanza di link: senza la categoria dei link
+    # l'istanza viene scartata e nessun elemento dei link viene trovato. La categoria degli elementi del link si
+    # controlla qui sotto
+    categories.Add(DB.BuiltInCategory.OST_RvtLinks)
+    wanted = set(int(c) for c in CLASH_CATEGORIES)
+    intersector = DB.ReferenceIntersector(DB.ElementMulticategoryFilter(categories),
+                                          DB.FindReferenceTarget.Face, view3d)
+    intersector.FindReferencesInRevitLinks = True
+    best = None
+    for context in intersector.Find(origin, direction):
+        distance = context.Proximity
+        if distance > length or (best is not None and distance >= best[2]):
+            continue
+        reference = context.GetReference()
+        hit = origin.Add(direction.Multiply(distance))
+        host = doc.GetElement(reference.ElementId)
+        if isinstance(host, DB.RevitLinkInstance):
+            link_doc = host.GetLinkDocument()
+            if link_doc is None or reference.LinkedElementId == DB.ElementId.InvalidElementId:
+                continue
+            element = link_doc.GetElement(reference.LinkedElementId)
+            if element is None or element.Category is None or category_value(element) not in wanted:
+                continue
+            best = (element, host.GetTotalTransform(), distance, link_doc.Title, hit,
+                    hit_face_normal(reference, element, host))
+        else:
+            best = (host, None, distance, "host model", hit, hit_face_normal(reference, host, None))
+    return best
+
+
+def clash_label(clash):
+    element, _, distance, model, _, _ = clash
+    category = element.Category.Name if element.Category is not None else "element"
+    return "{} {} ({}) at {:.0f} mm".format(category, element.Id, model, distance * MM_PER_FT)
+
+
+def parallel_turn(clash, origin, travel, signed_deg):
+    """Angolo con segno per correre parallelo all'elemento colpito, e distanza dell'asse del tratto dalla faccia.
+    Ritorna (angolo, distanza mm o None) oppure solleva TurnError se l'elemento non e' lineare."""
+    element, transform, _, _, hit, face_normal = clash
+    location = getattr(element, "Location", None)
+    tangent, on_line, from_axis = None, hit, False
+    if isinstance(location, DB.LocationCurve):
+        curve = location.Curve if transform is None else location.Curve.CreateTransformed(transform)
+        projection = curve.Project(hit)
+        direction_3d = curve.ComputeDerivatives(projection.Parameter, False).BasisX
+        flat = DB.XYZ(direction_3d.X, direction_3d.Y, 0)
+        if flat.GetLength() > 1e-9:
+            tangent, on_line, from_axis = flat.Normalize(), projection.XYZPoint, True
+    if tangent is None:
+        # senza asse orizzontale utilizzabile (DirectShape IFC, pilastro, pannello): lungo la faccia colpita
+        if face_normal is None:
+            raise TurnError("The new run hits {}: it has no horizontal axis and the face that was hit could not be "
+                            "read, so the turn cannot follow it".format(clash_label(clash)))
+        flat = DB.XYZ(-face_normal.Y, face_normal.X, 0)
+        if flat.GetLength() < VERTICAL_FACE_TOL:
+            raise TurnError("The new run hits {} on a horizontal face (floor, soffit): no direction to "
+                            "follow".format(clash_label(clash)))
+        tangent = flat.Normalize()
+    horizontal_len = math.sqrt(travel.X ** 2 + travel.Y ** 2)
+    forward = DB.XYZ(travel.X / horizontal_len, travel.Y / horizontal_len, 0)
+    wanted = turn_direction(DB.XYZ(forward.X, forward.Y, 0), signed_deg, False)
+    # dei due versi lungo il muro si tiene quello piu' vicino alla curva richiesta
+    if tangent.DotProduct(wanted) < 0:
+        tangent = tangent.Negate()
+    angle = math.degrees(math.atan2(forward.CrossProduct(tangent).Z, forward.DotProduct(tangent)))
+    if abs(angle) < MIN_ADJUSTED_DEG:
+        raise TurnError("The new run hits {}, which is almost parallel to the existing run: following it "
+                        "means no turn ({:.1f} degrees)".format(clash_label(clash), angle))
+    # distanza in pianta dell'estremo dalla linea del muro (retta per il punto colpito, lungo la tangente)
+    axis_distance = abs((origin.X - on_line.X) * tangent.Y - (origin.Y - on_line.Y) * tangent.X)
+    width = getattr(element, "Width", None)  # solo i muri hanno lo spessore
+    if not from_axis:
+        face_mm = axis_distance * MM_PER_FT  # la linea passa gia' per la faccia colpita
+    else:
+        face_mm = (axis_distance - width / 2.0) * MM_PER_FT if isinstance(width, float) else None
+    return angle, face_mm
+
+
+CLASH_VIEW = []  # vista 3D trovata al primo uso
+
+
+def avoid_clash(origin, travel, signed_deg, direction, length, keep_slope):
+    """Se il nuovo tratto colpisce un muro, gira parallelo al muro. Ritorna (angolo, direzione, nota per il report);
+    solleva TurnError se l'interferenza non si puo' evitare."""
+    if not CLASH_VIEW:
+        CLASH_VIEW.append(clash_view())
+    view3d = CLASH_VIEW[0]
+    if view3d is None:
+        return signed_deg, direction, "Not checked: no 3D view in the model"
+    clash = find_clash(view3d, origin, direction, length)
+    if clash is None:
+        return signed_deg, direction, "None"
+    angle, face_mm = parallel_turn(clash, origin, travel, signed_deg)
+    new_direction = turn_direction(travel, angle, keep_slope)
+    note = "Hit {}: turned {:.1f} degrees {} to run parallel".format(
+        clash_label(clash), abs(angle), "left" if angle > 0 else "right")
+    if face_mm is not None:
+        note += ", run axis {:.0f} mm from the wall face".format(face_mm)
+    again = find_clash(view3d, origin, new_direction, length)
+    if again is not None:
+        note += ". WARNING: the new run still hits {}".format(clash_label(again))
+    return angle, new_direction, note
+
+
+def tray_turned_copy(element, conn, settings, signed_deg):
+    """Passerella nuova con lo stesso orientamento della sezione (es. di costa): CableTray.Create la farebbe sempre
+    piatta e Revit non ruota una passerella orizzontale attorno al proprio asse. Si copia il tratto di partenza, lo si
+    mette in prosecuzione dall'estremo libero e lo si ruota attorno alla verticale passante per l'estremo: la
+    rotazione attorno a Z conserva sia l'orientamento della sezione sia la pendenza."""
+    travel = run_direction_at(element, conn)
+    start = conn.Origin
+    copy_id = list(DB.ElementTransformUtils.CopyElement(doc, element.Id, DB.XYZ.Zero))[0]
+    new_element = doc.GetElement(copy_id)
+    new_element.Location.Curve = DB.Line.CreateBound(
+        start, start.Add(travel.Multiply(settings["length_mm"] / MM_PER_FT)))
+    doc.Regenerate()
+    # signed_deg positivo = antiorario visto dall'alto (sinistra), eventualmente corretto per seguire un muro
+    axis = DB.Line.CreateBound(start, start.Add(DB.XYZ.BasisZ))
+    DB.ElementTransformUtils.RotateElement(doc, copy_id, axis, math.radians(signed_deg))
+    mark = new_element.get_Parameter(DB.BuiltInParameter.ALL_MODEL_MARK)
+    if mark is not None and not mark.IsReadOnly:
+        mark.Set("")  # la copia eredita il Mark: duplicato
+    doc.Regenerate()
+    return new_element
+
+
+def create_segment(element, conn, end_point, level_id, settings, signed_deg):
     """Crea il nuovo tratto (senza garantire il raccordo). Ritorna l'elemento creato."""
     type_id = element.GetTypeId()
     if isinstance(element, Pipe):
         return Pipe.Create(doc, type_id, level_id, conn, end_point)
     if isinstance(element, Duct):
         return Duct.Create(doc, type_id, level_id, conn, end_point)
+    sloped = abs(run_direction_at(element, conn).Z) > 1e-6
+    if isinstance(element, CableTray) and (settings["keep_slope"] or not sloped):
+        return tray_turned_copy(element, conn, settings, signed_deg)
     if isinstance(element, CableTray):
         new_element = CableTray.Create(doc, type_id, conn.Origin, end_point, level_id)
         copy_tray_dimensions(element, new_element)
@@ -330,7 +535,8 @@ def process_pick(reference, settings):
     """Elabora un elemento. Ritorna un dict con l'esito (usato per il report)."""
     element = doc.GetElement(reference.ElementId)
     result = {"element": element, "category": category_name(element), "status": "", "ok": False,
-              "new": None, "fitting": "", "added_mm": None, "z_mm": None, "level": "", "rel_mm": None}
+              "new": None, "fitting": "", "added_mm": None, "z_mm": None, "level": "", "rel_mm": None,
+              "clash": "", "angle": None, "side": ""}
 
     click = reference.GlobalPoint
     if click is None:
@@ -341,11 +547,24 @@ def process_pick(reference, settings):
         result["status"] = "No free end (both ends are connected)"
         return result
 
-    direction = turn_direction(run_direction_at(element, conn),
-                               settings["angle_deg"], settings["keep_slope"])
-    if direction is None:
+    travel = run_direction_at(element, conn)
+    if abs(travel.Z) > VERTICAL_TOL:
         result["status"] = "Vertical end: right and left are not defined"
         return result
+
+    # il lato si sceglie con un secondo clic, per ogni tratto
+    try:
+        side_click = uidoc.Selection.PickPoint("Turn: click on the side the new run must turn to "
+                                               "(ESC to skip this element)")
+    except OperationCanceledException:
+        return None
+    side = side_of(travel, conn.Origin, side_click)
+    if side is None:
+        result["status"] = "Not created. The side click is in line with the run: no side"
+        return result
+    result["side"] = side
+    signed_deg = signed_turn_deg(settings["angle_deg"], side)
+    direction = turn_direction(travel, signed_deg, settings["keep_slope"])
 
     level_id = get_level_id(element)
     if level_id is None:
@@ -355,12 +574,20 @@ def process_pick(reference, settings):
     result["level"] = ref_level.Name
 
     length = settings["length_mm"] / MM_PER_FT
+    if settings.get("avoid_clash"):
+        try:
+            signed_deg, direction, result["clash"] = avoid_clash(conn.Origin, travel, signed_deg, direction,
+                                                                length, settings["keep_slope"])
+        except TurnError as ex:
+            result["status"] = "Not created. {}".format(ex)
+            return result
     end_point = conn.Origin.Add(direction.Multiply(length))
+    result["angle"] = abs(signed_deg)  # angolo effettivo: scelto al clic o corretto per seguire un muro
 
-    transaction = DB.Transaction(doc, "Turn {}".format(TURN_SIDE.capitalize()))
+    transaction = DB.Transaction(doc, "Turn {}".format(side))
     transaction.Start()
     try:
-        new_element = create_segment(element, conn, end_point, level_id)
+        new_element = create_segment(element, conn, end_point, level_id, settings, signed_deg)
         fitting = ensure_elbow(element, conn, new_element)
         check_remaining_space(element, new_element)
         inherited = inherit(element, [new_element], [fitting])
@@ -387,13 +614,14 @@ def fmt(value):
 
 
 def settings_text(settings):
-    return "{:g} mm, {:g} degrees, {}".format(
+    return "{:g} mm, {:g} degrees, {}{}".format(
         settings["length_mm"], settings["angle_deg"],
-        "keep slope" if settings["keep_slope"] else "horizontal")
+        "keep slope" if settings["keep_slope"] else "horizontal",
+        ", parallel to walls on clash" if settings.get("avoid_clash") else "")
 
 
 def print_report(results, settings):
-    output.print_md("# Turn {} report".format(TURN_SIDE.capitalize()))
+    output.print_md("# Turn report")
     output.print_md("Settings: **{}**".format(settings_text(settings)))
     done = [r for r in results if r["ok"]]
     output.print_md("Elements picked: **{}** | runs created: **{}** | not processed: **{}**".format(
@@ -405,15 +633,16 @@ def print_report(results, settings):
     rows = []
     for i, r in enumerate(results, 1):
         rows.append([
-            i, output.linkify(r["element"].Id), r["category"], r["status"],
-            fmt(r["added_mm"]),
+            i, output.linkify(r["element"].Id), r["category"], r["status"], r["side"],
+            fmt(r["angle"]), fmt(r["added_mm"]),
             output.linkify(r["new"].Id) if r["new"] is not None else "", r["fitting"],
-            fmt(r["z_mm"]), r["level"], fmt(r["rel_mm"]),
+            fmt(r["z_mm"]), r["level"], fmt(r["rel_mm"]), r["clash"],
         ])
     output.print_table(
         table_data=rows,
-        columns=["#", "Element", "Category", "Status", "Added length [mm]", "New element", "Fitting",
-                 "End Z, internal coordinates [mm]", "Reference level", "End Z vs reference level [mm]"])
+        columns=["#", "Element", "Category", "Status", "Side", "Angle [deg]", "Added length [mm]", "New element", "Fitting",
+                 "End Z, internal coordinates [mm]", "Reference level", "End Z vs reference level [mm]",
+                 "Clash"])
 
 
 def load_settings(config):
@@ -425,6 +654,10 @@ def load_settings(config):
         if not isinstance(keep, bool):
             keep = str(keep).strip().lower() in ("true", "1", "yes")
         settings["keep_slope"] = keep
+        avoid = config.get_option("avoid_clash", DEFAULTS["avoid_clash"])
+        if not isinstance(avoid, bool):
+            avoid = str(avoid).strip().lower() in ("true", "1", "yes")
+        settings["avoid_clash"] = avoid
     except Exception:
         pass
     return settings
@@ -435,21 +668,32 @@ def save_settings(config, settings):
         config.length_mm = settings["length_mm"]
         config.angle_deg = settings["angle_deg"]
         config.keep_slope = settings["keep_slope"]
+        config.avoid_clash = settings["avoid_clash"]
         script.save_config()
     except Exception:
         pass
 
 
+def ask_settings(settings):
+    """Unica finestra del comando: angolo, lunghezza, pendenza, interferenze. Ritorna le impostazioni o None se
+    annullata (ESC). Non forms.CommandSwitchWindow: si chiude appena perde il focus, cioe' subito dopo il clic
+    nel modello."""
+    return Turn_ui.AngleWindow(script.get_bundle_file(ANGLE_XAML_FILE_NAME), settings, QUICK_ANGLES,
+                               MIN_ANGLE, MAX_ANGLE).show()
+
+
 def pick_loop(settings):
     results = []
     selection_filter = MepCurveFilter()
-    prompt = "Turn {} ({}): click near the free end (ESC to finish)".format(TURN_SIDE, settings_text(settings))
+    prompt = "Turn ({}): click near the free end (ESC to finish)".format(settings_text(settings))
     while True:
         try:
             reference = uidoc.Selection.PickObject(ObjectType.Element, selection_filter, prompt)
         except OperationCanceledException:
             break
-        results.append(process_pick(reference, settings))
+        result = process_pick(reference, settings)
+        if result is not None:  # None: lato annullato con ESC, l'elemento viene saltato
+            results.append(result)
     return results
 
 
@@ -457,22 +701,22 @@ def main():
     config = script.get_config(CONFIG_NAME)
     settings = load_settings(config)
 
-    if __shiftclick__:  # noqa: F821
-        xaml_path = script.get_bundle_file(XAML_FILE_NAME)
-        new_settings = Turn_ui.TurnWindow(xaml_path, settings).show()
-        if new_settings is None:
-            script.exit()
-        settings = new_settings
-        save_settings(config, settings)
+    # tutte le opzioni (angolo, lunghezza, pendenza, interferenze) in un'unica finestra a ogni avvio, una volta sola:
+    # valgono per tutti i clic di questa sessione e si salvano come valori proposti la volta successiva
+    new_settings = ask_settings(settings)
+    if new_settings is None:
+        script.exit()
+    settings = new_settings
+    save_settings(config, settings)
 
     warnings = []
-    if abs(settings["angle_deg"] - 90.0) > 1e-6:
-        warnings.append("turn angle {:g} degrees".format(settings["angle_deg"]))
     if not settings["keep_slope"]:
         warnings.append("new runs forced horizontal")
+    if settings.get("avoid_clash"):
+        warnings.append("turns parallel to walls on clash")
 
     if warnings:
-        message = "Turn {}: {} (SHIFT + CLICK to change)".format(TURN_SIDE, ", ".join(warnings))
+        message = "Turn: {} (change it in the window at the next start)".format(", ".join(warnings))
         with forms.WarningBar(title=message):
             results = pick_loop(settings)
     else:

@@ -1,0 +1,9 @@
+title: Refresh
+tooltip: >-
+  Compares the openings with the current crossings, in the active view or in the whole model, and lists the new
+  crossings, the openings that changed (moved, resized, rotated, other family or class, e.g. a wall became REI, other
+  elements or parameters) and the ones no longer needed.
+
+  Then choose what to apply: all, only new, only changes, only the openings no longer needed (marked obsolete or
+  deleted, as set in Setup), or report only. Everything applied is one Undo.
+author: Matteo Maiorano

@@ -8,9 +8,6 @@ from System.IO import File
 from System.Windows import MessageBox
 from System.Windows.Markup import XamlReader
 
-PRESET_ANGLES = (10, 15, 30, 45, 60, 90)
-CUSTOM_LABEL = "Custom"
-
 
 def parse_number(text):
     """(ok, valore): accetta anche la virgola decimale."""
@@ -20,63 +17,66 @@ def parse_number(text):
         return False, None
 
 
-class TurnWindow(object):
-    """Finestra modale (SHIFT+CLICK): lunghezza, angolo di curva e pendenza."""
+class AngleWindow(object):
+    """Unica finestra del comando, a ogni avvio: angolo (pulsanti con gli angoli piu' usati o campo libero),
+    lunghezza, pendenza e aggiramento delle interferenze. Sostituisce forms.CommandSwitchWindow, che si chiude appena
+    perde il focus (subito dopo un clic nel modello)."""
 
-    def __init__(self, xaml_path, settings):
-        # settings: dict con length_mm, angle_deg, keep_slope
+    def __init__(self, xaml_path, settings, angles, min_deg, max_deg):
+        # settings: dict con angle_deg, length_mm, keep_slope, avoid_clash; show() ritorna lo stesso dict aggiornato
+        from System.Windows.Controls import Button
+        from System.Windows import Thickness
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
+        self.settings = dict(settings)
+        self.min_deg, self.max_deg = min_deg, max_deg
+        self.window.FindName("SavedText").Text = "Click an angle, or type a custom one. Saved angle: {:g} degrees.".format(
+            settings["angle_deg"])
+        self.window.FindName("RangeText").Text = "degrees ({:g} to {:g})".format(min_deg, max_deg)
+        self.custom_box = self.window.FindName("CustomBox")
+        self.custom_box.Text = "{:g}".format(settings["angle_deg"])
         self.length_box = self.window.FindName("LengthBox")
-        self.angle_combo = self.window.FindName("AngleCombo")
-        self.angle_box = self.window.FindName("AngleBox")
+        self.length_box.Text = "{:g}".format(settings["length_mm"])
         self.keep_slope = self.window.FindName("KeepSlope")
         self.horizontal = self.window.FindName("Horizontal")
+        self.keep_slope.IsChecked = bool(settings["keep_slope"])
+        self.horizontal.IsChecked = not settings["keep_slope"]
+        self.clash_check = self.window.FindName("AvoidClashCheck")
+        self.clash_check.IsChecked = bool(settings.get("avoid_clash", False))
+        panel = self.window.FindName("AnglePanel")
+        for angle in angles:
+            button = Button()
+            button.Content = u"{:g}°".format(angle)
+            button.Width, button.Height = 60, 30
+            button.Margin = Thickness(0, 0, 6, 6)
+            button.Click += self._picker(angle)
+            panel.Children.Add(button)
         self.window.FindName("OkButton").Click += self._on_ok
         self.result = None
 
-        self.length_box.Text = "{:g}".format(settings["length_mm"])
-        for angle in PRESET_ANGLES:
-            self.angle_combo.Items.Add("{} degrees".format(angle))
-        self.angle_combo.Items.Add(CUSTOM_LABEL)
-        angle = settings["angle_deg"]
-        if angle in PRESET_ANGLES:
-            self.angle_combo.SelectedIndex = PRESET_ANGLES.index(angle)
-        else:
-            self.angle_combo.SelectedIndex = len(PRESET_ANGLES)
-        self.angle_box.Text = "{:g}".format(angle)
-        self.angle_combo.SelectionChanged += self._on_angle_mode
-        self._on_angle_mode(None, None)
-
-        self.keep_slope.IsChecked = bool(settings["keep_slope"])
-        self.horizontal.IsChecked = not settings["keep_slope"]
-
-    def _is_custom(self):
-        return self.angle_combo.SelectedIndex == len(PRESET_ANGLES)
-
-    def _on_angle_mode(self, sender, args):
-        self.angle_box.IsEnabled = self._is_custom()
-
-    def _validate(self):
-        """Ritorna (ok, messaggio, valori)."""
+    def _finish(self, angle):
+        """Valida le altre opzioni tutte insieme; se va bene chiude la finestra con il risultato."""
         ok, length = parse_number(self.length_box.Text)
         if not ok or length <= 0:
-            return False, "The length must be a number greater than zero (mm).", None
-        if self._is_custom():
-            ok, angle = parse_number(self.angle_box.Text)
-            if not ok or angle <= 0 or angle > 90:
-                return False, "The custom angle must be a number greater than 0 and up to 90 degrees.", None
-        else:
-            angle = float(PRESET_ANGLES[self.angle_combo.SelectedIndex])
-        return True, "", {"length_mm": length, "angle_deg": angle,
-                          "keep_slope": bool(self.keep_slope.IsChecked)}
+            MessageBox.Show("The length must be a number greater than zero (mm).", "Turn")
+            return
+        self.settings.update({"angle_deg": angle, "length_mm": length,
+                              "keep_slope": bool(self.keep_slope.IsChecked),
+                              "avoid_clash": bool(self.clash_check.IsChecked)})
+        self.result = self.settings
+        self.window.DialogResult = True
+
+    def _picker(self, angle):
+        def handler(sender, args):
+            self._finish(angle)
+        return handler
 
     def _on_ok(self, sender, args):
-        ok, message, values = self._validate()
-        if not ok:
-            MessageBox.Show(message, "Turn Settings")
+        ok, value = parse_number(self.custom_box.Text)
+        if not ok or value < self.min_deg or value > self.max_deg:
+            MessageBox.Show("The angle must be a number from {:g} to {:g} degrees.".format(
+                self.min_deg, self.max_deg), "Turn")
             return
-        self.result = values
-        self.window.DialogResult = True
+        self._finish(value)
 
     def show(self):
         self.window.ShowDialog()

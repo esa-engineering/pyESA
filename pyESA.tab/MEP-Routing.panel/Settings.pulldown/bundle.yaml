@@ -1,0 +1,7 @@
+title: Settings
+tooltip: >-
+  Settings shared by the tools of this panel. Report Mode chooses when the tools open their full report.
+author: Matteo Maiorano
+
+layout:
+  - ReportMode

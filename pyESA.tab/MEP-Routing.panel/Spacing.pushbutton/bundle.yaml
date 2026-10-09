@@ -1,0 +1,15 @@
+title: Spacing
+tooltip: >-
+  CLICK: select pipes, ducts, cable trays or conduits (at least two, parallel within 10 degrees), then set the
+  distance and which line stays fixed. The elements are moved sideways in the plane of the active view (plan: side by
+  side; section or elevation: one above the other) so that the clear distance between neighbours is the same. The
+  distance is measured between the outer faces, so the insulation counts (or between the centerlines). Segments of the
+  same line move together.
+
+  SHIFT + CLICK: copies the spacing from a reference series to another series with the same number of lines: select
+  the reference series, then the series to change. Lines are matched in order (left to right or bottom to top);
+  measure and fixed line are the last used with CLICK.
+
+  Accessories connected to the elements (valves, dampers) are checked for clashes with the neighbouring elements and
+  their insulation. A report lists the distances obtained; clashing accessories are listed and selected.
+author: Matteo Maiorano

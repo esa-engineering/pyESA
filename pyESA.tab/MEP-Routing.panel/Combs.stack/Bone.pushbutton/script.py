@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 __title__ = "Bone"
-__doc__ = """Version = 0.4
-Date    = 08.10.2026
+__doc__ = """Version = 0.6
+Date    = 09.10.2026
 ________________________________________________________________
 Bends the selected parallel horizontal pipes, ducts or cable trays to the left or
-right by a chosen angle, keeping their spacing. Select the pipes,
-then click the point where the bend starts, on the side the pipes
-must turn to. The part of each pipe beyond the bend is replaced.
-The new parts keep the parameters and the insulation of the starting element.
+right by a chosen angle, keeping their spacing. Select the pipes, then click on one
+of them, or any point (also on a linked model), to choose where the bend starts: the
+closest pipe is stretched to that point and the others bend in line with it. Then click to the left or right of the row to choose the side the pipes
+turn to. The part of each pipe beyond the start point is replaced. The new parts
+keep the parameters and the insulation of the starting element. Cable trays keep the
+orientation of their section (a tray on edge stays on edge after the bend).
+CLICK uses the last angle and length; SHIFT + CLICK opens the settings window.
+With "Ask the angle every time", after the clicks a quick window offers common
+angles or a custom one; the saved angle does not change.
 ________________________________________________________________
 Author(s): Matteo Maiorano
 """
@@ -26,7 +31,7 @@ clr.AddReference("RevitAPIUI")
 from Autodesk.Revit.DB.Plumbing import Pipe, PipeInsulation
 from Autodesk.Revit.DB.Mechanical import Duct, DuctInsulation, DuctLining
 from Autodesk.Revit.DB.Electrical import CableTray
-from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
+from Autodesk.Revit.UI.Selection import ObjectType, ObjectSnapTypes, ISelectionFilter
 from Autodesk.Revit.Exceptions import OperationCanceledException
 
 from pyrevit import revit, script, DB
@@ -36,7 +41,10 @@ import Comb_ui
 XAML_FILE_NAME = "Comb_form.xaml"
 BEND_XAML_FILE_NAME = "Bend_form.xaml"
 CONFIG_NAME = "ESA_Comb"
-BEND_DEFAULTS = {"angle_deg": 90.0, "leg_mm": 1500.0}
+BEND_DEFAULTS = {"angle_deg": 90.0, "leg_mm": 1500.0, "ask_angle": False}
+ANGLE_XAML_FILE_NAME = "Angle_form.xaml"
+QUICK_ANGLES = (10.0, 15.0, 22.5, 30.0, 45.0, 60.0, 90.0)
+MIN_ANGLE, MAX_ANGLE = 5.0, 90.0  # stessi limiti della finestra della curva
 DEFAULTS = {"mode": "below", "side": "Up", "factor": 3.0, "standoff_mm": 100.0, "length_mm": 1500.0}
 
 doc = revit.doc
@@ -166,10 +174,34 @@ def copy_size(source, target):
             dest.Set(src.AsDouble())
 
 
+def tray_turned_copy(source, conn, end_point):
+    """Passerella nuova con lo stesso orientamento della sezione (es. di costa): CableTray.Create la farebbe sempre
+    piatta e Revit non ruota una passerella orizzontale attorno al proprio asse. Si copia il tratto di partenza, lo si
+    mette in prosecuzione dall'estremo e lo si ruota attorno alla verticale passante per l'estremo fino alla
+    direzione voluta: la rotazione attorno a Z conserva l'orientamento della sezione."""
+    origin = conn.Origin
+    travel = conn.CoordinateSystem.BasisZ  # verso uscente dall'estremo
+    wanted = end_point.Subtract(origin)
+    copy_id = list(DB.ElementTransformUtils.CopyElement(doc, source.Id, DB.XYZ.Zero))[0]
+    new = doc.GetElement(copy_id)
+    new.Location.Curve = DB.Line.CreateBound(origin, origin.Add(travel.Multiply(wanted.GetLength())))
+    doc.Regenerate()
+    flat_travel, flat_wanted = DB.XYZ(travel.X, travel.Y, 0), DB.XYZ(wanted.X, wanted.Y, 0)
+    angle = math.atan2(flat_travel.CrossProduct(flat_wanted).Z, flat_travel.DotProduct(flat_wanted))
+    if abs(angle) > 1e-6:
+        axis = DB.Line.CreateBound(origin, origin.Add(DB.XYZ.BasisZ))
+        DB.ElementTransformUtils.RotateElement(doc, copy_id, axis, angle)
+    mark = new.get_Parameter(DB.BuiltInParameter.ALL_MODEL_MARK)
+    if mark is not None and not mark.IsReadOnly:
+        mark.Set("")  # la copia eredita il Mark: duplicato
+    doc.Regenerate()
+    return new
+
+
 def create_curve(source, conn, end_point, type_id, level_id):
     """Crea un tratto dello stesso tipo di source (tubo, canale o passerella) da conn a end_point."""
     if isinstance(source, CableTray):
-        new = CableTray.Create(doc, type_id, conn.Origin, end_point, level_id)
+        return tray_turned_copy(source, conn, end_point)
     elif isinstance(source, Duct):
         new = Duct.Create(doc, type_id, level_id, conn, end_point)
     else:
@@ -554,17 +586,23 @@ def stop(message):
     script.exit()
 
 
-def analyse_bend(pipes, click):
-    """Geometria di partenza della curva, senza toccare il modello. Ritorna (piani dei tubi, dati comuni)."""
+def analyse_bend(pipes, start_click, side_click):
+    """Geometria di partenza della curva, senza toccare il modello. Ritorna (piani dei tubi, dati comuni).
+    start_click: punto qualsiasi (anche fuori dai tubi o su un link): il tubo piu' vicino fa da riferimento e la
+    curva parte dalla proiezione del punto sulla sua linea (i tubi vengono prolungati fino li').
+    side_click: punto a lato della fila che sceglie il verso della piega."""
     d0 = check_straight_parallel(pipes)
     d0 = DB.XYZ(d0.X, d0.Y, 0).Normalize()
-    anchor = min(pipes, key=lambda p: abs(DB.XYZ(-d0.Y, d0.X, 0).DotProduct(ends_of(p)[0].Subtract(click))))
+    perp = DB.XYZ(-d0.Y, d0.X, 0)
+    anchor = min(pipes, key=lambda p: abs(ends_of(p)[0].Subtract(start_click).DotProduct(perp)))
     a0, a1 = ends_of(anchor)
+    along = start_click.Subtract(a0).DotProduct(d0)
+    start_point = DB.XYZ(a0.X + d0.X * along, a0.Y + d0.Y * along, a0.Z)
     mid = a0.Add(a1).Multiply(0.5)
-    # verso della curva: la parte del tubo oltre il click viene sostituita
-    d = d0 if click.Subtract(mid).DotProduct(d0) >= 0 else d0.Negate()
+    # verso della curva: la parte del tubo oltre il punto di partenza viene sostituita
+    d = d0 if start_point.Subtract(mid).DotProduct(d0) >= 0 else d0.Negate()
     left = DB.XYZ(-d.Y, d.X, 0)
-    lats = [ends_of(p)[0].Subtract(click).DotProduct(left) for p in pipes]
+    lats = [ends_of(p)[0].Subtract(side_click).DotProduct(left) for p in pipes]
     click_left = -sum(lats) / len(lats)
     if abs(click_left) < CLICK_TOL_FT:
         raise CombError("Click clearly to the left or to the right of the row of pipes")
@@ -575,7 +613,7 @@ def analyse_bend(pipes, click):
         back, forward = sorted(ends_of(pipe), key=lambda e: e.DotProduct(d))
         items.append({"element": pipe, "back": back, "forward": forward,
                       "w": back.Subtract(base).DotProduct(n),
-                      "u0": click.Subtract(back).DotProduct(d)})
+                      "u0": start_point.Subtract(back).DotProduct(d)})
     geo = {"d": d, "n": n, "left": click_left > 0}
     return items, geo
 
@@ -615,7 +653,12 @@ def build_bend_pipe(plan):
         end_conn.DisconnectFrom(ref)
 
     STAGE[0] = "cutting pipe {} at the bend".format(element.Id)
-    element.Location.Curve = DB.Line.CreateBound(plan["back"], plan["corner"])
+    # si mantiene il verso di disegno originale (inizio/fine): invertirlo fa rifiutare il cambio a passerelle con raccordi
+    if element.Location.Curve.GetEndPoint(0).DistanceTo(plan["back"]) <= element.Location.Curve.GetEndPoint(1).DistanceTo(plan["back"]):
+        new_line = DB.Line.CreateBound(plan["back"], plan["corner"])
+    else:
+        new_line = DB.Line.CreateBound(plan["corner"], plan["back"])
+    element.Location.Curve = new_line
     doc.Regenerate()
     conn = nearest_connector(element, plan["corner"])
 
@@ -640,6 +683,13 @@ def build_bend(plans, geo):
         STAGE[0] = "copying parameters and insulation"
         for plan, res in zip(plans, results):
             res["status"] = "Created ({})".format(inherit(plan["element"], plan["created"], plan["fittings"]))
+        STAGE[0] = "final check of the new elements"
+        doc.Regenerate()
+        for plan in plans:
+            if not all(e.IsValidObject for e in [plan["element"]] + plan["created"]):
+                raise CombError("Revit removed the new pipe of element {} while rebuilding the bend. "
+                                "Try a smaller angle, a longer length after the bend, or a start point farther "
+                                "from the ends of the pipe".format(plan["element"].Id))
         transaction.Commit()
     except Exception as ex:
         transaction.RollBack()
@@ -667,8 +717,9 @@ def print_bend_report(results, geo, settings, detail):
     if freed:
         output.print_md("**Note:** {} connections at the far end of the pipes were removed, "
                         "because the part beyond the bend was replaced.".format(freed))
-    rows = [[output.linkify(r["element"].Id), ", ".join(output.linkify(p.Id) for p in r["new"]),
-             r["elbows"], r["status"]] for r in results]
+    rows = [[output.linkify(r["element"].Id) if r["element"].IsValidObject else "(removed)",
+             ", ".join(output.linkify(p.Id) for p in r["new"] if p.IsValidObject), r["elbows"], r["status"]]
+            for r in results]
     output.print_table(table_data=rows, columns=["Pipe", "New pipes", "Elbows", "Status"])
     if detail:
         output.print_md("**Technical detail**")
@@ -678,11 +729,22 @@ def print_bend_report(results, geo, settings, detail):
 def load_bend_settings(config):
     settings = dict(BEND_DEFAULTS)
     try:
-        for key in BEND_DEFAULTS:
+        for key in ("angle_deg", "leg_mm"):
             settings[key] = float(config.get_option(key, BEND_DEFAULTS[key]))
+        ask = config.get_option("ask_angle", BEND_DEFAULTS["ask_angle"])
+        if not isinstance(ask, bool):
+            ask = str(ask).strip().lower() in ("true", "1", "yes")
+        settings["ask_angle"] = ask
     except Exception:
         pass
     return settings
+
+
+def ask_angle(saved_deg):
+    """Finestra rapida con gli angoli piu' usati. Ritorna l'angolo scelto o None se annullata (ESC).
+    Non forms.CommandSwitchWindow: si chiude appena perde il focus, cioe' subito dopo il clic nel modello."""
+    return Comb_ui.AngleWindow(script.get_bundle_file(ANGLE_XAML_FILE_NAME), "Bend angle", saved_deg,
+                               QUICK_ANGLES, MIN_ANGLE, MAX_ANGLE).show()
 
 
 def save_bend_settings(config, settings):
@@ -695,26 +757,44 @@ def save_bend_settings(config, settings):
 
 
 def bend_main():
-    pipes = pick_pipes("Step 1 of 2: select the pipes, ducts or cable trays to bend, then press Finish", CurveFilter())
+    config = script.get_config(CONFIG_NAME + "_Bend")
+    settings = load_bend_settings(config)
+    if __shiftclick__:  # noqa: F821
+        settings = Comb_ui.BendWindow(script.get_bundle_file(BEND_XAML_FILE_NAME), None, settings).show()
+        if settings is None:
+            script.exit()
+        save_bend_settings(config, settings)
+
+    pipes = pick_pipes("Step 1 of 3: select the pipes, ducts or cable trays to bend, then press Finish", CurveFilter())
     if not pipes:
         script.exit()
+
+    snaps = (ObjectSnapTypes.Endpoints | ObjectSnapTypes.Midpoints | ObjectSnapTypes.Nearest |
+             ObjectSnapTypes.Intersections | ObjectSnapTypes.Perpendicular | ObjectSnapTypes.Centers)
     try:
-        click = uidoc.Selection.PickPoint("Step 2 of 2: click where the bend starts, on the side the pipes "
-                                          "must turn to (left or right of the row)")
+        start_click = uidoc.Selection.PickPoint(snaps, "Step 2 of 3: click where the bend starts (on a pipe, or "
+                                                       "any point, also on a linked model: the closest pipe is "
+                                                       "stretched to it)")
     except OperationCanceledException:
         script.exit()
+
     try:
-        plans, geo = analyse_bend(pipes, click)
+        side_click = uidoc.Selection.PickPoint("Step 3 of 3: click to the left or right of the row, "
+                                               "on the side the pipes must turn to")
+    except OperationCanceledException:
+        script.exit()
+
+    if settings.get("ask_angle"):
+        angle = ask_angle(settings["angle_deg"])
+        if angle is None:
+            script.exit()
+        settings = dict(settings)
+        settings["angle_deg"] = angle  # solo per questa esecuzione: l'angolo salvato non cambia
+
+    try:
+        plans, geo = analyse_bend(pipes, start_click, side_click)
     except CombError as ex:
         stop(ex)
-
-    config = script.get_config(CONFIG_NAME + "_Bend")
-    settings = Comb_ui.BendWindow(script.get_bundle_file(BEND_XAML_FILE_NAME),
-                                  (len(plans), "left" if geo["left"] else "right"),
-                                  load_bend_settings(config)).show()
-    if settings is None:
-        script.exit()
-    save_bend_settings(config, settings)
 
     try:
         compute_bend(plans, geo, settings)

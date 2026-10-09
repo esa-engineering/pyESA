@@ -1,5 +1,13 @@
-title: Comb
+title: Bone
 tooltip: >-
-  CLICK: bends the selected parallel horizontal pipes, ducts or cable trays to the left or right by a chosen angle, keeping their spacing.
-  Select the pipes, then click the point where the bend starts, on the side the pipes must turn to.
+  CLICK: bends the selected parallel horizontal pipes, ducts or cable trays to the left or right, keeping their
+  spacing, with the last used angle and length after the bend. Select the elements, click where the bend starts (on
+  one of them, or any point, also on a linked model: the closest element is stretched to it), then click to the left
+  or right of the row on the side they must turn to. With "Ask the angle every time" a quick window offers common
+  angles or a custom one after the clicks.
+
+  SHIFT + CLICK: opens the settings first: angle, length after the bend and the "Ask the angle every time" option.
+
+  A report lists the result. The new parts keep the parameters and the insulation of the starting element; cable trays
+  keep the orientation of their section (a tray on edge stays on edge).
 author: Matteo Maiorano

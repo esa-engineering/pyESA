@@ -4,11 +4,9 @@ title:
 layout:
   - RiserPass
   - Turns
-  - Combs
-  - Check
+  - Combs 
+  - MatchElevation
+  - Spacing 
   - Stub
-  - Branch
-  - SplitGap
-  - CreateSimilar
-  - WorksetViews
-  - ReportMode
+  - Check
+  - Settings

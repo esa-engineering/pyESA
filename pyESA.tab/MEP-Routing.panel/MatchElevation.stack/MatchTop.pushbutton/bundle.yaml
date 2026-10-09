@@ -1,0 +1,12 @@
+title: Match Top
+tooltip: >-
+  CLICK: click a reference pipe, duct, cable tray or conduit, then select the elements to align and press Finish.
+  Each element is moved vertically so that its upper end top elevation matches the one of the reference (plan
+  position and length are kept). Vertical elements work both as reference (top end) and as aligned elements (moved as
+  a whole).
+
+  SHIFT + CLICK: settings shared by Match Top, Match Middle and Match Bottom: overwrite the reference level with the
+  one of the reference element (on by default) and remove the slope from the aligned elements (off by default).
+
+  A report lists how much each element moved and what could not be changed.
+author: Matteo Maiorano

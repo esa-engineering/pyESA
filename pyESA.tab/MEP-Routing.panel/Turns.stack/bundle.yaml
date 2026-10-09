@@ -1,3 +1,4 @@
 layout:
-  - TurnLeft
-  - TurnRight
+  - Turn
+  - RiserTurn
+  - Branch
