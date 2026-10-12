@@ -1,10 +1,11 @@
 title: Turn
 tooltip: >-
-  CLICK: one window with the turn angle (common angles or a custom one), the length of the new run, the slope (keep it
-  or make the new run horizontal) and the clash option; the last used are proposed and saved. Then for each element
-  click near its free end and then on the side the new run must turn to (ESC on this click skips the element): a run
-  turning left or right is added, with an elbow. The options hold for all the clicks until ESC. With the clash option
-  the new run follows the walls, curtain walls, beams and columns it hits, also in linked RVT and IFC models.
+  CLICK: one window with the turn angle (common angles or a custom one) or a direction of the view (arrows up, down,
+  left, right), the length of the new run, the slope (keep it or make the new run horizontal) and the option to align
+  to an element; the last used are proposed and saved. Then for each element click near its free end: with an angle,
+  click on the side the new run must turn to; with an arrow, the run turns towards that direction of the view; with
+  the alignment, click a wall, beam, pipe or other element (also in linked RVT and IFC models) and the new run turns
+  parallel to it. ESC on the second click skips the element. The options hold for all the clicks until ESC.
 
   A report lists the result. The new parts keep the parameters and the insulation of the starting element; cable trays
   keep the orientation of their section (a tray on edge stays on edge).

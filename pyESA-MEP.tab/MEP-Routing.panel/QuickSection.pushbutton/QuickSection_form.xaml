@@ -1,0 +1,137 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Quick Section - Settings"
+        Width="480" Height="580"
+        MinWidth="420" MinHeight="440"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip">
+
+    <Window.Resources>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="✂ QUICK SECTION" FontSize="16" FontWeight="Bold"
+                   HorizontalAlignment="Center" Margin="0,0,0,10"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
+                        Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="📏 EXTENT"/>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Side margin:"/>
+                            <TextBox Grid.Column="1" x:Name="MarginBox" Style="{StaticResource InputField}"/>
+                            <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}" Text="mm beyond the points or the element, each side"/>
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Below view range:"/>
+                            <TextBox Grid.Column="1" x:Name="BelowBox" Style="{StaticResource InputField}"/>
+                            <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}" Text="mm under the bottom of the plan view range"/>
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Above view range:"/>
+                            <TextBox Grid.Column="1" x:Name="AboveBox" Style="{StaticResource InputField}"/>
+                            <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}" Text="mm over the top of the plan view range"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
+                        Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="🖼 VIEW"/>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Section name:"/>
+                            <TextBox Grid.Column="1" x:Name="NameBox" VerticalContentAlignment="Center"/>
+                        </Grid>
+                        <TextBlock x:Name="NameHint" Style="{StaticResource HintText}" Margin="130,0,0,5"/>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Section type:"/>
+                            <ComboBox Grid.Column="1" x:Name="TypeCombo" Style="{StaticResource ComboStyle}"/>
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="View template:"/>
+                            <ComboBox Grid.Column="1" x:Name="TemplateCombo" Style="{StaticResource ComboStyle}"/>
+                        </Grid>
+                        <TextBlock Style="{StaticResource HintText}" Margin="0,5,0,0"
+                                   Text="Type and template are applied when the section is created. On an existing section only what you change here is applied; everything else you set on the section (visibility, scale, detail level, far clip mode) is kept. Without a template a new section takes the scale of the plan. A template that controls the far clip overrides the depth of the click."/>
+                    </StackPanel>
+                </Border>
+
+                <Border BorderBrush="#E8E8E8" BorderThickness="1" CornerRadius="5"
+                        Background="#F8F8F8" Padding="10" Margin="0,0,0,10">
+                    <TextBlock Style="{StaticResource HintText}"
+                               Text="CLICK, from a plan view: click an element (also in a linked model) to cut parallel to it, or press ESC and click two points (the section snaps to the nearest axis of the view). Then click on the side to look at: the distance of that click from the section line is the depth. The same section is moved every time; it opens beside the plan the first time."/>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+            <Button x:Name="CancelButton" Content="Cancel" Width="80" Height="30" Margin="0,0,10,0" IsCancel="True"/>
+            <Button x:Name="OkButton" Content="OK" Width="100" Height="30" IsDefault="True"
+                    Background="#2D5A8A" Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>

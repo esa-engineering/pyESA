@@ -1,18 +1,25 @@
 # -*- coding: utf-8 -*-
 __title__ = "Bone"
-__doc__ = """Version = 0.6
-Date    = 09.10.2026
+__doc__ = """Version = 0.7
+Date    = 12.10.2026
 ________________________________________________________________
 Bends the selected parallel horizontal pipes, ducts or cable trays to the left or
-right by a chosen angle, keeping their spacing. Select the pipes, then click on one
-of them, or any point (also on a linked model), to choose where the bend starts: the
-closest pipe is stretched to that point and the others bend in line with it. Then click to the left or right of the row to choose the side the pipes
-turn to. The part of each pipe beyond the start point is replaced. The new parts
-keep the parameters and the insulation of the starting element. Cable trays keep the
+right, keeping their spacing.
+CLICK opens the settings window first, before any selection or click:
+- angle (common angles or a custom one), or a direction of the view (arrows up,
+  down, left, right: the angle is computed from the direction of the row)
+- length after the bend (all ends aligned)
+- align to an element: the row bends to run parallel to a clicked wall, beam,
+  column, pipe, duct or vertical face, also in linked RVT and IFC models
+Then select the elements and click where the bend starts (on one of them, or any
+point, also on a linked model: the closest element is stretched to that point and
+the others bend in line with it). With an angle, click to the left or right of the
+row on the side to turn to; with the alignment, click the element to follow (if it
+is perpendicular to the row, click it on the side to turn to).
+SHIFT + CLICK skips the window and uses the last settings.
+The part of each element beyond the start point is replaced. The new parts keep the
+parameters and the insulation of the starting element. Cable trays keep the
 orientation of their section (a tray on edge stays on edge after the bend).
-CLICK uses the last angle and length; SHIFT + CLICK opens the settings window.
-With "Ask the angle every time", after the clicks a quick window offers common
-angles or a custom one; the saved angle does not change.
 ________________________________________________________________
 Author(s): Matteo Maiorano
 """
@@ -37,14 +44,14 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 from pyrevit import revit, script, DB
 
 import Comb_ui
+import Turn_ui
 
 XAML_FILE_NAME = "Comb_form.xaml"
-BEND_XAML_FILE_NAME = "Bend_form.xaml"
 CONFIG_NAME = "ESA_Comb"
-BEND_DEFAULTS = {"angle_deg": 90.0, "leg_mm": 1500.0, "ask_angle": False}
+BEND_DEFAULTS = {"angle_deg": 90.0, "length_mm": 1500.0, "mode": "angle", "direction": "up"}
 ANGLE_XAML_FILE_NAME = "Angle_form.xaml"
 QUICK_ANGLES = (10.0, 15.0, 22.5, 30.0, 45.0, 60.0, 90.0)
-MIN_ANGLE, MAX_ANGLE = 5.0, 90.0  # stessi limiti della finestra della curva
+MIN_ANGLE, MAX_ANGLE = 5.0, 90.0  # limiti dell'angolo di curva, anche quando si calcola da freccia o elemento
 DEFAULTS = {"mode": "below", "side": "Up", "factor": 3.0, "standoff_mm": 100.0, "length_mm": 1500.0}
 
 doc = revit.doc
@@ -581,16 +588,163 @@ def save_settings(config, settings):
 
 
 def stop(message):
-    output.print_md("# Comb report")
+    output.print_md("# Multi Turn report")
     output.print_md("**Nothing was changed.** {}".format(message))
     script.exit()
 
 
-def analyse_bend(pipes, start_click, side_click):
+# ----------------------------------------------------------------------------------------------------------------
+# Direzione dopo la curva: angolo e clic sul lato, freccia nella vista, oppure parallela a un elemento cliccato
+# ----------------------------------------------------------------------------------------------------------------
+VERTICAL_FACE_TOL = 0.1  # sotto questa componente orizzontale la normale della faccia cliccata non da' una direzione
+PERPENDICULAR_SIN = math.sin(math.radians(1.0))  # entro 1 grado dalla perpendicolare il verso lo decide il clic
+
+
+def signed_angle_to(forward, target):
+    """Angolo con segno in gradi da forward a target (orizzontali): positivo = sinistra visto dall'alto."""
+    return math.degrees(math.atan2(forward.CrossProduct(target).Z, forward.DotProduct(target)))
+
+
+def view_direction(name):
+    """Direzione orizzontale della freccia scelta, come si vede nella vista attiva: destra = RightDirection della
+    vista, su = 90 gradi a sinistra della destra (in pianta: verso l'alto dello schermo, anche con la vista ruotata)."""
+    right = doc.ActiveView.RightDirection
+    right = DB.XYZ(right.X, right.Y, 0)
+    right = right.Normalize() if right.GetLength() > 1e-6 else DB.XYZ.BasisX
+    up = DB.XYZ(-right.Y, right.X, 0)
+    return {"right": right, "left": right.Negate(), "up": up, "down": up.Negate()}[name]
+
+
+def hit_face_normal(reference, element, link_instance):
+    """Normale (coordinate host) della faccia piana cliccata, o None se non e' leggibile. Per gli elementi di un link
+    la faccia si legge dal documento del link e la normale si porta nel modello host."""
+    try:
+        if link_instance is not None:
+            face = element.GetGeometryObjectFromReference(reference.CreateReferenceInLink())
+        else:
+            face = element.GetGeometryObjectFromReference(reference)
+        if not isinstance(face, DB.PlanarFace):
+            return None
+        normal = face.FaceNormal
+        return link_instance.GetTotalTransform().OfVector(normal) if link_instance is not None else normal
+    except Exception:
+        return None
+
+
+def pick_alignment(prompt):
+    """Clic su un elemento a cui allinearsi, anche in un link RVT o IFC. Ritorna (elemento, transform del link o None,
+    nome del modello, punto cliccato, normale della faccia cliccata o None), o None con ESC."""
+    try:
+        reference = uidoc.Selection.PickObject(ObjectType.PointOnElement, prompt)
+    except OperationCanceledException:
+        return None
+    host = doc.GetElement(reference.ElementId)
+    hit = reference.GlobalPoint
+    if isinstance(host, DB.RevitLinkInstance):
+        link_doc = host.GetLinkDocument()
+        if link_doc is None or reference.LinkedElementId == DB.ElementId.InvalidElementId:
+            raise CombError("The element clicked in the linked model could not be read")
+        element = link_doc.GetElement(reference.LinkedElementId)
+        return element, host.GetTotalTransform(), link_doc.Title, hit, hit_face_normal(reference, element, host)
+    return host, None, "host model", hit, hit_face_normal(reference, host, None)
+
+
+def element_axis(element, transform, hit):
+    """Asse orizzontale dell'elemento vicino al punto cliccato (muri, travi, tubi, canali, griglie, linee): ritorna
+    la tangente orizzontale unitaria in coordinate host, o None se non c'e'."""
+    location = getattr(element, "Location", None)
+    if isinstance(location, DB.LocationCurve):
+        curve = location.Curve
+    elif isinstance(element, DB.Grid):
+        curve = element.Curve
+    elif isinstance(element, DB.CurveElement):
+        curve = element.GeometryCurve
+    else:
+        return None
+    if transform is not None:
+        curve = curve.CreateTransformed(transform)
+    projection = curve.Project(hit)
+    if projection is None:
+        return None
+    direction = curve.ComputeDerivatives(projection.Parameter, False).BasisX
+    flat = DB.XYZ(direction.X, direction.Y, 0)
+    return flat.Normalize() if flat.GetLength() > 1e-9 else None
+
+
+def align_target(pick, d, side_of_point):
+    """Direzione dopo la curva parallela all'elemento cliccato, e nota per il report. Dei due versi lungo l'elemento
+    si tiene quello che curva al massimo 90 gradi; se l'elemento e' perpendicolare ai tubi, il lato lo decide il punto
+    cliccato (side_of_point: True = sinistra della fila, False = destra, None = sulla fila)."""
+    element, transform, model, hit, face_normal = pick
+    category = element.Category.Name if element.Category is not None else "Element"
+    label = "{} {} ({})".format(category, element.Id, model)
+    tangent = element_axis(element, transform, hit)
+    if tangent is None:
+        # senza asse (pilastro, pannello, DirectShape IFC): lungo la faccia cliccata
+        if face_normal is None:
+            raise CombError("{} has no axis and the clicked face could not be read: click a wall, beam, pipe or "
+                            "duct, or a vertical face".format(label))
+        flat = DB.XYZ(-face_normal.Y, face_normal.X, 0)
+        if flat.GetLength() < VERTICAL_FACE_TOL:
+            raise CombError("The clicked face of {} is horizontal (floor, soffit, top of an element): it gives no "
+                            "direction. Click a vertical face".format(label))
+        tangent = flat.Normalize()
+    dot = d.DotProduct(tangent)
+    if abs(dot) < PERPENDICULAR_SIN:
+        side = side_of_point(hit)
+        if side is None:
+            raise CombError("{} is perpendicular to the pipes: click it to the left or to the right of the row, on "
+                            "the side to turn to".format(label))
+        left = DB.XYZ(-d.Y, d.X, 0)
+        if (tangent.DotProduct(left) > 0) != side:
+            tangent = tangent.Negate()
+    elif dot < 0:
+        tangent = tangent.Negate()
+    return tangent, "Parallel to {}".format(label)
+
+
+def check_angle(signed_deg):
+    if abs(signed_deg) < MIN_ANGLE:
+        raise CombError("The new direction is only {:.1f} degrees from the pipes: the minimum is {:g} degrees".format(
+            abs(signed_deg), MIN_ANGLE))
+    if abs(signed_deg) > MAX_ANGLE + 0.01:
+        raise CombError("The new direction is {:.1f} degrees from the pipes: more than {:g} degrees needs two "
+                        "bends".format(abs(signed_deg), MAX_ANGLE))
+
+
+def click_side(pipes, left, click):
+    """Lato della fila su cui sta il punto: True = sinistra, False = destra, None = sulla fila."""
+    lats = [ends_of(p)[0].Subtract(click).DotProduct(left) for p in pipes]
+    click_left = -sum(lats) / len(lats)
+    if abs(click_left) < CLICK_TOL_FT:
+        return None
+    return click_left > 0
+
+
+def resolve_turn(pipes, d, settings, side_click, pick):
+    """Angolo (positivo), verso (True = sinistra) e nota per il report, secondo la modalita' della finestra."""
+    left = DB.XYZ(-d.Y, d.X, 0)
+    mode = settings["mode"]
+    if mode == "angle":
+        side = click_side(pipes, left, side_click)
+        if side is None:
+            raise CombError("Click clearly to the left or to the right of the row of pipes")
+        return settings["angle_deg"], side, ""
+    if mode == "direction":
+        target, note = view_direction(settings["direction"]), Turn_ui.describe(settings).capitalize()
+    else:
+        target, note = align_target(pick, d, lambda point: click_side(pipes, left, point))
+    signed_deg = signed_angle_to(d, target)
+    check_angle(signed_deg)
+    return abs(signed_deg), signed_deg > 0, note
+
+
+def analyse_bend(pipes, start_click, settings, side_click=None, pick=None):
     """Geometria di partenza della curva, senza toccare il modello. Ritorna (piani dei tubi, dati comuni).
     start_click: punto qualsiasi (anche fuori dai tubi o su un link): il tubo piu' vicino fa da riferimento e la
     curva parte dalla proiezione del punto sulla sua linea (i tubi vengono prolungati fino li').
-    side_click: punto a lato della fila che sceglie il verso della piega."""
+    side_click (modalita' angolo): punto a lato della fila che sceglie il verso della piega.
+    pick (modalita' allineamento): elemento cliccato a cui la fila diventa parallela dopo la curva."""
     d0 = check_straight_parallel(pipes)
     d0 = DB.XYZ(d0.X, d0.Y, 0).Normalize()
     perp = DB.XYZ(-d0.Y, d0.X, 0)
@@ -601,12 +755,9 @@ def analyse_bend(pipes, start_click, side_click):
     mid = a0.Add(a1).Multiply(0.5)
     # verso della curva: la parte del tubo oltre il punto di partenza viene sostituita
     d = d0 if start_point.Subtract(mid).DotProduct(d0) >= 0 else d0.Negate()
+    angle_deg, turn_left, note = resolve_turn(pipes, d, settings, side_click, pick)
     left = DB.XYZ(-d.Y, d.X, 0)
-    lats = [ends_of(p)[0].Subtract(side_click).DotProduct(left) for p in pipes]
-    click_left = -sum(lats) / len(lats)
-    if abs(click_left) < CLICK_TOL_FT:
-        raise CombError("Click clearly to the left or to the right of the row of pipes")
-    n = left.Multiply(1 if click_left > 0 else -1)
+    n = left if turn_left else left.Negate()
     base = min(ends_of(anchor), key=lambda e: e.DotProduct(d))
     items = []
     for pipe in pipes:
@@ -614,13 +765,13 @@ def analyse_bend(pipes, start_click, side_click):
         items.append({"element": pipe, "back": back, "forward": forward,
                       "w": back.Subtract(base).DotProduct(n),
                       "u0": start_point.Subtract(back).DotProduct(d)})
-    geo = {"d": d, "n": n, "left": click_left > 0}
+    geo = {"d": d, "n": n, "left": turn_left, "angle_deg": angle_deg, "note": note}
     return items, geo
 
 
 def compute_bend(plans, geo, settings):
     """Angolo di curva di ogni tubo: gli angoli stanno sulla bisettrice, cosi' l'interasse si conserva."""
-    theta = math.radians(settings["angle_deg"])
+    theta = math.radians(geo["angle_deg"])
     d, n = geo["d"], geo["n"]
     d_new = d.Multiply(math.cos(theta)).Add(n.Multiply(math.sin(theta)))
     geo["d_new"] = d_new
@@ -632,7 +783,7 @@ def compute_bend(plans, geo, settings):
                             "Click farther along the pipes".format(plan["element"].Id))
         plan["corner"] = plan["back"].Add(d.Multiply(u))
         plan["q"] = plan["corner"].DotProduct(d_new)
-    q_end = max(p["q"] for p in plans) + settings["leg_mm"] / MM_PER_FT
+    q_end = max(p["q"] for p in plans) + settings["length_mm"] / MM_PER_FT
     for plan in plans:
         plan["leg"] = q_end - plan["q"]
         plan["leg_end"] = plan["corner"].Add(d_new.Multiply(plan["leg"]))
@@ -707,9 +858,11 @@ def build_bend(plans, geo):
 
 
 def print_bend_report(results, geo, settings, detail):
-    output.print_md("# Comb bend report")
-    output.print_md("Bend to the **{}** | angle **{:g} deg** | length after the bend **{:g} mm**".format(
-        "left" if geo["left"] else "right", settings["angle_deg"], settings["leg_mm"]))
+    output.print_md("# Multi Turn report")
+    output.print_md("Bend to the **{}** | angle **{:.1f} deg** | length after the bend **{:g} mm**".format(
+        "left" if geo["left"] else "right", geo["angle_deg"], settings["length_mm"]))
+    if geo.get("note"):
+        output.print_md("Direction: **{}**".format(geo["note"]))
     done = [r for r in results if r["status"].startswith("Created")]
     output.print_md("Pipes: **{}** | bent: **{}** | new pipes: **{}** | elbows: **{}**".format(
         len(results), len(done), sum(len(r["new"]) for r in done), sum(r["elbows"] for r in done)))
@@ -729,74 +882,88 @@ def print_bend_report(results, geo, settings, detail):
 def load_bend_settings(config):
     settings = dict(BEND_DEFAULTS)
     try:
-        for key in ("angle_deg", "leg_mm"):
-            settings[key] = float(config.get_option(key, BEND_DEFAULTS[key]))
-        ask = config.get_option("ask_angle", BEND_DEFAULTS["ask_angle"])
-        if not isinstance(ask, bool):
-            ask = str(ask).strip().lower() in ("true", "1", "yes")
-        settings["ask_angle"] = ask
+        settings["angle_deg"] = float(config.get_option("angle_deg", BEND_DEFAULTS["angle_deg"]))
+        # nella configurazione la lunghezza resta "leg_mm", come nelle versioni precedenti
+        settings["length_mm"] = float(config.get_option("leg_mm", BEND_DEFAULTS["length_mm"]))
+        mode = config.get_option("mode", BEND_DEFAULTS["mode"])
+        settings["mode"] = mode if mode in ("angle", "direction", "align") else BEND_DEFAULTS["mode"]
+        direction = config.get_option("direction", BEND_DEFAULTS["direction"])
+        settings["direction"] = direction if direction in Turn_ui.DIRECTIONS else BEND_DEFAULTS["direction"]
     except Exception:
         pass
     return settings
 
 
-def ask_angle(saved_deg):
-    """Finestra rapida con gli angoli piu' usati. Ritorna l'angolo scelto o None se annullata (ESC).
-    Non forms.CommandSwitchWindow: si chiude appena perde il focus, cioe' subito dopo il clic nel modello."""
-    return Comb_ui.AngleWindow(script.get_bundle_file(ANGLE_XAML_FILE_NAME), "Bend angle", saved_deg,
-                               QUICK_ANGLES, MIN_ANGLE, MAX_ANGLE).show()
-
-
 def save_bend_settings(config, settings):
     try:
-        for key in BEND_DEFAULTS:
-            setattr(config, key, settings[key])
+        config.angle_deg = settings["angle_deg"]
+        config.leg_mm = settings["length_mm"]
+        config.mode = settings["mode"]
+        config.direction = settings["direction"]
         script.save_config()
     except Exception:
         pass
 
 
+WINDOW_TEXTS = {
+    "caption": "Multi Turn",
+    "title": u"↪ MULTI TURN",
+    "length_header": u"\U0001F4CF LENGTH",
+    "length_unit": "mm after the farthest bend (all ends aligned)",
+    "align_hint": "After selecting the elements and clicking where the bend starts, click the element to follow: a "
+                  "wall, beam, column, pipe, duct or vertical face, also in linked RVT and IFC models. The row bends "
+                  "to run parallel to it (at most 90 degrees). If the element is perpendicular to the row, click it "
+                  "on the side to turn to.",
+    "info": "Click an angle button or an arrow to start, or type a custom angle and press Use custom. Then select the "
+            "elements, click where the bend starts and, with an angle, click on the side to turn to; with an arrow "
+            "the row turns towards that direction of the view. The elements keep their spacing through the bend and "
+            "the part beyond the bend is replaced. SHIFT + CLICK skips this window and uses the last settings.",
+}
+
+
 def bend_main():
     config = script.get_config(CONFIG_NAME + "_Bend")
     settings = load_bend_settings(config)
-    if __shiftclick__:  # noqa: F821
-        settings = Comb_ui.BendWindow(script.get_bundle_file(BEND_XAML_FILE_NAME), None, settings).show()
+    # CLICK: la finestra si apre sempre, prima di selezione e clic; SHIFT + CLICK: ultime impostazioni, senza finestra
+    if not __shiftclick__:  # noqa: F821
+        settings = Turn_ui.TurnWindow(script.get_bundle_file(ANGLE_XAML_FILE_NAME), settings, WINDOW_TEXTS,
+                                      QUICK_ANGLES, MIN_ANGLE, MAX_ANGLE, show_slope=False).show()
         if settings is None:
             script.exit()
         save_bend_settings(config, settings)
 
-    pipes = pick_pipes("Step 1 of 3: select the pipes, ducts or cable trays to bend, then press Finish", CurveFilter())
+    steps = 3 if settings["mode"] in ("angle", "align") else 2
+    pipes = pick_pipes("Step 1 of {}: select the pipes, ducts or cable trays to bend, then press Finish".format(steps),
+                       CurveFilter())
     if not pipes:
         script.exit()
 
     snaps = (ObjectSnapTypes.Endpoints | ObjectSnapTypes.Midpoints | ObjectSnapTypes.Nearest |
              ObjectSnapTypes.Intersections | ObjectSnapTypes.Perpendicular | ObjectSnapTypes.Centers)
     try:
-        start_click = uidoc.Selection.PickPoint(snaps, "Step 2 of 3: click where the bend starts (on a pipe, or "
+        start_click = uidoc.Selection.PickPoint(snaps, "Step 2 of {}: click where the bend starts (on a pipe, or "
                                                        "any point, also on a linked model: the closest pipe is "
-                                                       "stretched to it)")
+                                                       "stretched to it)".format(steps))
     except OperationCanceledException:
         script.exit()
 
+    side_click, pick = None, None
     try:
-        side_click = uidoc.Selection.PickPoint("Step 3 of 3: click to the left or right of the row, "
-                                               "on the side the pipes must turn to")
+        if settings["mode"] == "angle":
+            side_click = uidoc.Selection.PickPoint("Step 3 of 3: click to the left or right of the row, "
+                                                   "on the side the pipes must turn to")
+        elif settings["mode"] == "align":
+            pick = pick_alignment("Step 3 of 3: click the element the pipes must be parallel to after the bend, "
+                                  "also in a linked model")
+            if pick is None:
+                script.exit()
     except OperationCanceledException:
         script.exit()
-
-    if settings.get("ask_angle"):
-        angle = ask_angle(settings["angle_deg"])
-        if angle is None:
-            script.exit()
-        settings = dict(settings)
-        settings["angle_deg"] = angle  # solo per questa esecuzione: l'angolo salvato non cambia
-
-    try:
-        plans, geo = analyse_bend(pipes, start_click, side_click)
     except CombError as ex:
         stop(ex)
 
     try:
+        plans, geo = analyse_bend(pipes, start_click, settings, side_click, pick)
         compute_bend(plans, geo, settings)
     except CombError as ex:
         stop(ex)

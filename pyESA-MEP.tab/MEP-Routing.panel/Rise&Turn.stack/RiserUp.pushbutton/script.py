@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "Riser Up"
-__doc__ = """Version = 0.2
-Date    = 07.10.2026
+__doc__ = """Version = 0.3
+Date    = 12.10.2026
 ________________________________________________________________
 Description:
 Adds a vertical run upwards to pipes, ducts, cable trays and conduits.
@@ -10,6 +10,8 @@ Instruction:
 - CLICK: uses the last settings (default: 1000 mm)
 - SHIFT + CLICK: set the height, either a length from the selected
   end or a level plus an offset
+  - optional inclined run before the vertical one: angle and length of the slope
+    (from a horizontal free end, the run goes on rising at that angle, then up or down)
 - Click each element near the free end you want to extend
   (the nearest free end is used)
 - Press ESC to finish: a report lists the new elements and their
@@ -44,7 +46,9 @@ WORDS = {"up": {"side": "above", "towards": "upwards", "opposite": "downwards"},
 
 XAML_FILE_NAME = "Riser_form.xaml"
 CONFIG_NAME = "ESA_Riser{}".format(RISER_DIRECTION.capitalize())
-DEFAULTS = {"mode": "length", "length_mm": 1000.0, "offset_mm": 0.0, "level_name": ""}
+DEFAULTS = {"mode": "length", "length_mm": 1000.0, "offset_mm": 0.0, "level_name": "",
+            "slope_on": False, "slope_deg": 45.0, "slope_length_mm": 1000.0}
+SLOPE_MIN_DEG, SLOPE_MAX_DEG = 5.0, 85.0  # angolo del tratto inclinato rispetto all'orizzontale
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -426,6 +430,9 @@ def process_pick(reference, settings):
     ref_level = doc.GetElement(level_id)
     result["level"] = ref_level.Name
 
+    if settings.get("slope_on"):
+        return process_slope(element, conn, settings, level_id, ref_level, result)
+
     origin = conn.Origin
     if settings["mode"] == "level":
         target_z = level_elevation(settings["level"]) + settings["offset_mm"] / MM_PER_FT
@@ -465,14 +472,81 @@ def process_pick(reference, settings):
     return result
 
 
+def flat_unit(vector):
+    return DB.XYZ(vector.X, vector.Y, 0).Normalize()
+
+
+def process_slope(element, conn, settings, level_id, ref_level, result):
+    """Tratto inclinato prima del verticale: dall'estremo libero orizzontale si va avanti nella direzione del tratto
+    salendo con l'angolo scelto, poi il verticale. Due gomiti: tra il tratto esistente e l'inclinato, e tra
+    l'inclinato e il verticale. Con il livello, la quota e' quella della cima del verticale."""
+    if abs(conn.CoordinateSystem.BasisZ.Z) > 0.01:
+        result["status"] = "The slope needs a horizontal free end: this end is vertical"
+        return result
+    out = flat_unit(conn.CoordinateSystem.BasisZ)
+    angle = math.radians(settings["slope_deg"])
+    slope_dir = out.Multiply(math.cos(angle)).Add(DB.XYZ.BasisZ.Multiply(SIGN * math.sin(angle))).Normalize()
+    knee = conn.Origin.Add(slope_dir.Multiply(settings["slope_length_mm"] / MM_PER_FT))
+    if settings["mode"] == "level":
+        target_z = level_elevation(settings["level"]) + settings["offset_mm"] / MM_PER_FT
+        riser = SIGN * (target_z - knee.Z)
+    else:
+        riser = settings["length_mm"] / MM_PER_FT
+    if riser < MIN_LENGTH_FT:
+        result["status"] = "Target is not {} the end of the slope ({:.0f} mm)".format(
+            WORDS["side"], riser * MM_PER_FT)
+        return result
+    top = DB.XYZ(knee.X, knee.Y, knee.Z + SIGN * riser)
+
+    transaction = DB.Transaction(doc, "Riser {} with slope".format(RISER_DIRECTION.capitalize()))
+    transaction.Start()
+    try:
+        slope, note = create_segment(element, conn, knee, level_id)
+        first = ensure_connection(element, conn, slope, straight=False)
+        knee_conn = nearest_connector(slope, knee)
+        riser_element, _ = create_segment(element, knee_conn, top, level_id)
+        second = ensure_connection(slope, knee_conn, riser_element, straight=False)
+        doc.Regenerate()
+        for name, part in (("slope", slope), ("riser", riser_element)):
+            if part.Location.Curve.Length * MM_PER_FT < MIN_REMAINING_MM:
+                raise RiserError("The {} would be shorter than {:.0f} mm".format(name, MIN_REMAINING_MM))
+        inherited = inherit(element, [slope, riser_element], [first, second])
+        transaction.Commit()
+    except RiserError as ex:
+        transaction.RollBack()
+        result["status"] = "Not created. {}".format(ex)
+        return result
+    except Exception as ex:
+        transaction.RollBack()
+        result["status"] = ("Not created. The slope could not be placed (not enough space, or no valid fitting "
+                            "in the routing preferences): {}".format(ex))
+        return result
+
+    result.update({"ok": True, "status": "Created ({})".format("; ".join(t for t in (note, inherited) if t)),
+                   "new": riser_element,
+                   "fitting": " + ".join(fitting_label(f) for f in (first, second)),
+                   "added_mm": settings["slope_length_mm"] + riser * MM_PER_FT,
+                   "z_mm": top.Z * MM_PER_FT,
+                   "rel_mm": (top.Z - level_elevation(ref_level)) * MM_PER_FT})
+    return result
+
+
 def fmt(value):
     return "" if value is None else "{:.1f}".format(value)
 
 
-def settings_text(settings):
+def height_text(settings):
     if settings["mode"] == "level":
         return "to {} {:+.0f} mm".format(settings["level"].Name, settings["offset_mm"])
     return "{:g} mm {} the selected end".format(settings["length_mm"], WORDS["side"])
+
+
+def settings_text(settings):
+    text = height_text(settings)
+    if settings.get("slope_on"):
+        text += ", after an inclined run of {:g} mm at {:g} degrees".format(
+            settings["slope_length_mm"], settings["slope_deg"])
+    return text
 
 
 def print_report(results, settings):
@@ -507,6 +581,9 @@ def load_saved(config):
         saved["length_mm"] = float(config.get_option("length_mm", DEFAULTS["length_mm"]))
         saved["offset_mm"] = float(config.get_option("offset_mm", DEFAULTS["offset_mm"]))
         saved["level_name"] = config.get_option("level_name", DEFAULTS["level_name"])
+        saved["slope_on"] = bool(config.get_option("slope_on", DEFAULTS["slope_on"]))
+        saved["slope_deg"] = float(config.get_option("slope_deg", DEFAULTS["slope_deg"]))
+        saved["slope_length_mm"] = float(config.get_option("slope_length_mm", DEFAULTS["slope_length_mm"]))
     except Exception:
         pass
     return saved
@@ -538,6 +615,9 @@ def ask_settings(saved, levels):
         settings["level_name"] = settings["level"].Name
     else:
         settings["length_mm"] = values["length_mm"]
+    settings["slope_on"] = values["slope_on"]
+    settings["slope_deg"] = values["slope_deg"]
+    settings["slope_length_mm"] = values["slope_length_mm"]
     return settings
 
 
@@ -547,6 +627,9 @@ def save_settings(config, settings):
         config.length_mm = settings["length_mm"]
         config.offset_mm = settings["offset_mm"]
         config.level_name = settings["level_name"]
+        config.slope_on = settings["slope_on"]
+        config.slope_deg = settings["slope_deg"]
+        config.slope_length_mm = settings["slope_length_mm"]
         script.save_config()
     except Exception:
         pass

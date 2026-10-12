@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "Riser\nTurn"
-__doc__ = """Version = 0.1
-Date    = 09.10.2026
+__doc__ = """Version = 0.2
+Date    = 12.10.2026
 ________________________________________________________________
 Description:
 Turns vertical runs of pipe, duct or cable tray into a horizontal run,
@@ -25,9 +25,11 @@ Instruction:
 4. Staggering, computed in plan and independent of the view: each
    horizontal run is a corridor along its real direction (after snapping
    to a face), as wide as the riser across that direction. If it crosses
-   another selected riser farther ahead, the run goes up above the elbow
-   of that riser, by their distance in plan along the run (at least
-   enough for the sections not to touch). The riser farthest in the
+   another selected riser farther ahead, the run passes the elbow of that
+   riser by their distance in plan along the run (at least enough for
+   the sections not to touch): above it when the elbow is at the top
+   (the riser is below the elbow), below it when the elbow is at the
+   bottom (the riser rises above the elbow). The riser farthest in the
    direction of the turn keeps the elevation. The moved end is the one
    where the elbow goes
 
@@ -572,9 +574,10 @@ def plan_elevations(risers, settings, z, wanted):
     Geometria in pianta, indipendente dalla vista: ogni tratto orizzontale e' un corridoio che parte dall'asse del
     suo montante, nella direzione reale del tratto (quella agganciata alla faccia) e largo quanto l'ingombro vero
     del montante di traverso a quella direzione. Se il corridoio attraversa un altro montante che sta piu' avanti,
-    alla stessa quota il tratto lo colpirebbe: il tratto sale sopra la curva di quel montante, della distanza in
-    pianta tra i due lungo il tratto (almeno quanto serve perche' le sezioni non si tocchino). Il montante piu'
-    avanti nella direzione della curva tiene quindi la quota base. Ritorna {id del montante: plan}."""
+    alla stessa quota il tratto lo colpirebbe: il tratto passa oltre la curva di quel montante, della distanza in
+    pianta tra i due lungo il tratto (almeno quanto serve perche' le sezioni non si tocchino). Sopra se la curva e'
+    in alto (il montante sta sotto), sotto se la curva e' in basso (il montante sale sopra la curva). Il montante
+    piu' avanti nella direzione della curva tiene quindi la quota base. Ritorna {id del montante: plan}."""
     which = settings["move_end"] if settings["position"] == "elevation" else settings["position"]
     length = settings["length_mm"] / MM_PER_FT
     info = {}
@@ -608,6 +611,10 @@ def plan_elevations(risers, settings, z, wanted):
         return found
 
     elevations, notes, visiting = {}, {}, set()
+    # curva in alto: il montante sta sotto la curva, il tratto passa SOPRA la curva dell'altro montante.
+    # Curva in basso: il montante sale sopra la curva, quindi il tratto deve passare SOTTO, altrimenti attraversa
+    # il montante dell'altro
+    sign = 1.0 if which == "top" else -1.0
 
     def elevation(key):
         if key in elevations:
@@ -618,11 +625,12 @@ def plan_elevations(risers, settings, z, wanted):
             visiting.add(key)
             for other, distance in hits(i):
                 step = max(distance, (i["height"] + info[other]["height"]) / 2.0)
-                needed = elevation(other) + step
-                if needed > value + 1e-6:
+                needed = elevation(other) + sign * step
+                if sign * (needed - value) > 1e-6:
                     value = needed
-                    notes[key] = "raised {:+.0f} mm to pass over riser {}".format(
-                        (value - i["base"]) * MM_PER_FT, other)
+                    notes[key] = "{} {:+.0f} mm to pass {} riser {}".format(
+                        "raised" if sign > 0 else "lowered", (value - i["base"]) * MM_PER_FT,
+                        "over" if sign > 0 else "under", other)
             visiting.discard(key)
         elevations[key] = value
         return value

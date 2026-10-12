@@ -2,7 +2,8 @@ title: Gap
 tooltip: >-
   Opens a gap in straight pipes, ducts, cable trays and conduits, one element at a time until ESC. No selection and no
   Finish: click the element at the first point of the gap, then click the second point on the same (highlighted)
-  element. The piece in between is removed. ESC on the second click skips the element, ESC on the first click
+  element. The piece in between is removed; a second point beyond the end of the element removes the whole rest
+  of it, up to that end. ESC on the second click skips the element, ESC on the first click
   finishes.
 
   In plans, sections and elevations the clicks use Revit snaps; in 3D views both clicks are on the element. Vertical

@@ -95,7 +95,7 @@
                                        Text="The chosen end is moved to the elevation: the riser is extended or shortened. If the riser would end up too short, it is left unchanged and the report says why."/>
                         </StackPanel>
                         <TextBlock Style="{StaticResource HintText}" Margin="0,6,0,0"
-                                   Text="The end where the elbow goes must be free: if it is connected to something, that riser is left unchanged and the report says to what. Risers in line along the direction of the turn are staggered so that their horizontal runs do not cross: the one farthest in the direction of the turn keeps the elevation, the ones behind go up by their distance from the previous one."/>
+                                   Text="The end where the elbow goes must be free: if it is connected to something, that riser is left unchanged and the report says to what. Risers in line along the direction of the turn are staggered so that their horizontal runs do not cross: the one farthest in the direction of the turn keeps the elevation, the ones behind move by their distance from the previous one: up when the elbow is at the top, down when it is at the bottom (so that the runs pass under the risers above them)."/>
                     </StackPanel>
                 </Border>
 

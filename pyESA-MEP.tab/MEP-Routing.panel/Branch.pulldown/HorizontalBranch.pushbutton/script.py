@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __title__ = "Horizontal\nBranch"
-__doc__ = """Version = 0.4
+__doc__ = """Version = 0.6
 Date    = 12.10.2026
 ________________________________________________________________
 Description:
@@ -15,8 +15,13 @@ from vertical runs are made by Vertical Branch.
   always get a tee and keep the orientation of their section)
 - keep clicking to add more branches, also on the same run; ESC to finish
 - pipe branches keep the size of the run
-- length from the run axis: the saved one (default 500 mm);
-  SHIFT + CLICK asks it before starting
+- optional change of level: a short stub with the tee or tap, then an inclined run at the
+  chosen angle (90, 45, 30 or custom) up or down to the offset (+ up, - down), then the
+  horizontal run of the set length after the change of level. Ducts and cable trays keep
+  the tee on the stub before the change of level. Set in SHIFT + CLICK; 0 = straight branch
+- length of the horizontal run (after the change of level, or the whole branch with 0 offset),
+  from the run axis / elbow: the saved one (default 500 mm)
+- SHIFT + CLICK opens one window with the offset, the angle and the length
 If a fitting does not fit, the run is left unchanged and the report
 says why.
 The new parts keep the parameters and the insulation of the starting element.
@@ -44,6 +49,9 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 from pyrevit import revit, script, DB, forms
 
 import Branch_ui
+import Horizontal_ui
+
+HORIZONTAL_XAML = "Horizontal_form.xaml"
 
 XAML_FILES = {"duct": "Branch_form.xaml", "pipe": "BranchPipe_form.xaml", "tray": "BranchTray_form.xaml"}
 KIND_LABELS = {"duct": "Ducts", "pipe": "Pipes", "tray": "Cable trays"}
@@ -931,7 +939,9 @@ def main():
 # ----------------------------------------------------------------------------------------------------------------
 VERTICAL_MODE, HORIZONTAL_MODE = "Vertical runs", "Horizontal runs"
 MAX_SLOPE_DEG = 60.0
-H_LENGTH_KEY, H_LENGTH_DEFAULT = "h_length_mm", 500.0
+H_LENGTH_KEY, H_LENGTH_DEFAULT = "h_length_mm", 500.0  # tratto orizzontale fino al gomito
+H_DROP_KEY, H_DROP_DEFAULT = "h_drop_mm", 0.0  # dislivello del tratto inclinato: + sale, - scende, 0 = nessuno
+H_ANGLE_KEY, H_ANGLE_DEFAULT = "h_angle_deg", 90.0  # angolo del tratto inclinato dall'orizzontale
 def is_horizontal_run(element):
     """Tubo, condotto o passerella rettilinea con pendenza fino a 60 gradi dall'orizzontale."""
     if not isinstance(element, (Pipe, Duct, CableTray)):
@@ -975,8 +985,56 @@ def side_direction(run, point, side_click):
     return perpendicular if side > 0 else perpendicular.Negate()
 
 
-def process_horizontal(run, point, direction, length_mm, junction):
-    """Uno stacco a 90 gradi in point, con T (tratto diviso) o tap secondo l'innesto salvato per la categoria."""
+def section_half_height(element):
+    """Meta' altezza della sezione del condotto (raggio se tondo), in piedi."""
+    for bip in (DB.BuiltInParameter.RBS_CURVE_HEIGHT_PARAM, DB.BuiltInParameter.RBS_CURVE_DIAMETER_PARAM):
+        value = param_value(element, bip)
+        if value:
+            return value / 2.0
+    raise BranchError("Cannot read the section of the duct")
+
+
+STUB_MIN_MM = 150.0  # tratto corto dopo lo stacco, dove stanno il T o lo stacco: per condotti e passerelle, il doppio
+
+
+def stub_ft(run):
+    """Lunghezza del tratto corto dopo lo stacco, in piedi: almeno STUB_MIN_MM, o il doppio dell'altezza sezione."""
+    try:
+        section_ft = 2.0 * section_half_height(run)
+    except BranchError:
+        section_ft = 0.0
+    return max(STUB_MIN_MM / MM_PER_FT, 2.0 * section_ft)
+
+
+def connect_elbow(first, second, point):
+    """Gomito tra due tratti che si incontrano in point."""
+    try:
+        return doc.Create.NewElbowFitting(nearest_connector(first, point), nearest_connector(second, point))
+    except Exception as ex:
+        raise BranchError("No elbow could be placed after the change of level ({})".format(ex))
+
+
+def add_inclined(branch, run, elbow_point, direction, drop_mm, angle_deg, level_id):
+    """Tratto inclinato dal gomito alla quota finale: sale o scende di drop_mm con l'angolo dato dall'orizzontale,
+    nella direzione dello stacco. Il gomito tra lo stacco orizzontale e l'inclinato sta in elbow_point. Ritorna
+    (tratto inclinato, gomito, punto finale). A 90 gradi il tratto e' verticale."""
+    drop = drop_mm / MM_PER_FT
+    run_ft = 0.0 if abs(angle_deg - 90.0) < 1e-6 else abs(drop) / math.tan(math.radians(angle_deg))
+    end = elbow_point.Add(direction.Multiply(run_ft)).Add(DB.XYZ(0, 0, drop))
+    slope = create_branch(run, elbow_point, end, level_id, "same")
+    try:
+        elbow = doc.Create.NewElbowFitting(nearest_connector(branch, elbow_point),
+                                           nearest_connector(slope, elbow_point))
+    except Exception as ex:
+        raise BranchError("No elbow of {:g} degrees could be placed with the routing preferences of this type "
+                          "({})".format(angle_deg, ex))
+    return slope, elbow, end
+
+
+def process_horizontal(run, point, direction, length_mm, junction, drop_mm=0.0, angle_deg=90.0):
+    """Stacco in point: tratto orizzontale di length_mm, poi, se drop_mm e' diverso da zero, un tratto inclinato
+    che porta alla quota finale con angle_deg. Con T (tratto diviso) o tap secondo l'innesto salvato per la
+    categoria."""
     result = {"element": run, "category": category_name(run), "case": "", "branch": None, "fittings": 0,
               "status": ""}
     level_id = get_level_id(run)
@@ -991,14 +1049,49 @@ def process_horizontal(run, point, direction, length_mm, junction):
     transaction.SetFailureHandlingOptions(options)
     transaction.Start()
     try:
-        STAGE[0] = "creating the branch"
-        end = point.Add(direction.Multiply(length_mm / MM_PER_FT))
-        branch = create_branch(run, point, end, level_id, "same")
-        STAGE[0] = "placing the junction"
-        kind, fitting, others = place_junction(run, point, branch, junction)
-        check_remaining_space([("run", run), ("branch", branch)] + [("rest of the run", o) for o in others])
+        inclined = bool(drop_mm)
+        from_below = inclined and isinstance(run, Duct) and abs(angle_deg - 90.0) < 1e-6
+        if from_below:
+            # condotto a 90 gradi: stacco dal basso, verticale dalla faccia inferiore del condotto, con una presa
+            if drop_mm > 0:
+                # salendo dalla faccia inferiore il tratto attraverserebbe il condotto stesso
+                raise BranchError("A duct branch at 90 degrees from below must go down: use a negative offset")
+            STAGE[0] = "creating the duct from below"
+            half = section_half_height(run)
+            bottom = DB.XYZ(point.X, point.Y, point.Z - half)
+            branch = create_branch(run, bottom, bottom.Add(DB.XYZ(0, 0, drop_mm / MM_PER_FT)), level_id, "same")
+            doc.Regenerate()
+            STAGE[0] = "placing the take-off from below"
+            fitting = doc.Create.NewTakeoffFitting(nearest_connector(branch, bottom), run)
+            kind, others = "Tap from below", []
+            check_remaining_space([("run", run), ("branch", branch)])
+            parts, fittings = [branch], [fitting]
+        else:
+            if inclined:
+                # prima il tratto corto con T (o stacco), poi il cambio di quota, poi l'orizzontale di length_mm
+                STAGE[0] = "creating the stub and the junction"
+                stub_end = point.Add(direction.Multiply(stub_ft(run)))
+                branch = create_branch(run, point, stub_end, level_id, "same")
+                kind, fitting, others = place_junction(run, point, branch, junction)
+                check_remaining_space([("run", run), ("stub", branch)] + [("rest of the run", o) for o in others])
+                STAGE[0] = "creating the inclined run and its elbow"
+                slope, elbow, top = add_inclined(branch, run, stub_end, direction, drop_mm, angle_deg, level_id)
+                STAGE[0] = "creating the horizontal run after the change of level"
+                final = create_branch(run, top, top.Add(direction.Multiply(length_mm / MM_PER_FT)), level_id, "same")
+                elbow2 = connect_elbow(slope, final, top)
+                doc.Regenerate()
+                check_remaining_space([("inclined run", slope), ("horizontal run", final)])
+                parts, fittings = [branch, slope, final], [fitting, elbow, elbow2]
+            else:
+                STAGE[0] = "creating the branch"
+                end = point.Add(direction.Multiply(length_mm / MM_PER_FT))
+                branch = create_branch(run, point, end, level_id, "same")
+                STAGE[0] = "placing the junction"
+                kind, fitting, others = place_junction(run, point, branch, junction)
+                check_remaining_space([("run", run), ("branch", branch)] + [("rest of the run", o) for o in others])
+                parts, fittings = [branch], [fitting]
         STAGE[0] = "copying parameters and insulation"
-        note = inherit(run, others + [branch], [fitting])
+        note = inherit(run, others + parts, fittings)
         STAGE[0] = "committing"
         if transaction.Commit() != DB.TransactionStatus.Committed:
             result["status"] = "Unchanged. Revit refused the result: {}".format(
@@ -1015,29 +1108,18 @@ def process_horizontal(run, point, direction, length_mm, junction):
         result["status"] = "Unchanged. The branch could not be built (step: {}): {}".format(STAGE[0], ex)
         result["detail"] = traceback.format_exc() if traceback else ""
         return result
-    result.update({"case": kind, "branch": branch, "fittings": 1, "status": "Created ({})".format(note)})
+    result.update({"case": kind, "branch": branch, "fittings": len(fittings),
+                   "status": "Created ({})".format(note)})
     return result
 
 
-def ask_length(current_mm):
-    """Lunghezza degli stacchi (SHIFT + CLICK). Ritorna i mm oppure None se annullata."""
-    while True:
-        text = forms.ask_for_string(default="{:g}".format(current_mm), title="Branch",
-                                    prompt="Length of the branches from the run axis, in mm (at least 50)")
-        if text is None:
-            return None
-        try:
-            value = float(text.strip().replace(",", "."))
-        except ValueError:
-            value = None
-        if value is not None and value >= 50:
-            return value
-        forms.alert("The length must be a number of at least 50 mm.")
-
-
-def print_horizontal_report(results, length_mm):
+def print_horizontal_report(results, length_mm, drop_mm=0.0, angle_deg=90.0):
     output.print_md("# Branch report: horizontal runs")
-    output.print_md("Branches at 90 degrees | length **{:g} mm** from the run axis".format(length_mm))
+    if drop_mm:
+        output.print_md("Short stub with the junction, then an inclined run at **{:g} degrees** up to an offset of "
+                        "**{:+g} mm**, then a horizontal run of **{:g} mm**".format(angle_deg, drop_mm, length_mm))
+    else:
+        output.print_md("Branches at 90 degrees | length **{:g} mm** from the run axis".format(length_mm))
     done = [r for r in results if r["status"].startswith("Created")]
     output.print_md("Branches requested: **{}** | created: **{}** | not created: **{}**".format(
         len(results), len(done), len(results) - len(done)))
@@ -1058,14 +1140,20 @@ def main_horizontal():
     config = script.get_config(CONFIG_NAME)
     try:
         length_mm = float(config.get_option(H_LENGTH_KEY, H_LENGTH_DEFAULT))
+        drop_mm = float(config.get_option(H_DROP_KEY, H_DROP_DEFAULT))
+        angle_deg = float(config.get_option(H_ANGLE_KEY, H_ANGLE_DEFAULT))
     except Exception:
-        length_mm = H_LENGTH_DEFAULT
+        length_mm, drop_mm, angle_deg = H_LENGTH_DEFAULT, H_DROP_DEFAULT, H_ANGLE_DEFAULT
     if __shiftclick__:  # noqa: F821
-        length_mm = ask_length(length_mm)
-        if length_mm is None:
+        values = Horizontal_ui.HorizontalWindow(script.get_bundle_file(HORIZONTAL_XAML), {
+            "length_mm": length_mm, "drop_mm": drop_mm, "angle_deg": angle_deg}).show()
+        if values is None:
             script.exit()
+        length_mm, drop_mm, angle_deg = values["length_mm"], values["drop_mm"], values["angle_deg"]
         try:
             setattr(config, H_LENGTH_KEY, length_mm)
+            setattr(config, H_DROP_KEY, drop_mm)
+            setattr(config, H_ANGLE_KEY, angle_deg)
             script.save_config()
         except Exception:
             pass
@@ -1093,11 +1181,12 @@ def main_horizontal():
             results.append({"element": run, "category": category_name(run), "case": "", "branch": None,
                             "fittings": 0, "status": "Unchanged. The side click is on the run axis: no side"})
             continue
-        results.append(process_horizontal(run, point, direction, length_mm, junctions[kind_of(run)]))
+        results.append(process_horizontal(run, point, direction, length_mm, junctions[kind_of(run)],
+                                          drop_mm, angle_deg))
 
     problems = len([r for r in results if not r["status"].startswith("Created")])
     if want_report(len(results), problems, "branches created"):
-        print_horizontal_report(results, length_mm)
+        print_horizontal_report(results, length_mm, drop_mm, angle_deg)
 
 
 main_horizontal()

@@ -5,6 +5,8 @@ quello che sta qui non compare nella barra.
 
 - `Openings.pulldown`: forometrie (Links, Setup, Place, Refresh), in sviluppo.
 - `CreateSimilar.pushbutton`: Create Similar.
+- `Rise&Turn.pushbutton`: Rise&Turn (pettine di tubi contro una parete), sostituito nella barra da Quick Extend.
 
 Per rimetterli: spostare la cartella in `MEP-Routing.panel` e aggiungere il nome (`Openings`,
-`CreateSimilar`) al `layout` di `MEP-Routing.panel/bundle.yaml`.
+`CreateSimilar`) al `layout` di `MEP-Routing.panel/bundle.yaml`. `Rise&Turn.pushbutton` torna invece in
+`Rise&Turn.stack`, con il nome `Rise&Turn` nel `layout` di `Rise&Turn.stack/bundle.yaml`.

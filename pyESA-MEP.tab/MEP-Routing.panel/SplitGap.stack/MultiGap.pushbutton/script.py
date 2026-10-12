@@ -9,7 +9,8 @@ Opens a gap in straight pipes, ducts, cable trays and conduits.
 1. Select the elements (or select them first) and press Finish
 2. Click two points: between them, each element is cut and the
    piece in between is removed. Each element is cut where the two
-   points project on its axis
+   points project on its axis. Where a point is beyond the end of an
+   element, the whole rest of it is removed, up to that end
 3. The report lists the elements, the gap length and what could not
    be cut. An element that cannot be cut is left unchanged
 Vertical or not is detected from the selection. Vertical elements: the
@@ -247,25 +248,38 @@ def diagnostics(element, click1, click2):
 
 
 def make_gap(element, click1, click2):
-    """Taglia un elemento. Ritorna la lunghezza del vuoto in mm."""
+    """Taglia un elemento. Ritorna (lunghezza eliminata in mm, stato per il report). Se un punto cade oltre un
+    estremo, o a meno di MIN_REMAINING_MM da esso, il vuoto arriva fino a quell'estremo: si elimina tutto il tratto
+    restante e quanto era collegato a quell'estremo resta, scollegato."""
     curve = element.Location.Curve
     if not isinstance(curve, DB.Line):
         raise GapError("Only straight elements are supported")
     a, b = curve.GetEndPoint(0), curve.GetEndPoint(1)
     d = curve.Direction
+    length = curve.Length
     t = sorted((click1.Subtract(a).DotProduct(d), click2.Subtract(a).DotProduct(d)))
     min_ft = MIN_REMAINING_MM / MM_PER_FT
     if t[1] - t[0] < MIN_GAP_MM / MM_PER_FT:
         raise GapError("The gap would be shorter than {:g} mm".format(MIN_GAP_MM))
-    if t[0] < min_ft or curve.Length - t[1] < min_ft:
-        raise GapError("The points are outside the element, or closer than {:.0f} mm to its ends".format(
-            MIN_REMAINING_MM))
+    if t[1] <= 0 or t[0] >= length:
+        raise GapError("The gap is outside the element")
+    to_start, to_end = t[0] < min_ft, length - t[1] < min_ft
+    if to_start and to_end:
+        raise GapError("The gap covers the whole element (or leaves less than {:.0f} mm): delete the element "
+                       "instead".format(MIN_REMAINING_MM))
+    if to_start or to_end:
+        # t_side oltre l'estremo: indica solo da che parte eliminare
+        removed, disconnected = trim(element, t[0], length + 1.0) if to_end else trim(element, t[1], -1.0)
+        status = "Rest of the element removed up to its {} end".format("second" if to_end else "first")
+        if disconnected:
+            status += ". Disconnected from: {}".format(", ".join(disconnected))
+        return removed, status
     p1, p2 = a.Add(d.Multiply(t[0])), a.Add(d.Multiply(t[1]))
     if isinstance(element, (Pipe, Duct)):
         cut_by_break(element, p1, p2)
     else:
         cut_by_copy(element, a, b, p1, p2)
-    return (t[1] - t[0]) * MM_PER_FT
+    return (t[1] - t[0]) * MM_PER_FT, "Gap created"
 
 
 def axis_param(element, point):
@@ -481,9 +495,9 @@ def main():
         transaction = DB.Transaction(doc, "Split gap")
         transaction.Start()
         try:
-            gap = make_gap(element, click1, click2)
+            gap, status = make_gap(element, click1, click2)
             transaction.Commit()
-            rows.append((element, "{:.0f}".format(gap), "Gap created", info))
+            rows.append((element, "{:.0f}".format(gap), status, info))
             done += 1
         except GapError as ex:
             transaction.RollBack()

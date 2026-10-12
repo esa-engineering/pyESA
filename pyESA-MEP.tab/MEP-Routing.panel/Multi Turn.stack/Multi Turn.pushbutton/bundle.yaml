@@ -1,12 +1,13 @@
 title: Multi Turn
 tooltip: >-
-  CLICK: bends the selected parallel horizontal pipes, ducts or cable trays to the left or right, keeping their
-  spacing, with the last used angle and length after the bend. Select the elements, click where the bend starts (on
-  one of them, or any point, also on a linked model: the closest element is stretched to it), then click to the left
-  or right of the row on the side they must turn to. With "Ask the angle every time" a quick window offers common
-  angles or a custom one after the clicks.
+  CLICK: opens the settings first: angle (common angles or a custom one) or a direction of the view (arrows up, down,
+  left, right), length after the bend, and the option to align to an element. Then select the parallel horizontal
+  pipes, ducts or cable trays and click where the bend starts (on one of them, or any point, also on a linked model:
+  the closest element is stretched to it). With an angle, click to the left or right of the row on the side to turn
+  to; with an arrow the row turns towards that direction of the view; with the alignment, click a wall, beam, pipe or
+  other element (also in linked RVT and IFC models) and the row bends parallel to it. The elements keep their spacing.
 
-  SHIFT + CLICK: opens the settings first: angle, length after the bend and the "Ask the angle every time" option.
+  SHIFT + CLICK: no window, the last settings are used.
 
   A report lists the result. The new parts keep the parameters and the insulation of the starting element; cable trays
   keep the orientation of their section (a tray on edge stays on edge).

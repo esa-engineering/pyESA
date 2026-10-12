@@ -5,9 +5,11 @@ tooltip: >-
   Vertical Branch. Keep clicking to add more branches, also on the same run; ESC to finish. Pipe branches keep the
   size of the run.
 
-  CLICK: uses the last branch length (default 500 mm).
+  CLICK: uses the last settings (default: 500 mm horizontal, no offset).
 
-  SHIFT + CLICK: asks the length of the branches first.
+  SHIFT + CLICK: one window with the vertical offset of the branch end (+ up, - down, 0 = straight), the angle of the
+  inclined run (90, 45, 30 or custom) and the length of the horizontal run after the change of level.
+  The short stub with the tee comes first; ducts and cable trays keep the tee on it.
 
   A report lists the result. The new parts keep the parameters and the insulation of the starting element.
 author: Matteo Maiorano

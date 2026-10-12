@@ -1,0 +1,10 @@
+title: Select Run
+tooltip: >-
+  CLICK: selects the whole run of the selected pipes, ducts, cable trays or conduits (select them first, or pick them
+  after clicking). It follows straight and flex runs, fittings with two connections (elbows, transitions, unions) and
+  inline accessories (valves, dampers), and stops at tees, crosses, taps, equipment and terminals, which are not
+  selected. Insulation and lining are selected too.
+
+  SHIFT + CLICK: after the search, a list of the categories found, all checked: uncheck the ones you do not want
+  selected (for example the fittings, to keep only the pipes). The choice is saved and used by the normal click.
+author: Matteo Maiorano

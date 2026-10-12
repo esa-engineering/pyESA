@@ -83,6 +83,7 @@ MM_PER_FT = 304.8
 STRAIGHT_TOL = 0.999
 HORIZONTAL_TOL = 1e-4
 MIN_REMAINING_MM = 20.0  # lunghezza minima di ogni tratto dopo l'inserimento dei gomiti
+TAIL_MIN_MM = 300.0  # tratto orizzontale minimo oltre lo scavalco, dopo il gomito: sotto Revit inverte il tratto
 
 CATEGORY_NAMES = (
     (Pipe, "Pipe"),
@@ -884,12 +885,37 @@ def clearance_check(parts, piece, obstacles, clearance_ft):
     return False, verified
 
 
+def grow_free_end(piece, idx, amount_ft):
+    """Allunga di amount_ft l'estremo idx del tratto, nella sua direzione, se e' libero. Ritorna True se fatto.
+    Usato quando dopo l'ostacolo manca tratto: il punto di arrivo cliccato era troppo corto per lo scavalco."""
+    curve = piece.Location.Curve
+    end = curve.GetEndPoint(idx)
+    if nearest_connector(piece, end).IsConnected:
+        return False
+    other = curve.GetEndPoint(1 - idx)
+    d = end.Subtract(other).Normalize()
+    new_end = end.Add(d.Multiply(amount_ft))
+    transaction = DB.Transaction(doc, "Overpass extend to clear")
+    transaction.Start()
+    try:
+        piece.Location.Curve = DB.Line.CreateBound(other, new_end) if idx == 1 else \
+            DB.Line.CreateBound(new_end, other)
+        transaction.Commit()
+    except Exception:
+        transaction.RollBack()
+        raise
+    return True
+
+
 def apply_group(piece, group, angle_deg, clearance_ft):
     """Scavalco di un gruppo di ostacoli, con verifica della distanza dopo la costruzione: se salite o gomiti
-    stanno troppo vicini all'ostacolo si annulla, si allarga lo scavalco e si riprova.
-    Ritorna (nuovi tratti, raccordi, allargamento in mm, distanza verificata del tutto)."""
+    stanno troppo vicini all'ostacolo si annulla, si allarga lo scavalco e si riprova. Se dopo l'ostacolo manca
+    tratto e l'estremo e' libero, lo si allunga della quantita' mancante (grown).
+    Ritorna (nuovi tratti, raccordi, allargamento in mm, distanza verificata del tutto, allungamento in mm)."""
     obstacles = [c["obstacle"] for c in group["clashes"]]
     min_ft = MIN_REMAINING_MM / MM_PER_FT
+    # il gomito finale ha bisogno di spazio: il tratto dopo lo scavalco e' almeno TAIL_MIN_MM (o 3 diametri)
+    tail_ft = max(TAIL_MIN_MM / MM_PER_FT, 3.0 * 2.0 * half_sizes(piece)[1])
     offset_ft = group["offset"]
     if abs(offset_ft) < min_ft:
         raise OverpassError("No change of elevation is needed (offset {:.0f} mm)".format(offset_ft * MM_PER_FT))
@@ -899,17 +925,22 @@ def apply_group(piece, group, angle_deg, clearance_ft):
     inset_ft = leg_inset_ft(offset_ft, angle_deg)
     step = max(half_sizes(piece)[1], 25.0 / MM_PER_FT)
     extra = 0.0
-    for _ in range(MAX_CLEARANCE_ATTEMPTS):
+    grown = 0.0
+    for _ in range(MAX_CLEARANCE_ATTEMPTS + 2):  # due passi in piu' per gli allungamenti
         curve = piece.Location.Curve
         start, d = curve.GetEndPoint(0), curve.Direction
         t1, t2 = group["lo"] - extra - inset_ft, group["hi"] + extra + inset_ft
         why = " to keep the clearance near the elbows" if extra > 0 else ""
-        if t1 < min_ft:
+        if t1 < tail_ft:
             raise OverpassError("Not enough run before the obstacle{}: {:.0f} mm more are needed".format(
-                why, (min_ft - t1) * MM_PER_FT))
-        if curve.Length - t2 < min_ft:
-            raise OverpassError("Not enough run after the obstacle{}: {:.0f} mm more are needed".format(
-                why, (t2 - curve.Length + min_ft) * MM_PER_FT))
+                why, (tail_ft - t1) * MM_PER_FT))
+        if curve.Length - t2 < tail_ft:
+            missing = tail_ft - (curve.Length - t2) + 1.0 / MM_PER_FT
+            if grow_free_end(piece, 1, missing):
+                grown += missing
+                continue
+            raise OverpassError("Not enough run after the obstacle{}: {:.0f} mm more are needed, and the free end "
+                                "is connected".format(why, (missing - 1.0 / MM_PER_FT) * MM_PER_FT))
         transaction = DB.Transaction(doc, "Overpass")
         transaction.Start()
         try:
@@ -924,7 +955,7 @@ def apply_group(piece, group, angle_deg, clearance_ft):
             raise
         if not violated:
             transaction.Commit()
-            return new_elements, fittings, extra * MM_PER_FT, verified
+            return new_elements, fittings, extra * MM_PER_FT, verified, grown * MM_PER_FT
         transaction.RollBack()
         extra += step
     raise OverpassError("The clearance of {:.0f} mm is not reached near the elbows, even starting the legs "
@@ -968,8 +999,8 @@ def resolve(todo, answer, ignored):
         # dal gruppo piu' lontano: il tratto originale resta quello iniziale, gli altri gruppi restano su di lui
         for group in sorted(groups, key=lambda g: -g["lo"]):
             try:
-                new_elements, fittings, extra_mm, verified = apply_group(piece, group, answer["angle_deg"],
-                                                                         clearance_ft)
+                new_elements, fittings, extra_mm, verified, grown_mm = apply_group(
+                    piece, group, answer["angle_deg"], clearance_ft)
             except OverpassError as ex:
                 give_up(group["clashes"], str(ex), action, ignored, rows)
                 continue
@@ -982,6 +1013,8 @@ def resolve(todo, answer, ignored):
             note = "Created: offset {:+.0f} mm, {} new elements".format(group["offset"] * MM_PER_FT, len(new_elements))
             if len(group["clashes"]) > 1:
                 note += ", one overpass for {} obstacles".format(len(group["clashes"]))
+            if grown_mm > 0:
+                note += ", run extended {:.0f} mm beyond the obstacle to make room for the overpass".format(grown_mm)
             if extra_mm > 0:
                 note += ", legs moved {:.0f} mm farther from the obstacle to keep the clearance".format(extra_mm)
             note += "" if verified else ", clearance near the elbows not fully verified"
