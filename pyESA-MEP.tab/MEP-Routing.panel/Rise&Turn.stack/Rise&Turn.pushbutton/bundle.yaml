@@ -1,4 +1,4 @@
-title: Comb
+title: Rise&Turn
 tooltip: >-
   Turns a row of horizontal pipes heading to a wall into a comb: each pipe reaches the wall, goes up or down with an
   elbow to its own elevation, then turns 90 degrees and runs along the wall, forming a stack with aligned ends. Select

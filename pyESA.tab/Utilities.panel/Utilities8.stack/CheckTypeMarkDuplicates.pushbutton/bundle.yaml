@@ -1,4 +1,4 @@
-title: "Check Type Mark\nDuplicates"
+title: "TM Duplicates"
 tooltip: >
   Select categories, choose a type parameter and check it for duplicate values. Duplicates are shown in an editable
   table; select rows to select their instances in Revit, or press Refresh to read the model again.

@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-__title__ = "Split\nGap"
+__title__ = "Multi\nGap"
 __doc__ = """Version = 0.2
 Date    = 09.10.2026
 ________________________________________________________________
 Description:
-Opens a gap in straight pipes, ducts, cable trays and conduits, or cuts
-one element and deletes one side of it.
+Opens a gap in straight pipes, ducts, cable trays and conduits.
 
-CLICK (gap):
 1. Select the elements (or select them first) and press Finish
 2. Click two points: between them, each element is cut and the
    piece in between is removed. Each element is cut where the two
@@ -19,17 +17,6 @@ two points are the bottom and the top of the gap; run it in a section,
 elevation or 3D view (in 3D a temporary vertical work plane facing the
 camera is used; the view must not look straight up or down). A
 selection mixing vertical and non-vertical elements is refused.
-
-SHIFT + CLICK (cut and delete one side), one element at a time until ESC:
-click the element where it must be cut, then click the part of the same
-element to delete. The element is shortened to the cut point; what was
-connected to the deleted end stays, disconnected. Vertical elements need
-a section, elevation or 3D view.
-The first click uses Revit snaps (endpoints, midpoints, intersections,
-perpendicular, centers, nearest) in plans, sections and elevations: the
-element is the straight run whose axis is closest to the snapped point,
-and it is highlighted for the second click. In 3D views the first click
-is directly on the element, without snaps.
 
 Pipes and ducts are split with BreakCurve, so their insulation is
 kept. Cable trays and conduits are split by copy.
@@ -166,7 +153,7 @@ def pick(prompt):
     except OperationCanceledException:
         script.exit()
     except Exception as ex:
-        forms.alert("The point could not be picked in this view: {}".format(ex), title="Split Gap")
+        forms.alert("The point could not be picked in this view: {}".format(ex), title="Multi Gap")
         script.exit()
 
 
@@ -180,7 +167,7 @@ def set_vertical_work_plane(view, element):
     horizontal = DB.XYZ(view_dir.X, view_dir.Y, 0.0)
     if horizontal.GetLength() < 0.05:
         forms.alert("The view looks straight down or up: rotate the 3D view so that the vertical elements are seen "
-                    "from the side.", title="Split Gap")
+                    "from the side.", title="Multi Gap")
         script.exit()
     origin = element.Location.Curve.GetEndPoint(0)
     plane = DB.Plane.CreateByNormalAndOrigin(horizontal.Normalize(), origin)
@@ -384,7 +371,7 @@ def quick_main():
                 break
             except Exception as ex:
                 forms.alert("Points with snaps cannot be picked in this view ({}). The command continues "
-                            "without snaps: click directly on the elements.".format(ex), title="Split Gap")
+                            "without snaps: click directly on the elements.".format(ex), title="Multi Gap")
                 use_snaps = False
                 continue
             element = element_near(cut_point)
@@ -466,7 +453,7 @@ def main():
     if vertical and len(vertical) < len(elements):
         forms.alert("The selection mixes {} vertical and {} non-vertical elements. Select only vertical or only "
                     "non-vertical elements, then run the command again.".format(
-                        len(vertical), len(elements) - len(vertical)), title="Split Gap")
+                        len(vertical), len(elements) - len(vertical)), title="Multi Gap")
         script.exit()
     vertical_mode = bool(vertical)
 
@@ -485,7 +472,7 @@ def main():
             plane_transaction.RollBack()  # il piano di lavoro serve solo per i click, nel modello non resta nulla
     if vertical_mode and abs(click1.Z - click2.Z) < MIN_GAP_MM / MM_PER_FT:
         forms.alert("The two points have the same height. For vertical elements run the command in a section, "
-                    "elevation or 3D view and click the two heights on the element.", title="Split Gap")
+                    "elevation or 3D view and click the two heights on the element.", title="Multi Gap")
         script.exit()
 
     rows, done = [], 0
@@ -506,7 +493,7 @@ def main():
             rows.append((element, "", "Unchanged. The gap could not be created: {}".format(ex), info))
     if not want_report(len(elements), len(elements) - done, "gaps created"):
         return
-    output.print_md("# Split Gap report")
+    output.print_md("# Multi Gap report")
     output.print_md("Elements: **{}** | gaps created: **{}** | left unchanged: **{}**".format(
         len(elements), done, len(elements) - done))
     # righe in testo, non in tabella: si vedono sempre, anche se la tabella non le mostra
@@ -516,7 +503,4 @@ def main():
         output.print_md("&nbsp;&nbsp;&nbsp;{}".format(info))
 
 
-if __shiftclick__:  # noqa: F821
-    quick_main()
-else:
-    main()
+main()

@@ -1,12 +1,10 @@
-title: Split Gap
+title: Multi Gap
 tooltip: >-
-  CLICK: opens a gap in straight pipes, ducts, cable trays and conduits. Select the elements, then click two points:
+  Opens the same gap in several straight pipes, ducts, cable trays and conduits. Select the elements, then click two points:
   between them each element is cut and the piece in between is removed, where the two points project on its axis.
   Vertical or not is detected from the selection: for vertical elements the points are the bottom and the top of the
   gap (use a section, elevation or 3D view). A selection mixing vertical and non-vertical elements is refused.
 
-  SHIFT + CLICK: cut and delete one side, one element at a time until ESC. Click the element where it must be cut,
-  then click the part of the same element to delete. What was connected to the deleted end stays, disconnected.
-
-  Elements that cannot be cut are left unchanged, and a report lists the result.
+  Elements that cannot be cut are left unchanged, and a report lists the result. For one element at a time, without
+  selecting first, use Gap.
 author: Matteo Maiorano

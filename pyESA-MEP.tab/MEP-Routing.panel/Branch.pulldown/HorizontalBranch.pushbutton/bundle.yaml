@@ -1,0 +1,13 @@
+title: Horizontal Branch
+tooltip: >-
+  Branches from horizontal runs of pipe, duct or cable tray (also sloped up to 60 degrees). Click the point of a run,
+  then one of its sides: a branch at 90 degrees is created there with a tee or a tap, as set for the category in
+  Vertical Branch. Keep clicking to add more branches, also on the same run; ESC to finish. Pipe branches keep the
+  size of the run.
+
+  CLICK: uses the last branch length (default 500 mm).
+
+  SHIFT + CLICK: asks the length of the branches first.
+
+  A report lists the result. The new parts keep the parameters and the insulation of the starting element.
+author: Matteo Maiorano

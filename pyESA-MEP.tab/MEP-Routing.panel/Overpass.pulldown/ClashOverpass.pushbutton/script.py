@@ -1,16 +1,27 @@
 # -*- coding: utf-8 -*-
 __title__ = "Clash\nOverpass"
-__doc__ = """Version = 0.3
+__doc__ = """Version = 0.4
 Date    = 12.10.2026
 ________________________________________________________________
-Route with clash check.
+Route with clash check, solved automatically.
 1. Select one or more pipes, ducts or cable trays (or select them first)
-2. The tool looks for clashes with other MEP elements. If it finds any,
-   a window lists them: tick the ones to handle and choose to pass over,
-   under or do nothing, with the clearance from the obstacle and the
-   angle of the rises and drops
-3. With no clashes left, click a point: the runs are extended to it
-   from their free end, then the check runs again. ESC to finish
+2. A window (only at the start) shows how many clashes were found and
+   the settings: pass over, pass under or report only, the clearance
+   from the obstacle, the merge distance and the angle of the rises and
+   drops, plus the clash detection. On OK all the clashes are solved
+   with these settings (report only: nothing is changed)
+3. Click a point: the runs are extended to it from their free end, the
+   check runs again and new clashes are solved in the same way. ESC to
+   finish. The report shows the number of clashes found
+Clash detection (kept for the next time): distribution elements only
+(pipes, ducts, cable trays, conduits, fittings, accessories, insulation)
+or everything (all model elements of this file; linked models are not
+checked). Changing it in the window searches again.
+Merge: obstacles on the same run get one single overpass when the run
+left at its elevation between two overpasses would be shorter than the
+merge distance (default 2000 mm).
+If overpasses keep creating new clashes, after 10 automatic rounds in a
+row the remaining ones are left as they are and listed in the report.
 A manual overpass between two clicked points is done by Quick Overpass.
 The new parts keep the parameters and the insulation of the starting element.
 ________________________________________________________________
@@ -524,20 +535,31 @@ def print_report(results, offset_mm, angle_deg):
 # CLICK: percorso con controllo delle interferenze
 # ---------------------------------------------------------------------------
 CLASH_XAML_FILE_NAME = "Clash_form.xaml"
-ROUTE_DEFAULTS = {"action": "over", "clearance_mm": 50.0, "angle_deg": 90.0}
+# scope: "distribution" = solo elementi distributivi, "all" = tutti gli elementi di modello
+# merge_mm: scavalchi vicini sullo stesso tratto diventano uno solo se il tratto a quota originale fra i due
+# sarebbe piu' corto di questa distanza
+ROUTE_DEFAULTS = {"action": "over", "clearance_mm": 50.0, "angle_deg": 90.0, "scope": "distribution",
+                  "merge_mm": 2000.0}
+SCOPE_LABELS = {"distribution": "distribution elements", "all": "all model elements"}
 CORRIDOR_HALF_HEIGHT_FT = 30.0  # quota cercata sopra e sotto il tratto per misurare l'ostacolo (circa 9 m)
 BBOX_TOL_FT = 0.01
 ROUTE_CLASSES = (Pipe, Duct, CableTray)
-OBSTACLE_CATEGORIES = (
+DISTRIBUTION_CATEGORIES = (
     DB.BuiltInCategory.OST_PipeCurves, DB.BuiltInCategory.OST_DuctCurves, DB.BuiltInCategory.OST_CableTray,
     DB.BuiltInCategory.OST_Conduit, DB.BuiltInCategory.OST_FlexPipeCurves, DB.BuiltInCategory.OST_FlexDuctCurves,
     DB.BuiltInCategory.OST_PipeFitting, DB.BuiltInCategory.OST_DuctFitting,
     DB.BuiltInCategory.OST_CableTrayFitting, DB.BuiltInCategory.OST_ConduitFitting,
     DB.BuiltInCategory.OST_PipeAccessory, DB.BuiltInCategory.OST_DuctAccessory,
-    DB.BuiltInCategory.OST_MechanicalEquipment,
     DB.BuiltInCategory.OST_PipeInsulations, DB.BuiltInCategory.OST_DuctInsulations,
     DB.BuiltInCategory.OST_DuctLinings,
 )
+# controllo "tutto": categorie di modello senza un ingombro fisico da scavalcare
+NON_PHYSICAL_CATEGORIES = set(int(c) for c in (
+    DB.BuiltInCategory.OST_Rooms, DB.BuiltInCategory.OST_MEPSpaces, DB.BuiltInCategory.OST_Areas,
+    DB.BuiltInCategory.OST_HVAC_Zones, DB.BuiltInCategory.OST_RvtLinks, DB.BuiltInCategory.OST_Cameras,
+    DB.BuiltInCategory.OST_VolumeOfInterest, DB.BuiltInCategory.OST_SectionBox, DB.BuiltInCategory.OST_Lines,
+    DB.BuiltInCategory.OST_SketchLines,
+))
 
 
 class RouteFilter(ISelectionFilter):
@@ -612,16 +634,19 @@ def run_pieces(run):
     return pieces
 
 
-def category_key(element):
-    return id_value(element.Category.Id) if element.Category is not None else None
+def is_physical_obstacle(element):
+    """Controllo "tutto": elementi di modello con un ingombro fisico (no locali, vani, link, telecamere...)."""
+    category = element.Category
+    if category is None or category.CategoryType != DB.CategoryType.Model:
+        return False
+    return id_value(category.Id) not in NON_PHYSICAL_CATEGORIES
 
 
-def find_clashes(runs, ignored, accepted, skipped):
-    """Interferenze tra i tratti dei percorsi e gli altri elementi MEP.
-    ignored: {(n. percorso, id ostacolo)} gia' decise; accepted: categorie di ostacolo da non controllare;
-    skipped: {categoria: {(id tratto, id ostacolo)}} interferenze saltate perche' la categoria e' accettata."""
+def find_clashes(runs, ignored, scope):
+    """Interferenze tra i tratti dei percorsi e gli altri elementi: solo distributivi o tutti (scope).
+    ignored: {(n. percorso, id ostacolo)} gia' decise, da non riproporre."""
     clashes, seen = [], set()
-    category_filter = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](OBSTACLE_CATEGORIES))
+    category_filter = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](DISTRIBUTION_CATEGORIES))
     tol = DB.XYZ(BBOX_TOL_FT, BBOX_TOL_FT, BBOX_TOL_FT)
     for run in runs:
         for piece in run_pieces(run):
@@ -631,13 +656,17 @@ def find_clashes(runs, ignored, accepted, skipped):
             skip = set(run["chain"].keys()) | connected_ids(piece)
             piece_id = id_value(piece.Id)
             try:
-                found = list(DB.FilteredElementCollector(doc).WherePasses(category_filter)
-                             .WhereElementIsNotElementType()
+                collector = DB.FilteredElementCollector(doc).WhereElementIsNotElementType()
+                if scope != "all":
+                    collector = collector.WherePasses(category_filter)
+                found = list(collector
                              .WherePasses(DB.BoundingBoxIntersectsFilter(DB.Outline(box.Min.Subtract(tol),
                                                                                     box.Max.Add(tol))))
                              .WherePasses(DB.ElementIntersectsElementFilter(piece)))
             except Exception:
                 continue
+            if scope == "all":
+                found = [e for e in found if is_physical_obstacle(e)]
             for obstacle in found:
                 obstacle_id = id_value(obstacle.Id)
                 if obstacle_id in skip or (run["index"], obstacle_id) in ignored:
@@ -646,10 +675,6 @@ def find_clashes(runs, ignored, accepted, skipped):
                 if isinstance(obstacle, DB.InsulationLiningBase) and id_value(obstacle.HostElementId) in skip:
                     continue
                 pair = (min(piece_id, obstacle_id), max(piece_id, obstacle_id))
-                key = category_key(obstacle)
-                if key in accepted:
-                    skipped.setdefault(key, set()).add(pair)
-                    continue
                 if pair in seen:
                     continue
                 seen.add(pair)
@@ -739,8 +764,10 @@ def obstacle_extent(piece, obstacle, half_lateral):
     return min(ts), max(ts), min(zs), max(zs)
 
 
-def plan_groups(piece, clashes, action, clearance_ft, angle_deg):
-    """Raggruppa gli ostacoli vicini sullo stesso tratto: un solo scavalco per gruppo."""
+def plan_groups(piece, clashes, action, clearance_ft, angle_deg, merge_ft):
+    """Raggruppa gli ostacoli vicini sullo stesso tratto: un solo scavalco per gruppo. Due scavalchi si uniscono se
+    il tratto che resterebbe alla quota originale fra i due e' piu' corto di merge_ft (minimo MIN_REMAINING_MM);
+    lo scavalco unito sta alla quota piu' sfavorevole dei due."""
     half_w, half_h, _ = half_sizes(piece)
     z_run = piece.Location.Curve.GetEndPoint(0).Z
     # la salita inizia prima dell'ostacolo: distanza + spessore della salita + ingombro del gomito
@@ -751,12 +778,14 @@ def plan_groups(piece, clashes, action, clearance_ft, angle_deg):
         z = z1 + clearance_ft + half_h if action == "over" else z0 - clearance_ft - half_h
         items.append({"lo": t0 - margin, "hi": t1 + margin, "z": z, "clashes": [clash]})
     items.sort(key=lambda i: i["lo"])
+    min_low_ft = max(MIN_REMAINING_MM / MM_PER_FT, merge_ft)
     groups = []
     for item in items:
         if groups:
             last = groups[-1]
             offset = max(abs(last["z"] - z_run), abs(item["z"] - z_run))
-            if item["lo"] - last["hi"] < 2 * leg_inset_ft(offset, angle_deg) + MIN_REMAINING_MM / MM_PER_FT:
+            # tratto a quota originale fra i due scavalchi = distanza fra i gruppi meno le due salite
+            if item["lo"] - last["hi"] < 2 * leg_inset_ft(offset, angle_deg) + min_low_ft:
                 last["hi"] = max(last["hi"], item["hi"])
                 last["z"] = max(last["z"], item["z"]) if action == "over" else min(last["z"], item["z"])
                 last["clashes"] += item["clashes"]
@@ -931,7 +960,8 @@ def resolve(todo, answer, ignored):
             give_up(clashes, "Only straight horizontal runs can pass over or under an obstacle", action, ignored, rows)
             continue
         try:
-            groups = plan_groups(piece, clashes, answer["action"], clearance_ft, answer["angle_deg"])
+            groups = plan_groups(piece, clashes, answer["action"], clearance_ft, answer["angle_deg"],
+                                 answer["merge_mm"] / MM_PER_FT)
         except Exception as ex:
             give_up(clashes, "Cannot measure the obstacle: {}".format(ex), action, ignored, rows)
             continue
@@ -950,6 +980,8 @@ def resolve(todo, answer, ignored):
             for element in list(new_elements) + list(fittings):
                 run["chain"][id_value(element.Id)] = element.Id
             note = "Created: offset {:+.0f} mm, {} new elements".format(group["offset"] * MM_PER_FT, len(new_elements))
+            if len(group["clashes"]) > 1:
+                note += ", one overpass for {} obstacles".format(len(group["clashes"]))
             if extra_mm > 0:
                 note += ", legs moved {:.0f} mm farther from the obstacle to keep the clearance".format(extra_mm)
             note += "" if verified else ", clearance near the elbows not fully verified"
@@ -1022,6 +1054,9 @@ def load_route_settings(config):
         settings["action"] = config.get_option("route_action", ROUTE_DEFAULTS["action"])
         settings["clearance_mm"] = float(config.get_option("route_clearance_mm", ROUTE_DEFAULTS["clearance_mm"]))
         settings["angle_deg"] = float(config.get_option("route_angle_deg", ROUTE_DEFAULTS["angle_deg"]))
+        settings["merge_mm"] = float(config.get_option("route_merge_mm", ROUTE_DEFAULTS["merge_mm"]))
+        scope = config.get_option("route_scope", ROUTE_DEFAULTS["scope"])
+        settings["scope"] = scope if scope in SCOPE_LABELS else ROUTE_DEFAULTS["scope"]
     except Exception:
         pass
     return settings
@@ -1033,42 +1068,36 @@ def save_route_settings(config, settings):
         config.route_action = settings["action"]
         config.route_clearance_mm = settings["clearance_mm"]
         config.route_angle_deg = settings["angle_deg"]
+        config.route_merge_mm = settings["merge_mm"]
+        config.route_scope = settings["scope"]
         script.save_config()
     except Exception:
         pass
 
 
-def category_names(keys, clashes):
-    """Nome di ogni categoria: dalle interferenze trovate, altrimenti dalle categorie del documento."""
-    names = {}
-    for clash in clashes:
-        names[category_key(clash["obstacle"])] = clash["obstacle"].Category.Name
-    missing = set(keys) - set(names)
-    if missing:
-        for category in doc.Settings.Categories:
-            key = id_value(category.Id)
-            if key in missing:
-                names[key] = category.Name
-    return names
+ACTION_LABELS = {"over": "pass over", "under": "pass under", "none": "report only"}
+MAX_AUTO_ROUNDS = 10  # ricerche consecutive senza clic: uno scavalco puo' creare nuove interferenze, non all'infinito
 
 
-def print_route_report(runs, rows, settings, accepted, skipped):
-    output.print_md("# Overpass report")
-    output.print_md("Runs: **{}** | clearance **{:g} mm** | leg angle **{:g} degrees** from the horizontal".format(
-        len(runs), settings["clearance_mm"], settings["angle_deg"]))
-    if accepted:
-        names = category_names(accepted, [])
-        output.print_md("Accepted obstacle categories (not checked): {}".format(", ".join(
-            "**{}** ({} clashes left as they are)".format(names.get(k, k), len(skipped.get(k, ())))
-            for k in sorted(accepted))))
+def print_route_report(runs, rows, settings, clashes_found):
+    output.print_md("# Clash Overpass report")
+    if clashes_found:
+        output.print_md("**⚠ Clashes found: {}** (with {})".format(clashes_found, SCOPE_LABELS[settings["scope"]]))
+    else:
+        output.print_md("No clash found with {}.".format(SCOPE_LABELS[settings["scope"]]))
+    output.print_md("Runs: **{}** | action: **{}** | clearance **{:g} mm** | leg angle **{:g} degrees** from the "
+                    "horizontal | overpasses merged when closer than **{:g} mm**".format(
+                        len(runs), ACTION_LABELS.get(settings["action"], settings["action"]),
+                        settings["clearance_mm"], settings["angle_deg"], settings["merge_mm"]))
     if not rows:
-        output.print_md("No clash was found and no extension was made: nothing was changed.")
+        output.print_md("No extension was made: nothing was changed.")
         return
     created = len([r for r in rows if r["result"].startswith("Created")])
     extended = len([r for r in rows if r["result"].startswith("Extended")])
     unchanged = len([r for r in rows if r["result"].startswith("Unchanged")])
-    output.print_md("Clashes solved: **{}** | extensions: **{}** | not done: **{}**".format(
-        created, extended, unchanged))
+    listed = len([r for r in rows if r["result"].startswith("Left")])
+    output.print_md("Clashes solved: **{}** | only listed: **{}** | extensions: **{}** | not done: **{}**".format(
+        created, listed, extended, unchanged))
     table = [[r["run"], output.linkify(r["piece"]), output.linkify(r["obstacle"]) if r["obstacle"] else "",
               r["obstacle_cat"], r["action"], r["result"]] for r in rows]
     output.print_table(table_data=table,
@@ -1084,48 +1113,61 @@ def route_main():
     runs = [{"index": i + 1, "source": e, "chain": {id_value(e.Id): e.Id}} for i, e in enumerate(selected)]
     xaml_path = script.get_bundle_file(CLASH_XAML_FILE_NAME)
     ignored, rows = set(), []
-    accepted, skipped = set(), {}
+
+    # finestra solo all'avvio: impostazioni e avviso con il numero di interferenze; cambiando il tipo di controllo
+    # la ricerca si ripete e la finestra si riapre
     while True:
-        clashes = find_clashes(runs, ignored, accepted, skipped)
-        if clashes:
-            keys = [category_key(c["obstacle"]) for c in clashes]
-            names = category_names(accepted, clashes)
-            # categorie delle interferenze trovate (spuntate) e quelle gia' accettate (da poter riattivare)
-            categories = [(k, names.get(k, str(k)), True) for k in sorted(set(keys), key=lambda k: names.get(k, ""))]
-            categories += [(k, names.get(k, str(k)), False) for k in sorted(accepted, key=lambda k: names.get(k, ""))]
-            answer = Overpass_ui.ClashWindow(xaml_path, [(clash_label(c), k) for c, k in zip(clashes, keys)],
-                                             categories, settings).show()
-            if answer is None:
-                break
-            settings.update({k: answer[k] for k in ROUTE_DEFAULTS})
-            accepted = set(answer["accepted_categories"])
+        clashes = find_clashes(runs, ignored, settings["scope"])
+        answer = Overpass_ui.ClashWindow(xaml_path, len(clashes), settings).show()
+        if answer is None:
+            script.exit()  # Stop all'avvio: nulla e' stato modificato
+        if answer.get("rescan"):
+            settings["scope"] = answer["scope"]
             save_route_settings(config, settings)
-            checked = set(answer["checked"]) if answer["action"] != "none" else set()
-            todo = []
-            for i, clash in enumerate(clashes):
-                if keys[i] in accepted:
-                    rows.append(make_row(clash["run"]["index"], clash["piece"], clash["obstacle"],
-                                         "Accept category", "Left as it is: category not checked"))
-                elif i in checked:
-                    todo.append(clash)
-                else:
+            continue
+        settings.update({k: answer[k] for k in ROUTE_DEFAULTS})
+        save_route_settings(config, settings)
+        break
+
+    # poi tutto in automatico con quelle impostazioni: interferenze risolte (o solo elencate), clic per estendere,
+    # nuova ricerca dopo ogni estensione
+    clashes_found = 0
+    rounds = 0
+    while True:
+        if clashes and rounds < MAX_AUTO_ROUNDS:
+            rounds += 1
+            clashes_found += len(clashes)
+            if settings["action"] == "none":
+                for clash in clashes:
                     ignored.add((clash["run"]["index"], id_value(clash["obstacle"].Id)))
                     rows.append(make_row(clash["run"]["index"], clash["piece"], clash["obstacle"],
-                                         "Do nothing", "Left as it is"))
-            if todo:
-                rows += resolve(todo, answer, ignored)
+                                         "Report only", "Left as it is"))
+            else:
+                rows += resolve(clashes, settings, ignored)
+            clashes = find_clashes(runs, ignored, settings["scope"])
             continue
+        if clashes:
+            # troppe ricerche di fila: gli scavalchi continuano a creare interferenze, si lasciano come sono
+            clashes_found += len(clashes)
+            give_up(clashes, "Still clashing after {} automatic rounds: solve it by hand".format(MAX_AUTO_ROUNDS),
+                    ACTION_LABELS[settings["action"]].capitalize(), ignored, rows)
+            clashes = []
         try:
-            click = uidoc.Selection.PickPoint("No clashes. Click the point to extend the runs to (ESC to finish)")
+            click = uidoc.Selection.PickPoint("Clash Overpass ({} clashes found so far): click the point to extend "
+                                              "the runs to (ESC to finish)".format(clashes_found))
         except OperationCanceledException:
             break
         except Exception as ex:
             output.print_md("**Cannot pick a point in this view** (set a work plane or use a plan view): {}".format(ex))
             break
         rows += extend_runs(runs, click)
+        rounds = 0
+        clashes = find_clashes(runs, ignored, settings["scope"])
     problems = len([r for r in rows if r["result"].startswith("Unchanged")])
-    if want_report(len(rows), problems, "actions done"):
-        print_route_report(runs, rows, settings, accepted, skipped)
+    # solo report: il report e' lo scopo, si apre sempre se ci sono interferenze
+    if (settings["action"] == "none" and clashes_found) or \
+            want_report(len(rows), problems, "actions done, {} clashes found".format(clashes_found)):
+        print_route_report(runs, rows, settings, clashes_found)
 
 
 def overpass_main():

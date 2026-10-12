@@ -1,9 +1,16 @@
 title: Clash Overpass
 tooltip: >-
-  Select pipes, ducts or cable trays: the tool checks clashes with other MEP elements and lets you pass over, under or
-  leave each one, with a clearance from the obstacle and the angle of the rises and drops. With no clashes left, click
-  a point to extend the runs to it; the check runs again after each extension. ESC to finish.
+  Select pipes, ducts or cable trays. A window shows how many clashes were found and the settings: pass over, pass
+  under or report only, clearance from the obstacle, merge distance and leg angle. On OK all the clashes are solved
+  with these settings. Then click a point to extend the runs to it: the check runs again and new clashes are solved
+  the same way. ESC to finish.
 
-  A report lists the result. The new parts keep the parameters and the insulation of the starting element. For a
-  manual overpass between two clicked points use Quick Overpass.
+  CLASH DETECTION: distribution elements only (pipes, ducts, cable trays, conduits, fittings, accessories, insulation)
+  or everything (all model elements of this file, linked models excluded). The option is in the window and is kept.
+
+  MERGE: obstacles close to each other on the same run get one single overpass when the run left between two
+  overpasses would be shorter than the merge distance (default 2000 mm).
+
+  The report shows the number of clashes found and the result of each one. The new parts keep the parameters and the
+  insulation of the starting element. For a manual overpass between two clicked points use Quick Overpass.
 author: Matteo Maiorano

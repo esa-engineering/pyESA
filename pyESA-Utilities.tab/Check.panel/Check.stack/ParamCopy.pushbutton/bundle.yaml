@@ -1,7 +1,0 @@
-title: Param Copy
-tooltip: >-
-  Copy parameters from one element to multiple selected elements.
-  1. Select the source element.
-  2. Choose which instance and type parameters to copy.
-  3. Select target elements to receive the values.
-author: Matteo Maiorano

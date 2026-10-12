@@ -1,8 +1,8 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Overpass - Clashes"
-        Width="560" Height="680"
-        MinWidth="480" MinHeight="520"
+        Title="Clash Overpass"
+        Width="560" Height="640"
+        MinWidth="480" MinHeight="460"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip">
 
@@ -44,57 +44,21 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="⚠ OVERPASS: CLASHES" FontSize="16" FontWeight="Bold"
+        <TextBlock Grid.Row="0" Text="⚠ CLASH OVERPASS" FontSize="16" FontWeight="Bold"
                    HorizontalAlignment="Center" Margin="0,0,0,10"/>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <Border BorderBrush="#E8E8E8" BorderThickness="1" CornerRadius="5"
-                        Background="#F8F8F8" Padding="10" Margin="0,0,0,10">
-                    <TextBlock x:Name="SummaryText" Style="{StaticResource HintText}"/>
-                </Border>
-
+                <!-- azione: sopra / sotto / niente, distanza, unione, angolo delle salite -->
                 <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
                         Padding="10" Margin="0,0,0,10">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="🏷 OBSTACLE CATEGORIES"/>
-                        <StackPanel x:Name="CategoryPanel"/>
-                        <TextBlock Style="{StaticResource HintText}" Margin="0,6,0,0"
-                                   Text="Untick a category to accept its clashes as they are (for example insulation): they are no longer checked until the tool ends. Every new run of the tool checks all categories again."/>
-                    </StackPanel>
-                </Border>
-
-                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
-                        Padding="10" Margin="0,0,0,10">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="⚠ CLASHES FOUND"/>
-                        <Grid Margin="0,0,0,5">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="🔍" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <TextBox Grid.Column="1" x:Name="SearchBox" VerticalContentAlignment="Center"/>
-                        </Grid>
-                        <ListBox x:Name="ClashList" Height="180"/>
-                        <Thumb x:Name="ResizeThumb" Height="6" Cursor="SizeNS" Margin="0,2,0,2"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                            <Button x:Name="SelectAllButton" Content="Select All" Width="90" Margin="0,0,6,0"/>
-                            <Button x:Name="DeselectAllButton" Content="Deselect All" Width="90"/>
-                        </StackPanel>
-                        <TextBlock Style="{StaticResource HintText}" Margin="0,6,0,0"
-                                   Text="Clashes not ticked are left as they are and not asked again."/>
-                    </StackPanel>
-                </Border>
-
-                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
-                        Padding="10" Margin="0,0,0,10">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="↕ ACTION ON THE TICKED CLASHES"/>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="↕ ACTION"/>
                         <RadioButton x:Name="ActionOver" GroupName="Action" Margin="0,3" Content="Pass over the obstacle"/>
                         <RadioButton x:Name="ActionUnder" GroupName="Action" Margin="0,3" Content="Pass under the obstacle"/>
-                        <RadioButton x:Name="ActionNone" GroupName="Action" Margin="0,3" Content="Do nothing"/>
-                        <Grid Margin="0,8,0,3">
+                        <RadioButton x:Name="ActionNone" GroupName="Action" Margin="0,3"
+                                     Content="Report only (change nothing, list the clashes in the report)"/>
+                        <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="140"/>
                                 <ColumnDefinition Width="Auto"/>
@@ -104,19 +68,24 @@
                             <TextBox Grid.Column="1" x:Name="ClearanceBox" Style="{StaticResource InputField}"/>
                             <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}" Text="mm, edge to edge from the obstacle"/>
                         </Grid>
-                    </StackPanel>
-                </Border>
-
-                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
-                        Padding="10" Margin="0,0,0,10">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="📐 LEG ANGLE"/>
                         <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Merge overpasses:"/>
+                            <TextBox Grid.Column="1" x:Name="MergeBox" Style="{StaticResource InputField}"/>
+                            <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}" Text="mm, minimum run left between two overpasses"/>
+                        </Grid>
+                        <TextBlock Style="{StaticResource HintText}" Margin="20,0,0,0"
+                                   Text="Ticked obstacles on the same run get one single overpass when the run left at its elevation between them would be shorter than this. 0 = merge only when the overpasses would touch."/>
+                        <Grid Margin="0,8,0,5">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="140"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Angle:"/>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Leg angle:"/>
                             <ComboBox Grid.Column="1" x:Name="AngleCombo" Style="{StaticResource ComboStyle}"/>
                         </Grid>
                         <Grid Margin="20,5,0,0">
@@ -130,7 +99,33 @@
                             <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}" Text="degrees (0 - 90)"/>
                         </Grid>
                         <TextBlock Style="{StaticResource HintText}" Margin="0,8,0,0"
-                                   Text="Measured from the horizontal: 90 = vertical legs. Rises and drops start before the obstacle, so it is cleared by the clearance."/>
+                                   Text="The leg angle is measured from the horizontal: 90 = vertical legs. Rises and drops start before the obstacle, so it is cleared by the clearance."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- avviso: numero di interferenze trovate, risolte tutte con le impostazioni sopra -->
+                <Border BorderBrush="#E8E8E8" BorderThickness="1" CornerRadius="5"
+                        Background="#F8F8F8" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock x:Name="ClashHeader" Style="{StaticResource SectionHeader}" Text="⚠ CLASHES FOUND"/>
+                        <TextBlock x:Name="ClashText" Style="{StaticResource HintText}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- tipo di controllo: cambiandolo la ricerca si ripete -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
+                        Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="🔎 CLASH DETECTION"/>
+                        <RadioButton x:Name="ScopeDistribution" GroupName="Scope" Margin="0,3"
+                                     Content="Distribution elements only"/>
+                        <TextBlock Style="{StaticResource HintText}" Margin="20,0,0,4"
+                                   Text="Pipes, ducts, cable trays, conduits, flex pipes and ducts, their fittings and accessories, insulation and lining."/>
+                        <RadioButton x:Name="ScopeAll" GroupName="Scope" Margin="0,3" Content="Everything"/>
+                        <TextBlock Style="{StaticResource HintText}" Margin="20,0,0,0"
+                                   Text="All model elements of this file: also structure, walls, floors, ceilings, equipment and generic models. Linked models are not checked."/>
+                        <TextBlock Style="{StaticResource HintText}" Margin="0,6,0,0"
+                                   Text="Changing the option searches the clashes again and reloads this window. The choice is kept for the next time."/>
                     </StackPanel>
                 </Border>
             </StackPanel>

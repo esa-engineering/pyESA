@@ -1,0 +1,16 @@
+title: Param Copy Instance
+tooltip: >-
+  Copies instance parameters from one element to many.
+
+  WITH A SELECTION: select the target elements in Revit first (Tab for a whole connected chain, window selection,
+  filters), start the command, then pick the source element and choose the parameters. The source is excluded from
+  the targets.
+
+  WITHOUT A SELECTION: pick the source element, choose the parameters, then pick the target elements and press
+  Finish.
+
+  In the window choose the instance parameters and whether to overwrite values already filled on the targets. A
+  parameter is copied only if the target has it, writable and with the same storage type; targets without it (e.g.
+  fittings) are counted apart, not as errors. A report lists the result. Type parameters are copied by Param Copy
+  Type.
+author: Matteo Maiorano

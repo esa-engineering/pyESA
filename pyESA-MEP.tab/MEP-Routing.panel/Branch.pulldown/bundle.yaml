@@ -1,0 +1,9 @@
+title: Branch
+tooltip: >-
+  Branches from pipes, ducts or cable trays. Horizontal Branch adds branches at 90 degrees from horizontal runs, click
+  by click; Vertical Branch adds a horizontal branch from vertical runs, with a window per category.
+author: Matteo Maiorano
+
+layout:
+  - HorizontalBranch
+  - VerticalBranch

@@ -1,0 +1,9 @@
+title: Split Side
+tooltip: >-
+  CLICK: cut and delete one side of straight pipes, ducts, cable trays and conduits, one element at a time until ESC.
+  Click the element where it must be cut, then click the part of the same element to delete. What was connected to
+  the deleted end stays, disconnected.
+
+  Vertical elements need a section, elevation or 3D view. Elements that cannot be cut are left unchanged, and a
+  report lists the result.
+author: Matteo Maiorano

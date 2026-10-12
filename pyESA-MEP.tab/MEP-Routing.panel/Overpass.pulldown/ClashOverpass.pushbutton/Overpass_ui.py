@@ -80,64 +80,53 @@ class OverpassWindow(object):
 
 
 ACTIONS = ("over", "under", "none")
+SCOPES = ("distribution", "all")
+SCOPE_TEXT = {"distribution": "distribution elements (pipes, ducts, cable trays, conduits, fittings, accessories, "
+                              "insulation)",
+              "all": "all model elements"}
 
 
 class ClashWindow(object):
-    """Finestra modale: interferenze trovate, azione (sopra/sotto/niente), distanza e angolo delle salite."""
+    """Finestra modale, solo all'avvio: azione (sopra / sotto / solo report, distanza, unione degli scavalchi vicini,
+    angolo delle salite), avviso con il numero di interferenze trovate e tipo di controllo. Dopo OK lo script risolve
+    tutte le interferenze con queste impostazioni. Cambiando il tipo di controllo la finestra si chiude con
+    {"rescan": True, "scope": ...}: lo script rifa' la ricerca e la riapre."""
 
-    def __init__(self, xaml_path, clash_items, categories, settings):
-        # clash_items: [(etichetta, chiave categoria ostacolo)]; categories: [(chiave, nome, controllata)]
-        clash_labels = [label for label, _ in clash_items]
+    def __init__(self, xaml_path, clash_count, settings):
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
-        self.clash_list = self.window.FindName("ClashList")
-        self.search_box = self.window.FindName("SearchBox")
         self.clearance_box = self.window.FindName("ClearanceBox")
+        self.merge_box = self.window.FindName("MergeBox")
         self.angle_combo = self.window.FindName("AngleCombo")
         self.angle_box = self.window.FindName("AngleBox")
         self.radios = {"over": self.window.FindName("ActionOver"),
                        "under": self.window.FindName("ActionUnder"),
                        "none": self.window.FindName("ActionNone")}
-        self.window.FindName("SummaryText").Text = (
-            "{} clashes found between the selected runs and other MEP elements. Tick the ones to handle, "
-            "choose the action, then OK. Stop ends the tool and shows the report.".format(len(clash_labels)))
+        self.scope_radios = {"distribution": self.window.FindName("ScopeDistribution"),
+                             "all": self.window.FindName("ScopeAll")}
+        self.scope = settings.get("scope", "distribution") if settings.get("scope") in SCOPES else "distribution"
+        # avviso con il numero di interferenze: si risolvono tutte, niente elenco da spuntare
+        header = self.window.FindName("ClashHeader")
+        if clash_count:
+            header.Text = "⚠ {} CLASHES FOUND".format(clash_count) if clash_count > 1 else "⚠ 1 CLASH FOUND"
+            text = ("Between the selected runs and {}. On OK they are all solved with the settings above (Report "
+                    "only: nothing is changed, they are listed in the report). Clashes found after each extension "
+                    "are solved in the same way. Stop ends the tool.".format(SCOPE_TEXT[self.scope]))
+        else:
+            header.Text = "✔ NO CLASH FOUND"
+            text = ("No clash with {}. On OK you click the point to extend the runs to; clashes found after each "
+                    "extension are solved automatically with the settings above.".format(SCOPE_TEXT[self.scope]))
+        self.window.FindName("ClashText").Text = text
         self.window.FindName("OkButton").Click += self._on_ok
-        self.window.FindName("SelectAllButton").Click += lambda s, a: self._set_all(True)
-        self.window.FindName("DeselectAllButton").Click += lambda s, a: self._set_all(False)
-        self.window.FindName("ResizeThumb").DragDelta += self._on_resize
-        self.search_box.TextChanged += self._on_search
         self.result = None
-
-        # una CheckBox per interferenza, l'indice nella lista originale va in Tag
-        self.boxes = []
-        self.box_category = {}
-        for index, (label, key) in enumerate(clash_items):
-            box = CheckBox()
-            box.Content = label
-            box.Tag = index
-            box.IsChecked = True
-            self.boxes.append(box)
-            self.box_category[index] = key
-            self.clash_list.Items.Add(box)
-
-        # una CheckBox per categoria di ostacolo: tolta la spunta, le sue interferenze si accettano
-        self.category_boxes = []
-        panel = self.window.FindName("CategoryPanel")
-        for key, name, checked in categories:
-            box = CheckBox()
-            count = len([k for k in self.box_category.values() if k == key])
-            box.Content = "{} ({} clashes)".format(name, count) if count else "{} (accepted, no clashes listed)".format(name)
-            box.Tag = key
-            box.IsChecked = checked
-            box.Margin = Thickness(0, 2, 0, 2)
-            box.Checked += self._on_category
-            box.Unchecked += self._on_category
-            self.category_boxes.append(box)
-            panel.Children.Add(box)
-        self._refresh_visibility()
 
         action = settings["action"] if settings["action"] in ACTIONS else "over"
         self.radios[action].IsChecked = True
         self.clearance_box.Text = "{:g}".format(settings["clearance_mm"])
+        self.merge_box.Text = "{:g}".format(settings.get("merge_mm", 2000.0))
+        # stato iniziale prima di collegare gli eventi: il cambio successivo fa ripetere la ricerca
+        self.scope_radios[self.scope].IsChecked = True
+        for radio in self.scope_radios.values():
+            radio.Checked += self._on_scope
         for angle in PRESET_ANGLES:
             self.angle_combo.Items.Add("{} degrees".format(angle))
         self.angle_combo.Items.Add(CUSTOM_LABEL)
@@ -149,31 +138,6 @@ class ClashWindow(object):
         self.angle_box.Text = "{:g}".format(angle)
         self.angle_combo.SelectionChanged += self._on_angle_mode
         self._on_angle_mode(None, None)
-
-    def _set_all(self, value):
-        for box in self.boxes:
-            if box.Visibility == Visibility.Visible:
-                box.IsChecked = value
-
-    def _accepted_categories(self):
-        return set(box.Tag for box in self.category_boxes if not box.IsChecked)
-
-    def _refresh_visibility(self):
-        """Interferenze visibili: categoria controllata e testo di ricerca."""
-        text = (self.search_box.Text or "").lower()
-        accepted = self._accepted_categories()
-        for box in self.boxes:
-            shown = self.box_category[box.Tag] not in accepted and text in str(box.Content).lower()
-            box.Visibility = Visibility.Visible if shown else Visibility.Collapsed
-
-    def _on_category(self, sender, args):
-        self._refresh_visibility()
-
-    def _on_search(self, sender, args):
-        self._refresh_visibility()
-
-    def _on_resize(self, sender, args):
-        self.clash_list.Height = max(80, self.clash_list.Height + args.VerticalChange)
 
     def _is_custom(self):
         return self.angle_combo.SelectedIndex == len(PRESET_ANGLES)
@@ -187,21 +151,29 @@ class ClashWindow(object):
                 return name
         return "over"
 
+    def _on_scope(self, sender, args):
+        scope = next((name for name in SCOPES if self.scope_radios[name].IsChecked), self.scope)
+        if scope == self.scope:
+            return
+        self.result = {"rescan": True, "scope": scope}
+        self.window.DialogResult = True
+
     def _validate(self):
         """Ritorna (ok, messaggio, valori)."""
         ok, clearance = parse_number(self.clearance_box.Text)
         if not ok or clearance < 0:
             return False, "The clearance must be a number (mm), zero or more.", None
+        ok, merge = parse_number(self.merge_box.Text)
+        if not ok or merge < 0:
+            return False, "The merge distance must be a number (mm), zero or more.", None
         if self._is_custom():
             ok, angle = parse_number(self.angle_box.Text)
             if not ok or angle <= 0 or angle > 90:
                 return False, "The custom angle must be a number greater than 0 and up to 90 degrees.", None
         else:
             angle = float(PRESET_ANGLES[self.angle_combo.SelectedIndex])
-        accepted = self._accepted_categories()
-        checked = [box.Tag for box in self.boxes if box.IsChecked and self.box_category[box.Tag] not in accepted]
-        return True, "", {"action": self._action(), "checked": checked, "accepted_categories": accepted,
-                          "clearance_mm": clearance, "angle_deg": angle}
+        return True, "", {"action": self._action(), "clearance_mm": clearance, "angle_deg": angle,
+                          "merge_mm": merge, "scope": self.scope}
 
     def _on_ok(self, sender, args):
         ok, message, values = self._validate()
