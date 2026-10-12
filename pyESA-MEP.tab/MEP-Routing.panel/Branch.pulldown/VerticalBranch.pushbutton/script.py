@@ -1,33 +1,19 @@
 # -*- coding: utf-8 -*-
-__title__ = "Branch"
-__doc__ = """Version = 0.3
-Date    = 09.10.2026
+__title__ = "Vertical\nBranch"
+__doc__ = """Version = 0.4
+Date    = 12.10.2026
 ________________________________________________________________
 Description:
-Creates branches from pipes, ducts or cable trays. At start you choose
-between horizontal runs and vertical runs.
+Creates horizontal branches from vertical runs of pipe, duct or cable
+tray. Branches from horizontal runs are made by Horizontal Branch.
 
-HORIZONTAL RUNS (also sloped up to 60 degrees):
-- click the point of a run where the branch starts, then click on one of
-  its sides: a branch at 90 degrees, horizontal, is created there with a
-  tee (the run is split) or a tap, as saved for the category in the
-  vertical mode (tap on ducts and tee on pipes by default; cable trays
-  always get a tee and keep the orientation of their section)
-- keep clicking to add more branches, also on the same run; ESC to finish
-- at every start a quick window asks whether pipe branches keep the size
-  of the run, are one size smaller, or have a custom size (chosen from
-  the pipe sizes of the model; if a pipe type does not have it, its
-  nearest size is used and the report says so)
-- length from the run axis: the saved one (default 500 mm);
-  SHIFT + CLICK asks it before starting
+PIPES: a branch "one size smaller" (checkbox in the pipe window) gets
+the next smaller nominal diameter of the pipe segment of the type; at
+the smallest size it keeps the size and the report says so.
 
-PIPES, both modes: a branch "one size smaller" (asked at every start in
-the horizontal mode, checkbox in the pipe window in the vertical mode)
-gets the next smaller nominal diameter of the pipe segment of the type;
-at the smallest size it keeps the size and the report says so.
-
-VERTICAL RUNS: pipes, ducts and cable trays each have their own window (a
-mixed selection opens one window per category, in sequence).
+Pipes, ducts and cable trays each have their own window (a mixed
+selection opens one window per category, in sequence). The junction
+chosen here (tee or tap) is also used by Horizontal Branch.
 
 Instruction (vertical runs):
 1. Select the vertical runs (or select them first) and press Finish
@@ -964,56 +950,6 @@ def main():
 VERTICAL_MODE, HORIZONTAL_MODE = "Vertical runs", "Horizontal runs"
 MAX_SLOPE_DEG = 60.0
 H_LENGTH_KEY, H_LENGTH_DEFAULT = "h_length_mm", 500.0
-SAME_SIZE, ONE_SIZE_SMALLER, CUSTOM_SIZE = "Same size", "One size smaller", "Custom size"
-
-
-def segment_sizes(segment):
-    """Diametri nominali (piedi) di un segmento di tubo abilitati negli elenchi delle misure, in ordine."""
-    return sorted(s.NominalDiameter for s in segment.GetSizes() if s.UsedInSizeLists)
-
-
-def model_pipe_sizes():
-    """Diametri nominali di tutti i segmenti di tubo del modello, senza doppioni (al centesimo di mm)."""
-    sizes = {}
-    for segment in DB.FilteredElementCollector(doc).OfClass(PipeSegment):
-        for d in segment_sizes(segment):
-            sizes[round(d * MM_PER_FT, 2)] = d
-    return [sizes[k] for k in sorted(sizes)]
-
-
-def ask_pipe_size():
-    """Misura personalizzata degli stacchi dei tubi, scelta dall'elenco delle misure del modello. Piedi o None."""
-    sizes = model_pipe_sizes()
-    if not sizes:
-        forms.alert("No pipe segment with sizes was found in the model.", exitscript=True)
-    labels = ["DN {:g}".format(round(d * MM_PER_FT, 2)) for d in sizes]
-    choice = forms.SelectFromList.show(labels, title="Branch: pipe size", button_name="Use this size",
-                                       multiselect=False)
-    if choice is None:
-        return None
-    return sizes[labels.index(choice)]
-
-
-def branch_pipe_size(run, size_mode, custom_ft):
-    """Diametro nominale dello stacco di un tubo secondo la scelta all'avvio. Ritorna (diametro o None, nota)."""
-    if size_mode == ONE_SIZE_SMALLER:
-        return smaller_pipe_size(run)
-    if size_mode != CUSTOM_SIZE:
-        return None, ""
-    try:
-        sizes = segment_sizes(run.PipeSegment)
-    except Exception:
-        sizes = []
-    custom_mm = custom_ft * MM_PER_FT
-    if not sizes:
-        return custom_ft, "branch DN {:g} (the segment of this pipe could not be read)".format(custom_mm)
-    nearest = min(sizes, key=lambda d: abs(d - custom_ft))
-    if abs(nearest - custom_ft) * MM_PER_FT < 0.01:
-        return nearest, "branch DN {:g}".format(custom_mm)
-    return nearest, "DN {:g} is not a size of this pipe segment: nearest DN {:g} used".format(
-        custom_mm, nearest * MM_PER_FT)
-
-
 def is_horizontal_run(element):
     """Tubo, condotto o passerella rettilinea con pendenza fino a 60 gradi dall'orizzontale."""
     if not isinstance(element, (Pipe, Duct, CableTray)):
@@ -1057,7 +993,7 @@ def side_direction(run, point, side_click):
     return perpendicular if side > 0 else perpendicular.Negate()
 
 
-def process_horizontal(run, point, direction, length_mm, junction, size_mode=None, custom_ft=None):
+def process_horizontal(run, point, direction, length_mm, junction):
     """Uno stacco a 90 gradi in point, con T (tratto diviso) o tap secondo l'innesto salvato per la categoria."""
     result = {"element": run, "category": category_name(run), "case": "", "branch": None, "fittings": 0,
               "status": ""}
@@ -1075,14 +1011,9 @@ def process_horizontal(run, point, direction, length_mm, junction, size_mode=Non
     try:
         STAGE[0] = "creating the branch"
         end = point.Add(direction.Multiply(length_mm / MM_PER_FT))
-        diameter, size_note = None, ""
-        if isinstance(run, Pipe):
-            diameter, size_note = branch_pipe_size(run, size_mode, custom_ft)
-            size_note = ", " + size_note if size_note else ""
-        branch = create_branch(run, point, end, level_id, "same", diameter)
+        branch = create_branch(run, point, end, level_id, "same")
         STAGE[0] = "placing the junction"
         kind, fitting, others = place_junction(run, point, branch, junction)
-        kind += size_note
         check_remaining_space([("run", run), ("branch", branch)] + [("rest of the run", o) for o in others])
         STAGE[0] = "copying parameters and insulation"
         note = inherit(run, others + [branch], [fitting])
@@ -1122,10 +1053,9 @@ def ask_length(current_mm):
         forms.alert("The length must be a number of at least 50 mm.")
 
 
-def print_horizontal_report(results, length_mm, size_text):
+def print_horizontal_report(results, length_mm):
     output.print_md("# Branch report: horizontal runs")
-    output.print_md("Branches at 90 degrees | length **{:g} mm** from the run axis | pipe branches **{}**".format(
-        length_mm, size_text))
+    output.print_md("Branches at 90 degrees | length **{:g} mm** from the run axis".format(length_mm))
     done = [r for r in results if r["status"].startswith("Created")]
     output.print_md("Branches requested: **{}** | created: **{}** | not created: **{}**".format(
         len(results), len(done), len(results) - len(done)))
@@ -1148,18 +1078,6 @@ def main_horizontal():
         length_mm = float(config.get_option(H_LENGTH_KEY, H_LENGTH_DEFAULT))
     except Exception:
         length_mm = H_LENGTH_DEFAULT
-    # a ogni avvio, con la finestra rapida (nessun clic nel modello prima: non si chiude da sola)
-    size_mode = forms.CommandSwitchWindow.show(
-        [SAME_SIZE, ONE_SIZE_SMALLER, CUSTOM_SIZE],
-        message="Pipe branches: same size as the run, one size smaller, or a size you choose? "
-                "(ducts and cable trays keep the size)")
-    if size_mode is None:
-        script.exit()
-    custom_ft = None
-    if size_mode == CUSTOM_SIZE:
-        custom_ft = ask_pipe_size()
-        if custom_ft is None:
-            script.exit()
     if __shiftclick__:  # noqa: F821
         length_mm = ask_length(length_mm)
         if length_mm is None:
@@ -1193,27 +1111,11 @@ def main_horizontal():
             results.append({"element": run, "category": category_name(run), "case": "", "branch": None,
                             "fittings": 0, "status": "Unchanged. The side click is on the run axis: no side"})
             continue
-        results.append(process_horizontal(run, point, direction, length_mm, junctions[kind_of(run)],
-                                          size_mode, custom_ft))
+        results.append(process_horizontal(run, point, direction, length_mm, junctions[kind_of(run)]))
 
     problems = len([r for r in results if not r["status"].startswith("Created")])
     if want_report(len(results), problems, "branches created"):
-        size_text = "DN {:g}".format(custom_ft * MM_PER_FT) if size_mode == CUSTOM_SIZE else size_mode.lower()
-        print_horizontal_report(results, length_mm, size_text)
+        print_horizontal_report(results, length_mm)
 
 
-def start():
-    """All'avvio: tratti verticali (comportamento con selezione multipla e finestre) o orizzontali (clic per clic)."""
-    choice = forms.CommandSwitchWindow.show(
-        [HORIZONTAL_MODE, VERTICAL_MODE],
-        message="Branch from horizontal runs (also sloped up to {:g} degrees) or from vertical runs?".format(
-            MAX_SLOPE_DEG))
-    if choice is None:
-        script.exit()
-    if choice == HORIZONTAL_MODE:
-        main_horizontal()
-    else:
-        main()
-
-
-start()
+main()

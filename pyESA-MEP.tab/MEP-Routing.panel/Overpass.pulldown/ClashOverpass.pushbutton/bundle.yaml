@@ -1,0 +1,9 @@
+title: Clash Overpass
+tooltip: >-
+  Select pipes, ducts or cable trays: the tool checks clashes with other MEP elements and lets you pass over, under or
+  leave each one, with a clearance from the obstacle and the angle of the rises and drops. With no clashes left, click
+  a point to extend the runs to it; the check runs again after each extension. ESC to finish.
+
+  A report lists the result. The new parts keep the parameters and the insulation of the starting element. For a
+  manual overpass between two clicked points use Quick Overpass.
+author: Matteo Maiorano

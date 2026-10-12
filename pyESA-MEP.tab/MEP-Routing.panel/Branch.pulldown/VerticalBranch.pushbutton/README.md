@@ -2,7 +2,7 @@
 
 ## Logica di funzionamento
 
-Il comando **Branch** crea un ramo orizzontale partendo da verticali di tubo, condotto o passerella, con una finestra per categoria (tubi: anche direzione libera con un clic nella vista; passerelle: solo dal lato stretto, ramo di costa; nessun angolo di inclinazione). **La modalità SHIFT+CLICK (braga Y) è stata spostata nel pulsante Branch Y: le sezioni di questo file che la descrivono sono storiche.** La logica è strutturata in tre fasi principali:
+Il comando **Branch** crea rami orizzontali da tratti verticali o orizzontali (con due modalità di avvio), partendo da tubo, condotto o passerella. Per i tratti verticali c'è una finestra per categoria (tubi: anche direzione libera con un clic nella vista; passerelle: solo dal lato stretto, ramo di costa; nessun angolo di inclinazione). La logica è strutturata in tre fasi principali:
 
 ### 1. Selezione e preparazione
 - Il sistema legge l'elenco di verticali selezionati (riser)
@@ -14,7 +14,6 @@ Il comando **Branch** crea un ramo orizzontale partendo da verticali di tubo, co
   - **Lato**: destra/sinistra rispetto all'asse
   - **Livello**: livello + offset
   - **Lunghezza**: del ramo orizzontale
-  - **Angolo**: 15°, 30°, 45° o 60° (solo SHIFT+CLICK)
 - Viene creata una curva 3D che definisce il percorso del ramo
 - La curve è vincolata nel piano orizzontale specificato
 
@@ -32,14 +31,6 @@ Il comando **Branch** crea un ramo orizzontale partendo da verticali di tubo, co
   - **Dimensioni** (Size) del riser
   - **Isolamento** del riser (PipeInsulation / DuctInsulation)
 - Se il fitto non entra, il riser resta invariato e il report spiega perché
-
-### 5. Modalità SHIFT+CLICK (Y branch)
-- Quando si usa SHIFT+CLICK:
-  - Creazione di un ramo Y su verticale di tubo
-  - Passo 1: ramo orizzontale (obbligatorio)
-  - Passo 2: ramo inclinato con gombo
-  - Passo 3: ramo Y sul riser
-  - Il punto Y è posizionato sotto il ramo orizzontale
 
 ---
 
@@ -63,7 +54,7 @@ Il comando **Branch** crea un ramo orizzontale partendo da verticali di tubo, co
                  ▼
 ┌─────────────────────────────────────────┐
 │  3. Apertura dialogo configurazione      │
-│  - Lato, Livello, Lunghezza, Angolo        │
+│  - Lato, Livello, Lunghezza                │
 └────────────────┬──────────────────────────┘
                  │
                  ▼
@@ -88,45 +79,6 @@ Il comando **Branch** crea un ramo orizzontale partendo da verticali di tubo, co
                  ▼
 ┌─────────────────────────────────────────┐
 │  7. Generazione report di errore/fallito  │
-└─────────────────────────────────────────┘
-```
-
-**Per SHIFT+CLICK (Y branch):**
-```
-┌─────────────────────────────────────────┐
-│  Inizio Y Branch                         │
-└────────────────┬──────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────┐
-│  1. Seleziona verticale + SHIFT+CLICK   │
-└────────────────┬──────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────┐
-│  2. Dialogo configurazione Y branch         │
-│  - Lato, Livello, Lunghezza, Angolo       │
-└────────────────┬──────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────┐
-│  3. Creazione ramo orizzontale           │
-└────────────────┬──────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────┐
-│  4. Creazione ramo inclinato             │
-└────────────────┬──────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────┐
-│  5. Creazione ramo Y sul riser             │
-│  - Posizionato sotto ramo orizzontale      │
-└────────────────┬──────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────┐
-│  6. Generazione report                    │
 └─────────────────────────────────────────┘
 ```
 
@@ -240,7 +192,6 @@ output.print_md("\n".join(report_lines))
 | **Side** | Lato del ramo rispetto all'asse | Left, Right |
 | **Level** | Livello di posizionamento | Qualsiasi livello del modello |
 | **Length** | Lunghezza del ramo | 0.01 - 1000+ m (valore reale) |
-| **Angle** | Angolo di inclinazione | 15°, 30°, 45°, 60° (solo SHIFT+CLICK) |
 | **Junction Type** | Tipo di giunzione | Tee, Tap (dipende dal tipo elemento) |
 | **Offset** | Offset dal livello | Valore reale o "None" per livello base |
 
@@ -253,7 +204,6 @@ output.print_md("\n".join(report_lines))
 - **Duct**: usa Tap come default, Tee come alternativa
 - **PipeInsulation/DuctInsulation**: copiato dal riser se presente
 - Se il fitto non entra, il riser resta invariato
-- SHIFT+CLICK crea ramo Y con tre segmenti: orizzontale → inclinato → Y
 
 ---
 

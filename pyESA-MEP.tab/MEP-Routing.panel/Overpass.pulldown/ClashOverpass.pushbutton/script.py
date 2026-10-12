@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-__title__ = "Overpass"
-__doc__ = """Version = 0.2
-Date    = 08.10.2026
+__title__ = "Clash\nOverpass"
+__doc__ = """Version = 0.3
+Date    = 12.10.2026
 ________________________________________________________________
-CLICK: route with clash check.
+Route with clash check.
 1. Select one or more pipes, ducts or cable trays (or select them first)
 2. The tool looks for clashes with other MEP elements. If it finds any,
    a window lists them: tick the ones to handle and choose to pass over,
@@ -11,22 +11,7 @@ CLICK: route with clash check.
    angle of the rises and drops
 3. With no clashes left, click a point: the runs are extended to it
    from their free end, then the check runs again. ESC to finish
-
-SHIFT + CLICK: manual overpass between two clicked points.
-Makes a straight horizontal run of pipe, duct, cable tray or conduit
-go up (or down) between two points, as if it had to pass over an
-obstacle.
-
-Instruction:
-- Set the offset (mm): positive = up, negative = down
-- Set the leg angle from the horizontal (90 = vertical)
-- Click the first point on the run, then the second point on the
-  same run
-- The part between the two points is moved by the offset and joined
-  to the rest of the run with two legs and four elbows; inclined legs
-  start at the clicked points and go inwards
-- If an elbow does not fit, the run is left unchanged
-- Press ESC (at the first click) to finish and get the report
+A manual overpass between two clicked points is done by Quick Overpass.
 The new parts keep the parameters and the insulation of the starting element.
 ________________________________________________________________
 Author(s): Matteo Maiorano
@@ -1191,7 +1176,4 @@ def overpass_main():
         print_report(results, offset_mm, angle_deg)
 
 
-if __shiftclick__:  # noqa: F821
-    overpass_main()
-else:
-    route_main()
+route_main()
