@@ -157,6 +157,32 @@
                                 ToolTip="Choose the parameters of the WBS levels used to group the bill of quantities"/>
                     </Grid>
 
+                    <!-- Struttura WBS: Excel / CSV con codici e descrizioni dei valori WBS -->
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="WBS structure:" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="txt_wbs_structure" Grid.Column="1" Padding="5,3" Margin="0,2"
+                                 IsReadOnly="True" Background="#F8F8F8"
+                                 ToolTip="Excel / CSV with the codes of the WBS values and their descriptions (read only). The groups of the WBS levels in the Bill of quantities tab show code and description."/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Button x:Name="btn_wbs_structure" Content="Browse..." Padding="10,3" Margin="5,2,0,2"
+                                    ToolTip="Choose the Excel / CSV file of the WBS structure, then its sheet, columns and first row"/>
+                            <Button x:Name="btn_wbs_columns" Content="Columns..." Padding="10,3" Margin="5,2,0,2"
+                                    IsEnabled="False"
+                                    ToolTip="Choose the sheet, the columns of WBS code and description and the first row with values"/>
+                            <Button x:Name="btn_wbs_reload" Content="Reload" Padding="10,3" Margin="5,2,0,2"
+                                    IsEnabled="False"
+                                    ToolTip="Read the WBS structure again (after editing it in Excel)"/>
+                            <Button x:Name="btn_wbs_clear" Content="✕" Width="25" Margin="5,2,0,2"
+                                    IsEnabled="False"
+                                    ToolTip="Work without a WBS structure"/>
+                        </StackPanel>
+                    </Grid>
+
                     <Grid Margin="0,5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="100"/>

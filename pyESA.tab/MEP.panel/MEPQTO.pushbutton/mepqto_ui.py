@@ -59,6 +59,7 @@ from mepqto_allowance_ui import show_allowance_dialog
 from mepqto_scope_ui import show_scope_dialog, ScopeSettings, SET_NAME_SEPARATOR
 from mepqto_grid_filter import GridFilters
 from mepqto_layout_ui import show_layout_dialog
+from mepqto_columns_ui import show_wbs_columns_dialog
 from mepqto_columns_ui import show_columns_dialog
 
 XAML_FILE_NAME = 'MEPQTO_form.xaml'
@@ -194,6 +195,11 @@ class Session(object):
         self.price_list_path = None
         self.price_list_count = 0
         self.price_list_error = None
+        # struttura WBS: {posizione del livello attivo: {codice: descrizione}}, percorso
+        # ed eventuale errore di lettura
+        self.wbs_names = {}
+        self.wbs_structure_path = None
+        self.wbs_structure_error = None
         self.exported_paths = []
         # voci non modellate (mepqto_model.ManualItem), per l'export
         self.manual_items = []
@@ -241,6 +247,10 @@ class TakeoffForm(Window):
         self._layout_rows = None
         # foglio e colonne del listino Excel / CSV in uso (PriceListLayout), None = A..I
         self._price_layout = None
+        # foglio, riga di partenza e colonne per livello della struttura WBS (WbsLayout)
+        # e struttura letta (WbsStructure, descrizioni per nome del livello)
+        self._wbs_layout = None
+        self._wbs_structure = qs.WbsStructure()
         self._layout_columns = None
         # colonne create per i livelli WBS sulle colonne: (colonna della griglia, nome)
         self._pivot_columns = []
@@ -305,6 +315,8 @@ class TakeoffForm(Window):
                      "txt_project_file", "btn_project_file",
                      "cbo_phase", "cbo_phase_status", "txt_settings_hint",
                      "txt_wbs", "btn_wbs", "txt_params", "btn_params",
+                     "txt_wbs_structure", "btn_wbs_structure", "btn_wbs_columns",
+                     "btn_wbs_reload", "btn_wbs_clear",
                      "txt_models", "btn_scope",
                      "lst_categories", "btn_select_all", "btn_select_none",
                      "tabs", "tab_prices", "tab_bill", "tab_cme", "tab_marks", "tab_issues",
@@ -368,6 +380,10 @@ class TakeoffForm(Window):
         self.btn_density_remove.Click += self.OnRemoveDensity
         self.btn_rules_defaults.Click += self.OnRestoreRules
         self.btn_wbs.Click += self.OnWbs
+        self.btn_wbs_structure.Click += self.OnBrowseWbsStructure
+        self.btn_wbs_columns.Click += self.OnWbsColumns
+        self.btn_wbs_reload.Click += self.OnReloadWbsStructure
+        self.btn_wbs_clear.Click += self.OnClearWbsStructure
         self.btn_params.Click += self.OnParameters
         self.btn_scope.Click += self.OnScope
         self.btn_clear_filters_prices.Click += self.OnClearPriceFilters
@@ -767,6 +783,9 @@ class TakeoffForm(Window):
         self._param_map = qm.ParameterMap.from_dict(store.parameters)
         self.session.param_map = self._param_map
         self._update_params_text()
+        self._load_wbs_structure(store.wbs_structure_path,
+                                 qs.WbsLayout.from_dict(store.wbs_structure_layout),
+                                 show_errors=False)
         self.session.project_file = store.path
         if store.path:
             state = u"" if os.path.isfile(store.path) else u"  (new file, created on Save)"
@@ -1005,6 +1024,7 @@ class TakeoffForm(Window):
         session.bill_issues = bill.issues
         session.bill = bill
         session.wbs_labels = self._wbs_labels()
+        session.wbs_names = self._wbs_level_names(session.wbs_labels)
         session.rules = self._rules
         self._fill_bill_table()
         self._fill_cme_table()
@@ -1016,6 +1036,13 @@ class TakeoffForm(Window):
         session.issues = list(session.takeoff.issues) + list(session.bill_issues) + \
             qm.description_issues(session.takeoff, session.items, self._price_list_loaded(),
                                   qm.manual_codes(self._manual))
+        if session.wbs_names and session.wbs_labels:
+            session.issues += qm.wbs_structure_issues(session.takeoff, session.wbs_labels,
+                                                      session.wbs_names, self._manual)
+        if session.wbs_structure_error:
+            session.issues.insert(0, qm.Issue(u"WBS structure not loaded",
+                                              session.wbs_structure_path or u"",
+                                              session.wbs_structure_error))
         if session.price_list_error:
             session.issues.insert(0, qm.Issue(u"Price list not loaded",
                                               session.price_list_path or u"",
@@ -1115,7 +1142,11 @@ class TakeoffForm(Window):
                  "UnitPrice", "Amount"]))
         self._update_layout_text(labels, rows_layout, columns_layout)
         entries, column_keys = qm.pivot_bill(session.bill, session.items, session.bill_units,
-                                             len(labels), rows_layout, columns_layout)
+                                             len(labels), rows_layout, columns_layout,
+                                             session.wbs_names)
+        # livelli delle chiavi di colonna, nell'ordine (come in pivot_bill)
+        column_levels = [index for index in (qm.wbs_level_index(key) for key in columns_layout)
+                         if index is not None and index < len(labels)]
 
         # Totali dei gruppi: importo di tutte le loro voci, in totale e per colonna.
         totals = {}
@@ -1139,7 +1170,7 @@ class TakeoffForm(Window):
         self._updating = True
         try:
             self.bill_table.Rows.Clear()
-            names = self._rebuild_pivot_columns(column_keys)
+            names = self._rebuild_pivot_columns(column_keys, column_levels)
             for entry in entries:
                 row = self.bill_table.NewRow()
                 row["Kind"] = entry.kind
@@ -1199,7 +1230,7 @@ class TakeoffForm(Window):
         # I gruppi visibili dipendono dalle righe appena scritte.
         self._apply_bill_filter()
 
-    def _rebuild_pivot_columns(self, column_keys):
+    def _rebuild_pivot_columns(self, column_keys, column_levels=()):
         """Una colonna della tabella e della griglia per ogni combinazione dei livelli WBS
         sulle colonne, dopo le colonne WBS. Da chiamare a tabella vuota."""
         for column, name in self._pivot_columns:
@@ -1222,10 +1253,13 @@ class TakeoffForm(Window):
             column.ElementStyle = number_style
             column.Width = DataGridLength(95)
             header = TextBlock()
-            header.Text = u"\n".join(column_key)
+            # con la struttura WBS: "codice - descrizione"
+            values = [qm.wbs_label(value, self.session.wbs_names.get(level))
+                      for value, level in zip(column_key, column_levels)]
+            header.Text = u"\n".join(values)
             header.TextWrapping = TextWrapping.Wrap
             header.ToolTip = u"{}\nAmount in this combination (items and group rows).".format(
-                u" \u203a ".join(column_key))
+                u" \u203a ".join(values))
             column.Header = header
             self.dg_bill.Columns.Add(column)
             self._pivot_columns.append((column, name))
@@ -1803,6 +1837,110 @@ class TakeoffForm(Window):
         if levels is None or levels == self._wbs_levels():
             return
         self._apply_wbs(levels)
+
+    # ------------------------------------------------------------ struttura WBS
+
+    def _wbs_level_names(self, labels):
+        """{posizione del livello attivo: {codice: descrizione}} per i livelli mappati
+        nella struttura WBS."""
+        names = self._wbs_structure.names
+        return dict((index, names[label]) for index, label in enumerate(labels)
+                    if label in names)
+
+    def _load_wbs_structure(self, path, layout, show_errors):
+        """Legge la struttura WBS (codici e descrizioni per livello). Non ricalcola: chi
+        chiama fa _refresh()."""
+        session = self.session
+        session.wbs_structure_path = path or None
+        session.wbs_structure_error = None
+        self._wbs_structure = qs.WbsStructure()
+        session.wbs_names = {}
+        self._wbs_layout = layout if path else None
+        self.txt_wbs_structure.Text = path or u""
+        for button in (self.btn_wbs_columns, self.btn_wbs_reload, self.btn_wbs_clear):
+            button.IsEnabled = bool(path)
+        if not path:
+            self.txt_wbs_structure.ToolTip = (
+                u"Excel / CSV with the codes of the WBS values and their descriptions (read "
+                u"only). The groups of the WBS levels in the Bill of quantities tab show code "
+                u"and description.")
+            return
+        self.Cursor = Cursors.Wait
+        try:
+            structure = qs.load_wbs_structure(path, layout)
+            self._wbs_structure = structure
+            session.wbs_names = self._wbs_level_names(self._wbs_labels())
+            self.txt_wbs_structure.ToolTip = u"{} WBS codes in {} levels, {}{}".format(
+                structure.code_count, len(structure.names),
+                layout.describe(self._wbs_labels()),
+                u" ({} repeated codes ignored)".format(structure.duplicates)
+                if structure.duplicates else u"")
+        except qs.PriceListError as error:
+            session.wbs_structure_error = u"{}".format(error)
+            self.txt_wbs_structure.ToolTip = session.wbs_structure_error
+            if show_errors:
+                MessageBox.Show(session.wbs_structure_error, TITLE,
+                                MessageBoxButton.OK, MessageBoxImage.Warning)
+        finally:
+            self.Cursor = None
+
+    def _use_wbs_structure(self, path, layout):
+        self._load_wbs_structure(path, layout, show_errors=True)
+        self._store.set_wbs_structure(path, layout.to_dict() if path and layout else None)
+        self._mark_dirty()
+        self._refresh()
+
+    def OnBrowseWbsStructure(self, sender, args):
+        if not self._wbs_levels_set():
+            return
+        dialog = OpenFileDialog()
+        dialog.Title = "WBS structure"
+        dialog.Filter = ("WBS structure (*.xlsx;*.xlsm;*.csv)|*.xlsx;*.xlsm;*.csv"
+                         "|All files (*.*)|*.*")
+        current = self.session.wbs_structure_path
+        if current and os.path.isdir(os.path.dirname(current)):
+            dialog.InitialDirectory = os.path.dirname(current)
+        if dialog.ShowDialog(self) != True:
+            return
+        path = dialog.FileName
+        same = current and os.path.normcase(current) == os.path.normcase(path)
+        layout = show_wbs_columns_dialog(self, path, self._wbs_layout if same else None,
+                                         self._wbs_labels())
+        if layout is None:
+            return
+        self._use_wbs_structure(path, layout)
+
+    def _wbs_levels_set(self):
+        """La struttura si mappa per livello: senza livelli WBS non c'e' nulla da mappare."""
+        if self._wbs_labels():
+            return True
+        MessageBox.Show(u"Choose the WBS levels first (WBS Levels...): the WBS structure has "
+                        u"a code and a description column for every level.", TITLE,
+                        MessageBoxButton.OK, MessageBoxImage.Information)
+        return False
+
+    def OnWbsColumns(self, sender, args):
+        path = self.session.wbs_structure_path
+        if not path or not os.path.isfile(path):
+            MessageBox.Show(u"The WBS structure file is not on disk: choose it with Browse...",
+                            TITLE, MessageBoxButton.OK, MessageBoxImage.Information)
+            return
+        if not self._wbs_levels_set():
+            return
+        layout = show_wbs_columns_dialog(self, path, self._wbs_layout, self._wbs_labels())
+        if layout is None:
+            return
+        self._use_wbs_structure(path, layout)
+
+    def OnReloadWbsStructure(self, sender, args):
+        self._load_wbs_structure(self.session.wbs_structure_path, self._wbs_layout,
+                                 show_errors=True)
+        self._refresh()
+
+    def OnClearWbsStructure(self, sender, args):
+        if not self.session.wbs_structure_path:
+            return
+        self._use_wbs_structure(None, None)
 
     def _apply_wbs(self, levels):
         """Nuovi livelli WBS: si salvano nel progetto e si rileggono i valori dal modello."""

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 __title__ = "MEP\nQTO"
 
-__doc__ = """Version = 1.4
-Date    = 08.10.2026
+__doc__ = """Version = 1.5
+Date    = 09.10.2026
 _____________________________________________________________________
 Quantity takeoff of the MEP model, driven by the Type Mark.
 
@@ -56,7 +56,9 @@ type), Rules (editable), Issues.
 
 WBS Levels...: up to 15 levels, one parameter each (read on the
 instance, then the type, then the host). Levels left empty are
-skipped. Save writes the project file, Export Excel writes the same
+skipped. WBS structure: an Excel / CSV with one code / description
+table per WBS level, side by side (sheet, columns of every level and
+first row chosen with Columns...); the WBS groups of the bill of quantities show code and description. Save writes the project file, Export Excel writes the same
 five tabs to a workbook, one sheet each.
 
 The model is only read, never modified.

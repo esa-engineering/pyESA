@@ -94,6 +94,7 @@ ISSUE_DENSITY = "No pipe density"
 ISSUE_HOST = "Insulation on fittings not measured"
 ISSUE_EXCLUDED = "Excluded from the bill"
 ISSUE_LINK_SKIPPED = "Linked model not read"
+ISSUE_WBS_NOT_IN_STRUCTURE = "WBS code not in the WBS structure"
 # Etichetta delle voci non modellate nelle anomalie e nella colonna Source della scheda EPU.
 MANUAL_SOURCE = u"Manual items"
 
@@ -1362,6 +1363,14 @@ def group_options(wbs_labels):
     return options
 
 
+def wbs_label(value, names):
+    """Etichetta di un valore WBS: "codice - descrizione" se i codici del suo livello
+    (names, {codice: descrizione}) lo descrivono, altrimenti il valore com'e' (anche
+    "(not set)")."""
+    description = names.get(value) if names and value else None
+    return u"{} - {}".format(value, description) if description else value
+
+
 def wbs_level_index(key):
     """Posizione del livello WBS di una chiave "wbs:N"; None per gli altri campi."""
     if key and key.startswith(GROUP_WBS_PREFIX):
@@ -1429,7 +1438,7 @@ def _group_sort_key(value):
     return (value in _GROUP_PLACEHOLDERS, value.lower(), value)
 
 
-def pivot_bill(bill, items, units, wbs_count, group_by, column_levels=()):
+def pivot_bill(bill, items, units, wbs_count, group_by, column_levels=(), wbs_names=None):
     """Righe della scheda Bill of quantities e chiavi delle colonne.
 
     group_by: chiavi dei livelli sulle righe (group_options), nell'ordine; ogni gruppo ha
@@ -1440,6 +1449,10 @@ def pivot_bill(bill, items, units, wbs_count, group_by, column_levels=()):
 
     Restituisce (righe, chiavi di colonna); una chiave di colonna e' la tupla dei valori
     dei livelli sulle colonne ("(not set)" per un valore mancante).
+
+    wbs_names: {posizione del livello WBS: {codice: descrizione}} della struttura WBS.
+    Le intestazioni dei gruppi WBS diventano "codice - descrizione", cercando il codice fra
+    quelli del suo livello; path, ordinamento e chiavi restano sul codice.
     """
     if bill is None:
         return [], []
@@ -1483,9 +1496,12 @@ def pivot_bill(bill, items, units, wbs_count, group_by, column_levels=()):
         while common < min(len(path), len(current)) and path[common] == current[common]:
             common += 1
         for level in range(common, len(path)):
+            index = wbs_level_index(group_by[level])
+            label = wbs_label(path[level], (wbs_names or {}).get(index)) \
+                if index is not None else path[level]
             entries.append(GroupedEntry(
                 "group", level, path[:level + 1],
-                tuple(path[:index + 1] for index in range(level)), label=path[level]))
+                tuple(path[:index + 1] for index in range(level)), label=label))
         current = path
         cells, type_mark, code, quantity, columns, manual = line
         entries.append(GroupedEntry(
@@ -1606,6 +1622,43 @@ def type_rows(collect_result, selected_keys):
     return sorted(rows.values(), key=lambda r: (
         r.category.lower(), r.type_mark == u"", r.type_mark.lower(),
         r.type_label.lower(), r.nested, order.get(r.model, 0)))
+
+
+def wbs_structure_issues(takeoff, wbs_labels, names, manual=()):
+    """Valori WBS del computo che la struttura WBS caricata non descrive nel loro livello:
+    un'anomalia per livello e valore, con gli elementi che lo portano. names: {posizione
+    del livello: {codice: descrizione}}, solo per i livelli mappati (gli altri non si
+    controllano). manual: voci non modellate (i loro valori contano, senza elementi)."""
+    found = OrderedDict()
+    from_manual = set()
+    seen = set()
+    for group in takeoff.groups.values():
+        for records in group.code_records.values():
+            for record in records:
+                if id(record) in seen:
+                    continue
+                seen.add(id(record))
+                for index, value in enumerate(record.wbs[:len(wbs_labels)]):
+                    if value and index in names and value not in names[index]:
+                        found.setdefault((index, value), []).append(record.ref)
+    for item in manual:
+        for index, label in enumerate(wbs_labels):
+            value = (item.wbs.get(label) or u"").strip()
+            if value and index in names and value not in names[index]:
+                found.setdefault((index, value), [])
+                from_manual.add((index, value))
+    issues = []
+    for (index, value), refs in sorted(found.items(), key=lambda pair: (
+            pair[0][0], pair[0][1].lower(), pair[0][1])):
+        issues.append(Issue(
+            ISSUE_WBS_NOT_IN_STRUCTURE, value,
+            u"Value of the WBS level '{}' not found in the codes of that level in the "
+            u"WBS structure{}.".format(wbs_labels[index],
+                                   u" (also used by Manual items)" if refs and
+                                   (index, value) in from_manual else
+                                   u" (used by Manual items)" if not refs else u""),
+            refs))
+    return issues
 
 
 def description_issues(takeoff, merged_items, price_list_loaded=False, manual=()):

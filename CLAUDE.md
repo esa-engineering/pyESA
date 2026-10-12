@@ -324,6 +324,22 @@ Rules that come with the pattern:
   resolving chapters and price book by ID from `PweDGCapitoliCategorie`. Everything else
   (Columns..., layout in the project file, `_rows_to_items`) is the Excel path.
   `PweVociComputo` (the PriMus bill) is not read.
+- The **WBS structure** (`qs.load_wbs_structure()`, project file keys
+  `wbs_structure_path` / `wbs_structure_layout`) is one sheet with a code / description
+  table per WBS level, side by side; the same code can mean different things in two
+  levels, so lookups are per level. `qs.WbsLayout` holds sheet, common `first_row` and
+  `levels {parameter name: (code col, description col)}`, keyed by **name** so reordering
+  the WBS levels keeps the mapping; levels not active now are kept on save. It is edited
+  in the same columns window: `ColumnsForm` takes a *kind* (`PriceListKind` /
+  `WbsKind(level_names)`: fields, defaults, `guess`, `make`, `check`, `header_row`);
+  `guess_wbs_layout()` finds the Codice / Descrittivo header pairs and matches each to
+  the level named above it. `qs.WbsStructure.names` is `{name: {code: description}}`;
+  the window turns it into `session.wbs_names` `{level index: {code: description}}` for
+  the active levels. It only relabels: `pivot_bill(..., wbs_names)` turns WBS group
+  labels into "code - description" via `qm.wbs_label()`, while paths, sort keys and item
+  cells stay on the code; pivot column headers do the same. Values missing from their
+  level's table raise `ISSUE_WBS_NOT_IN_STRUCTURE` (`wbs_structure_issues()`, mapped
+  levels only). CME and the export stay on codes.
 - Excel / CSV price lists are read through a `PriceListLayout` (sheet + `{field: column
   index}`), chosen in the Price list columns window (`mepqto_columns_ui`) and stored in the
   project file as `price_list_layout` (column letters), with the path. No layout = first

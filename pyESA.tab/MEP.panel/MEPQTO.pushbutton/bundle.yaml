@@ -25,7 +25,10 @@ tooltip: >
   Columns... chooses which of its five prices to use. Every price code of the model
   is looked up in the code column; codes that are not there are red in the EPU tab. WBS Levels: pick the
   parameter of up to 15 WBS levels; the bill of quantities then has one column per level
-  after Amount. EPU tab: complete chapters, subchapters, short descriptions, descriptions, units (cad, m, kg, mq, mc) and unit prices. Bill of
+  after Amount. WBS structure: an Excel / CSV with one code / description table per WBS
+  level, side by side (sheet, the two columns of every level and the first row chosen
+  with Columns...); the WBS groups of the bill of quantities then show code and
+  description, each value looked up in the table of its own level. EPU tab: complete chapters, subchapters, short descriptions, descriptions, units (cad, m, kg, mq, mc) and unit prices. Bill of
   quantities tab: filled automatically; Layout... chooses the grouping levels of the rows
   (chapter and subchapter by default, or type mark, unit, WBS levels) and the WBS levels
   shown as columns, like a pivot table, in the order they are added. Every group has its

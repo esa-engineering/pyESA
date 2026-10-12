@@ -386,6 +386,74 @@ stesso parametro non può stare su due livelli.
   conta due volte le righe di combinazione. I valori WBS sulle voci permettono di filtrare
   il foglio o di metterlo in pivot.
 
+### Struttura WBS (codici e descrizioni)
+
+I parametri WBS del modello contengono codici (`PT`, `ELE`). La **struttura WBS** è un
+Excel o un CSV con, per ogni livello, i codici e le loro descrizioni: con la struttura
+caricata, i gruppi dei livelli WBS nella scheda Bill of quantities mostrano
+**`codice - descrizione`** (es. `ELE - Impianti elettrici`), come i gruppi di capitolo e
+sottocapitolo mostrano i nomi dell'elenco prezzi.
+
+- **Forma del file:** un foglio con le tabelle dei livelli **affiancate**, una coppia di
+  colonne Codice / Descrizione per livello, separate o no da colonne vuote. Sopra possono
+  esserci righe di titolo (nome del livello, `BIM`, nome descrittivo come *Fase / Lotto*)
+  e l'intestazione `Codice` / `Descrittivo`. Le tabelle possono avere lunghezze diverse.
+  Esempio:
+
+  | | A | B | C | D | E |
+  | --- | --- | --- | --- | --- | --- |
+  | 1 | WBS1 | | | WBS2 | |
+  | 3 | Scope of work | | | Fase / Lotto | |
+  | 4 | Codice | Descrittivo | | Codice | Descrittivo |
+  | 5 | ELE | Impianti elettrici e speciali | | L01 | Lotto 1 |
+
+- **Un livello, una tabella:** il valore di un parametro WBS si cerca solo fra i codici
+  del **suo** livello, quindi lo stesso codice può avere significati diversi in due
+  livelli (`ELE` in WBS3 e in WBS4). I livelli sono legati per **nome del parametro**, non
+  per posizione: riordinare i livelli in *WBS Levels...* non sposta le mappature.
+- **Prima i livelli:** *Browse...* chiede di scegliere prima i livelli WBS
+  (*WBS Levels...*), perché la finestra delle colonne ha una riga per ogni livello attivo.
+- **Dove si sceglie:** riga **WBS structure** nelle impostazioni. *Browse...* sceglie il
+  file e apre la finestra **WBS structure columns**; *Columns...* la riapre per il file
+  in uso; *Reload* rilegge il file dopo una modifica in Excel; `✕` toglie la struttura.
+- **La finestra** è quella del listino, con una tabella di campi e la riga di partenza:
+  - **Sheet:** il foglio del file (per un CSV non c'è scelta);
+  - **Una riga per livello WBS attivo:** colonna del codice e colonna della descrizione,
+    mostrate con lettera e intestazione (presa dalla riga `Codice` / `Descrittivo`, non
+    da quella dei titoli). Un livello si può lasciare senza tabella (`(none)` in tutte e
+    due), ma codice e descrizione vanno scelti insieme e almeno un livello va mappato;
+  - **First row:** il numero della prima riga con i valori, comune a tutti i livelli; le
+    righe sopra si ignorano (titoli, intestazioni). L'anteprima ha la colonna **Row** con
+    il numero di riga del foglio. Deve essere fra 1 e il numero di righe del foglio;
+  - **Proposta iniziale:** la mappatura già salvata per quel file; altrimenti la prima
+    riga d'intestazione con coppie `Codice` + `Descrizione` / `Descrittivo` (la
+    descrizione entro tre colonne a destra del codice): una coppia va al livello il cui
+    nome compare sopra di lei (es. `WBS1` nella riga del titolo), le altre ai livelli
+    rimasti da sinistra a destra, e i valori partono dalla riga dopo l'intestazione;
+    altrimenti A/B il primo livello, C/D il secondo e così via, dalla riga 1.
+    *Detect from Headers* e *Side by side* rifanno le due proposte.
+  - I livelli spenti al momento conservano la loro mappatura nel file di progetto e la
+    ritrovano quando tornano attivi.
+- **Righe saltate:** quelle prima di *First row*; in ogni livello, le celle senza codice
+  o senza descrizione e un'intestazione rimasta dentro (`Codice`...). **Codice ripetuto
+  nello stesso livello:** vale la prima riga (il tooltip del percorso dice quanti doppioni
+  sono stati ignorati).
+- **Confronto dei codici:** esatto, maiuscole comprese, senza gli spazi ai lati. Un codice
+  scritto come **numero** in Excel perde gli zeri finali (`1.10` diventa `1.1`): nella
+  struttura i codici vanno formattati come testo.
+- **Cosa cambia:** solo le etichette. Raggruppamento, ordine (per codice), filtri e
+  colonne WBS delle voci restano sui codici. Con un livello WBS sulle colonne
+  (*Layout...*) anche le intestazioni di colonna mostrano codice e descrizione. La scheda
+  CME e l'export Excel restano sui codici.
+- **Anomalie:** un valore WBS del computo che la tabella del suo livello non contiene è
+  un'anomalia "WBS code not in the WBS structure", una per livello e valore, con gli
+  elementi che lo portano (anche i valori della scheda Manual items). I livelli senza
+  tabella non si controllano. Un file che non si legge (mancante, bloccato, foglio
+  sparito, nessun codice dalla riga indicata) dà "WBS structure not loaded" e i gruppi
+  tornano ai soli codici.
+- **Salvataggio:** percorso e mappatura vanno nel file di progetto
+  (`wbs_structure_path`, `wbs_structure_layout`), quindi valgono per tutta la commessa. Il tool non scrive mai nel file della struttura.
+
 ## Regole di misura
 
 Le formule vengono dai fogli `XXXXEN_QTO_Ducts`, `_Pipes`, `_Flex Ducts`, `_Cable Trays` e
@@ -680,6 +748,10 @@ Contenuto:
   (codici di tipo), `linear_codes` (codici d'istanza, tutte le categorie) e
   `linear_include` (Sì/No d'istanza, tutte le categorie): i nomi restano quelli storici
   per non rompere i file già salvati;
+- `wbs_structure_path`, `wbs_structure_layout`: file della struttura WBS e sua mappatura
+  (`{"sheet": "WBS", "first_row": 5, "levels": {"WBS1": {"code": "A", "description": "B"},
+  "WBS2": {"code": "D", "description": "E"}}}`, livelli per nome del parametro; vedi
+  "Struttura WBS");
 - `manual_items`: voci non modellate della scheda Manual items
   (`{"type_mark": "MAN1", "code": "M.001", "quantity": 2.5, "wbs": {"Zona": "Z2"}}`);
 - `allowance_overrides`: override della maggiorazione sulle voci del computo, una riga
@@ -728,6 +800,8 @@ istanze prima di fare il computo.
 | Excluded from the bill | elementi tolti dal Sì/No di inclusione (No sull'istanza, tutte le categorie) |
 | Price list not loaded | il listino non si legge (file mancante, aperto e bloccato, nessun codice in colonna A) |
 | Linked model not read | link scelto ma non letto: non caricato, oppure senza una fase con il nome di quella scelta |
+| WBS code not in the WBS structure | valore di un livello WBS (del modello o della scheda Manual items) che la tabella di quel livello nella struttura WBS non contiene: il suo gruppo mostra il solo codice. I livelli senza tabella non si controllano |
+| WBS structure not loaded | la struttura WBS non si legge (file mancante o bloccato, foglio sparito, nessun codice con descrizione dalla riga di partenza) |
 | Unit not valid for the category | la voce non ha un'unità ammessa per la categoria (es. canale con unità vuota o `cad`): **non computato** |
 | Unit replaced | passerella o conduit con una voce non in m: computato comunque in m |
 | No pipe density | tubo con voce al kg e Type Mark assente dalla tabella densità: **non computato** |
@@ -774,8 +848,8 @@ di default è `YYMMDD_HHMMSS_MEPQTO_<Modello>.xlsx`. I fogli sono gli stessi del
 | `mepqto_grid_filter.py` | filtri per colonna in stile Excel sulle griglie legate a una `DataTable` |
 | `mepqto_layout_ui.py` | finestra Layout del Bill of quantities: livelli sulle righe e livelli WBS sulle colonne |
 | `MEPQTO_layout.xaml` | layout della finestra Layout |
-| `mepqto_columns_ui.py` | finestra Price list columns: foglio e colonne di un listino Excel / CSV, con anteprima |
-| `MEPQTO_columns.xaml` | layout della finestra Price list columns |
+| `mepqto_columns_ui.py` | finestra Price list columns / WBS structure columns: foglio e colonne di un listino Excel / CSV / PriMus o della struttura WBS (una coppia codice / descrizione per livello e la riga di partenza; `PriceListKind` / `WbsKind`), con anteprima |
+| `MEPQTO_columns.xaml` | layout della finestra delle colonne |
 | `mepqto_scope_ui.py` | finestra di scelta dei modelli (link), dei workset e delle categorie da leggere, con i set di categorie e di workset |
 | `MEPQTO_scope.xaml` | layout della finestra di scelta |
 | `mepqto_wbs_ui.py` | finestra di scelta dei livelli WBS |

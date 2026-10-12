@@ -9,6 +9,9 @@ Due livelli, fusi campo per campo (il progetto vince):
   file PriMus .xpwe, che il tool legge soltanto.
 * file di progetto <Modello>_MEPQTO.json accanto al modello centrale: descrizioni,
   unita' e prezzi aggiunti o corretti nella finestra, regole, WBS, parametri.
+* struttura WBS: Excel / CSV con una tabella codice / descrizione per ogni livello WBS,
+  affiancate sullo stesso foglio, letto soltanto (load_wbs_structure); da' le descrizioni
+  ai gruppi WBS del Bill of quantities.
 
 Salvataggio concorrente, sia sul file di progetto sia sul listino JSON: si
 ricordano le modifiche locali; se al salvataggio il file su disco e' cambiato dopo
@@ -89,6 +92,11 @@ LAYOUT_FIELDS = (
     ("price_book", u"Reference price book", False),
 )
 
+# Struttura WBS (Excel / CSV): per ogni livello una coppia di colonne codice / descrizione.
+# Intestazioni della colonna del codice WBS: riconosciute per la proposta e saltate se
+# rimaste dentro i valori.
+WBS_CODE_HEADERS = ("code", "codice", "codicewbs", "wbscode", "codwbs", "cod")
+
 # Intestazioni riconosciute per proporre la mappatura (normalizzate con _norm_header).
 HEADER_GUESSES = {
     "code": CODE_HEADERS,
@@ -108,6 +116,10 @@ HEADER_GUESSES = {
     "price_book": ("prezzariodiriferimento", "prezziariodiriferimento", "prezzario", "prezziario",
                    "referencepricebook", "pricebook"),
 }
+
+WBS_DESCRIPTION_HEADERS = HEADER_GUESSES["description"] + (
+    "descrittivo", "descrittiva", "titolo", "title", "nome", "name", "denominazione",
+    "descrizionewbs", "wbsdescription")
 
 
 def column_letter(index):
@@ -212,6 +224,141 @@ def guess_layout(rows, sheet=u""):
                     break
         if "code" in columns and len(columns) >= 2:
             return PriceListLayout(sheet, columns)
+    return None
+
+
+# --- struttura WBS: una tabella codice / descrizione per livello ---------------
+
+WBS_CODE_FIELD = u"code:"
+WBS_DESCRIPTION_FIELD = u"description:"
+
+
+class WbsLayout(object):
+    """Come leggere la struttura WBS: il foglio (vuoto = il primo), la riga da cui
+    partono i valori (first_row, 1-based) e per ogni livello WBS, per nome del parametro,
+    le colonne di codice e descrizione ({nome: (indice codice, indice descrizione)}).
+    Per nome e non per posizione: la mappatura resta valida se i livelli cambiano ordine.
+    Nel file di progetto le colonne si scrivono come lettere."""
+
+    def __init__(self, sheet=u"", levels=None, first_row=1):
+        self.sheet = sheet or u""
+        self.levels = dict(levels or {})
+        try:
+            first_row = int(first_row)
+        except (TypeError, ValueError):
+            first_row = 1
+        self.first_row = first_row if first_row > 1 else 1
+
+    @property
+    def columns(self):
+        """Le colonne come campi piatti della finestra: {"code:<livello>": indice,
+        "description:<livello>": indice}."""
+        flat = {}
+        for name, (code, description) in self.levels.items():
+            flat[WBS_CODE_FIELD + name] = code
+            flat[WBS_DESCRIPTION_FIELD + name] = description
+        return flat
+
+    @classmethod
+    def from_columns(cls, sheet, columns, first_row=1, keep=None):
+        """Dai campi piatti della finestra; keep: livelli di una mappatura precedente che
+        la finestra non mostrava (livelli WBS spenti), conservati."""
+        levels = dict(keep or {})
+        for field, code in columns.items():
+            if field.startswith(WBS_CODE_FIELD):
+                name = field[len(WBS_CODE_FIELD):]
+                description = columns.get(WBS_DESCRIPTION_FIELD + name)
+                if description is not None:
+                    levels[name] = (code, description)
+        return cls(sheet, levels, first_row)
+
+    @classmethod
+    def pairs(cls, level_names, first_row=1):
+        """Tabelle affiancate senza spazi: livello 1 in A e B, livello 2 in C e D..."""
+        return cls(u"", dict((name, (2 * index, 2 * index + 1))
+                             for index, name in enumerate(level_names)), first_row)
+
+    @classmethod
+    def from_dict(cls, data):
+        if not isinstance(data, dict):
+            return None
+        levels = {}
+        for name, columns in (data.get("levels") or {}).items():
+            if not isinstance(columns, dict):
+                continue
+            code = letter_index(columns.get("code"))
+            description = letter_index(columns.get("description"))
+            if code is not None and description is not None:
+                levels[name] = (code, description)
+        if not levels:
+            return None
+        return cls(data.get("sheet") or u"", levels, data.get("first_row") or 1)
+
+    def to_dict(self):
+        return {"sheet": self.sheet, "first_row": self.first_row,
+                "levels": dict((name, {"code": column_letter(code),
+                                       "description": column_letter(description)})
+                               for name, (code, description) in self.levels.items())}
+
+    def describe(self, level_names=None):
+        """"first sheet from row 5: WBS1 A/B, WBS2 D/E" per note e messaggi; con
+        level_names, nell'ordine dei livelli e solo quelli."""
+        names = [name for name in (level_names if level_names is not None
+                                   else sorted(self.levels)) if name in self.levels]
+        parts = [u"{} {}/{}".format(name, column_letter(self.levels[name][0]),
+                                    column_letter(self.levels[name][1])) for name in names]
+        sheet = u"sheet '{}'".format(self.sheet) if self.sheet else u"first sheet"
+        return u"{} from row {}: {}".format(sheet, self.first_row,
+                                            u", ".join(parts) or u"no level mapped")
+
+    def __eq__(self, other):
+        return isinstance(other, WbsLayout) and self.to_dict() == other.to_dict()
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+def guess_wbs_layout(rows, sheet=u"", level_names=()):
+    """Mappatura proposta per la struttura WBS: nella prima riga d'intestazione (fra le
+    prime HEADER_SCAN_ROWS) con almeno una coppia "Codice" + "Descrizione / Descrittivo"
+    (la descrizione entro tre colonne a destra del codice), ogni coppia e' la tabella di
+    un livello. Una coppia va al livello il cui nome compare sopra l'intestazione, nelle
+    sue colonne (es. "WBS1" nella riga del titolo); le altre ai livelli rimasti, da
+    sinistra a destra. La riga di partenza e' quella dopo l'intestazione. None se non c'e'
+    un'intestazione riconoscibile."""
+    names = list(level_names)
+    by_lower = dict((name.strip().lower(), name) for name in names)
+    for row_index, cells in enumerate(rows[:HEADER_SCAN_ROWS]):
+        pairs = []
+        for index, cell in enumerate(cells):
+            if _norm_header(cell) not in WBS_CODE_HEADERS:
+                continue
+            for other in range(index + 1, min(index + 4, len(cells))):
+                if _norm_header(cells[other]) in WBS_DESCRIPTION_HEADERS:
+                    pairs.append((index, other))
+                    break
+        if not pairs:
+            continue
+        levels = {}
+        unnamed = []
+        for code, description in pairs:
+            found = None
+            for above in rows[:row_index]:
+                for column in (code, description):
+                    if column < len(above):
+                        name = by_lower.get((above[column] or u"").strip().lower())
+                        if name and name not in levels:
+                            found = name
+                            break
+                if found:
+                    break
+            if found:
+                levels[found] = (code, description)
+            else:
+                unnamed.append((code, description))
+        for name, pair in zip([name for name in names if name not in levels], unnamed):
+            levels[name] = pair
+        return WbsLayout(sheet, levels, row_index + 2)
     return None
 
 
@@ -692,6 +839,81 @@ def is_table_file(path):
         (".xlsx", ".xlsm", ".csv", ".txt") + XPWE_EXTENSIONS
 
 
+# =============================================================================
+# STRUTTURA WBS (sola lettura)
+# =============================================================================
+
+class WbsStructure(object):
+    """Descrizioni dei codici WBS per livello: {nome del parametro WBS: {codice:
+    descrizione}}, da un Excel / CSV. Lo stesso codice puo' stare in due livelli con
+    descrizioni diverse."""
+
+    def __init__(self, path=None):
+        self.path = path
+        self.names = {}
+        self.duplicates = 0
+        self.sheet_name = None
+
+    @property
+    def code_count(self):
+        return sum(len(codes) for codes in self.names.values())
+
+
+def is_wbs_table_file(path):
+    """La struttura WBS si legge da Excel o CSV (non da PriMus)."""
+    return os.path.splitext(path or u"")[1].lower() in (".xlsx", ".xlsm", ".csv", ".txt")
+
+
+def load_wbs_structure(path, layout):
+    """Codici e descrizioni WBS per livello secondo la mappatura (WbsLayout: foglio, riga
+    di partenza, colonne di ogni livello). Ogni livello si legge dalle sue colonne, dalla
+    riga di partenza in giu': si saltano le celle senza codice o senza descrizione e
+    un'intestazione rimasta dentro ("Codice"...); un codice ripetuto nello stesso livello:
+    vale la prima riga. Solleva PriceListError con un messaggio per l'utente."""
+    structure = WbsStructure(path)
+    if not path:
+        return structure
+    if not os.path.isfile(path):
+        raise PriceListError(u"WBS structure not found: {}".format(path))
+    if not is_wbs_table_file(path):
+        raise PriceListError(u"Unsupported WBS structure format '{}': use .xlsx, .xlsm or "
+                             u".csv.".format(os.path.splitext(path)[1]))
+    if layout is None or not layout.levels:
+        raise PriceListError(u"The columns of the WBS structure are not set: choose them "
+                             u"with Columns...")
+    try:
+        structure.sheet_name, rows = read_sheet_rows(path, layout.sheet)
+    except PriceListError:
+        raise
+    except IOError as error:
+        raise PriceListError(u"Cannot read the WBS structure (is it open and locked?): "
+                             u"{}".format(error))
+    except Exception as error:
+        raise PriceListError(u"Cannot read the WBS structure: {}".format(error))
+    data = rows[layout.first_row - 1:]
+    for name, (code_index, description_index) in layout.levels.items():
+        codes = {}
+        for cells in data:
+            code = (cells[code_index] or u"").strip() if code_index < len(cells) else u""
+            description = (cells[description_index] or u"").strip() \
+                if description_index < len(cells) else u""
+            if not code or not description or _norm_header(code) in WBS_CODE_HEADERS:
+                continue
+            if code in codes:
+                structure.duplicates += 1
+                continue
+            codes[code] = description
+        structure.names[name] = codes
+    if not structure.code_count:
+        raise PriceListError(
+            u"No WBS codes with a description found from row {} of {} in the mapped "
+            u"columns. Check the sheet, the columns and the first row with "
+            u"Columns...".format(layout.first_row,
+                                 u"sheet '{}'".format(structure.sheet_name)
+                                 if structure.sheet_name else u"the file"))
+    return structure
+
+
 def load_price_list(path, layout=None):
     """Legge il listino. layout: PriceListLayout per Excel / CSV (None = A..I sul primo
     foglio). Solleva PriceListError con un messaggio per l'utente."""
@@ -984,6 +1206,9 @@ class ProjectStore(object):
         # manual_items: voci non modellate della scheda Manual items (dict di
         # mepqto_model.ManualItem.to_dict()), salvate in blocco
         self.manual_items = []
+        # struttura WBS: percorso dell'Excel / CSV e sua mappatura (dict), salvati insieme
+        self.wbs_structure_path = None
+        self.wbs_structure_layout = None
         self.updated_by = u""
         self.updated_at = u""
         self._loaded_mtime = None
@@ -994,6 +1219,7 @@ class ProjectStore(object):
         self._dirty_wbs = False
         self._dirty_parameters = False
         self._dirty_manual = False
+        self._dirty_wbs_structure = False
 
     # ------------------------------------------------------------ lettura
 
@@ -1008,6 +1234,8 @@ class ProjectStore(object):
         self.parameters = None
         self.allowance_overrides = {}
         self.manual_items = []
+        self.wbs_structure_path = None
+        self.wbs_structure_layout = None
         self._loaded_mtime = None
         if not self.path or not os.path.isfile(self.path):
             return
@@ -1037,6 +1265,9 @@ class ProjectStore(object):
         manual = data.get("manual_items")
         self.manual_items = [dict(entry) for entry in manual if isinstance(entry, dict)] \
             if isinstance(manual, list) else []
+        self.wbs_structure_path = data.get("wbs_structure_path") or None
+        layout = data.get("wbs_structure_layout")
+        self.wbs_structure_layout = layout if isinstance(layout, dict) else None
         self.updated_by = data.get("updated_by") or u""
         self.updated_at = data.get("updated_at") or u""
 
@@ -1046,7 +1277,7 @@ class ProjectStore(object):
     def is_dirty(self):
         return bool(self._dirty_fields or self._dirty_price_list or self._dirty_rules or
                     self._dirty_wbs or self._dirty_parameters or self._dirty_overrides or
-                    self._dirty_manual)
+                    self._dirty_manual or self._dirty_wbs_structure)
 
     def set_item_field(self, code, field, value):
         self.items.setdefault(code, {})[field] = value
@@ -1094,6 +1325,16 @@ class ProjectStore(object):
             self.price_list_layout = layout_dict
             self._dirty_price_list = True
 
+    def set_wbs_structure(self, path, layout_dict):
+        """Struttura WBS: percorso e mappatura (WbsLayout.to_dict()) insieme; None per
+        lavorare senza."""
+        path = path or None
+        layout_dict = layout_dict if path else None
+        if path != self.wbs_structure_path or layout_dict != self.wbs_structure_layout:
+            self.wbs_structure_path = path
+            self.wbs_structure_layout = layout_dict
+            self._dirty_wbs_structure = True
+
     # ------------------------------------------------------------ scrittura
 
     def _merge_with_disk(self):
@@ -1115,6 +1356,7 @@ class ProjectStore(object):
         local_parameters = self.parameters
         local_overrides = self.allowance_overrides
         local_manual = self.manual_items
+        local_structure = (self.wbs_structure_path, self.wbs_structure_layout)
         self._apply_data(data)
 
         for code, field in self._dirty_fields:
@@ -1136,6 +1378,8 @@ class ProjectStore(object):
             self.parameters = local_parameters
         if self._dirty_manual:
             self.manual_items = local_manual
+        if self._dirty_wbs_structure:
+            self.wbs_structure_path, self.wbs_structure_layout = local_structure
         return True
 
     def save(self, user_name):
@@ -1168,6 +1412,8 @@ class ProjectStore(object):
             "parameters": self.parameters,
             "allowance_overrides": _write_overrides(self.allowance_overrides),
             "manual_items": self.manual_items,
+            "wbs_structure_path": self.wbs_structure_path,
+            "wbs_structure_layout": self.wbs_structure_layout,
             "updated_by": self.updated_by,
             "updated_at": self.updated_at,
         }
@@ -1185,4 +1431,5 @@ class ProjectStore(object):
         self._dirty_wbs = False
         self._dirty_parameters = False
         self._dirty_manual = False
+        self._dirty_wbs_structure = False
         return merged
