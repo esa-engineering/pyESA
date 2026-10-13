@@ -1,0 +1,11 @@
+title: Stub
+tooltip: >-
+  CLICK: opens a window to create short pipe / duct stubs that start from the free mechanical connectors of the
+  elements you click (standard length, optional +50 mm per connector, all or chosen connectors, pipe and duct type).
+  ESC to finish.
+
+  SHIFT + CLICK: no window; stubs on all free connectors, starting from the last length and adding 50 mm per
+  connector.
+
+  A report lists the stubs created and the connectors skipped.
+author: Matteo Maiorano

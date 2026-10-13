@@ -1,0 +1,12 @@
+title: Riser Up
+tooltip: >-
+  CLICK: adds a vertical run upwards from the free end nearest to your click, with an elbow, using the last settings
+  (default 1000 mm).
+
+  SHIFT + CLICK: set the height first, as a length or as a level (current view level or above) plus an offset.
+
+  SHIFT + CLICK also sets the optional inclined run before the vertical one (angle and length).
+
+  A report lists the new elements and their final elevation. The new parts keep the parameters and the insulation of
+  the starting element.
+author: Matteo Maiorano

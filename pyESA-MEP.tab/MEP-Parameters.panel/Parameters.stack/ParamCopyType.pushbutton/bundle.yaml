@@ -1,0 +1,10 @@
+title: Param Copy Type
+tooltip: >-
+  Copies type parameters from the type of one element to the types of other elements. Pick the source element, choose
+  the type parameters and whether to overwrite values already filled, then pick elements of the types to change and
+  press Finish. Each different type is written once.
+
+  A type parameter applies to every instance of that type in the model. The type of the source and elements without a
+  type are left unchanged. A report lists, per type, what was copied, skipped and failed. Instance parameters are
+  copied by Param Copy Instance.
+author: Matteo Maiorano

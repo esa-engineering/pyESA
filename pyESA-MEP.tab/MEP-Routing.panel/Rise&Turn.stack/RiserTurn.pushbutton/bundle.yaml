@@ -1,0 +1,10 @@
+title: Riser Turn
+tooltip: >-
+  Turns vertical pipes, ducts or cable trays into a horizontal run with an elbow. Select the risers, then choose
+  where the elbow goes (top end, bottom end, or an elevation: the chosen end is moved there, extending or shortening
+  the riser), the side as seen on screen in the plan view or a clicked direction (pipes snap to 45 degrees), and the
+  length of the horizontal run. Cable trays: from a narrow side the run stays on edge, from a wide side it is flat.
+  If the end is already connected or the riser would be too short, it is left unchanged and the report says why.
+
+  The new parts keep the type, size, parameters and insulation of the riser.
+author: Matteo Maiorano
