@@ -1,0 +1,1435 @@
+# -*- coding: utf-8 -*-
+"""
+mepqto_store.py - archivio delle voci di computo, fuori dal modello Revit.
+
+Due livelli, fusi campo per campo (il progetto vince):
+
+* listino comune: file .json (PriceListDocument, modificabile con l'editor del
+  listino) oppure .xlsx / .xlsm / .csv mantenuto in Excel, oppure l'elenco prezzi di un
+  file PriMus .xpwe, che il tool legge soltanto.
+* file di progetto <Modello>_MEPQTO.json accanto al modello centrale: descrizioni,
+  unita' e prezzi aggiunti o corretti nella finestra, regole, WBS, parametri.
+* struttura WBS: Excel / CSV con una tabella codice / descrizione per ogni livello WBS,
+  affiancate sullo stesso foglio, letto soltanto (load_wbs_structure); da' le descrizioni
+  ai gruppi WBS del Bill of quantities.
+
+Salvataggio concorrente, sia sul file di progetto sia sul listino JSON: si
+ricordano le modifiche locali; se al salvataggio il file su disco e' cambiato dopo
+il caricamento, lo si rilegge e si riapplicano sopra solo quelle.
+"""
+
+import io
+import json
+import os
+import re
+import csv
+from datetime import datetime
+
+import clr
+clr.AddReference('System.Xml')
+
+from System.IO import StreamReader, File
+from System.Text import Encoding, UTF8Encoding
+from System.Xml import XmlDocument
+
+from pyrevit import DB
+
+PROJECT_FILE_SUFFIX = "_MEPQTO.json"
+FILE_VERSION = 1
+
+# epu_item: n. articolo dell'elenco prezzi unitari (EPU) di progetto.
+# price_book: prezzario di riferimento della voce (es. Prezzario Regione Lombardia 2026).
+# short_description: descrizione breve della voce, accanto a quella estesa.
+# Il codice della voce (chiave, letto dal modello) e' il codice del prezzario.
+FIELDS = ("chapter", "subchapter", "epu_item", "price_book", "short_description",
+          "description", "unit", "price")
+
+# Unita' di misura proposte dalla tendina dell'elenco prezzi.
+UNITS = (u"cad", u"m", u"kg", u"mq", u"mc")
+# Varianti frequenti nei listini, confrontate dopo _norm_unit (minuscolo, senza
+# punti ne' spazi, apici 2/3 come cifre).
+UNIT_ALIASES = {
+    # "n" e "nr" sono la stessa unita' di "cad": negli EPU compaiono entrambe.
+    u"cad": u"cad", u"cadauno": u"cad", u"cada": u"cad", u"n": u"cad", u"nr": u"cad",
+    u"n\u00b0": u"cad", u"n\u00ba": u"cad", u"nro": u"cad", u"numero": u"cad",
+    u"num": u"cad", u"pz": u"cad", u"pezzi": u"cad", u"pc": u"cad", u"pcs": u"cad",
+    u"ea": u"cad", u"each": u"cad",
+    u"m": u"m", u"ml": u"m", u"mt": u"m", u"m1": u"m", u"metri": u"m",
+    u"kg": u"kg",
+    u"mq": u"mq", u"m2": u"mq", u"sqm": u"mq",
+    u"mc": u"mc", u"m3": u"mc", u"cum": u"mc",
+}
+
+ORIGIN_PRICE_LIST = "Price list"
+ORIGIN_PROJECT = "Project"
+ORIGIN_MISSING = "Missing"
+
+# Listino Excel / CSV: colonne in posizione fissa, come un EPU (elenco prezzi unitari).
+# A codice, B descrizione sintetica, C descrizione completa, D unita', E prezzo unitario;
+# F..I facoltative (le scrive l'export, cosi' si puo' reimportare).
+EPU_COLUMNS = ("code", "short_description", "description", "unit", "price",
+               "chapter", "subchapter", "epu_item", "price_book")
+# Intestazioni della colonna A riconosciute come riga di titolo (normalizzate con
+# _norm_header: solo a-z0-9). Le altre righe senza un codice del modello sono innocue:
+# la ricerca parte dai codici del modello.
+CODE_HEADERS = ("code", "codice", "cod", "codici", "pricecode", "itemcode", "codicevoce",
+                "articolo", "art", "tariffa", "codicetariffa", "codiceprezzo",
+                "codiceprezzario", "codiceprezziario", "pricebookcode", "codiceepu")
+HEADER_SCAN_ROWS = 20
+EURO_SIGN = u"\u20ac"
+
+# Campi che si possono mappare su una colonna del listino Excel / CSV: (campo, etichetta
+# mostrata nella finestra Columns..., obbligatorio).
+LAYOUT_FIELDS = (
+    ("code", u"Price book code", True),
+    ("short_description", u"Short Description", False),
+    ("description", u"Description", False),
+    ("unit", u"Unit", False),
+    ("price", u"Unit price", False),
+    ("chapter", u"Chapter", False),
+    ("subchapter", u"Subchapter", False),
+    ("epu_item", u"EPU item No.", False),
+    ("price_book", u"Reference price book", False),
+)
+
+# Struttura WBS (Excel / CSV): per ogni livello una coppia di colonne codice / descrizione.
+# Intestazioni della colonna del codice WBS: riconosciute per la proposta e saltate se
+# rimaste dentro i valori.
+WBS_CODE_HEADERS = ("code", "codice", "codicewbs", "wbscode", "codwbs", "cod")
+
+# Intestazioni riconosciute per proporre la mappatura (normalizzate con _norm_header).
+HEADER_GUESSES = {
+    "code": CODE_HEADERS,
+    "short_description": ("shortdescription", "shortdesc", "descrizionebreve", "descrizionesintetica",
+                          "descrizioneridotta", "descrizionecorta", "breve", "sintetica"),
+    "description": ("description", "descrizione", "desc", "designazione", "designazionedeilavori",
+                    "descrizionecompleta", "descrizioneestesa", "fulldescription",
+                    "longdescription", "descrizionevoce"),
+    "unit": ("unit", "um", "uom", "udm", "unita", "unitamisura", "unitadimisura",
+             "unitdimisura", "unitofmeasure"),
+    "price": ("price", "prezzo", "unitprice", "prezzounitario", "pu", "euro", "prezzoeuro",
+              "importounitario", "price1", "prezzo1"),
+    "chapter": ("chapter", "capitolo", "wbs", "section", "sezione"),
+    "subchapter": ("subchapter", "sottocapitolo", "subcapitolo", "subsection", "sottosezione"),
+    "epu_item": ("narticoloepu", "nrarticoloepu", "numeroarticoloepu", "articoloepu", "nepu",
+                 "epuitem", "epuitemno", "epuitemnumber"),
+    "price_book": ("prezzariodiriferimento", "prezziariodiriferimento", "prezzario", "prezziario",
+                   "referencepricebook", "pricebook"),
+}
+
+WBS_DESCRIPTION_HEADERS = HEADER_GUESSES["description"] + (
+    "descrittivo", "descrittiva", "titolo", "title", "nome", "name", "denominazione",
+    "descrizionewbs", "wbsdescription")
+
+
+def column_letter(index):
+    """0 -> "A", 25 -> "Z", 26 -> "AA"."""
+    letters = u""
+    index += 1
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        letters = unichr(65 + remainder) + letters  # noqa: F821 - IronPython 2.7
+    return letters
+
+
+def letter_index(letters):
+    """"C" -> 2; None se non e' una lettera di colonna."""
+    letters = (letters or u"").strip().upper()
+    if not letters or not letters.isalpha():
+        return None
+    index = 0
+    for ch in letters:
+        index = index * 26 + (ord(ch) - ord("A") + 1)
+    return index - 1
+
+
+class PriceListLayout(object):
+    """Come leggere un listino Excel / CSV: il foglio (vuoto = il primo) e la colonna di
+    ogni campo ({campo: indice 0-based}; un campo assente non si legge). Nel file di
+    progetto e nella config le colonne si scrivono come lettere ("A", "C")."""
+
+    def __init__(self, sheet=u"", columns=None):
+        self.sheet = sheet or u""
+        self.columns = dict(columns or {})
+
+    @classmethod
+    def default(cls):
+        """Disposizione fissa A..I (EPU_COLUMNS), il primo foglio."""
+        return cls(u"", dict((field, index) for index, field in enumerate(EPU_COLUMNS)))
+
+    @classmethod
+    def from_dict(cls, data):
+        if not isinstance(data, dict):
+            return None
+        columns = {}
+        for field, letters in (data.get("columns") or {}).items():
+            index = letter_index(letters)
+            if index is not None and field in EPU_COLUMNS:
+                columns[field] = index
+        if "code" not in columns:
+            return None
+        return cls(data.get("sheet") or u"", columns)
+
+    def to_dict(self):
+        return {"sheet": self.sheet,
+                "columns": dict((field, column_letter(index))
+                                for field, index in self.columns.items())}
+
+    def describe(self):
+        """"Sheet EPU: code A, short description B, ..." per note e messaggi."""
+        labels = dict((field, label) for field, label, _ in LAYOUT_FIELDS)
+        parts = [u"{} {}".format(labels[field], column_letter(self.columns[field]))
+                 for field, _, _ in LAYOUT_FIELDS if field in self.columns]
+        sheet = u"sheet '{}'".format(self.sheet) if self.sheet else u"first sheet"
+        return u"{}: {}".format(sheet, u", ".join(parts))
+
+    def __eq__(self, other):
+        return isinstance(other, PriceListLayout) and self.to_dict() == other.to_dict()
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+def header_row_index(rows):
+    """Riga d'intestazione probabile fra le prime HEADER_SCAN_ROWS: la prima con almeno
+    tre celle di testo non numerico; None se non c'e'."""
+    for index, cells in enumerate(rows[:HEADER_SCAN_ROWS]):
+        texts = 0
+        for cell in cells:
+            text = (cell or u"").strip()
+            if not text:
+                continue
+            try:
+                float(text.replace(u",", u"."))
+            except ValueError:
+                texts += 1
+        if texts >= 3:
+            return index
+    return None
+
+
+def guess_layout(rows, sheet=u""):
+    """Mappatura proposta dalle intestazioni note (Codice, Descrizione, UM, Prezzo...);
+    None se nelle prime righe non c'e' un'intestazione con il codice e almeno un altro
+    campo riconoscibile."""
+    for cells in rows[:HEADER_SCAN_ROWS]:
+        columns = {}
+        for index, cell in enumerate(cells):
+            key = _norm_header(cell)
+            if not key:
+                continue
+            for field, aliases in HEADER_GUESSES.items():
+                if field not in columns and key in aliases:
+                    columns[field] = index
+                    break
+        if "code" in columns and len(columns) >= 2:
+            return PriceListLayout(sheet, columns)
+    return None
+
+
+# --- struttura WBS: una tabella codice / descrizione per livello ---------------
+
+WBS_CODE_FIELD = u"code:"
+WBS_DESCRIPTION_FIELD = u"description:"
+
+
+class WbsLayout(object):
+    """Come leggere la struttura WBS: il foglio (vuoto = il primo), la riga da cui
+    partono i valori (first_row, 1-based) e per ogni livello WBS, per nome del parametro,
+    le colonne di codice e descrizione ({nome: (indice codice, indice descrizione)}).
+    Per nome e non per posizione: la mappatura resta valida se i livelli cambiano ordine.
+    Nel file di progetto le colonne si scrivono come lettere."""
+
+    def __init__(self, sheet=u"", levels=None, first_row=1):
+        self.sheet = sheet or u""
+        self.levels = dict(levels or {})
+        try:
+            first_row = int(first_row)
+        except (TypeError, ValueError):
+            first_row = 1
+        self.first_row = first_row if first_row > 1 else 1
+
+    @property
+    def columns(self):
+        """Le colonne come campi piatti della finestra: {"code:<livello>": indice,
+        "description:<livello>": indice}."""
+        flat = {}
+        for name, (code, description) in self.levels.items():
+            flat[WBS_CODE_FIELD + name] = code
+            flat[WBS_DESCRIPTION_FIELD + name] = description
+        return flat
+
+    @classmethod
+    def from_columns(cls, sheet, columns, first_row=1, keep=None):
+        """Dai campi piatti della finestra; keep: livelli di una mappatura precedente che
+        la finestra non mostrava (livelli WBS spenti), conservati."""
+        levels = dict(keep or {})
+        for field, code in columns.items():
+            if field.startswith(WBS_CODE_FIELD):
+                name = field[len(WBS_CODE_FIELD):]
+                description = columns.get(WBS_DESCRIPTION_FIELD + name)
+                if description is not None:
+                    levels[name] = (code, description)
+        return cls(sheet, levels, first_row)
+
+    @classmethod
+    def pairs(cls, level_names, first_row=1):
+        """Tabelle affiancate senza spazi: livello 1 in A e B, livello 2 in C e D..."""
+        return cls(u"", dict((name, (2 * index, 2 * index + 1))
+                             for index, name in enumerate(level_names)), first_row)
+
+    @classmethod
+    def from_dict(cls, data):
+        if not isinstance(data, dict):
+            return None
+        levels = {}
+        for name, columns in (data.get("levels") or {}).items():
+            if not isinstance(columns, dict):
+                continue
+            code = letter_index(columns.get("code"))
+            description = letter_index(columns.get("description"))
+            if code is not None and description is not None:
+                levels[name] = (code, description)
+        if not levels:
+            return None
+        return cls(data.get("sheet") or u"", levels, data.get("first_row") or 1)
+
+    def to_dict(self):
+        return {"sheet": self.sheet, "first_row": self.first_row,
+                "levels": dict((name, {"code": column_letter(code),
+                                       "description": column_letter(description)})
+                               for name, (code, description) in self.levels.items())}
+
+    def describe(self, level_names=None):
+        """"first sheet from row 5: WBS1 A/B, WBS2 D/E" per note e messaggi; con
+        level_names, nell'ordine dei livelli e solo quelli."""
+        names = [name for name in (level_names if level_names is not None
+                                   else sorted(self.levels)) if name in self.levels]
+        parts = [u"{} {}/{}".format(name, column_letter(self.levels[name][0]),
+                                    column_letter(self.levels[name][1])) for name in names]
+        sheet = u"sheet '{}'".format(self.sheet) if self.sheet else u"first sheet"
+        return u"{} from row {}: {}".format(sheet, self.first_row,
+                                            u", ".join(parts) or u"no level mapped")
+
+    def __eq__(self, other):
+        return isinstance(other, WbsLayout) and self.to_dict() == other.to_dict()
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+def guess_wbs_layout(rows, sheet=u"", level_names=()):
+    """Mappatura proposta per la struttura WBS: nella prima riga d'intestazione (fra le
+    prime HEADER_SCAN_ROWS) con almeno una coppia "Codice" + "Descrizione / Descrittivo"
+    (la descrizione entro tre colonne a destra del codice), ogni coppia e' la tabella di
+    un livello. Una coppia va al livello il cui nome compare sopra l'intestazione, nelle
+    sue colonne (es. "WBS1" nella riga del titolo); le altre ai livelli rimasti, da
+    sinistra a destra. La riga di partenza e' quella dopo l'intestazione. None se non c'e'
+    un'intestazione riconoscibile."""
+    names = list(level_names)
+    by_lower = dict((name.strip().lower(), name) for name in names)
+    for row_index, cells in enumerate(rows[:HEADER_SCAN_ROWS]):
+        pairs = []
+        for index, cell in enumerate(cells):
+            if _norm_header(cell) not in WBS_CODE_HEADERS:
+                continue
+            for other in range(index + 1, min(index + 4, len(cells))):
+                if _norm_header(cells[other]) in WBS_DESCRIPTION_HEADERS:
+                    pairs.append((index, other))
+                    break
+        if not pairs:
+            continue
+        levels = {}
+        unnamed = []
+        for code, description in pairs:
+            found = None
+            for above in rows[:row_index]:
+                for column in (code, description):
+                    if column < len(above):
+                        name = by_lower.get((above[column] or u"").strip().lower())
+                        if name and name not in levels:
+                            found = name
+                            break
+                if found:
+                    break
+            if found:
+                levels[found] = (code, description)
+            else:
+                unnamed.append((code, description))
+        for name, pair in zip([name for name in names if name not in levels], unnamed):
+            levels[name] = pair
+        return WbsLayout(sheet, levels, row_index + 2)
+    return None
+
+
+# =============================================================================
+# NUMERI
+# =============================================================================
+
+def parse_decimal(text):
+    """float da testo utente o CSV italiano; None se vuoto, ValueError se non valido.
+
+    "12,5" -> 12.5   "1.234,56" -> 1234.56   "12.5" -> 12.5
+    """
+    if text is None:
+        return None
+    if isinstance(text, (int, float)):
+        return float(text)
+    cleaned = text.replace(EURO_SIGN, u"").replace(u" ", u"").replace(u"\u00a0", u"").strip()
+    if not cleaned:
+        return None
+    if u"," in cleaned:
+        cleaned = cleaned.replace(u".", u"").replace(u",", u".")
+    return float(cleaned)
+
+
+def format_decimal(value):
+    """Testo di un numero per la griglia: due decimali, di piu' solo se servono."""
+    if value is None:
+        return u""
+    if round(value, 2) == value:
+        return u"{:.2f}".format(value)
+    return (u"{:.6f}".format(value)).rstrip(u"0")
+
+
+def normalize_unit(text):
+    """Unita' del listino ricondotta ai valori della tendina quando e' una variante
+    nota ("cad." -> "cad", "m2" -> "mq"); altrimenti resta com'e'."""
+    raw = (text or u"").strip()
+    key = raw.lower().replace(u".", u"").replace(u" ", u"")
+    key = key.replace(u"\u00b2", u"2").replace(u"\u00b3", u"3")
+    return UNIT_ALIASES.get(key, raw)
+
+
+# =============================================================================
+# VOCI
+# =============================================================================
+
+class MergedItem(object):
+    """Voce di computo vista dalla finestra: listino + override di progetto."""
+
+    __slots__ = ("code", "chapter", "subchapter", "epu_item", "price_book",
+                 "short_description", "description", "unit", "price", "origin",
+                 "in_price_list")
+
+    def __init__(self, code):
+        self.code = code
+        self.chapter = u""
+        self.subchapter = u""
+        self.epu_item = u""
+        self.price_book = u""
+        self.short_description = u""
+        self.description = u""
+        self.unit = u""
+        self.price = None
+        self.origin = ORIGIN_MISSING
+        # True se il codice e' nel listino (colonna A dell'EPU Excel)
+        self.in_price_list = False
+
+
+def merge_item(code, price_list_items, project_items):
+    item = MergedItem(code)
+    base = price_list_items.get(code)
+    item.in_price_list = code in price_list_items
+    override = project_items.get(code)
+    overridden = False
+    for source in (base, override):
+        if not source:
+            continue
+        for field in FIELDS:
+            if source.get(field) not in (None, u""):
+                setattr(item, field, source[field])
+                overridden = overridden or source is override
+    if overridden:
+        item.origin = ORIGIN_PROJECT
+    elif base:
+        item.origin = ORIGIN_PRICE_LIST
+    return item
+
+
+def merge_items(codes, price_list_items, project_items):
+    return dict((code, merge_item(code, price_list_items, project_items)) for code in codes)
+
+
+# =============================================================================
+# LISTINO (sola lettura)
+# =============================================================================
+
+class PriceListError(Exception):
+    pass
+
+
+class PriceList(object):
+    def __init__(self, path=None):
+        self.path = path
+        self.items = {}
+        self.duplicates = 0
+        self.sheet_name = None
+
+
+def _norm_header(text):
+    return re.sub(r"[^a-z0-9]", "", (text or u"").lower())
+
+
+def _parse_price(text, numeric_prices):
+    """Prezzo di una cella: numero grezzo dell'xlsx ("12.5") oppure testo con virgola
+    decimale o simbolo dell'euro ("12,50", "€ 1.234,56"); None se vuoto o non numerico."""
+    if not text:
+        return None
+    if numeric_prices:
+        try:
+            return float(text)
+        except ValueError:
+            pass
+    try:
+        return parse_decimal(text)
+    except ValueError:
+        return None
+
+
+def _rows_to_items(rows, price_list, numeric_prices, layout=None):
+    """Voci dalle righe del foglio secondo la mappatura (layout; default: A codice,
+    B descrizione sintetica, C descrizione, D unita', E prezzo, F..I facoltative).
+
+    Si saltano: le righe senza codice, la riga di intestazione (codice "Codice", "Code"...)
+    e le righe con il solo codice (titoli, capitoli), che non hanno nessun altro campo
+    mappato. Un'intestazione con un nome diverso resta una voce che nessun codice del
+    modello trova. Un codice ripetuto: vale la prima riga.
+    """
+    layout = layout or PriceListLayout.default()
+    code_index = layout.columns["code"]
+    others = [index for field, index in layout.columns.items() if field != "code"]
+    for cells in rows:
+        def cell(index):
+            return (cells[index] or u"").strip() if index is not None and index < len(cells) \
+                else u""
+
+        code = cell(code_index)
+        if not code or _norm_header(code) in CODE_HEADERS:
+            continue
+        if others and not any(cell(index) for index in others):
+            continue
+        if code in price_list.items:
+            price_list.duplicates += 1
+            continue
+        values = dict((field, cell(layout.columns.get(field)))
+                      for field in EPU_COLUMNS if field != "code")
+        values["unit"] = normalize_unit(values["unit"])
+        values["price"] = _parse_price(values["price"], numeric_prices)
+        price_list.items[code] = values
+    if not price_list.items:
+        raise PriceListError(
+            "No price codes found in column {} of {}. Check the sheet and the columns of "
+            "the price list with Columns...".format(
+                column_letter(code_index),
+                u"sheet '{}'".format(price_list.sheet_name) if price_list.sheet_name
+                else u"the file"))
+
+
+# --- xlsx: zip + xml, senza Excel (stesso approccio di WorksetCreate) ---------
+
+def _open_archive(path):
+    clr.AddReference('System.IO.Compression')
+    clr.AddReference('System.IO.Compression.FileSystem')
+    from System.IO.Compression import ZipFile
+    return ZipFile.OpenRead(path)
+
+
+def _read_entry(archive, name):
+    entry = archive.GetEntry(name)
+    if entry is None:
+        lname = name.lower()
+        for candidate in archive.Entries:
+            if candidate.FullName.lower() == lname:
+                entry = candidate
+                break
+    if entry is None:
+        return None
+    stream = entry.Open()
+    try:
+        reader = StreamReader(stream, Encoding.UTF8)
+        try:
+            return reader.ReadToEnd()
+        finally:
+            reader.Close()
+    finally:
+        stream.Close()
+
+
+def _children(node, local_name):
+    out = []
+    for child in node.ChildNodes:
+        if child.NodeType.ToString() == 'Element' and child.LocalName == local_name:
+            out.append(child)
+    return out
+
+
+def _collect_text(node, acc):
+    for child in node.ChildNodes:
+        if child.NodeType.ToString() != 'Element':
+            continue
+        if child.LocalName == 'rPh':
+            continue
+        if child.LocalName == 't':
+            acc.append(child.InnerText)
+        else:
+            _collect_text(child, acc)
+
+
+def _load_shared_strings(archive):
+    xml = _read_entry(archive, 'xl/sharedStrings.xml')
+    if not xml:
+        return []
+    document = XmlDocument()
+    document.LoadXml(xml)
+    strings = []
+    for si in _children(document.DocumentElement, 'si'):
+        acc = []
+        _collect_text(si, acc)
+        strings.append(u''.join(acc))
+    return strings
+
+
+def _first_sheet(archive):
+    """(nome, percorso della parte xml) del primo foglio del workbook."""
+    sheets = _workbook_sheets(archive)
+    return sheets[0] if sheets else (None, 'xl/worksheets/sheet1.xml')
+
+
+def _workbook_sheets(archive):
+    """[(nome, percorso della parte xml)] dei fogli, nell'ordine del workbook."""
+    rels = {}
+    rel_xml = _read_entry(archive, 'xl/_rels/workbook.xml.rels')
+    if rel_xml:
+        rdoc = XmlDocument()
+        rdoc.LoadXml(rel_xml)
+        for rel in _children(rdoc.DocumentElement, 'Relationship'):
+            target = rel.GetAttribute('Target')
+            if not target:
+                continue
+            if target.startswith('/'):
+                target = target[1:]
+            elif not target.startswith('xl/'):
+                target = 'xl/' + target.replace('../', '')
+            rels[rel.GetAttribute('Id')] = target
+
+    wb_xml = _read_entry(archive, 'xl/workbook.xml')
+    if wb_xml:
+        wdoc = XmlDocument()
+        wdoc.LoadXml(wb_xml)
+        found = []
+        for sheets_node in _children(wdoc.DocumentElement, 'sheets'):
+            for position, sheet in enumerate(_children(sheets_node, 'sheet')):
+                rid = sheet.GetAttribute('r:id') or sheet.GetAttribute('id')
+                found.append((sheet.GetAttribute('name'),
+                              rels.get(rid, 'xl/worksheets/sheet{}.xml'.format(position + 1))))
+        return found
+    return []
+
+
+def _column_index(ref):
+    """'C12' -> 2."""
+    index = 0
+    for ch in ref:
+        if not ch.isalpha():
+            break
+        index = index * 26 + (ord(ch.upper()) - ord('A') + 1)
+    return index - 1
+
+
+def _cell_value(cell, shared):
+    ctype = cell.GetAttribute('t')
+    values = _children(cell, 'v')
+    if ctype == 's':
+        if not values:
+            return u''
+        try:
+            idx = int(values[0].InnerText)
+        except ValueError:
+            return u''
+        return shared[idx] if 0 <= idx < len(shared) else u''
+    if ctype == 'inlineStr' or not values:
+        acc = []
+        _collect_text(cell, acc)
+        return u''.join(acc)
+    raw = values[0].InnerText
+    if ctype in ('', 'n'):
+        # 100.0 deve leggersi "100": i codici numerici non devono prendere un ".0"
+        try:
+            fval = float(raw)
+            if fval == int(fval) and 'E' not in raw.upper():
+                return u"{}".format(int(fval))
+        except (ValueError, OverflowError):
+            pass
+    return raw
+
+
+def list_sheets(path):
+    """Nomi dei fogli di un .xlsx / .xlsm, nell'ordine; [] per gli altri formati."""
+    if os.path.splitext(path or u"")[1].lower() not in (".xlsx", ".xlsm"):
+        return []
+    archive = _open_archive(path)
+    try:
+        return [name for name, _ in _workbook_sheets(archive)]
+    finally:
+        archive.Dispose()
+
+
+def read_sheet_rows(path, sheet=u""):
+    """(nome del foglio, righe) di un .xlsx / .xlsm (foglio vuoto = il primo), di un
+    .csv o dell'elenco prezzi di un .xpwe (nome vuoto). Serve all'anteprima della
+    finestra Columns..."""
+    if is_xpwe_file(path):
+        return u"", _read_xpwe_rows(path)
+    if os.path.splitext(path or u"")[1].lower() in (".xlsx", ".xlsm"):
+        price_list = PriceList(path)
+        rows = _read_xlsx_rows(path, price_list, sheet)
+        return price_list.sheet_name or u"", rows
+    return u"", _read_csv_rows(path)
+
+
+def _read_xlsx_rows(path, price_list, sheet=u""):
+    archive = _open_archive(path)
+    try:
+        shared = _load_shared_strings(archive)
+        sheets = _workbook_sheets(archive)
+        if sheet:
+            chosen = [entry for entry in sheets if entry[0] == sheet]
+            if not chosen:
+                raise PriceListError(
+                    "The workbook has no sheet named '{}': choose the sheet with "
+                    "Columns...".format(sheet))
+            price_list.sheet_name, part = chosen[0]
+        else:
+            price_list.sheet_name, part = sheets[0] if sheets else \
+                (None, 'xl/worksheets/sheet1.xml')
+        xml = _read_entry(archive, part)
+        if not xml:
+            raise PriceListError("The worksheet '{}' is empty.".format(
+                price_list.sheet_name or u""))
+        document = XmlDocument()
+        document.LoadXml(xml)
+        rows = []
+        for sheet_data in _children(document.DocumentElement, 'sheetData'):
+            for row in _children(sheet_data, 'row'):
+                cells = []
+                for position, cell in enumerate(_children(row, 'c')):
+                    ref = cell.GetAttribute('r')
+                    index = _column_index(ref) if ref else position
+                    while len(cells) < index:
+                        cells.append(u'')
+                    cells.append(_cell_value(cell, shared))
+                rows.append(cells)
+        return rows
+    finally:
+        archive.Dispose()
+
+
+def read_text_file(path):
+    """Testo UTF-8, con ripiego sulla codepage di sistema (CSV salvati da Excel)."""
+    data = File.ReadAllBytes(path)
+    try:
+        content = UTF8Encoding(False, True).GetString(data)
+    except Exception:
+        content = Encoding.Default.GetString(data)
+    if content and content[0] == u'\ufeff':
+        content = content[1:]
+    return content
+
+
+def _read_csv_rows(path):
+    lines = read_text_file(path).splitlines()
+    if not lines:
+        return []
+    sample = u"\n".join(lines[:HEADER_SCAN_ROWS])
+    delimiter = max((u";", u",", u"\t"), key=sample.count)
+    return [list(row) for row in csv.reader(lines, delimiter=str(delimiter))]
+
+
+# --- PriMus .xpwe (ACCA): XML, elenco prezzi in PweMisurazioni/PweElencoPrezzi/EPItem --
+
+XPWE_EXTENSIONS = (".xpwe",)
+# L'elenco prezzi di un .xpwe si presenta come un foglio con queste colonne. A..I sono
+# nell'ordine di EPU_COLUMNS, cosi' la mappatura di default (e Detect from Headers) lo
+# legge senza cambiare nulla; J..M sono gli altri prezzi di PriMus (Prezzo2..Prezzo5),
+# N l'articolo del prezzario d'origine. Da tag PriMus a colonna:
+#   A Tariffa   B DesBreve, o DesRidotta se vuota   C DesEstesa   D UnMisura   E Prezzo1
+#   F capitolo (IDCap)   G sottocapitolo (IDSbCap)   H numero d'ordine nell'elenco
+#   I supercapitolo (IDSpCap: nei file ESA e' il prezzario, es. "LisLazio_LLPP_2023")
+# Capitoli e supercapitoli si leggono per ID dalle tabelle di PweDGCapitoliCategorie
+# (DesSintetica; ID 0 = nessuno). Le voci di computo (PweVociComputo) non si leggono.
+XPWE_HEADERS = (u"Code", u"Short description", u"Description", u"Unit", u"Price 1",
+                u"Chapter", u"Subchapter", u"EPU item No.", u"Price book",
+                u"Price 2", u"Price 3", u"Price 4", u"Price 5", u"Source article")
+
+
+def is_xpwe_file(path):
+    return os.path.splitext(path or u"")[1].lower() in XPWE_EXTENSIONS
+
+
+def _xpwe_text(node, name):
+    """Testo del primo figlio name di node, senza spazi ai lati e con gli a capo come "\\n"
+    (XmlDocument conserva i CRLF del file); u"" se manca."""
+    for child in _children(node, name):
+        return (child.InnerText or u"").replace(u"\r\n", u"\n").replace(u"\r", u"\n").strip()
+    return u""
+
+
+def _xpwe_names(document, item_name):
+    """{ID: DesSintetica (o Codice)} di una tabella dei dati generali."""
+    names = {}
+    for node in document.GetElementsByTagName(item_name):
+        ident = (node.GetAttribute('ID') or u"").strip()
+        if ident:
+            names[ident] = _xpwe_text(node, 'DesSintetica') or _xpwe_text(node, 'Codice')
+    return names
+
+
+def _load_xpwe_document(path):
+    document = XmlDocument()
+    try:
+        # Load legge BOM e dichiarazione di codifica; senza dichiarazione assume UTF-8.
+        document.Load(path)
+    except Exception:
+        # File senza dichiarazione salvato nella codepage di sistema.
+        document = XmlDocument()
+        document.LoadXml(read_text_file(path))
+    root = document.DocumentElement
+    if root is None or root.LocalName != 'PweDocumento':
+        raise PriceListError(u"Not a PriMus file: the root element is '{}', not "
+                             u"PweDocumento.".format(root.LocalName if root is not None else u""))
+    return document
+
+
+def _read_xpwe_rows(path):
+    """Righe dell'elenco prezzi di un .xpwe, con XPWE_HEADERS come prima riga."""
+    document = _load_xpwe_document(path)
+    supers = _xpwe_names(document, 'DGSuperCapitoliItem')
+    chapters = _xpwe_names(document, 'DGCapitoliItem')
+    subchapters = _xpwe_names(document, 'DGSubCapitoliItem')
+    rows = [list(XPWE_HEADERS)]
+    for price_list_node in document.GetElementsByTagName('PweElencoPrezzi'):
+        for item in _children(price_list_node, 'EPItem'):
+            rows.append([
+                _xpwe_text(item, 'Tariffa'),
+                _xpwe_text(item, 'DesBreve') or _xpwe_text(item, 'DesRidotta'),
+                _xpwe_text(item, 'DesEstesa'),
+                _xpwe_text(item, 'UnMisura'),
+                _xpwe_text(item, 'Prezzo1'),
+                chapters.get(_xpwe_text(item, 'IDCap'), u""),
+                subchapters.get(_xpwe_text(item, 'IDSbCap'), u""),
+                u"{}".format(len(rows)),
+                supers.get(_xpwe_text(item, 'IDSpCap'), u""),
+                _xpwe_text(item, 'Prezzo2'),
+                _xpwe_text(item, 'Prezzo3'),
+                _xpwe_text(item, 'Prezzo4'),
+                _xpwe_text(item, 'Prezzo5'),
+                _xpwe_text(item, 'Articolo'),
+            ])
+    if len(rows) == 1:
+        raise PriceListError(u"The PriMus file has no price list items "
+                             u"(PweElencoPrezzi / EPItem).")
+    return rows
+
+
+def is_table_file(path):
+    """True per i listini Excel / CSV / PriMus, che si leggono con una mappatura delle
+    colonne."""
+    return os.path.splitext(path or u"")[1].lower() in \
+        (".xlsx", ".xlsm", ".csv", ".txt") + XPWE_EXTENSIONS
+
+
+# =============================================================================
+# STRUTTURA WBS (sola lettura)
+# =============================================================================
+
+class WbsStructure(object):
+    """Descrizioni dei codici WBS per livello: {nome del parametro WBS: {codice:
+    descrizione}}, da un Excel / CSV. Lo stesso codice puo' stare in due livelli con
+    descrizioni diverse."""
+
+    def __init__(self, path=None):
+        self.path = path
+        self.names = {}
+        self.duplicates = 0
+        self.sheet_name = None
+
+    @property
+    def code_count(self):
+        return sum(len(codes) for codes in self.names.values())
+
+
+def is_wbs_table_file(path):
+    """La struttura WBS si legge da Excel o CSV (non da PriMus)."""
+    return os.path.splitext(path or u"")[1].lower() in (".xlsx", ".xlsm", ".csv", ".txt")
+
+
+def load_wbs_structure(path, layout):
+    """Codici e descrizioni WBS per livello secondo la mappatura (WbsLayout: foglio, riga
+    di partenza, colonne di ogni livello). Ogni livello si legge dalle sue colonne, dalla
+    riga di partenza in giu': si saltano le celle senza codice o senza descrizione e
+    un'intestazione rimasta dentro ("Codice"...); un codice ripetuto nello stesso livello:
+    vale la prima riga. Solleva PriceListError con un messaggio per l'utente."""
+    structure = WbsStructure(path)
+    if not path:
+        return structure
+    if not os.path.isfile(path):
+        raise PriceListError(u"WBS structure not found: {}".format(path))
+    if not is_wbs_table_file(path):
+        raise PriceListError(u"Unsupported WBS structure format '{}': use .xlsx, .xlsm or "
+                             u".csv.".format(os.path.splitext(path)[1]))
+    if layout is None or not layout.levels:
+        raise PriceListError(u"The columns of the WBS structure are not set: choose them "
+                             u"with Columns...")
+    try:
+        structure.sheet_name, rows = read_sheet_rows(path, layout.sheet)
+    except PriceListError:
+        raise
+    except IOError as error:
+        raise PriceListError(u"Cannot read the WBS structure (is it open and locked?): "
+                             u"{}".format(error))
+    except Exception as error:
+        raise PriceListError(u"Cannot read the WBS structure: {}".format(error))
+    data = rows[layout.first_row - 1:]
+    for name, (code_index, description_index) in layout.levels.items():
+        codes = {}
+        for cells in data:
+            code = (cells[code_index] or u"").strip() if code_index < len(cells) else u""
+            description = (cells[description_index] or u"").strip() \
+                if description_index < len(cells) else u""
+            if not code or not description or _norm_header(code) in WBS_CODE_HEADERS:
+                continue
+            if code in codes:
+                structure.duplicates += 1
+                continue
+            codes[code] = description
+        structure.names[name] = codes
+    if not structure.code_count:
+        raise PriceListError(
+            u"No WBS codes with a description found from row {} of {} in the mapped "
+            u"columns. Check the sheet, the columns and the first row with "
+            u"Columns...".format(layout.first_row,
+                                 u"sheet '{}'".format(structure.sheet_name)
+                                 if structure.sheet_name else u"the file"))
+    return structure
+
+
+def load_price_list(path, layout=None):
+    """Legge il listino. layout: PriceListLayout per Excel / CSV (None = A..I sul primo
+    foglio). Solleva PriceListError con un messaggio per l'utente."""
+    price_list = PriceList(path)
+    if not path:
+        return price_list
+    if not os.path.isfile(path):
+        raise PriceListError("Price list not found: {}".format(path))
+    extension = os.path.splitext(path)[1].lower()
+    try:
+        if extension == ".json":
+            document = PriceListDocument(path)
+            document.load()
+            price_list.items = document.items
+            price_list.sheet_name = document.name
+        elif extension in (".xlsx", ".xlsm"):
+            rows = _read_xlsx_rows(path, price_list, layout.sheet if layout else u"")
+            _rows_to_items(rows, price_list, True, layout)
+        elif extension in (".csv", ".txt"):
+            _rows_to_items(_read_csv_rows(path), price_list, False, layout)
+        elif extension in XPWE_EXTENSIONS:
+            # Prezzi PriMus con il punto decimale, come i numeri grezzi dell'xlsx.
+            _rows_to_items(_read_xpwe_rows(path), price_list, True, layout)
+        else:
+            raise PriceListError(
+                "Unsupported price list format '{}': use .json, .xlsx, .xlsm, .csv or "
+                ".xpwe.".format(extension))
+    except PriceListError:
+        raise
+    except IOError as error:
+        raise PriceListError("Cannot read the price list (is it open and locked?): {}".format(error))
+    except Exception as error:
+        raise PriceListError("Cannot read the price list: {}".format(error))
+    return price_list
+
+
+# =============================================================================
+# LISTINO JSON (modificabile con l'editor)
+# =============================================================================
+
+PRICE_LIST_FORMAT = u"ESA_MEPQTO_PriceList"
+PRICE_LIST_VERSION = 1
+
+
+def clean_item(values):
+    """Voce normalizzata: solo i campi noti, testi senza spazi ai lati, unita' ricondotta
+    ai valori della tendina, prezzo numerico o None."""
+    item = {}
+    for field in FIELDS:
+        value = values.get(field) if isinstance(values, dict) else None
+        if field == "price":
+            try:
+                item[field] = parse_decimal(value) if value not in (None, u"") else None
+            except ValueError:
+                item[field] = None
+        elif field == "unit":
+            item[field] = normalize_unit(u"{}".format(value or u""))
+        else:
+            item[field] = (u"{}".format(value or u"")).strip()
+    return item
+
+
+class PriceListDocument(object):
+    """Listino comune in formato JSON:
+
+        {"format": "ESA_MEPQTO_PriceList", "version": 1, "name": ..., "currency": "EUR",
+         "updated_by": ..., "updated_at": ...,
+         "items": {codice: {chapter, subchapter, epu_item, price_book,
+                            short_description, description, unit, price}}}
+
+    Salvataggio concorrente come per il file di progetto: si salvano solo i codici
+    toccati (aggiunti, cambiati, cancellati); se il file su disco e' cambiato dopo il
+    caricamento, lo si rilegge e le modifiche locali si riapplicano sopra.
+    """
+
+    def __init__(self, path=None):
+        self.path = path
+        self.name = u""
+        self.currency = u"EUR"
+        self.items = {}
+        self.updated_by = u""
+        self.updated_at = u""
+        self._loaded_mtime = None
+
+    def load(self):
+        self.items = {}
+        self._loaded_mtime = None
+        if not self.path or not os.path.isfile(self.path):
+            return
+        try:
+            data = _read_json(self.path)
+        except Exception as error:
+            raise PriceListError(u"The price list is not valid JSON:\n{}\n\n{}".format(
+                self.path, error))
+        if data.get("format") not in (None, PRICE_LIST_FORMAT):
+            raise PriceListError(u"Not a MEP QTO price list (format '{}'):\n{}".format(
+                data.get("format"), self.path))
+        self._apply(data)
+        self._loaded_mtime = _mtime(self.path)
+
+    def _apply(self, data):
+        self.name = u"{}".format(data.get("name") or u"")
+        self.currency = u"{}".format(data.get("currency") or u"EUR")
+        self.updated_by = u"{}".format(data.get("updated_by") or u"")
+        self.updated_at = u"{}".format(data.get("updated_at") or u"")
+        items = data.get("items") or {}
+        self.items = dict((u"{}".format(code).strip(), clean_item(values))
+                          for code, values in items.items()
+                          if u"{}".format(code).strip())
+
+    def changed_since_load(self):
+        current = _mtime(self.path) if self.path else None
+        return current is not None and current != self._loaded_mtime
+
+    def save(self, items, changed_codes, deleted_codes, name, currency, user_name,
+             path=None):
+        """Scrive il listino; True se le modifiche sono state fuse con quelle di un altro.
+
+        items: tutte le voci correnti. changed_codes / deleted_codes: i codici toccati
+        dall'utente, gli unici che si riapplicano se il file e' cambiato nel frattempo.
+        path: nuovo percorso (Save As); in quel caso si scrive senza fondere.
+        """
+        merged = False
+        if path is not None and path != self.path:
+            self.path = path
+            self._loaded_mtime = None
+            final = dict(items)
+        elif self.changed_since_load():
+            disk = PriceListDocument(self.path)
+            disk.load()
+            final = disk.items
+            for code in deleted_codes:
+                final.pop(code, None)
+            for code in changed_codes:
+                if code in items:
+                    final[code] = items[code]
+            merged = True
+        else:
+            final = dict(items)
+
+        self.items = dict((code, clean_item(values)) for code, values in final.items())
+        self.name = name or u""
+        self.currency = currency or u"EUR"
+        self.updated_by = user_name or u""
+        self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        data = {
+            "format": PRICE_LIST_FORMAT,
+            "version": PRICE_LIST_VERSION,
+            "name": self.name,
+            "currency": self.currency,
+            "updated_by": self.updated_by,
+            "updated_at": self.updated_at,
+            "items": self.items,
+        }
+        try:
+            write_json_file(self.path, data)
+        except (IOError, OSError) as error:
+            raise PriceListError(u"Cannot write the price list:\n{}\n\n{}".format(
+                self.path, error))
+        self._loaded_mtime = _mtime(self.path)
+        return merged
+
+
+# =============================================================================
+# FILE DI PROGETTO
+# =============================================================================
+
+def _is_local_path(path):
+    if not path or "://" in path:
+        return False
+    folder = os.path.dirname(path)
+    return bool(folder) and os.path.isdir(folder)
+
+
+def default_project_file(doc):
+    """<Modello>_MEPQTO.json accanto al centrale (o al file, se non condiviso).
+
+    None per modelli cloud o mai salvati: in quel caso il percorso lo sceglie
+    l'utente e lo si ricorda nella config.
+    """
+    path = None
+    try:
+        if doc.IsWorkshared:
+            central = doc.GetWorksharingCentralModelPath()
+            if central is not None:
+                path = DB.ModelPathUtils.ConvertModelPathToUserVisiblePath(central)
+    except Exception:
+        path = None
+    if not _is_local_path(path):
+        path = doc.PathName
+    if not _is_local_path(path):
+        return None
+    folder, name = os.path.split(path)
+    return os.path.join(folder, os.path.splitext(name)[0] + PROJECT_FILE_SUFFIX)
+
+
+def document_key(doc):
+    """Chiave stabile del documento per ricordare il file di progetto nella config."""
+    try:
+        if doc.IsWorkshared:
+            central = doc.GetWorksharingCentralModelPath()
+            if central is not None:
+                return DB.ModelPathUtils.ConvertModelPathToUserVisiblePath(central)
+    except Exception:
+        pass
+    return doc.PathName or doc.Title
+
+
+class ProjectStoreError(Exception):
+    pass
+
+
+def _mtime(path):
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return None
+
+
+def write_json_file(path, data):
+    """Scrive data come JSON indentato, tramite un file temporaneo.
+
+    ensure_ascii=True in IronPython 2.7 prova a decodificare come UTF-8 le stringhe (che
+    sono gia' unicode) e fallisce sulle lettere accentate: si serializza senza escape e
+    si fa l'escape \\uXXXX a mano. Solleva IOError / OSError.
+    """
+    text = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True)
+    text = u"".join(c if ord(c) < 128 else u"\\u{:04x}".format(ord(c)) for c in text)
+    temp_path = path + ".tmp"
+    with io.open(temp_path, "w", encoding="utf-8") as handle:
+        handle.write(unicode(text))  # noqa: F821 - IronPython 2.7
+    if os.path.exists(path):
+        os.remove(path)
+    os.rename(temp_path, path)
+
+
+def _read_json(path):
+    with io.open(path, "r", encoding="utf-8-sig") as handle:
+        data = json.loads(handle.read())
+    if not isinstance(data, dict):
+        raise ValueError("not a JSON object")
+    return data
+
+
+def _read_overrides(data):
+    """{(Type Mark, codice): frazione} dalla lista del file di progetto; le righe non
+    valide si saltano."""
+    overrides = {}
+    if not isinstance(data, list):
+        return overrides
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        type_mark = u"{}".format(entry.get("type_mark") or u"").strip()
+        code = u"{}".format(entry.get("code") or u"").strip()
+        try:
+            fraction = float(entry.get("allowance"))
+        except (TypeError, ValueError):
+            continue
+        if type_mark and code and fraction >= 0:
+            overrides[(type_mark, code)] = fraction
+    return overrides
+
+
+def _write_overrides(overrides):
+    """Lista ordinata per il JSON: le chiavi del dizionario sono tuple."""
+    return [{"type_mark": type_mark, "code": code, "allowance": fraction}
+            for (type_mark, code), fraction in sorted(overrides.items())]
+
+
+class ProjectStore(object):
+    """Override di progetto: voci, regole di misura, livelli WBS, percorso del listino e
+    override della maggiorazione sulle voci del computo."""
+
+    def __init__(self, path):
+        self.path = path
+        self.items = {}
+        self.price_list_path = None
+        # mappatura delle colonne del listino Excel / CSV (dict), None = A..I
+        self.price_list_layout = None
+        # rules: dizionario di mepqto_rules.Rules.to_dict(), None = valori di default
+        self.rules = None
+        # wbs: nomi dei parametri dei livelli WBS (stringhe vuote per i livelli spenti)
+        self.wbs = []
+        # parameters: dizionario di mepqto_model.ParameterMap.to_dict(), None = default
+        self.parameters = None
+        # allowance_overrides: {(Type Mark, codice): frazione} che sostituisce la
+        # maggiorazione della categoria su quella voce del computo
+        self.allowance_overrides = {}
+        # manual_items: voci non modellate della scheda Manual items (dict di
+        # mepqto_model.ManualItem.to_dict()), salvate in blocco
+        self.manual_items = []
+        # struttura WBS: percorso dell'Excel / CSV e sua mappatura (dict), salvati insieme
+        self.wbs_structure_path = None
+        self.wbs_structure_layout = None
+        self.updated_by = u""
+        self.updated_at = u""
+        self._loaded_mtime = None
+        self._dirty_fields = set()
+        self._dirty_overrides = set()
+        self._dirty_price_list = False
+        self._dirty_rules = False
+        self._dirty_wbs = False
+        self._dirty_parameters = False
+        self._dirty_manual = False
+        self._dirty_wbs_structure = False
+
+    # ------------------------------------------------------------ lettura
+
+    def load(self):
+        """Carica il file, se esiste. Un file mancante e' un progetto vuoto."""
+        self.items = {}
+        self.price_list_path = None
+        # mappatura delle colonne del listino Excel / CSV (dict), None = A..I
+        self.price_list_layout = None
+        self.rules = None
+        self.wbs = []
+        self.parameters = None
+        self.allowance_overrides = {}
+        self.manual_items = []
+        self.wbs_structure_path = None
+        self.wbs_structure_layout = None
+        self._loaded_mtime = None
+        if not self.path or not os.path.isfile(self.path):
+            return
+        try:
+            data = _read_json(self.path)
+        except Exception as error:
+            raise ProjectStoreError(
+                "The project file is not valid JSON and was not loaded:\n{}\n\n{}".format(
+                    self.path, error))
+        self._apply_data(data)
+        self._loaded_mtime = _mtime(self.path)
+
+    def _apply_data(self, data):
+        items = data.get("items") or {}
+        self.items = dict((code, dict(values)) for code, values in items.items()
+                          if isinstance(values, dict))
+        self.price_list_path = data.get("price_list_path") or None
+        layout = data.get("price_list_layout")
+        self.price_list_layout = layout if isinstance(layout, dict) else None
+        rules = data.get("rules")
+        self.rules = rules if isinstance(rules, dict) else None
+        wbs = data.get("wbs")
+        self.wbs = [u"{}".format(name or u"") for name in wbs] if isinstance(wbs, list) else []
+        parameters = data.get("parameters")
+        self.parameters = parameters if isinstance(parameters, dict) else None
+        self.allowance_overrides = _read_overrides(data.get("allowance_overrides"))
+        manual = data.get("manual_items")
+        self.manual_items = [dict(entry) for entry in manual if isinstance(entry, dict)] \
+            if isinstance(manual, list) else []
+        self.wbs_structure_path = data.get("wbs_structure_path") or None
+        layout = data.get("wbs_structure_layout")
+        self.wbs_structure_layout = layout if isinstance(layout, dict) else None
+        self.updated_by = data.get("updated_by") or u""
+        self.updated_at = data.get("updated_at") or u""
+
+    # ------------------------------------------------------------ modifiche
+
+    @property
+    def is_dirty(self):
+        return bool(self._dirty_fields or self._dirty_price_list or self._dirty_rules or
+                    self._dirty_wbs or self._dirty_parameters or self._dirty_overrides or
+                    self._dirty_manual or self._dirty_wbs_structure)
+
+    def set_item_field(self, code, field, value):
+        self.items.setdefault(code, {})[field] = value
+        self._dirty_fields.add((code, field))
+
+    def set_allowance_override(self, type_mark, code, fraction):
+        """Override della maggiorazione di una voce del computo; None lo toglie.
+        Come i campi delle voci, si salva voce per voce."""
+        key = (type_mark, code)
+        if fraction is None:
+            self.allowance_overrides.pop(key, None)
+        else:
+            self.allowance_overrides[key] = fraction
+        self._dirty_overrides.add(key)
+
+    def set_rules(self, rules_dict):
+        """Le regole si salvano in blocco: su un salvataggio concorrente vince l'ultimo."""
+        self.rules = rules_dict
+        self._dirty_rules = True
+
+    def set_wbs(self, names):
+        """I livelli WBS si salvano in blocco, come le regole."""
+        self.wbs = list(names)
+        self._dirty_wbs = True
+
+    def set_manual_items(self, items):
+        """Voci non modellate (lista di dict): si salvano in blocco, come WBS e regole."""
+        self.manual_items = [dict(item) for item in items]
+        self._dirty_manual = True
+
+    def set_parameters(self, parameters_dict):
+        """La mappa dei parametri si salva in blocco, come WBS e regole."""
+        self.parameters = parameters_dict
+        self._dirty_parameters = True
+
+    def set_price_list_path(self, path):
+        if path != self.price_list_path:
+            self.price_list_path = path
+            self._dirty_price_list = True
+
+    def set_price_list_layout(self, layout_dict):
+        """Mappatura delle colonne del listino Excel / CSV (PriceListLayout.to_dict(), None
+        per un listino JSON); si salva con il percorso."""
+        if layout_dict != self.price_list_layout:
+            self.price_list_layout = layout_dict
+            self._dirty_price_list = True
+
+    def set_wbs_structure(self, path, layout_dict):
+        """Struttura WBS: percorso e mappatura (WbsLayout.to_dict()) insieme; None per
+        lavorare senza."""
+        path = path or None
+        layout_dict = layout_dict if path else None
+        if path != self.wbs_structure_path or layout_dict != self.wbs_structure_layout:
+            self.wbs_structure_path = path
+            self.wbs_structure_layout = layout_dict
+            self._dirty_wbs_structure = True
+
+    # ------------------------------------------------------------ scrittura
+
+    def _merge_with_disk(self):
+        """Se qualcun altro ha salvato dopo il nostro caricamento, riparte dal disco
+        e riapplica solo le modifiche locali."""
+        current = _mtime(self.path)
+        if current is None or current == self._loaded_mtime:
+            return False
+        try:
+            data = _read_json(self.path)
+        except Exception:
+            return False
+
+        local_items = self.items
+        local_price_list = self.price_list_path
+        local_layout = self.price_list_layout
+        local_rules = self.rules
+        local_wbs = self.wbs
+        local_parameters = self.parameters
+        local_overrides = self.allowance_overrides
+        local_manual = self.manual_items
+        local_structure = (self.wbs_structure_path, self.wbs_structure_layout)
+        self._apply_data(data)
+
+        for code, field in self._dirty_fields:
+            value = local_items.get(code, {}).get(field)
+            self.items.setdefault(code, {})[field] = value
+        for key in self._dirty_overrides:
+            if key in local_overrides:
+                self.allowance_overrides[key] = local_overrides[key]
+            else:
+                self.allowance_overrides.pop(key, None)
+        if self._dirty_price_list:
+            self.price_list_path = local_price_list
+            self.price_list_layout = local_layout
+        if self._dirty_rules:
+            self.rules = local_rules
+        if self._dirty_wbs:
+            self.wbs = local_wbs
+        if self._dirty_parameters:
+            self.parameters = local_parameters
+        if self._dirty_manual:
+            self.manual_items = local_manual
+        if self._dirty_wbs_structure:
+            self.wbs_structure_path, self.wbs_structure_layout = local_structure
+        return True
+
+    def save(self, user_name):
+        """Scrive il file; True se nel frattempo era stato modificato da altri."""
+        if not self.path:
+            raise ProjectStoreError("No project file selected.")
+        folder = os.path.dirname(self.path)
+        if folder and not os.path.isdir(folder):
+            raise ProjectStoreError("The folder does not exist:\n{}".format(folder))
+
+        merged = self._merge_with_disk()
+        self.updated_by = user_name or u""
+        self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Si salvano solo le voci con almeno un campo valorizzato.
+        items = {}
+        for code, values in self.items.items():
+            kept = dict((field, values[field]) for field in FIELDS
+                        if values.get(field) not in (None, u""))
+            if kept:
+                items[code] = kept
+
+        data = {
+            "version": FILE_VERSION,
+            "price_list_path": self.price_list_path,
+            "price_list_layout": self.price_list_layout,
+            "items": items,
+            "rules": self.rules,
+            "wbs": self.wbs,
+            "parameters": self.parameters,
+            "allowance_overrides": _write_overrides(self.allowance_overrides),
+            "manual_items": self.manual_items,
+            "wbs_structure_path": self.wbs_structure_path,
+            "wbs_structure_layout": self.wbs_structure_layout,
+            "updated_by": self.updated_by,
+            "updated_at": self.updated_at,
+        }
+        try:
+            write_json_file(self.path, data)
+        except (IOError, OSError) as error:
+            raise ProjectStoreError("Cannot write the project file:\n{}\n\n{}".format(
+                self.path, error))
+
+        self._loaded_mtime = _mtime(self.path)
+        self._dirty_fields.clear()
+        self._dirty_overrides.clear()
+        self._dirty_price_list = False
+        self._dirty_rules = False
+        self._dirty_wbs = False
+        self._dirty_parameters = False
+        self._dirty_manual = False
+        self._dirty_wbs_structure = False
+        return merged

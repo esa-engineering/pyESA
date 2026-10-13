@@ -106,6 +106,9 @@ Rules:
 Every script is standalone — there is **no shared library module**. Helpers are duplicated
 per-script by design; when you fix a helper, check whether the same helper exists elsewhere
 (`get_element_id_value` alone appears in ~6 files with three slightly different bodies).
+The one exception to "one file per tool" is MEPQTO, which splits a large tool into helper
+modules *inside its own bundle folder* (see "Multi-module tools" below). That is still not
+a shared library: nothing outside the bundle imports those modules.
 
 Standard header:
 
@@ -159,7 +162,10 @@ Both are current; pick whichever the file already uses.
 2. **Raw `XamlReader.Load`** — plain .NET, no pyRevit dependency; requires
    `clr.AddReference` for `PresentationFramework` / `PresentationCore` / `WindowsBase`
    and manual `FindName()` for every control. Used by `HiddenFinder`, `ModelReport1`,
-   `DWGManage`, `ClassificationTool`, `PointCloudAnalysis`.
+   `DWGManage`, `ClassificationTool`, `PointCloudAnalysis`, `MEPQTO`. MEPQTO's variant
+   subclasses `System.Windows.Window`, loads the XAML root and copies `Content`, `Title`,
+   size and `ResizeMode` onto `self` (`_load_xaml()` in `mepqto_ui.py`), so handlers are
+   plain methods on the class.
 
 Resolve the XAML path with `script.get_bundle_file(XAML_FILE_NAME)`, falling back to
 `op.join(op.dirname(__file__), XAML_FILE_NAME)`.
@@ -210,6 +216,10 @@ element links, `output.close_others()`. Reports are the primary debugging surfac
 these tools — when a tool finds nothing, still emit the report explaining why, rather than
 an alert pointing at an empty panel.
 
+Exception: tools whose whole workflow lives in a long-lived window (MEPQTO) show results,
+totals and anomalies inside the window (an Issues tab) and in their Excel export, and
+deliberately emit **no** pyRevit report on close.
+
 ## Revit version compatibility
 
 The extension targets **Revit 2022 through 2026**. Older scripts guard with
@@ -248,6 +258,168 @@ a displayed label get English names too (`TO_WRITE = "TO WRITE"`, not
 Code comments, docstrings and per-tool `README.md` files are mostly Italian — keep writing
 those in Italian, matching the file you are editing. The split is: **English out, Italian
 in.** Older tools still carry Italian UI strings; translate them when you touch them.
+
+## Multi-module tools: MEPQTO
+
+`pyESA.tab/MEP.panel/MEPQTO.pushbutton` (MEP quantity takeoff driven by Type Mark and price
+codes, ~6,800 lines) is the only tool split across several modules. Use it as the template
+when a tool outgrows one file. Its `README.md` (Italian) is the functional spec: categories,
+measurement formulas, file formats, the full Issues list, merge and concurrency rules.
+Read it before changing behaviour, and keep it in sync with the code.
+
+| Module | Role |
+| --- | --- |
+| `MEPQTO_script.py` | entry point only: document checks, then `show_takeoff_window(doc)` |
+| `mepqto_model.py` | the **only** module that reads Revit. `list_links()` lists the link instances; `collect_records()` reads the open model plus the chosen links, only the chosen categories, and reduces elements to plain `InstanceRecord`s (geometry already in mm / m); aggregation, bill, Type Mark summary and issues are pure Python on those records. `CATEGORY_RULES` lists the categories and their measure kind |
+| `mepqto_rules.py` | measurement formulas, allowances, duct sheet kg/mq bands, pipe densities. No Revit imports |
+| `mepqto_store.py` | price list readers (JSON, .xlsx, .csv, PriMus .xpwe), unit aliases, project file, field-by-field merge (`merge_item`) |
+| `mepqto_xlsx.py` | minimal .xlsx writer and the export sheets |
+| `mepqto_ui.py` + `MEPQTO_form.xaml` | main window (`TakeoffForm`, `Session`) |
+| `mepqto_<x>_ui.py` + `MEPQTO_<x>.xaml` | one pair per sub-dialog: `scope` (models, worksets and categories to read, shown before every read; its `_SetPicker` handles both kinds of named sets), `wbs`, `params`, `allowance`, `pricelist` (price list editor) |
+
+Rules that come with the pattern:
+
+- Helper modules live in the bundle folder and are imported by bare name
+  (`import mepqto_model as qm`; aliases `qm`, `qr`, `qs`, `qx`). Prefix every module with
+  the tool name so it cannot shadow another bundle's module, and never end a helper's name
+  with `_script.py` (pyRevit would load it as a command).
+- **Read the model once, compute in Python.** `_collect_model()` runs only when phase, phase
+  status, parameter map, WBS levels, project file or the scope (links
+  and categories, chosen in `mepqto_scope_ui`) change. Category ticks in the main window, units, prices, rules and allowance overrides only call `_refresh()` on the cached
+  records. Keep new options on the right side of that line.
+- **The model is never modified**: no transactions anywhere in the tool. Everything the user
+  types goes to files, not to Revit parameters.
+- Display labels that end up in UI and Excel (`ISSUE_*`, `CATEGORY_RULES` labels,
+  `WBS_NOT_SET`, `PHASE_STATUS_*`) are English constants in `mepqto_model.py`.
+- Its own `get_element_id_value` returns `-1` for `None`: a fourth variant of the helper.
+- **Linked models.** Each record carries `source` (index into `CollectResult.docs` /
+  `.sources`; 0 = open model) and `ref`, which issues use instead of the bare ElementId:
+  an `ElementId` in the open model, a `LinkedId(label, id)` in a link, printed by
+  `id_text()`. Element ids of different documents overlap, so per-type and per-host caches
+  are per source, and any `GetElement` on a record must use `docs[record.source]`. A link is
+  read in the phase with the same name as the host phase, or skipped with an Issue.
+  Worksets are excluded **by name** in every source (`CollectOptions.excluded_worksets`,
+  counted in `CollectResult.skipped_worksets`): workset ids differ between documents, and
+  names keep saved sets valid across projects. In the dialog a tick means *read*; the
+  dialog turns the unticked names in the list into the exclusions. To keep a workset
+  added later from being silently dropped, it remembers the ticked **and** the already
+  seen names (`last_included_worksets`, `last_known_worksets`): unseen names come up
+  ticked and flagged. A named set is applied exactly.
+- Design options: only the main model and primary options are read
+  (`PRIMARY_OPTIONS_ONLY = True` in `mepqto_ui.py`; the UI checkbox was removed). The
+  `CollectOptions.primary_only` logic is kept on purpose; the tool README ("Opzioni di
+  progetto") explains how to restore it and why "all options at once" double counts.
+
+### Data outside the model
+
+| Data | Where | Written by |
+| --- | --- | --- |
+| Shared price list | `.json` (`"format": "ESA_MEPQTO_PriceList"`) on a network path, or a read-only `.xlsx` / `.xlsm` / `.csv` / PriMus `.xpwe` | price list editor (`mepqto_pricelist_ui.py`) |
+| Project file | `<Model>_MEPQTO.json` next to the **central** model (`default_project_file()`); cloud / unsaved models pick a path, remembered in config | Save button |
+| Per-user settings | `script.get_config('ESA_MEPQTO')`: last phase, categories, category set, price list; `project_files` as `"<doc key>::<path>"` and `scope_links` as `"<doc key>::<uid>|<uid>"` strings, both capped at 50; `category_sets` as `"<name>::<key>,<key>"`, `workset_include_sets` as `"<name>::<ws>|<ws>"` (worksets to read; Revit forbids `|` and `:` in names; the older `workset_sets` held exclusions and is ignored); last included / known worksets and workset set | window close; scope and sets as soon as they are chosen / saved |
+
+- PriMus `.xpwe` files (XML, root `PweDocumento`) are a third table format:
+  `_read_xpwe_rows()` turns `PweElencoPrezzi/EPItem` into rows with the `XPWE_HEADERS`
+  columns (A..I in `EPU_COLUMNS` order, so the default layout fits; J..M `Prezzo2..5`),
+  resolving chapters and price book by ID from `PweDGCapitoliCategorie`. Everything else
+  (Columns..., layout in the project file, `_rows_to_items`) is the Excel path.
+  `PweVociComputo` (the PriMus bill) is not read.
+- The **WBS structure** (`qs.load_wbs_structure()`, project file keys
+  `wbs_structure_path` / `wbs_structure_layout`) is one sheet with a code / description
+  table per WBS level, side by side; the same code can mean different things in two
+  levels, so lookups are per level. `qs.WbsLayout` holds sheet, common `first_row` and
+  `levels {parameter name: (code col, description col)}`, keyed by **name** so reordering
+  the WBS levels keeps the mapping; levels not active now are kept on save. It is edited
+  in the same columns window: `ColumnsForm` takes a *kind* (`PriceListKind` /
+  `WbsKind(level_names)`: fields, defaults, `guess`, `make`, `check`, `header_row`);
+  `guess_wbs_layout()` finds the Codice / Descrittivo header pairs and matches each to
+  the level named above it. `qs.WbsStructure.names` is `{name: {code: description}}`;
+  the window turns it into `session.wbs_names` `{level index: {code: description}}` for
+  the active levels. It only relabels: `pivot_bill(..., wbs_names)` turns WBS group
+  labels into "code - description" via `qm.wbs_label()`, while paths, sort keys and item
+  cells stay on the code; pivot column headers do the same. Values missing from their
+  level's table raise `ISSUE_WBS_NOT_IN_STRUCTURE` (`wbs_structure_issues()`, mapped
+  levels only). CME and the export stay on codes.
+- Excel / CSV price lists are read through a `PriceListLayout` (sheet + `{field: column
+  index}`), chosen in the Price list columns window (`mepqto_columns_ui`) and stored in the
+  project file as `price_list_layout` (column letters), with the path. No layout = first
+  sheet, positional `EPU_COLUMNS` (A code, B short description, C description, D unit,
+  E unit price, F..I optional), which is also the order of the export's EPU sheet.
+  `guess_layout()` proposes a mapping from known header names. `MergedItem.in_price_list` drives
+  the red rows of the EPU tab and the "Code not in the price list" issue (only when a
+  price list is loaded). Unit aliases (`n`, `nr`, `n°` -> `cad`) live in `UNIT_ALIASES`.
+- Window values = empty item, then non-empty price list fields, then non-empty project
+  fields. An emptied field falls back to the price list; project values never flow back
+  into the shared list.
+- **Concurrent saves** (both files sit on shared paths): the store records which
+  `(code, field)` pairs and overrides were touched (`_dirty_*`). On save, if the file
+  mtime changed since load, it re-reads the disk copy and re-applies only the local edits
+  (`ProjectStore._merge_with_disk()`). Rules, WBS levels and the parameter map are saved as
+  a block, so last writer wins. The price list editor does the same per code.
+- `write_json_file()` writes via a `.tmp` file and escapes non-ASCII by hand (see the
+  IronPython `ensure_ascii` trap); reads accept UTF-8 with BOM. A project file that is not
+  valid JSON is never overwritten: the user is asked for another one.
+- **Adding a field to a price item** (as `short_description` was) touches: `FIELDS`,
+  `MergedItem.__slots__` / `__init__`, `EPU_COLUMNS`, `LAYOUT_FIELDS` and `HEADER_GUESSES` in
+  `mepqto_store.py`; `COLUMNS`, `FIELD_OF`, `_add_row()` and the import loop in
+  `mepqto_pricelist_ui.py` plus its XAML column; `prices_table`, `PRICE_FIELDS`,
+  `_write_price_values()` and the search in `mepqto_ui.py` plus the EPU tab column;
+  `_price_list_sheet()` in `mepqto_xlsx.py`. Merge, project file and concurrent save
+  pick it up from `FIELDS` with no further change.
+- Older files must keep loading without conversion: new keys are optional, and the
+  `parameters` keys keep their historical names (`piece_codes`, `linear_codes`,
+  `linear_include`) even where they no longer describe the content.
+
+### Excel without Excel
+
+Both directions go through `System.IO.Compression` (zip) and XML, with no COM and no
+Excel installed: `mepqto_store._read_xlsx_rows()` reads the first sheet (shared strings
+included), `mepqto_xlsx.write_workbook()` writes inline strings, fixed styles, formulas
+with cached values and `fullCalcOnLoad`. A locked target raises `FileLockedError`. Reuse
+these two modules when another tool needs .xlsx I/O instead of introducing COM interop.
+
+### WPF patterns specific to MEPQTO
+
+- Grids are bound to `System.Data.DataTable` (`grid.ItemsSource = table.DefaultView`): .NET
+  handles two-way binding, so no IronPython `INotifyPropertyChanged` objects. Search uses
+  `DefaultView.RowFilter` with `LIKE`, escaped by `escape_like()`.
+- The Bill of quantities tab is an **outline**, not WPF grouping: `qm.pivot_bill()` (pure
+  Python) returns group and item entries for the row levels chosen in the Layout dialog
+  (`mepqto_layout_ui`; `group_options()`: chapter, subchapter, type mark, unit, `wbs:N`)
+  plus the column keys of the WBS levels put on the columns. Pivot columns are rebuilt on
+  every fill (`_rebuild_pivot_columns()`, table columns `P1..Pn`, removed and re-added
+  with the table empty): items carry quantities, group rows amounts. The window writes
+  them as rows of one DataTable with hidden `Kind`, `Gid`, `Anc` ("|1|4|"), `Level`,
+  `Shade`, `Toggle` and `Hidden` columns. Collapsing sets `Hidden` on the rows under a
+  group (state keyed by the group path, so it survives a recompute); filters run on the
+  items and keep the groups listed in their `Anc`. Group totals sit in the Amount column,
+  aligned with the items. The Excel export still uses `bill_outline()` (WBS combinations),
+  and so does the **CME** tab (`cme_table`, `_fill_cme_table()`), the pre-grouping view kept
+  as a flat mirror of the export. Both grids share the allowance-override handlers:
+  `_selected_bill_lines()` reads the grid of the selected tab.
+- **Manual items** (`qm.ManualItem`, project file key `manual_items`) are rows typed in
+  their own tab. They carry only WBS values (by parameter name), Type Mark, code and
+  quantity; description, unit and price are the EPU fields of the code (edits go through
+  `ProjectStore.set_item_field`). `compute_bill()` keeps them in `bill.manual_quantities`,
+  separate from `wbs_quantities`, so `pivot_bill()` / `bill_outline()` emit them as their
+  own rows with `manual=True` (hidden `Manual` column -> lavender italics; skipped by the
+  allowance override). Their codes join `session.price_codes` (EPU `Source` column).
+- Excel-style column filters come from `mepqto_grid_filter.GridFilters`: it replaces each
+  bound column's `Header` with title + funnel button, builds the value popup in code and
+  only *returns* a RowFilter fragment (`expression()`); the window ANDs it with its search
+  and owns the final `RowFilter`. Set a filtered column's title with `set_title()`, never
+  `column.Header =` (that would drop the funnel), and look up columns by header text
+  (as `col_unit` does) **before** creating `GridFilters`. Reusable on any DataTable grid.
+- Editable numeric cells are **string** columns converted by hand in the table's
+  `ColumnChanging` handler, because WPF binding uses the en-US culture and would read
+  `12,5` as `125`. `qs.parse_decimal()` accepts both comma and dot.
+- A `MessageBox` raised from inside a cell commit is deferred with
+  `Dispatcher.BeginInvoke(DispatcherPriority.Background, Action(...))` (`_defer()`).
+  Call `_commit_edits()` before Save, Export and close, or the cell being edited is lost.
+- `MEPQTO_form.xaml` follows the house style and adds three styles for data grids:
+  `GridStyle`, `NumberCell`, `WrapCell`. Copy those for any DataGrid-heavy window.
+- Main window: `OnWindowClosing` asks to save if `ProjectStore.is_dirty`, and cancels the
+  close on Cancel or on a failed save.
 
 ## Development notes worth reading
 
