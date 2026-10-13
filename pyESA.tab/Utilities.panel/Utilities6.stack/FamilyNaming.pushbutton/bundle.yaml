@@ -1,0 +1,32 @@
+title:
+  Family
+
+  Naming
+
+tooltip: >-
+  Renames a family and a type following the ESA naming classification.
+
+  HOW IT WORKS:
+   1. Select one element in the model, then run the tool.
+   2. The category is detected and the matching classification sheet opens.
+   3. Pick Group 1 and Group 2, fill the coding fields the category asks for,
+      check the preview and apply.
+
+  WHAT IT WRITES:
+   - Loadable families: the family name and the type name.
+   - System families: the type name only, the Type Mark included.
+   - In place elements: a single name, family and type joined by " - ".
+   - The Type Mark parameter, unless the option is turned off.
+   - FireRating, when REI is filled. Overwriting an existing value is asked.
+
+  THE TYPE MARK:
+  Always AA-XXX. The prefix is the category code, or the Group 2 code on the
+  seven loadable categories with a shared Group 1, or a material code when
+  Group 1 is Other. The next free sequential is searched by prefix across the
+  whole model and proposed; it can always be overridden by hand.
+
+  NOTE - the classification tables come from the three
+  "Naming classification-*.xlsx" files in this bundle. Editing them requires
+  regenerating FamilyNaming_data.py with gen_data.py.
+
+author: "pyESA"
