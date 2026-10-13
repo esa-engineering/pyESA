@@ -1,4 +1,4 @@
-# Stub
+# Spring (cartella Stub)
 
 ## Logica di funzionamento
 

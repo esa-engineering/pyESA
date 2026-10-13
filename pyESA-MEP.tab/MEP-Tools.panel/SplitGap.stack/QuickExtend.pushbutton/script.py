@@ -25,7 +25,7 @@ nearest); in plans only XY counts and the slope is kept. In 3D views
 the target point is clicked on the face of any element.
 Only a free end can be moved: an end connected to a fitting or to
 another element is left unchanged. Insulation and lining follow the
-element. The report lists each element and the length change.
+element. No report: an alert appears only if something could not be done.
 ________________________________________________________________
 Author(s): Matteo Maiorano
 """
@@ -49,26 +49,16 @@ uidoc = revit.uidoc
 output = script.get_output()
 
 
-REPORT_CONFIG = "ESA_Report"  # impostazione condivisa da tutti i pulsanti, cambiata col pulsante Report
 
-
-def want_report(total, problems, noun):
-    """True se va stampato il report completo. Modalita' "problems" (predefinita): solo se qualcosa non e' andato a
-    buon fine; "always": sempre; "never": mai, resta la notifica. Altrimenti notifica breve (e nessuna finestra)."""
-    try:
-        mode = script.get_config(REPORT_CONFIG).get_option("mode", "problems")
-    except Exception:
-        mode = "problems"
-    if mode == "always" or (mode == "problems" and problems):
-        return True
-    if not total:
-        return False
-    text = "{} {}".format(total - problems, noun) + (", {} not done".format(problems) if problems else "")
-    try:
-        script.toast(text, title="pyESA")
-    except Exception:
-        return problems > 0  # notifica non disponibile: con dei problemi meglio il report che niente
-    return False
+def notify(total, problems, noun, detail=""):
+    """Nessun report e nessuna notifica di successo (la toast di Windows rallenta il ritorno a Revit): un avviso solo
+    se qualcosa non e' andato a buon fine, con il primo motivo."""
+    if not total or not problems:
+        return
+    text = "{} {}, {} not done".format(total - problems, noun, problems)
+    if detail:
+        text += ".\n\n" + detail
+    forms.alert(text, title="pyESA")
 
 
 MM_PER_FT = 304.8
@@ -198,15 +188,9 @@ def apply(element, end_index, target, rows):
 
 
 def report(title, rows, done):
-    if not want_report(len(rows), len(rows) - done, "elements extended"):
-        return
-    output.print_md("# {}".format(title))
-    output.print_md("Elements: **{}** | changed: **{}** | left unchanged: **{}**".format(
-        len(rows), done, len(rows) - done))
-    # righe in testo, non in tabella: si vedono sempre
-    for i, (element, change, status) in enumerate(rows, 1):
-        output.print_md("**#{}** {} {} | length change [mm]: {} | **{}**".format(
-            i, category_name(element), output.linkify(element.Id), change or "-", status))
+    """Solo una notifica breve con l'esito, nessun report."""
+    first_problem = next((status for _, _, status in rows if status.startswith("Unchanged")), "")
+    notify(len(rows), len(rows) - done, "elements extended", first_problem)
 
 
 def quick_main():

@@ -8,7 +8,9 @@ tooltip: >-
   CLICK: uses the last settings (default: 500 mm horizontal, no offset).
 
   SHIFT + CLICK: one window with the vertical offset of the branch end (+ up, - down, 0 = straight), the angle of the
-  inclined run (90, 45, 30 or custom) and the length of the horizontal run after the change of level.
+  inclined run (90, 45, 30 or custom) and the length of the horizontal run after the change of level, plus a tick box
+  for a return run after it: same angle, opposite direction, back to the level the branch started from, then a last
+  horizontal run of the same length.
   Pipes: the tee is rotated by that angle and the branch goes on inclined up to the offset, then the horizontal run.
   Ducts: the short stub with the tee comes first, then the inclined run.
   Cable trays: the tee is placed only where it exists, i.e. when the branch lies in the plane of the run and its width

@@ -90,15 +90,24 @@ Rules:
 
 - 96×96 PNG, 32-bit with alpha, **transparent** background (never a white plate).
 - Monochrome, not coloured: one hue is off-brand here and colour never reads on both
-  themes. Keep a grey ramp so fills stay distinguishable from outlines — roughly grey
-  20…140 for `icon.png` and the reversed ramp, 248…138, for `icon.dark.png` (the darkest
-  element of the light icon becomes the lightest element of the dark one).
+  themes. Strokes use grey roughly 20…70 for `icon.png` and the reversed ramp, 248…200,
+  for `icon.dark.png` (the darkest element of the light icon becomes the lightest element
+  of the dark one).
+- **Outline style, no fill.** Closed shapes are drawn as outlines with a transparent
+  interior, as in the `pyESA` tab (e.g. `MEPConnect`). Never flood a shape with a mid-grey
+  (≈ 90…200, the ~139 / ~137 grey of the old `pyESA-MEP` icons): on the ribbon it reads as
+  a flat grey block. Only deliberately solid marks (a black tile, a dot, an arrowhead, the
+  roll of insulation) are allowed to be filled, in the stroke colour itself.
 - The two files are the same drawing, only re-inked. Don't redraw the shape per theme.
 - Bold, simple shapes with strokes around 3.5 px in the 96 px grid: the ribbon also renders
   the icon at 32 px and 16 px, so check legibility at those sizes before committing.
 - Converting an existing coloured icon: map luminance to the grey ramp above and keep the
   alpha channel, rather than desaturating (a flat desaturation collapses light fills and
-  dark outlines into the same mid-grey).
+  dark outlines into the same mid-grey). Then drop the fill: make the mid-grey interior
+  transparent (alpha 0) and keep the outline, blending only the anti-aliased edge pixels so
+  no grey halo is left. Do it per theme, since the fill grey differs (e.g. 139 light /
+  137 dark, or 199 / 104 on a few icons), and check that thin mid-grey strokes or lines
+  (not fills) survive.
 - `icon.small.png` is **not** a name pyRevit reads — it is inert. Don't add new ones.
 
 ## Script conventions
@@ -143,6 +152,25 @@ output = script.get_output()
 Transactions: `with revit.Transaction("name"):` is the dominant form (~80 sites); raw
 `Transaction(doc, ...)` with explicit `Start()`/`Commit()` appears mostly in the
 `XamlReader`-based scripts that don't import `pyrevit.revit`.
+
+Scripts must stay compatible with **Rocket mode** (pyRevit Settings → Core): it reuses the
+IronPython engine between commands and avoids a freeze of a second or two at the end of every
+command, so users are expected to turn it on. The command script
+is executed fresh each time, but **helper modules imported by bare name stay in `sys.modules`**
+across commands. Hence:
+
+- A helper module's name must be unique in the whole extension, unless the copies are
+  byte-identical (`Branch_ui`, `MatchElevation_ui`, `Riser_ui`, `Select_ui` are). Two different
+  `Turn_ui.py` would make the second button run the first one's code. Name new helpers after the
+  tool (`ClashOverpass_ui.py`, `MultiTurn_ui.py`); keep the old local name with
+  `import ClashOverpass_ui as Overpass_ui` if the script refers to it everywhere. When you edit a
+  shared copy, edit all copies.
+- No document, UI document or output window at module level in a helper
+  (`OUTPUT = script.get_output()`, `doc = revit.doc`): it would stay bound to the first run.
+  Fetch them inside the function, or pass them in. Command scripts may keep doing it.
+- Module-level caches in helpers would survive across documents: keep caches local or on an
+  instance.
+- After editing a helper module, pyRevit **Reload** is needed even for a quick test.
 
 Cancellation is `script.exit()`. It raises `SystemExit`, which derives from
 `BaseException` and is therefore **not** caught by a trailing `except Exception` — several

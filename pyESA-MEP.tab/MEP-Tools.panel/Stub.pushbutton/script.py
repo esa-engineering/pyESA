@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__title__ = "Stub"
+__title__ = "Spring"
 __doc__ = """Version = 0.1
 Date    = 07.10.2026
 ________________________________________________________________
@@ -197,7 +197,7 @@ def process_element(element, settings, type_ids, base_length_mm):
     else:
         chosen = free
 
-    transaction = DB.Transaction(doc, "Stub")
+    transaction = DB.Transaction(doc, "Spring")
     transaction.Start()
     try:
         for k, (number, conn) in enumerate(chosen):
@@ -308,7 +308,7 @@ def main():
     type_ids = resolve_type_ids(settings, pipe_types, duct_types)
     results = []
     selection_filter = MechanicalConnectorFilter()
-    prompt = "Stub ({:g} mm{}): click an element with mechanical connectors (ESC to finish)".format(
+    prompt = "Spring ({:g} mm{}): click an element with mechanical connectors (ESC to finish)".format(
         settings["length_mm"], " +50 each" if settings["different"] else "")
     while True:
         try:

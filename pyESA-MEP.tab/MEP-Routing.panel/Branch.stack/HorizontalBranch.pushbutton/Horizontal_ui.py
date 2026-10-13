@@ -21,7 +21,8 @@ def parse_number(text):
 
 class HorizontalWindow(object):
     """Unica finestra di Horizontal Branch (SHIFT + CLICK): offset, angolo (90, 45, 30 o personalizzato) e lunghezza
-    del tratto orizzontale dopo il cambio di quota. show() ritorna {length_mm, drop_mm, angle_deg} o None."""
+    del tratto orizzontale dopo il cambio di quota, con la spunta per tornare alla quota di partenza. show() ritorna
+    {length_mm, drop_mm, angle_deg, return_back} o None."""
 
     def __init__(self, xaml_path, settings):
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
@@ -31,6 +32,8 @@ class HorizontalWindow(object):
         self.custom_box = find("CustomBox")
         self.custom_radio = find("AngCustom")
         self.preset_radios = {90.0: find("Ang90"), 45.0: find("Ang45"), 30.0: find("Ang30")}
+        self.return_check = find("ReturnCheck")
+        self.return_check.IsChecked = bool(settings.get("return_back", False))
         self.length_box.Text = "{:g}".format(settings["length_mm"])
         self.offset_box.Text = "{:g}".format(settings["drop_mm"])
         angle = float(settings["angle_deg"])
@@ -59,7 +62,10 @@ class HorizontalWindow(object):
         ok, angle = self._angle()
         if not ok or angle < 5 or angle > 90:
             return False, "The angle must be a number from 5 to 90 degrees.", None
-        return True, "", {"length_mm": length, "drop_mm": offset, "angle_deg": angle}
+        return_back = bool(self.return_check.IsChecked)
+        if return_back and offset == 0:
+            return False, "The return to the starting level needs a vertical offset other than 0.", None
+        return True, "", {"length_mm": length, "drop_mm": offset, "angle_deg": angle, "return_back": return_back}
 
     def _on_ok(self, sender, args):
         ok, message, values = self._validate()

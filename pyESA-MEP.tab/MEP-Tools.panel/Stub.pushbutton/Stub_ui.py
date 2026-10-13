@@ -70,7 +70,7 @@ class StubWindow(object):
     def _on_ok(self, sender, args):
         ok, message, values = self._validate()
         if not ok:
-            MessageBox.Show(message, "Stub")
+            MessageBox.Show(message, "Spring")
             return
         self.result = values
         self.window.DialogResult = True

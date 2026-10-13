@@ -19,7 +19,6 @@ from System.IO import FileStream, FileMode
 # pyRevit imports
 from pyrevit import script
 
-OUTPUT = script.get_output()
 LOGGER = script.get_logger()
 
 
@@ -393,5 +392,7 @@ def show_summary_dashboard(csv_data):
         dashboard.populate(csv_data)
         dashboard.Show()
     except Exception as e:
-        OUTPUT.print_md("⚠️ Errore apertura dashboard: {}".format(str(e)))
+        # output chiesto qui e non all'import: con Rocket mode il modulo resta in memoria e la finestra del primo
+        # comando non e' piu' quella giusta
+        script.get_output().print_md("⚠️ Dashboard could not be opened: {}".format(str(e)))
         LOGGER.error("Errore SummaryDashboard: {}".format(str(e)))

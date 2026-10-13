@@ -19,8 +19,8 @@ In plans, sections and elevations the clicks use Revit snaps
 nearest) and the element is the straight run whose axis is closest
 to the first point. In 3D views both clicks are on the element,
 without snaps. Vertical elements need a section, elevation or 3D view.
-The report lists each element, the gap length and what could not be
-cut. An element that cannot be cut is left unchanged.
+No report: an alert appears only if something could not be cut,
+with the first reason. An element that cannot be cut is left unchanged.
 
 Pipes and ducts are split with BreakCurve, so their insulation is
 kept. Cable trays and conduits are split by copy.
@@ -38,6 +38,7 @@ from Autodesk.Revit.DB.Mechanical import Duct, MechanicalUtils
 from Autodesk.Revit.DB.Electrical import CableTray, Conduit
 from Autodesk.Revit.UI.Selection import ObjectType, ObjectSnapTypes, ISelectionFilter
 from Autodesk.Revit.Exceptions import OperationCanceledException
+from System import Type
 from System.Collections.Generic import List
 
 from pyrevit import revit, script, DB, forms
@@ -47,26 +48,16 @@ uidoc = revit.uidoc
 output = script.get_output()
 
 
-REPORT_CONFIG = "ESA_Report"  # impostazione condivisa da tutti i pulsanti, cambiata col pulsante Report
 
-
-def want_report(total, problems, noun):
-    """True se va stampato il report completo. Modalita' "problems" (predefinita): solo se qualcosa non e' andato a
-    buon fine; "always": sempre; "never": mai, resta la notifica. Altrimenti notifica breve (e nessuna finestra)."""
-    try:
-        mode = script.get_config(REPORT_CONFIG).get_option("mode", "problems")
-    except Exception:
-        mode = "problems"
-    if mode == "always" or (mode == "problems" and problems):
-        return True
-    if not total:
-        return False
-    text = "{} {}".format(total - problems, noun) + (", {} not done".format(problems) if problems else "")
-    try:
-        script.toast(text, title="pyESA")
-    except Exception:
-        return problems > 0  # notifica non disponibile: con dei problemi meglio il report che niente
-    return False
+def notify(total, problems, noun, detail=""):
+    """Nessun report e nessuna notifica di successo (la toast di Windows rallenta il ritorno a Revit): un avviso solo
+    se qualcosa non e' andato a buon fine, con il primo motivo."""
+    if not total or not problems:
+        return
+    text = "{} {}, {} not done".format(total - problems, noun, problems)
+    if detail:
+        text += ".\n\n" + detail
+    forms.alert(text, title="pyESA")
 
 MM_PER_FT = 304.8
 MIN_REMAINING_MM = 20.0  # lunghezza minima dei due tratti che restano
@@ -354,9 +345,9 @@ def element_near(point):
 
     p = on_view_plane(point)
     best, best_score = None, None
-    for element in DB.FilteredElementCollector(doc, view.Id).WhereElementIsNotElementType():
-        if not isinstance(element, CLASSES):
-            continue
+    # filtro per classe in Revit: non si scorrono in Python tutti gli elementi della vista a ogni clic
+    classes = List[Type]([clr.GetClrType(cls) for cls in CLASSES])
+    for element in DB.FilteredElementCollector(doc, view.Id).WherePasses(DB.ElementMulticlassFilter(classes)):
         curve = getattr(element.Location, "Curve", None)
         if not isinstance(curve, DB.Line):
             continue
@@ -371,153 +362,6 @@ def element_near(point):
         if distance <= limit and (best is None or distance < best_score):
             best, best_score = element, distance
     return best
-
-
-def quick_main():
-    """SHIFT + CLICK: un elemento alla volta, fino a ESC. Primo clic sull'elemento = punto di taglio, secondo clic
-    sulla parte dello stesso elemento da eliminare."""
-    rows, done = [], 0
-    use_snaps = not isinstance(doc.ActiveView, DB.View3D)
-    while True:
-        if use_snaps:
-            # primo clic con gli snap di Revit; l'elemento e' quello con l'asse piu' vicino al punto agganciato
-            try:
-                cut_point = uidoc.Selection.PickPoint(SNAPS, "Split: click where the element must be cut, snaps "
-                                                             "active (ESC to finish)")
-            except OperationCanceledException:
-                break
-            except Exception as ex:
-                forms.alert("Points with snaps cannot be picked in this view ({}). The command continues "
-                            "without snaps: click directly on the elements.".format(ex), title="Gap")
-                use_snaps = False
-                continue
-            element = element_near(cut_point)
-            if element is None:
-                rows.append((None, "", "Unchanged. No straight pipe, duct, cable tray or conduit near the clicked "
-                                       "point", ""))
-                continue
-        else:
-            # vista 3D: PickPoint richiede un piano di lavoro, si clicca direttamente sull'elemento (niente snap)
-            try:
-                first = uidoc.Selection.PickObject(ObjectType.Element, CurveFilter(),
-                                                   "Split: click the element where it must be cut (ESC to finish)")
-            except OperationCanceledException:
-                break
-            element = doc.GetElement(first.ElementId)
-            cut_point = first.GlobalPoint
-        uidoc.Selection.SetElementIds(List[DB.ElementId]([element.Id]))  # si vede quale elemento e' stato preso
-        try:
-            second = uidoc.Selection.PickObject(ObjectType.Element, SameElementFilter(element.Id),
-                                                "Split: click the part of the highlighted element to delete "
-                                                "(ESC to skip)")
-        except OperationCanceledException:
-            uidoc.Selection.SetElementIds(List[DB.ElementId]())
-            continue
-        uidoc.Selection.SetElementIds(List[DB.ElementId]())
-        transaction = DB.Transaction(doc, "Split")
-        transaction.Start()
-        try:
-            if cut_point is None or second.GlobalPoint is None:
-                raise GapError("The clicked points could not be read in this view")
-            if isinstance(doc.ActiveView, DB.ViewPlan) and get_vertical_elements([element]):
-                raise GapError("A vertical element cannot be cut in a plan view: use a section, elevation or "
-                               "3D view")
-            removed, disconnected = trim(element, axis_param(element, cut_point),
-                                         axis_param(element, second.GlobalPoint))
-            transaction.Commit()
-            status = "Cut, {:.0f} mm removed".format(removed)
-            if disconnected:
-                status += ". Disconnected from: {}".format(", ".join(disconnected))
-            rows.append((element, "{:.0f}".format(removed), status, ""))
-            done += 1
-        except GapError as ex:
-            transaction.RollBack()
-            rows.append((element, "", "Unchanged. {}".format(ex), ""))
-        except Exception as ex:
-            transaction.RollBack()
-            rows.append((element, "", "Unchanged. The element could not be cut: {}".format(ex), ""))
-    if not want_report(len(rows), len(rows) - done, "elements cut"):
-        return
-    output.print_md("# Split report (cut and delete one side)")
-    output.print_md("Elements: **{}** | cut: **{}** | left unchanged: **{}**".format(
-        len(rows), done, len(rows) - done))
-    for i, (element, removed, status, _) in enumerate(rows, 1):
-        label = "{} {}".format(category_name(element), output.linkify(element.Id)) if element is not None \
-            else "No element"
-        output.print_md("**{}.** {} | {}".format(i, label, status))
-
-
-class SameElementFilter(ISelectionFilter):
-    """Solo l'elemento appena cliccato (secondo clic dello SHIFT + CLICK)."""
-
-    def __init__(self, element_id):
-        self.element_id = element_id
-
-    def AllowElement(self, element):
-        return element.Id == self.element_id
-
-    def AllowReference(self, reference, point):
-        return False
-
-
-def main():
-    elements = get_selection()
-    if not elements:
-        script.exit()
-
-    # verticale o orizzontale si capisce dagli elementi; selezione mista: avviso e stop
-    vertical = get_vertical_elements(elements)
-    if vertical and len(vertical) < len(elements):
-        forms.alert("The selection mixes {} vertical and {} non-vertical elements. Select only vertical or only "
-                    "non-vertical elements, then run the command again.".format(
-                        len(vertical), len(elements) - len(vertical)), title="Gap")
-        script.exit()
-    vertical_mode = bool(vertical)
-
-    if vertical_mode:
-        prompt_1, prompt_2 = "Click the bottom of the gap", "Click the top of the gap"
-    else:
-        prompt_1, prompt_2 = "Click the first point of the gap", "Click the second point of the gap"
-    plane_transaction = None
-    try:
-        if vertical_mode:
-            plane_transaction = set_vertical_work_plane(uidoc.ActiveView, elements[0])
-        click1 = pick(prompt_1)
-        click2 = pick(prompt_2)
-    finally:
-        if plane_transaction is not None:
-            plane_transaction.RollBack()  # il piano di lavoro serve solo per i click, nel modello non resta nulla
-    if vertical_mode and abs(click1.Z - click2.Z) < MIN_GAP_MM / MM_PER_FT:
-        forms.alert("The two points have the same height. For vertical elements run the command in a section, "
-                    "elevation or 3D view and click the two heights on the element.", title="Gap")
-        script.exit()
-
-    rows, done = [], 0
-    for element in elements:
-        info = diagnostics(element, click1, click2)
-        transaction = DB.Transaction(doc, "Split gap")
-        transaction.Start()
-        try:
-            gap, status = make_gap(element, click1, click2)
-            transaction.Commit()
-            rows.append((element, "{:.0f}".format(gap), status, info))
-            done += 1
-        except GapError as ex:
-            transaction.RollBack()
-            rows.append((element, "", "Unchanged. {}".format(ex), info))
-        except Exception as ex:
-            transaction.RollBack()
-            rows.append((element, "", "Unchanged. The gap could not be created: {}".format(ex), info))
-    if not want_report(len(elements), len(elements) - done, "gaps created"):
-        return
-    output.print_md("# Split Gap report")
-    output.print_md("Elements: **{}** | gaps created: **{}** | left unchanged: **{}**".format(
-        len(elements), done, len(elements) - done))
-    # righe in testo, non in tabella: si vedono sempre, anche se la tabella non le mostra
-    for i, (element, gap, status, info) in enumerate(rows, 1):
-        output.print_md("**#{}** {} {} | gap [mm]: {} | **{}**".format(
-            i, category_name(element), output.linkify(element.Id), gap or "-", status))
-        output.print_md("&nbsp;&nbsp;&nbsp;{}".format(info))
 
 
 def gap_main():
@@ -593,17 +437,8 @@ def gap_main():
         except Exception as ex:
             transaction.RollBack()
             rows.append((element, "", "Unchanged. The gap could not be created: {}".format(ex), info))
-    if not want_report(len(rows), len(rows) - done, "gaps created"):
-        return
-    output.print_md("# Gap report")
-    output.print_md("Elements: **{}** | gaps created: **{}** | left unchanged: **{}**".format(
-        len(rows), done, len(rows) - done))
-    for i, (element, gap, status, info) in enumerate(rows, 1):
-        label = "{} {}".format(category_name(element), output.linkify(element.Id)) if element is not None \
-            else "No element"
-        output.print_md("**#{}** {} | gap [mm]: {} | **{}**".format(i, label, gap or "-", status))
-        if info:
-            output.print_md("&nbsp;&nbsp;&nbsp;{}".format(info))
+    first_problem = next((status for _, _, status, _ in rows if status.startswith("Unchanged")), "")
+    notify(len(rows), len(rows) - done, "gaps created", first_problem)
 
 
 gap_main()

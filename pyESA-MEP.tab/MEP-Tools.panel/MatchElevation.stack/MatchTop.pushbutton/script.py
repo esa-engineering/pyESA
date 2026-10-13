@@ -13,8 +13,8 @@ CLICK:
 3. Each element is moved vertically so that its upper end top
    elevation matches the one of the reference. Plan position and
    length are kept
-4. The report lists the elements, how much they moved and what
-   could not be changed
+4. No report: a short alert appears only if
+   something could not be changed, with the first reason
 
 SHIFT + CLICK: settings shared by Match Top, Match Middle and Match
 Bottom:
@@ -28,7 +28,7 @@ Vertical elements can be the reference (their top end is used) or be
 aligned: they are moved as a whole, never made horizontal.
 Elements connected to the moved ones follow as when the elevation is
 changed in the Properties palette; if Revit refuses the result, the
-element is left unchanged and the reason goes to the report.
+element is left unchanged and the reason is shown in an alert.
 ________________________________________________________________
 Author(s): Matteo Maiorano
 """
@@ -59,10 +59,12 @@ TOOL_TITLES = {"top": "Match Top", "middle": "Match Middle", "bottom": "Match Bo
 TOOL_TITLE = TOOL_TITLES[MATCH_MODE]
 
 SETTINGS_CONFIG = "ESA_MatchElevation"  # condivisa dai tre pulsanti, si cambia con SHIFT + CLICK
-DEFAULT_SETTINGS = {"override_level": True, "remove_slope": False}
+DEFAULT_SETTINGS = {"override_level": True, "remove_slope": False, "single_element": False}
+# raccordi e accessori in linea collegati agli estremi: si spostano sempre con l'elemento
+FOLLOW_CATEGORIES = (DB.BuiltInCategory.OST_PipeFitting, DB.BuiltInCategory.OST_DuctFitting,
+                     DB.BuiltInCategory.OST_CableTrayFitting, DB.BuiltInCategory.OST_ConduitFitting,
+                     DB.BuiltInCategory.OST_PipeAccessory, DB.BuiltInCategory.OST_DuctAccessory)
 XAML_FILE_NAME = "MatchElevation_form.xaml"
-
-REPORT_CONFIG = "ESA_Report"  # impostazione condivisa da tutti i pulsanti, cambiata col pulsante Report
 
 # Match Middle con tratti inclinati: "upper" / "lower" = Upper / Lower End Centerline Elevation, scelto dall'utente
 # nel popup. None: nessun tratto inclinato, si usa il centro dell'asse (per un tratto orizzontale e' lo stesso)
@@ -76,23 +78,15 @@ def mode_label():
     return MODE_LABELS[MATCH_MODE]
 
 
-def want_report(total, problems, noun):
-    """True se va stampato il report completo. Modalita' "problems" (predefinita): solo se qualcosa non e' andato a
-    buon fine; "always": sempre; "never": mai, resta la notifica. Altrimenti notifica breve (e nessuna finestra)."""
-    try:
-        mode = script.get_config(REPORT_CONFIG).get_option("mode", "problems")
-    except Exception:
-        mode = "problems"
-    if mode == "always" or (mode == "problems" and problems):
-        return True
-    if not total:
-        return False
-    text = "{} {}".format(total - problems, noun) + (", {} not done".format(problems) if problems else "")
-    try:
-        script.toast(text, title="pyESA")
-    except Exception:
-        return problems > 0  # notifica non disponibile: con dei problemi meglio il report che niente
-    return False
+def notify(total, problems, noun, detail=""):
+    """Nessun report e nessuna notifica di successo (la toast di Windows rallenta il ritorno a Revit): un avviso solo
+    se qualcosa non e' andato a buon fine, con il primo motivo."""
+    if not total or not problems:
+        return
+    text = "{} {}, {} not done".format(total - problems, noun, problems)
+    if detail:
+        text += ".\n\n" + detail
+    forms.alert(text, title="pyESA")
 
 
 MM_PER_FT = 304.8
@@ -107,7 +101,7 @@ class MatchError(Exception):
 
 class RevitErrors(DB.IFailuresPreprocessor):
     """Errori di Revit al commit (es. elementi collegati che non si possono adattare): invece della finestra
-    bloccante, la transazione viene annullata e i messaggi vanno nel report. Gli avvisi passano come sempre."""
+    bloccante, la transazione viene annullata e i messaggi vanno nell'avviso. Gli avvisi passano come sempre."""
 
     def __init__(self):
         self.messages = []
@@ -338,6 +332,32 @@ def set_level(element, level_id):
             category_name(element), element.Id, ex))
 
 
+def connected_fittings(element):
+    """[(raccordo o accessorio, estremo 0/1)] collegati direttamente agli estremi dell'elemento."""
+    curve = element.Location.Curve
+    ends = (curve.GetEndPoint(0), curve.GetEndPoint(1))
+    found = []
+    for conn in element.ConnectorManager.Connectors:
+        if conn.ConnectorType != DB.ConnectorType.End or not conn.IsConnected:
+            continue
+        end = 0 if conn.Origin.DistanceTo(ends[0]) <= conn.Origin.DistanceTo(ends[1]) else 1
+        for ref in conn.AllRefs:
+            owner = ref.Owner
+            if owner.Id == element.Id or not isinstance(owner, DB.FamilyInstance) or owner.Category is None:
+                continue
+            if not any(owner.Category.Id == DB.ElementId(bic) for bic in FOLLOW_CATEGORIES):
+                continue
+            # solo raccordi in linea (curve, manicotti, riduzioni, valvole): un T o una croce sposterebbe anche la
+            # dorsale su cui sta, quindi si lascia a Revit
+            try:
+                count = owner.MEPModel.ConnectorManager.Connectors.Size
+            except Exception:
+                continue
+            if count <= 2:
+                found.append((owner, end))
+    return found
+
+
 def make_plan(element, target, ref_level_id, settings):
     """Cosa va fatto sull'elemento, calcolato sulla geometria di partenza senza toccare il modello. La nuova
     posizione e' assoluta (estremi dell'asse), cosi' non dipende da come Revit tratta il cambio di livello."""
@@ -368,6 +388,14 @@ def make_plan(element, target, ref_level_id, settings):
     elif plan["change_level"]:
         plan["line"] = DB.Line.CreateBound(a, b)  # stessa posizione: la blocca anche se il cambio di livello la sposta
     plan["todo"] = plan["change_level"] or plan["line"] is not None
+    # i raccordi agli estremi salgono o scendono quanto il loro estremo: cosi' seguono l'elemento invece di
+    # bloccare la modifica ("can no longer keep the connectivity"); i tratti oltre il raccordo si adattano
+    plan["fittings"] = []
+    if plan["line"] is not None:
+        for fitting, end in connected_fittings(element):
+            dz = plan["line"].GetEndPoint(end).Z - (a, b)[end].Z
+            if abs(dz) > TOL_FT:
+                plan["fittings"].append((fitting, dz))
     return plan
 
 
@@ -380,6 +408,15 @@ def apply_plans(plans, ref_level_id):
         set_level(plan["element"], ref_level_id)
     if level_plans:
         doc.Regenerate()
+    # prima i raccordi (una volta sola anche se collegati a due elementi selezionati), poi gli assi: le nuove
+    # posizioni sono assolute, quindi se lo spostamento del raccordo trascina l'estremo dell'elemento non importa
+    moved = set()
+    for plan in plans:
+        for fitting, dz in plan.get("fittings", []):
+            if str(fitting.Id) in moved:
+                continue
+            moved.add(str(fitting.Id))
+            DB.ElementTransformUtils.MoveElement(doc, fitting.Id, DB.XYZ(0.0, 0.0, dz))
     for plan in plans:
         if plan["line"] is not None:
             plan["element"].Location.Curve = plan["line"]
@@ -486,7 +523,17 @@ def pick_reference():
     return doc.GetElement(ref.ElementId)
 
 
-def pick_targets(reference, value_text):
+def pick_targets(reference, value_text, single=False):
+    if single:
+        # un solo elemento da allineare: un clic, senza Finish
+        try:
+            ref = uidoc.Selection.PickObject(
+                ObjectType.Element, CurveFilter(reference.Id),
+                "{}: click the element to align to {} {} ({})".format(
+                    TOOL_TITLE, category_name(reference), reference.Id, value_text))
+        except OperationCanceledException:
+            script.exit()
+        return [doc.GetElement(ref.ElementId)]
     try:
         refs = uidoc.Selection.PickObjects(
             ObjectType.Element, CurveFilter(reference.Id),
@@ -525,46 +572,24 @@ def value_text(reference, ref_level_id):
 
 def main():
     settings = load_settings()
+
     reference = pick_reference()
     ref_level_id = get_level_id(reference)
     # Match Middle: se il riferimento e' inclinato si chiede subito l'estremo, cosi' il prompt mostra la quota giusta
     if MATCH_MODE == "middle" and is_sloped(reference):
         ask_middle_end()
-    elements = pick_targets(reference, value_text(reference, ref_level_id))
+    elements = pick_targets(reference, value_text(reference, ref_level_id), settings["single_element"])
     if not elements:
         script.exit()
     if MATCH_MODE == "middle" and MIDDLE_END[0] is None and any(is_sloped(e) for e in elements):
         ask_middle_end()
     target = mode_elevation(reference, MATCH_MODE)
-    ref_text = value_text(reference, ref_level_id)
 
     plans, method_note = process_all(elements, target, ref_level_id, settings)
-    changed = len([p for p in plans if p["todo"] and not p["status"].startswith("Unchanged")])
     problems = len([p for p in plans if p["problem"]])
-    if not want_report(len(elements), problems, "elements aligned"):
-        return
+    first_problem = next((p["status"] for p in plans if p["problem"]), "")
+    notify(len(elements), problems, "elements aligned", first_problem)
 
-    output.print_md("# {} report".format(TOOL_TITLE))
-    curve = reference.Location.Curve
-    ref_shape = ""
-    if is_vertical(curve.Direction):
-        ref_shape = " (vertical)"
-    elif abs(curve.GetEndPoint(1).Z - curve.GetEndPoint(0).Z) > TOL_FT:
-        ref_shape = " (sloped)"
-    output.print_md("Reference: {} {}{} | level: {} | {}".format(
-        category_name(reference), output.linkify(reference.Id), ref_shape, level_name(ref_level_id), ref_text))
-    output.print_md("Settings: reference level **{}** | slope **{}** (SHIFT + CLICK to change)".format(
-        "overwritten" if settings["override_level"] else "kept",
-        "removed" if settings["remove_slope"] else "kept"))
-    output.print_md("Elements: **{}** | changed: **{}** | already matching: **{}** | with problems: **{}**".format(
-        len(elements), changed, len([p for p in plans if not p["todo"] and not p["problem"]]), problems))
-    if method_note:
-        output.print_md("_{}_".format(method_note))
-    # righe in testo, non in tabella: si vedono sempre, anche se la tabella non le mostra
-    for i, plan in enumerate(plans, 1):
-        element = plan["element"]
-        output.print_md("**#{}** {} {} | {}".format(i, category_name(element), output.linkify(element.Id),
-                                                   plan["status"]))
 
 
 if __shiftclick__:  # noqa: F821
