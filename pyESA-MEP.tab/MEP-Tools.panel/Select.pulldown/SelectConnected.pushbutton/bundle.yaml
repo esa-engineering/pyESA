@@ -1,0 +1,9 @@
+title: Select Connected
+tooltip: >-
+  CLICK: selects everything connected to the selected elements (select them first, or pick them after clicking),
+  following every physical connection: runs, fittings, accessories, taps, terminals and through the equipment too.
+  Insulation and lining are selected too.
+
+  SHIFT + CLICK: after the search, a list of the categories found, all checked: uncheck the ones you do not want
+  selected (for example the fittings, to keep only the pipes). The choice is saved and used by the normal click.
+author: Matteo Maiorano

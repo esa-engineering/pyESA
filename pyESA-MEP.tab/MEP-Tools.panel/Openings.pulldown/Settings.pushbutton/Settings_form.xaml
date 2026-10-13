@@ -1,0 +1,189 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Openings Settings" Width="560" Height="640" MinWidth="480" MinHeight="480"
+        WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip">
+    <Window.Resources>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="IsEditable" Value="True"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="🕳 OPENINGS SETTINGS" FontSize="16" FontWeight="Bold"
+                   HorizontalAlignment="Center" Margin="0,0,0,10"/>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="📦 FAMILIES"/>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Wall, rectangular"/>
+                            <ComboBox Grid.Column="1" x:Name="FamWallRect" Style="{StaticResource ComboStyle}"/>
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Wall, round"/>
+                            <ComboBox Grid.Column="1" x:Name="FamWallRound" Style="{StaticResource ComboStyle}"/>
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Floor, rectangular"/>
+                            <ComboBox Grid.Column="1" x:Name="FamFloorRect" Style="{StaticResource ComboStyle}"/>
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Floor, round"/>
+                            <ComboBox Grid.Column="1" x:Name="FamFloorRound" Style="{StaticResource ComboStyle}"/>
+                        </Grid>
+                        <Button x:Name="DefaultsButton" Content="Default families" HorizontalAlignment="Left"
+                                Width="130" Height="26" Margin="0,5,0,5"/>
+                        <TextBlock Style="{StaticResource HintText}" x:Name="FamilyHint"/>
+                    </StackPanel>
+                </Border>
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="📏 SIZES"/>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Clearance per side"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBox x:Name="ClearanceBox" Style="{StaticResource InputField}"/>
+                                <TextBlock Style="{StaticResource UnitLabel}" Text="mm"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Round up to"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBox x:Name="RoundingBox" Style="{StaticResource InputField}"/>
+                                <TextBlock Style="{StaticResource UnitLabel}" Text="mm (0 = no rounding)"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Merge within"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBox x:Name="MergeBox" Style="{StaticResource InputField}"/>
+                                <TextBlock Style="{StaticResource UnitLabel}" Text="mm (0 = only touching)"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Extra depth per side"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBox x:Name="ExtraDepthBox" Style="{StaticResource InputField}"/>
+                                <TextBlock Style="{StaticResource UnitLabel}" Text="mm, beyond each face"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Join layers across"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBox x:Name="LayerGapBox" Style="{StaticResource InputField}"/>
+                                <TextBlock Style="{StaticResource UnitLabel}" Text="mm of gap (cavity walls)"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="The section of the MEP element includes its insulation. Walls (or floors) parallel to the selected one, in the host model or in links, closer than the gap above along the MEP element are crossed too: the opening goes through the whole structure, cavity included."/>
+                    </StackPanel>
+                </Border>
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="⚙ OPTIONS"/>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Minimum angle"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBox x:Name="MinAngleBox" Style="{StaticResource InputField}"/>
+                                <TextBlock Style="{StaticResource UnitLabel}" x:Name="MinAngleSlope" Text="degrees"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Style="{StaticResource HintText}" Margin="0,0,0,5"
+                                   Text="Elements at a smaller angle to the wall or floor run inside it and get no opening: drains laid in the floor screed, risers inside a wall."/>
+                        <CheckBox x:Name="SeparateCheck" Margin="0,5"
+                                  Content="Separate MEC (pipes, ducts) and ELE (cable trays, conduits) openings"/>
+                        <TextBlock Style="{StaticResource HintText}" Margin="20,0,0,5"
+                                   Text="Unticked: crossings of both disciplines can share an opening (status MEC+ELE)."/>
+                        <CheckBox x:Name="MisalignedCheck" Margin="0,5"
+                                  Content="Refresh: elements moved but still inside the opening are Misaligned"/>
+                        <TextBlock Style="{StaticResource HintText}" Margin="20,0,0,5"
+                                   Text="Unticked: any movement makes the opening Changed."/>
+                    </StackPanel>
+                </Border>
+                <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1" CornerRadius="5" Padding="10"
+                        Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Foreground="Gray" Text="ℹ PARAMETERS"/>
+                        <TextBlock Style="{StaticResource HintText}" x:Name="ParamsInfo"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="CancelButton" Content="Cancel" Width="80" Height="30" Margin="0,0,10,0" IsCancel="True"/>
+            <Button x:Name="OkButton" Content="OK" Width="100" Height="30" IsDefault="True"
+                    Background="#2D5A8A" Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>

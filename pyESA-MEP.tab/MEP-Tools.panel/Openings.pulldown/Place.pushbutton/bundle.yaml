@@ -1,0 +1,16 @@
+title: Place
+tooltip: >-
+  Two ways, chosen from the selection. With pipes, ducts, cable trays or conduits already selected: their crossings
+  with every wall, floor and structural element (beams, columns, foundations) of the host model and of the loaded RVT
+  links get an opening. With nothing selected: choose whether to select walls, floors and structure (all the MEP
+  elements crossing them) or the MEP elements.
+
+  Each crossing gets an opening at its centre, with the families and sizes of Settings: outer section with insulation
+  plus the clearance, rounded up; depth = whole stack of parallel walls (or floors), cavities included, plus the extra
+  depth on each side; nearby crossings share one rectangular opening (MEC and ELE apart, if set). Structural
+  elements: floor opening for vertical MEP elements, wall opening for the others. Elements running inside (under the
+  minimum angle) and crossings that already have an opening are skipped. A preview comes first, then you confirm.
+
+  Opening: e_GEN_PFV_ID = Ids of its MEP elements, e_GEN_PFV_Status = MEC / ELE / MEC+ELE - New. MEP elements:
+  e_GEN_PFV_ID = PFV + Id of their openings, e_GEN_PFV_Status = MEC / ELE - New. Comments and Mark are not touched.
+author: Matteo Maiorano

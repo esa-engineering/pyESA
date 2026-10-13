@@ -1,0 +1,17 @@
+title: Quick Section
+tooltip: >-
+  CLICK, from a plan view: places a section quickly, always moving the same one (one per user, "ESA Quick Section -
+  <user name>"). Click an element to cut parallel to it (pipe, duct, cable tray, wall, beam, grid, also in linked RVT
+  and IFC models; a riser is cut along the nearest axis of the view), or press ESC and click two points: the line
+  snaps to the nearest axis of the view. Then click on the side to look at: the distance of that click from the
+  section line is the depth. Width = element or points plus a margin; height = view range of the plan.
+  The section line is then moved back just behind the clicked element (50 mm clear), so the element is seen whole
+  and not cut; the far clip stays on the click.
+
+  The first time the section opens beside the plan; if it is already open it simply updates. Once created, only its
+  position, crop and depth change: template, visibility, scale and the other settings you give it are kept.
+
+  SHIFT + CLICK: settings first (section name, side margin, margins below and above the view range, section type,
+  view template). A new name renames your existing section.
+  Type and template are applied to the existing section only if you change them in the window.
+author: Matteo Maiorano

@@ -1,0 +1,11 @@
+title: Multi Gap
+tooltip: >-
+  Opens the same gap in several straight pipes, ducts, cable trays and conduits. Select the elements, then click two points:
+  between them each element is cut and the piece in between is removed, where the two points project on its axis.
+  Where a point is beyond the end of an element, the whole rest of that element is removed, up to that end.
+  Vertical or not is detected from the selection: for vertical elements the points are the bottom and the top of the
+  gap (use a section, elevation or 3D view). A selection mixing vertical and non-vertical elements is refused.
+
+  Elements that cannot be cut are left unchanged, and a report lists the result. For one element at a time, without
+  selecting first, use Gap.
+author: Matteo Maiorano

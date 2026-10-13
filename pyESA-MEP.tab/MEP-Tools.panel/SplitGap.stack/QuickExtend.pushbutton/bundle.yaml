@@ -1,0 +1,14 @@
+title: Quick Extend
+tooltip: >-
+  CLICK: extends straight pipes, ducts, cable trays and conduits up to a picked point, one element at a time until
+  ESC. No selection and no Finish: click the element near the end to extend, then click the target point. The end
+  moves along the element axis to the point; a point inside the element shortens it. ESC on the second click skips
+  the element, ESC on the first click finishes.
+
+  SHIFT + CLICK: select several elements (or pre-select them), then click one point: each element is extended along
+  its own axis from the end closer to the point, so parallel elements end aligned.
+
+  In plans, sections and elevations the target point uses Revit snaps (in plans the slope is kept); in 3D views click
+  the point on the face of any element. Only free ends are moved; connected ends are left unchanged, and a report
+  lists the result.
+author: Matteo Maiorano

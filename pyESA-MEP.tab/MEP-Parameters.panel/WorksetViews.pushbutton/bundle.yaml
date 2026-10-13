@@ -1,0 +1,11 @@
+title: WRK Views
+tooltip: >-
+  CLICK: choose the worksets, then one 3D view per workset is created, showing only that workset
+  (102_WRK_Workset_<last part of the name> Control: e.g. 04_MEP_Electrical becomes 102_WRK_Workset_Electrical
+  Control).
+
+  SHIFT + CLICK: does the same for all user worksets.
+
+  Existing views are updated. If the views have u_OTH_ViewChapter1 / u_OTH_ViewChapter2, they are set to
+  100_CON_Control / 102_WRK_Worksets.
+author: Matteo Maiorano

@@ -1,0 +1,7 @@
+title: Create Similar
+tooltip: >-
+  CLICK: creates new instances of the same type as the selected element (or the one you click), carrying all its parameters.
+  Click in the view to place each one, ESC to finish. Straight pipes, ducts, cable trays and conduits take two clicks (start and end).
+  SHIFT + CLICK: lets you choose another type or family of the same category for the new instances; parameters that
+  do not exist in the new family are lost.
+author: Matteo Maiorano

@@ -1,0 +1,4 @@
+layout:
+  - HorizontalBranch
+  - VerticalBranch
+  - SplitSide

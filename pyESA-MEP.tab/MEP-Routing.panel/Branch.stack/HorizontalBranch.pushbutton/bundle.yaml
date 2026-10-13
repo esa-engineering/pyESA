@@ -1,0 +1,20 @@
+title: Horizontal Branch
+tooltip: >-
+  Branches from horizontal runs of pipe, duct or cable tray (also sloped up to 60 degrees). Click the point of a run,
+  then one of its sides: a branch at 90 degrees is created there with a tee or a tap, as set for the category in
+  Vertical Branch. Keep clicking to add more branches, also on the same run; ESC to finish. Pipe branches keep the
+  size of the run.
+
+  CLICK: uses the last settings (default: 500 mm horizontal, no offset).
+
+  SHIFT + CLICK: one window with the vertical offset of the branch end (+ up, - down, 0 = straight), the angle of the
+  inclined run (90, 45, 30 or custom) and the length of the horizontal run after the change of level.
+  Pipes: the tee is rotated by that angle and the branch goes on inclined up to the offset, then the horizontal run.
+  Ducts: the short stub with the tee comes first, then the inclined run.
+  Cable trays: the tee is placed only where it exists, i.e. when the branch lies in the plane of the run and its width
+  (flat tray: side branches; tray on edge: vertical branches). Otherwise only new runs are created, without the tee.
+  At other angles: flat tray = tee, 50 mm horizontal, inclined run, final run; tray on edge = 50 mm horizontal, inclined
+  run, final run (always on edge).
+
+  A report lists the result. The new parts keep the parameters and the insulation of the starting element.
+author: Matteo Maiorano

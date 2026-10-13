@@ -1,0 +1,10 @@
+title: Remove Branch
+tooltip: >-
+  CLICK: select elements of the branches to remove (or select them first), then Finish. Pipes, ducts, cable trays,
+  conduits and flex, also sloped. Each branch is deleted with its fittings, accessories and sub-branches, up to the
+  terminals and equipment (they stay) and up to the tee where it leaves a run: the tee is removed and the run restored
+  as one piece. If the two sides of the run have different sizes, a transition takes the place of the tee. A tap is
+  simply removed. Several branches on the same run work, also with reductions between them.
+
+  A confirmation shows what will be deleted; a report lists the result. Crosses are not handled.
+author: Matteo Maiorano
