@@ -1,30 +1,36 @@
 # -*- coding: utf-8 -*-
 __title__ = "Horizontal\nBranch"
-__doc__ = """Version = 0.6
-Date    = 12.10.2026
+__doc__ = """Version = 0.7
+Date    = 14.10.2026
 ________________________________________________________________
 Description:
 Creates branches at 90 degrees from horizontal runs of pipe, duct or
 cable tray (also sloped up to 60 degrees), click by click. Branches
 from vertical runs are made by Vertical Branch.
 
+- CLICK opens the window every time: angle (0 = side branch, 15, 22.5,
+  30, 45, 90), return to the starting level, offset, length and, for
+  ducts, junction (tap or tee) and branch size (same as the duct,
+  rectangular or circular, the duct type changing with the shape).
+- SHIFT + CLICK uses the last settings without the window
 - click the point of a run where the branch starts, then click on one of
   its sides: a branch at 90 degrees, horizontal, is created there with a
-  tee (the run is split) or a tap, as saved for the category in
-  Vertical Branch (tap on ducts and tee on pipes by default; cable trays
-  always get a tee and keep the orientation of their section)
+  tee (the run is split) or a tap. Ducts: as chosen in the window; pipes
+  and cable trays: as saved in Vertical Branch (cable trays always get a
+  tee and keep the orientation of their section)
 - keep clicking to add more branches, also on the same run; ESC to finish
-- pipe branches keep the size of the run
+- pipe branches keep the size of the run; duct branches take the size
+  set in the window
 - optional change of level: a short stub with the tee or tap, then an inclined run at the
-  chosen angle (90, 45, 30 or custom) up or down to the offset (+ up, - down), then the
-  horizontal run of the set length after the change of level. Ducts and cable trays keep
-  the tee on the stub before the change of level. Set in SHIFT + CLICK; 0 = straight branch
+  chosen angle (15, 22.5, 30, 45 or 90) up or down to the offset (+ up, - down), then the
+  horizontal run of the set length after the change of level. Ducts at 90 degrees: the
+  vertical run starts from the top face (offset +) or the bottom face (offset -) of a
+  horizontal duct, with the junction on that face; 0 = straight branch
 - optional return to the starting level: after the horizontal run, a second inclined run
   (same angle, opposite direction) brings the branch back to the level it started from, then a last horizontal
   run of the same length
 - length of the horizontal run (after the change of level, or the whole branch with 0 offset),
-  from the run axis / elbow: the saved one (default 500 mm)
-- SHIFT + CLICK opens one window with the offset, the angle and the length
+  from the run axis / elbow (default 500 mm)
 If a fitting does not fit, the run is left unchanged and the report
 says why.
 The new parts keep the parameters and the insulation of the starting element.
@@ -45,7 +51,7 @@ from System.Collections.Generic import List
 clr.AddReference("RevitAPI")
 clr.AddReference("RevitAPIUI")
 from Autodesk.Revit.DB.Plumbing import Pipe, PipeInsulation, PipeSegment, PipingSystemType, PlumbingUtils
-from Autodesk.Revit.DB.Mechanical import Duct, DuctInsulation, DuctLining, MechanicalSystemType, MechanicalUtils
+from Autodesk.Revit.DB.Mechanical import Duct, DuctInsulation, DuctLining, DuctType, MechanicalSystemType, MechanicalUtils
 from Autodesk.Revit.DB.Electrical import CableTray
 from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
 from Autodesk.Revit.Exceptions import OperationCanceledException
@@ -513,6 +519,20 @@ def smaller_pipe_size(pipe):
     return new, "branch reduced DN {:g} to DN {:g}".format(current * MM_PER_FT, new * MM_PER_FT)
 
 
+def duct_type_for(riser, mode):
+    """Tipo di canale per uno stacco rettangolare ("rect") o circolare ("round"): quello del tratto se ha gia' quella
+    forma, altrimenti il primo tipo del modello con quella forma (in ordine di nome)."""
+    wanted = DB.ConnectorProfileType.Round if mode == "round" else DB.ConnectorProfileType.Rectangular
+    own = doc.GetElement(riser.GetTypeId())
+    if getattr(own, "Shape", None) == wanted:
+        return own.Id
+    types = [t for t in DB.FilteredElementCollector(doc).OfClass(DuctType) if getattr(t, "Shape", None) == wanted]
+    if not types:
+        raise BranchError("No {} duct type in the model for the branch".format(
+            "circular" if mode == "round" else "rectangular"))
+    return sorted(types, key=lambda t: DB.Element.Name.GetValue(t))[0].Id
+
+
 def create_branch(riser, start, end, level_id, axis, diameter=None):
     """Stacco da start a end, con tipo e sezione del tratto di partenza. diameter: solo tubi, diametro nominale
     dello stacco se diverso da quello del tratto (stacco ridotto)."""
@@ -523,9 +543,19 @@ def create_branch(riser, start, end, level_id, axis, diameter=None):
         set_param(branch, DB.BuiltInParameter.RBS_PIPE_DIAMETER_PARAM,
                   diameter or param_value(riser, DB.BuiltInParameter.RBS_PIPE_DIAMETER_PARAM))
     elif isinstance(riser, Duct):
+        size = DUCT_SIZE[0]
+        custom = axis == "same" and size["mode"] in ("rect", "round")
+        if custom:
+            # forma e misura scelte nella finestra (Horizontal Branch): il tipo deve avere quella forma
+            type_id = duct_type_for(riser, size["mode"])
         branch = Duct.Create(doc, system_type_id(riser, DB.BuiltInParameter.RBS_DUCT_SYSTEM_TYPE_PARAM,
                                                  MechanicalSystemType), type_id, level_id, start, end)
-        if axis is None or (axis == "same" and is_round(riser)):
+        if custom and size["mode"] == "round":
+            set_param(branch, DB.BuiltInParameter.RBS_CURVE_DIAMETER_PARAM, size["round"])
+        elif custom:
+            set_param(branch, DB.BuiltInParameter.RBS_CURVE_WIDTH_PARAM, size["rect"][0])
+            set_param(branch, DB.BuiltInParameter.RBS_CURVE_HEIGHT_PARAM, size["rect"][1])
+        elif axis is None or (axis == "same" and is_round(riser)):
             set_param(branch, DB.BuiltInParameter.RBS_CURVE_DIAMETER_PARAM,
                       param_value(riser, DB.BuiltInParameter.RBS_CURVE_DIAMETER_PARAM))
         elif axis == "same":
@@ -947,6 +977,13 @@ H_LENGTH_KEY, H_LENGTH_DEFAULT = "h_length_mm", 500.0  # tratto orizzontale fino
 H_DROP_KEY, H_DROP_DEFAULT = "h_drop_mm", 0.0  # dislivello del tratto inclinato: + sale, - scende, 0 = nessuno
 H_ANGLE_KEY, H_ANGLE_DEFAULT = "h_angle_deg", 90.0  # angolo del tratto inclinato dall'orizzontale
 H_RETURN_KEY, H_RETURN_DEFAULT = "h_return", False  # dopo l'orizzontale, tratto inclinato che riporta alla quota di partenza
+H_DUCT_JUNCTION_KEY, H_DUCT_JUNCTION_DEFAULT = "h_duct_junction", "tap"  # innesto sui canali: "tap" o "tee"
+H_DUCT_RECT_KEY = "h_duct_rect_mm"    # stacco dei canali rettangolari "LxH" in mm, "" = come il tratto
+H_DUCT_ROUND_KEY = "h_duct_round_mm"  # stacco dei canali tondi, diametro in mm, "" = come il tratto
+H_DUCT_MODE_KEY = "h_duct_size_mode"  # misura dello stacco dei canali: "same", "rect", "round"
+# stacco dei canali per la corsa in atto: {"mode": "same" | "rect" | "round", "rect": (L, H) piedi, "round": d piedi}
+DUCT_SIZE = [{"mode": "same", "rect": None, "round": None}]
+HORIZONTAL_TOL_DEG = 2.0  # stacco a 90 gradi da sopra o sotto: solo da canali orizzontali entro questa pendenza
 def is_horizontal_run(element):
     """Tubo, condotto o passerella rettilinea con pendenza fino a 60 gradi dall'orizzontale."""
     if not isinstance(element, (Pipe, Duct, CableTray)):
@@ -999,34 +1036,67 @@ def section_half_height(element):
     raise BranchError("Cannot read the section of the duct")
 
 
-def horizontal_axis(cs):
-    """(nome, vettore) dell'asse orizzontale del connettore: X o Y, quello che non e' verticale. In un canale di costa
-    e' Y (l'altezza), in uno piano e' X (la larghezza)."""
-    if abs(cs.BasisX.Z) < 0.01:
-        return "X", cs.BasisX
-    return "Y", cs.BasisY
+def plan_extent(element, axis):
+    """Estensione della geometria dell'elemento lungo un asse orizzontale (piedi), o None se non leggibile."""
+    try:
+        low, high = 1e9, -1e9
+        pending = list(element.get_Geometry(DB.Options()))
+        while pending:
+            item = pending.pop()
+            if isinstance(item, DB.GeometryInstance):
+                pending.extend(item.GetInstanceGeometry())
+            elif isinstance(item, DB.Solid):
+                for edge in item.Edges:
+                    for end in (0, 1):
+                        p = edge.AsCurve().GetEndPoint(end)
+                        value = p.X * axis.X + p.Y * axis.Y
+                        low, high = min(low, value), max(high, value)
+        return high - low if high >= low else None
+    except Exception:
+        return None
 
 
-def align_vertical_section(run, vertical, point):
-    """Ruota il canale verticale attorno al proprio asse: in pianta la sezione deve coincidere con quella del tratto
-    di partenza. Se il tratto e' di costa la sua larghezza e' verticale e la dimensione orizzontale e' l'altezza:
-    senza questa rotazione Revit orienta il verticale sugli assi del progetto e le due misure risultano scambiate."""
-    if is_round(run):
+def orient_vertical(vertical, along, point):
+    """Ruota il canale verticale attorno al proprio asse in modo che la larghezza sia parallela ad along (orizzontale).
+    Con along perpendicolare alla direzione dello stacco il gomito verso l'orizzontale trova due facce uguali: la
+    larghezza del verticale e quella dell'orizzontale, entrambe parallele ad along. Il verso di BasisX non e'
+    documentato con certezza: dopo la rotazione si controlla la geometria e, se serve, si gira di altri 90 gradi."""
+    if is_round(vertical):
         return
     doc.Regenerate()
-    name, run_axis = horizontal_axis(nearest_connector(run, point).CoordinateSystem)
-    new_cs = nearest_connector(vertical, point).CoordinateSystem
-    new_axis = new_cs.BasisX if name == "X" else new_cs.BasisY
-    angle = math.atan2(run_axis.Y, run_axis.X) - math.atan2(new_axis.Y, new_axis.X)
-    # sezione simmetrica: basta allineare la direzione, a meno di 180 gradi
-    while angle > math.pi / 2:
+    width = param_value(vertical, DB.BuiltInParameter.RBS_CURVE_WIDTH_PARAM)
+    height = param_value(vertical, DB.BuiltInParameter.RBS_CURVE_HEIGHT_PARAM)
+    pivot_point = DB.XYZ(point.X, point.Y, vertical.Location.Curve.GetEndPoint(0).Z)
+    pivot = DB.Line.CreateBound(pivot_point, pivot_point.Add(DB.XYZ.BasisZ))
+    current = flat(nearest_connector(vertical, point).CoordinateSystem.BasisX)
+    angle = math.atan2(along.Y, along.X) - math.atan2(current.Y, current.X)
+    while angle > math.pi / 2:  # sezione simmetrica: basta la direzione, a meno di 180 gradi
         angle -= math.pi
     while angle <= -math.pi / 2:
         angle += math.pi
     if abs(angle) > 1e-6:
-        axis = DB.Line.CreateBound(point, point.Add(DB.XYZ.BasisZ))
-        DB.ElementTransformUtils.RotateElement(doc, vertical.Id, axis, angle)
+        DB.ElementTransformUtils.RotateElement(doc, vertical.Id, pivot, angle)
         doc.Regenerate()
+    if width and height and abs(width - height) > 1.0 / MM_PER_FT:
+        extent = plan_extent(vertical, along)
+        if extent is not None and abs(extent - height) < abs(extent - width):
+            DB.ElementTransformUtils.RotateElement(doc, vertical.Id, pivot, math.pi / 2)
+            doc.Regenerate()
+
+
+def duct_half_vertical(run, point):
+    """Distanza verticale tra asse e faccia superiore / inferiore di un canale orizzontale (piedi): meta' altezza,
+    o meta' larghezza se il canale e' di costa. Dal bounding box, che per un canale orizzontale misura proprio la
+    dimensione verticale; se manca, dal connettore."""
+    box = run.get_BoundingBox(None)
+    if box is not None and box.Max.Z > box.Min.Z:
+        return (box.Max.Z - box.Min.Z) / 2.0
+    if is_round(run):
+        return section_half_height(run)
+    cs = nearest_connector(run, point).CoordinateSystem
+    width = param_value(run, DB.BuiltInParameter.RBS_CURVE_WIDTH_PARAM) or 0.0
+    height = param_value(run, DB.BuiltInParameter.RBS_CURVE_HEIGHT_PARAM) or 0.0
+    return (width if abs(cs.BasisX.Z) > abs(cs.BasisY.Z) else height) / 2.0
 
 
 def tray_is_on_edge(tray):
@@ -1233,6 +1303,10 @@ def add_inclined(branch, run, elbow_point, direction, drop_mm, angle_deg, level_
     run_ft = 0.0 if abs(angle_deg - 90.0) < 1e-6 else abs(drop) / math.tan(math.radians(angle_deg))
     end = elbow_point.Add(direction.Multiply(run_ft)).Add(DB.XYZ(0, 0, drop))
     slope = create_branch(run, elbow_point, end, level_id, "same")
+    if isinstance(run, Duct) and abs(angle_deg - 90.0) < 1e-6:
+        # canale verticale: Revit lo orienta sugli assi del progetto, il gomito vuole la larghezza parallela a quella
+        # dell'orizzontale (perpendicolare alla direzione dello stacco)
+        orient_vertical(slope, DB.XYZ.BasisZ.CrossProduct(direction), elbow_point)
     try:
         elbow = doc.Create.NewElbowFitting(nearest_connector(branch, elbow_point),
                                            nearest_connector(slope, elbow_point))
@@ -1294,22 +1368,27 @@ def process_horizontal(run, point, direction, length_mm, junction, drop_mm=0.0, 
             check_remaining_space([("horizontal run", final), ("return run", slope), ("last run", last)])
             return [slope, last], [elbow, elbow2]
 
-        from_below = inclined and isinstance(run, Duct) and abs(angle_deg - 90.0) < 1e-6
-        if from_below:
-            # condotto a 90 gradi: stacco dal basso, verticale dalla faccia inferiore del condotto, con una presa
-            if drop_mm > 0:
-                # salendo dalla faccia inferiore il tratto attraverserebbe il condotto stesso
-                raise BranchError("A duct branch at 90 degrees from below must go down: use a negative offset")
-            STAGE[0] = "creating the duct from below"
-            half = section_half_height(run)
-            bottom = DB.XYZ(point.X, point.Y, point.Z - half)
-            top = bottom.Add(DB.XYZ(0, 0, drop_mm / MM_PER_FT))
-            branch = create_branch(run, bottom, top, level_id, "same")
-            align_vertical_section(run, branch, bottom)
-            STAGE[0] = "placing the take-off from below"
-            fitting = doc.Create.NewTakeoffFitting(nearest_connector(branch, bottom), run)
-            kind, others = "Tap from below", []
-            check_remaining_space([("run", run), ("branch", branch)])
+        vertical_duct = inclined and isinstance(run, Duct) and abs(angle_deg - 90.0) < 1e-6
+        if vertical_duct:
+            # canale a 90 gradi: verticale dalla faccia superiore (offset +) o inferiore (offset -) del canale, con
+            # il T o il tap scelto nella finestra, poi il gomito e l'orizzontale
+            if abs(run.Location.Curve.Direction.Z) > math.sin(math.radians(HORIZONTAL_TOL_DEG)):
+                raise BranchError("A duct branch at 90 degrees from above or below needs a horizontal duct: this one "
+                                  "is sloped. Use a smaller angle")
+            up = drop_mm > 0
+            where = "above" if up else "below"
+            STAGE[0] = "creating the vertical duct from {}".format(where)
+            half = duct_half_vertical(run, point)
+            face = DB.XYZ(point.X, point.Y, point.Z + (half if up else -half))
+            top = face.Add(DB.XYZ(0, 0, drop_mm / MM_PER_FT))
+            branch = create_branch(run, face, top, level_id, "same")
+            # larghezza del verticale parallela al tratto: e' anche quella dell'orizzontale che segue (gomito
+            # coerente) e sulla faccia del tratto lo stacco occupa l'altezza, non tutta la larghezza
+            orient_vertical(branch, DB.XYZ.BasisZ.CrossProduct(direction), face)
+            STAGE[0] = "placing the junction {}".format(where)
+            kind, fitting, others = place_junction(run, point, branch, junction)
+            kind = "{} from {}".format(kind, where)
+            check_remaining_space([("run", run), ("branch", branch)] + [("rest of the run", o) for o in others])
             # poi, come negli altri casi, l'orizzontale di length_mm dalla quota raggiunta, con un gomito
             STAGE[0] = "creating the horizontal run after the change of level"
             final = create_branch(run, top, top.Add(direction.Multiply(length_mm / MM_PER_FT)), level_id, "same")
@@ -1447,22 +1526,52 @@ def main_horizontal():
     except Exception:
         length_mm, drop_mm, angle_deg = H_LENGTH_DEFAULT, H_DROP_DEFAULT, H_ANGLE_DEFAULT
         return_back = H_RETURN_DEFAULT
-    if __shiftclick__:  # noqa: F821
+    try:
+        duct_junction = str(config.get_option(H_DUCT_JUNCTION_KEY, H_DUCT_JUNCTION_DEFAULT))
+        duct_rect = str(config.get_option(H_DUCT_RECT_KEY, ""))
+        duct_round = str(config.get_option(H_DUCT_ROUND_KEY, ""))
+        duct_mode = str(config.get_option(H_DUCT_MODE_KEY, "same"))
+    except Exception:
+        duct_junction, duct_rect, duct_round, duct_mode = H_DUCT_JUNCTION_DEFAULT, "", "", "same"
+    if duct_junction not in ("tap", "tee"):
+        duct_junction = H_DUCT_JUNCTION_DEFAULT
+    # CLICK: sempre la finestra. SHIFT + CLICK: ultime impostazioni, senza finestra
+    if not __shiftclick__:  # noqa: F821
         values = Horizontal_ui.HorizontalWindow(script.get_bundle_file(HORIZONTAL_XAML), {
-            "length_mm": length_mm, "drop_mm": drop_mm, "angle_deg": angle_deg, "return_back": return_back}).show()
+            "length_mm": length_mm, "drop_mm": drop_mm, "angle_deg": angle_deg, "return_back": return_back,
+            "duct_junction": duct_junction, "duct_size_mode": duct_mode, "duct_rect": duct_rect,
+            "duct_round": duct_round}).show()
         if values is None:
             script.exit()
         length_mm, drop_mm, angle_deg = values["length_mm"], values["drop_mm"], values["angle_deg"]
         return_back = values["return_back"]
+        duct_junction, duct_rect, duct_round = values["duct_junction"], values["duct_rect"], values["duct_round"]
+        duct_mode = values["duct_size_mode"]
         try:
             setattr(config, H_LENGTH_KEY, length_mm)
             setattr(config, H_DROP_KEY, drop_mm)
             setattr(config, H_ANGLE_KEY, angle_deg)
             setattr(config, H_RETURN_KEY, return_back)
+            setattr(config, H_DUCT_JUNCTION_KEY, duct_junction)
+            setattr(config, H_DUCT_RECT_KEY, duct_rect)
+            setattr(config, H_DUCT_ROUND_KEY, duct_round)
+            setattr(config, H_DUCT_MODE_KEY, duct_mode)
             script.save_config()
         except Exception:
             pass
-    junctions = {kind: load_settings(config, kind)["junction"] for kind in ("pipe", "duct", "tray")}
+    rect = Horizontal_ui.parse_rect(duct_rect)
+    round_mm = Horizontal_ui.parse_round(duct_round)
+    if duct_mode not in ("same", "rect", "round") or (duct_mode == "rect" and not rect) or \
+            (duct_mode == "round" and not round_mm):
+        duct_mode = "same"  # misura salvata non valida: come il canale
+    DUCT_SIZE[0] = {"mode": duct_mode,
+                    "rect": (rect[0] / MM_PER_FT, rect[1] / MM_PER_FT) if rect else None,
+                    "round": round_mm / MM_PER_FT if round_mm else None}
+    if angle_deg == 0.0:
+        # 0 gradi = stacco di lato: offset e ritorno salvati restano per la prossima volta, ma non si usano
+        drop_mm, return_back = 0.0, False
+    junctions = {kind: load_settings(config, kind)["junction"] for kind in ("pipe", "tray")}
+    junctions["duct"] = duct_junction  # scelto nella finestra di Horizontal Branch
 
     results = []
     run_filter = HorizontalRunFilter()
