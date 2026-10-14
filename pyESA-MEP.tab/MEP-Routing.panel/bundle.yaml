@@ -2,6 +2,7 @@ title:
   MEP-Routing
 
 layout:
+  - MEPConnect
   - Rise&Turn
   - Turn
   - Multi Turn

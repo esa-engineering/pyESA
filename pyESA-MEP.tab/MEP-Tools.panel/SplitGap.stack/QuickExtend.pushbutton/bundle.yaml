@@ -9,6 +9,6 @@ tooltip: >-
   its own axis from the end closer to the point, so parallel elements end aligned.
 
   In plans, sections and elevations the target point uses Revit snaps (in plans the slope is kept); in 3D views click
-  the point on the face of any element. Only free ends are moved; connected ends are left unchanged, and a report
-  lists the result.
+  the point on the face of any element. Only free ends are moved; connected ends are left unchanged, and an alert with the reason
+  appears (no report).
 author: Matteo Maiorano

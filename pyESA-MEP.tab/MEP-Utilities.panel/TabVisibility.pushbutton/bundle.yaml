@@ -1,0 +1,5 @@
+title: Tab Visibility
+tooltip: >-
+  Shows or hides the Revit ribbon tabs: one checkbox per tab (checked = shown). The pyESA-MEP tab is never listed.
+  Revit starts with all tabs shown: run it again after a restart.
+author: Matteo Maiorano

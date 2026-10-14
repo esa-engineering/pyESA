@@ -7,6 +7,6 @@ tooltip: >-
   finishes.
 
   In plans, sections and elevations the clicks use Revit snaps; in 3D views both clicks are on the element. Vertical
-  elements need a section, elevation or 3D view. Elements that cannot be cut are left unchanged, and a report lists
-  the result. To cut the same gap in many elements at once use Multi Gap.
+  elements need a section, elevation or 3D view. Elements that cannot be cut are left unchanged, and an alert with the reason appears (no report).
+  To cut the same gap in many elements at once use Multi Gap.
 author: Matteo Maiorano
