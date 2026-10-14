@@ -27,6 +27,12 @@ py -c "import io,sys; src=io.open(sys.argv[1],encoding='utf-8').read(); compile(
 This only catches parse errors. Anything touching the Revit API must be tested in Revit.
 The most recent verified environment is **Revit 2026.4 / pyRevit 5.3.1**.
 
+`startup.py` in the repo root runs at every Revit start and every pyRevit Reload, for every
+user of the extension. Today it only re-hides the ribbon tabs saved by
+`pyESA.tab/Settings.panel/TabVisibility` (config section `ESA_TabVisibility`, key
+`hidden_tabs`). Keep it silent and cheap, and wrap everything in `try`: an error there shows
+up at Revit start.
+
 Autocomplete for the Revit API requires a local `pyrightconfig.json` pointing at the
 RevitAPI stubs (gitignored — each developer creates their own; see README.md).
 
@@ -289,7 +295,7 @@ in.** Older tools still carry Italian UI strings; translate them when you touch 
 
 ## Multi-module tools: MEPQTO
 
-`pyESA-MEP.tab/MEP-Tools.panel/MEPQTO.pushbutton` (MEP quantity takeoff driven by Type Mark and price
+`pyESA-MEP.tab/MEP-Utilities.panel/MEPQTO.pushbutton` (MEP quantity takeoff driven by Type Mark and price
 codes, ~6,800 lines) is the only tool split across several modules. Use it as the template
 when a tool outgrows one file. Its `README.md` (Italian) is the functional spec: categories,
 measurement formulas, file formats, the full Issues list, merge and concurrency rules.

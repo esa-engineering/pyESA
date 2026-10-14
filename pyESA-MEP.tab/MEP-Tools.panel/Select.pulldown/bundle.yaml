@@ -1,7 +1,0 @@
-title: Select
-tooltip: >-
-  Selects the run, or everything connected, starting from the selected pipes, ducts, trays or fittings.
-author: Matteo Maiorano
-layout:
-  - SelectRun
-  - SelectConnected

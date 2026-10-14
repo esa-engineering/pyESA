@@ -2,8 +2,7 @@ title:
   MEP-Tools
 
 layout:
-  - SplitGap
-  - SplitSide
   - Stub
+  - SplitGap
+  - ExtendRemove
   - Select
-  - MEPQTO

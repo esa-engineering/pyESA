@@ -1,0 +1,141 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Set Pipe Insulation By System"
+        Width="500" Height="680"
+        MinWidth="440" MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip">
+
+    <Window.Resources>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="🧣 SET PIPE INSULATION" FontSize="16" FontWeight="Bold"
+                   HorizontalAlignment="Center" Margin="0,0,0,10"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
+                        Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="🔧 PIPING SYSTEM"/>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="System type:"/>
+                            <ComboBox Grid.Column="1" x:Name="SystemCombo" Style="{StaticResource ComboStyle}"/>
+                        </Grid>
+                        <RadioButton x:Name="ModeAll" GroupName="Scope" Margin="0,8,0,3"
+                                     Content="All pipes and fittings of this system"/>
+                        <RadioButton x:Name="ModeSelected" GroupName="Scope" Margin="0,3"
+                                     Content="Only the selected pipes and fittings of this system"/>
+                    </StackPanel>
+                </Border>
+
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
+                        Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="🧩 INSULATION TYPES"/>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Exposed:" Margin="0,5"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" x:Name="VisibleCombo" Style="{StaticResource ComboStyle}" Margin="0,5"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Concealed:" Margin="0,5"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" x:Name="HiddenCombo" Style="{StaticResource ComboStyle}" Margin="0,5"/>
+                        </Grid>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="Exposed elements are the ones with e_EAN_IsVisible_1 = Yes; all the others use the concealed type."/>
+                    </StackPanel>
+                </Border>
+
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
+                        Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="📏 THICKNESS"/>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Thickness table:"/>
+                            <TextBox Grid.Column="1" x:Name="TableBox" VerticalContentAlignment="Center"
+                                     ToolTip="Tab-separated text file: Diameter, Interno, Non riscaldato, Interrato, Esterno"/>
+                            <Button Grid.Column="2" x:Name="BrowseButton" Content="Browse..." Padding="10,3" Margin="5,0,0,0"/>
+                        </Grid>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="Thickness by nominal diameter (mm) and thermal zone (e_EAN_ThermalPosition_1). A template is in the button folder: insulation_table_template.txt (ALT + CLICK on the button opens it)."/>
+
+                        <CheckBox x:Name="ManualCheck" Margin="0,10,0,0"
+                                  Content="Use a fixed thickness instead of the table"/>
+                        <Grid Margin="20,5,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Thickness:"/>
+                            <ComboBox Grid.Column="1" x:Name="ThicknessCombo" Width="70"/>
+                            <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}" Text="mm"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border BorderBrush="#E8E8E8" BorderThickness="1" CornerRadius="5"
+                        Background="#F8F8F8" Padding="10" Margin="0,0,0,10">
+                    <TextBlock Style="{StaticResource HintText}"
+                               Text="Pipes and fittings without insulation get a new one; existing insulation is updated (type and thickness). Elements with no diameter or no valid thermal zone are skipped and listed in the output window."/>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+            <Button x:Name="CancelButton" Content="Cancel" Width="80" Height="30" Margin="0,0,10,0" IsCancel="True"/>
+            <Button x:Name="OkButton" Content="OK" Width="100" Height="30" IsDefault="True"
+                    Background="#2D5A8A" Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>
