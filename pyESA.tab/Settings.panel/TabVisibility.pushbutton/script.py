@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 __title__ = "Tab\nVisibility"
-__doc__ = """Version = 1.0
-Date    = 12.10.2026
+__doc__ = """Version = 1.1
+Date    = 14.10.2026
 ________________________________________________________________
 Description:
 Shows or hides the tabs of the Revit ribbon with a checkbox for each
 tab (checked = shown). The list shows the tabs as they are now.
 
-The pyESA-MEP tab is never listed: hiding it would leave this tool out
+The pyESA tab is never listed: hiding it would leave this tool out
 of reach. Revit starts again with all tabs shown: run this tool again
 after a restart to hide them again.
 ________________________________________________________________
@@ -25,7 +25,7 @@ from pyrevit import script
 import Tab_ui
 
 XAML_FILE_NAME = "Tab_form.xaml"
-OWN_TAB = "pyESA-MEP"  # mai elencata: nasconderla lascerebbe senza accesso a questo strumento
+OWN_TAB = "pyESA"  # mai elencata: nasconderla lascerebbe senza accesso a questo strumento
 
 output = script.get_output()
 

@@ -289,7 +289,7 @@ in.** Older tools still carry Italian UI strings; translate them when you touch 
 
 ## Multi-module tools: MEPQTO
 
-`pyESA.tab/MEP.panel/MEPQTO.pushbutton` (MEP quantity takeoff driven by Type Mark and price
+`pyESA-MEP.tab/MEP-Tools.panel/MEPQTO.pushbutton` (MEP quantity takeoff driven by Type Mark and price
 codes, ~6,800 lines) is the only tool split across several modules. Use it as the template
 when a tool outgrows one file. Its `README.md` (Italian) is the functional spec: categories,
 measurement formulas, file formats, the full Issues list, merge and concurrency rules.

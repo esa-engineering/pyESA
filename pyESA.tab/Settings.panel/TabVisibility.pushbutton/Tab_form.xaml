@@ -34,7 +34,7 @@
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Style="{StaticResource SectionHeader}" Text="TABS (checked = shown)"/>
                 <TextBlock DockPanel.Dock="Top" Style="{StaticResource HintText}" Margin="0,0,0,6"
-                           Text="The pyESA-MEP tab is not listed: hiding it would leave this tool out of reach."/>
+                           Text="The pyESA tab is not listed: hiding it would leave this tool out of reach."/>
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
                     <Button x:Name="SelectAllButton" Content="Show all" Padding="10,3" Margin="0,0,5,0"/>
                     <Button x:Name="DeselectAllButton" Content="Hide all" Padding="10,3"/>

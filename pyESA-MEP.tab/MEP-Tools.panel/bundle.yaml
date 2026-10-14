@@ -3,7 +3,7 @@ title:
 
 layout:
   - SplitGap
-  - MatchElevation
-  - Spacing
+  - SplitSide
   - Stub
   - Select
+  - MEPQTO
