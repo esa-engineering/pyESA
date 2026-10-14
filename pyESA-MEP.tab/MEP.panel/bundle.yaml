@@ -2,8 +2,4 @@ title:
   MEP
 
 layout:
-  - Insulation
-  - ReLevelMEP
-  - MEPAlignToWall
-  - IsVertical  
   - MEPQTO

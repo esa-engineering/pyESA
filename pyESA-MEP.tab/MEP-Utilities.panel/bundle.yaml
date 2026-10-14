@@ -2,7 +2,9 @@ title:
   MEP-Utilities
 
 layout:
+  - Insulation
+  - ReLevelMEP
+  - MEPAlignToWall
+  - IsVertical
   - QuickSection
-  - Openings
-  - Settings
   - TabVisibility
