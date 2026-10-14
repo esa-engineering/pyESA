@@ -9,18 +9,20 @@ cable tray (also sloped up to 60 degrees), click by click. Branches
 from vertical runs are made by Vertical Branch.
 
 - CLICK opens the window every time: angle (0 = side branch, 15, 22.5,
-  30, 45, 90), return to the starting level, offset, length and, for
-  ducts, junction (tap or tee) and branch size (same as the duct,
-  rectangular or circular, the duct type changing with the shape).
-- SHIFT + CLICK uses the last settings without the window
+  30, 45, 90), return to the starting level, offset, length. With ducts,
+  pipes or cable trays selected before the click, one section for each
+  of those categories only: junction (ducts, pipes) and custom branch
+  size (ducts: rectangular or circular, the duct type changing with the
+  shape; pipes: diameter; cable trays: W x H). Without a selection the
+  branches keep the size of the run and the last junction
+- SHIFT + CLICK uses the last settings without the window (custom sizes
+  still only for the categories selected before the click)
 - click the point of a run where the branch starts, then click on one of
   its sides: a branch at 90 degrees, horizontal, is created there with a
-  tee (the run is split) or a tap. Ducts: as chosen in the window; pipes
-  and cable trays: as saved in Vertical Branch (cable trays always get a
+  tee (the run is split) or a tap, as chosen in the window (pipes: as
+  saved in Vertical Branch until chosen here; cable trays always get a
   tee and keep the orientation of their section)
 - keep clicking to add more branches, also on the same run; ESC to finish
-- pipe branches keep the size of the run; duct branches take the size
-  set in the window
 - optional change of level: a short stub with the tee or tap, then an inclined run at the
   chosen angle (15, 22.5, 30, 45 or 90) up or down to the offset (+ up, - down), then the
   horizontal run of the set length after the change of level. Ducts at 90 degrees: the
@@ -540,8 +542,9 @@ def create_branch(riser, start, end, level_id, axis, diameter=None):
     if isinstance(riser, Pipe):
         branch = Pipe.Create(doc, system_type_id(riser, DB.BuiltInParameter.RBS_PIPING_SYSTEM_TYPE_PARAM,
                                                  PipingSystemType), type_id, level_id, start, end)
+        # diametro: stacco ridotto, poi misura scelta nella finestra (Horizontal Branch), poi quello del tratto
         set_param(branch, DB.BuiltInParameter.RBS_PIPE_DIAMETER_PARAM,
-                  diameter or param_value(riser, DB.BuiltInParameter.RBS_PIPE_DIAMETER_PARAM))
+                  diameter or PIPE_SIZE[0] or param_value(riser, DB.BuiltInParameter.RBS_PIPE_DIAMETER_PARAM))
     elif isinstance(riser, Duct):
         size = DUCT_SIZE[0]
         custom = axis == "same" and size["mode"] in ("rect", "round")
@@ -582,6 +585,10 @@ def create_branch(riser, start, end, level_id, axis, diameter=None):
                   param_value(riser, DB.BuiltInParameter.RBS_CABLETRAY_WIDTH_PARAM))
         set_param(branch, DB.BuiltInParameter.RBS_CABLETRAY_HEIGHT_PARAM,
                   param_value(riser, DB.BuiltInParameter.RBS_CABLETRAY_HEIGHT_PARAM))
+    if isinstance(branch, CableTray) and TRAY_SIZE[0]:
+        # misura scelta nella finestra (Horizontal Branch); le copie fatte poi da questo tratto la ereditano
+        set_param(branch, DB.BuiltInParameter.RBS_CABLETRAY_WIDTH_PARAM, TRAY_SIZE[0][0])
+        set_param(branch, DB.BuiltInParameter.RBS_CABLETRAY_HEIGHT_PARAM, TRAY_SIZE[0][1])
     doc.Regenerate()
     return branch
 
@@ -976,13 +983,24 @@ MAX_SLOPE_DEG = 60.0
 H_LENGTH_KEY, H_LENGTH_DEFAULT = "h_length_mm", 500.0  # tratto orizzontale fino al gomito
 H_DROP_KEY, H_DROP_DEFAULT = "h_drop_mm", 0.0  # dislivello del tratto inclinato: + sale, - scende, 0 = nessuno
 H_ANGLE_KEY, H_ANGLE_DEFAULT = "h_angle_deg", 90.0  # angolo del tratto inclinato dall'orizzontale
-H_RETURN_KEY, H_RETURN_DEFAULT = "h_return", False  # dopo l'orizzontale, tratto inclinato che riporta alla quota di partenza
-H_DUCT_JUNCTION_KEY, H_DUCT_JUNCTION_DEFAULT = "h_duct_junction", "tap"  # innesto sui canali: "tap" o "tee"
-H_DUCT_RECT_KEY = "h_duct_rect_mm"    # stacco dei canali rettangolari "LxH" in mm, "" = come il tratto
-H_DUCT_ROUND_KEY = "h_duct_round_mm"  # stacco dei canali tondi, diametro in mm, "" = come il tratto
-H_DUCT_MODE_KEY = "h_duct_size_mode"  # misura dello stacco dei canali: "same", "rect", "round"
-# stacco dei canali per la corsa in atto: {"mode": "same" | "rect" | "round", "rect": (L, H) piedi, "round": d piedi}
-DUCT_SIZE = [{"mode": "same", "rect": None, "round": None}]
+H_RETURN_KEY, H_RETURN_DEFAULT = "h_return", False  # dopo l'orizzontale, tratto inclinato che riporta alla quota
+# impostazioni per categoria, nella finestra solo se la categoria e' selezionata al clic:
+# {nome nella finestra: (chiave config, predefinito)}; misure in mm come testo ("LxH" o "D"), "" = nessuna
+H_CATEGORY_SETTINGS = {
+    "duct_junction": ("h_duct_junction", "tap"),     # "tap" o "tee"
+    "duct_size_mode": ("h_duct_size_mode", "same"),  # "same", "rect", "round"
+    "duct_rect": ("h_duct_rect_mm", ""),
+    "duct_round": ("h_duct_round_mm", ""),
+    "pipe_junction": ("h_pipe_junction", ""),        # "tee", "tap"; "" = quello di Vertical Branch
+    "pipe_size_mode": ("h_pipe_size_mode", "same"),  # "same", "custom"
+    "pipe_diameter": ("h_pipe_diameter_mm", ""),
+    "tray_size_mode": ("h_tray_size_mode", "same"),  # "same", "custom"
+    "tray_rect": ("h_tray_rect_mm", ""),
+}
+# misure personalizzate della corsa in atto (piedi), solo per le categorie selezionate al clic
+DUCT_SIZE = [{"mode": "same", "rect": None, "round": None}]  # mode: "same", "rect", "round"
+PIPE_SIZE = [None]  # diametro nominale
+TRAY_SIZE = [None]  # (larghezza, altezza)
 HORIZONTAL_TOL_DEG = 2.0  # stacco a 90 gradi da sopra o sotto: solo da canali orizzontali entro questa pendenza
 def is_horizontal_run(element):
     """Tubo, condotto o passerella rettilinea con pendenza fino a 60 gradi dall'orizzontale."""
@@ -1526,52 +1544,59 @@ def main_horizontal():
     except Exception:
         length_mm, drop_mm, angle_deg = H_LENGTH_DEFAULT, H_DROP_DEFAULT, H_ANGLE_DEFAULT
         return_back = H_RETURN_DEFAULT
-    try:
-        duct_junction = str(config.get_option(H_DUCT_JUNCTION_KEY, H_DUCT_JUNCTION_DEFAULT))
-        duct_rect = str(config.get_option(H_DUCT_RECT_KEY, ""))
-        duct_round = str(config.get_option(H_DUCT_ROUND_KEY, ""))
-        duct_mode = str(config.get_option(H_DUCT_MODE_KEY, "same"))
-    except Exception:
-        duct_junction, duct_rect, duct_round, duct_mode = H_DUCT_JUNCTION_DEFAULT, "", "", "same"
-    if duct_junction not in ("tap", "tee"):
-        duct_junction = H_DUCT_JUNCTION_DEFAULT
+    category = {}
+    for name, (key, default) in H_CATEGORY_SETTINGS.items():
+        try:
+            category[name] = str(config.get_option(key, default))
+        except Exception:
+            category[name] = default
+    # categorie selezionate prima del clic: solo per loro la finestra mostra innesto e misura, e solo per loro si
+    # usa una misura personalizzata (anche con SHIFT + CLICK)
+    kinds = set(kind_of(e) for e in (doc.GetElement(i) for i in uidoc.Selection.GetElementIds())
+                if isinstance(e, (Pipe, Duct, CableTray)))
     # CLICK: sempre la finestra. SHIFT + CLICK: ultime impostazioni, senza finestra
     if not __shiftclick__:  # noqa: F821
-        values = Horizontal_ui.HorizontalWindow(script.get_bundle_file(HORIZONTAL_XAML), {
-            "length_mm": length_mm, "drop_mm": drop_mm, "angle_deg": angle_deg, "return_back": return_back,
-            "duct_junction": duct_junction, "duct_size_mode": duct_mode, "duct_rect": duct_rect,
-            "duct_round": duct_round}).show()
+        settings = dict(category)
+        settings.update({"length_mm": length_mm, "drop_mm": drop_mm, "angle_deg": angle_deg,
+                         "return_back": return_back, "kinds": kinds})
+        values = Horizontal_ui.HorizontalWindow(script.get_bundle_file(HORIZONTAL_XAML), settings).show()
         if values is None:
             script.exit()
         length_mm, drop_mm, angle_deg = values["length_mm"], values["drop_mm"], values["angle_deg"]
         return_back = values["return_back"]
-        duct_junction, duct_rect, duct_round = values["duct_junction"], values["duct_rect"], values["duct_round"]
-        duct_mode = values["duct_size_mode"]
+        category = dict((name, values[name]) for name in H_CATEGORY_SETTINGS)
         try:
             setattr(config, H_LENGTH_KEY, length_mm)
             setattr(config, H_DROP_KEY, drop_mm)
             setattr(config, H_ANGLE_KEY, angle_deg)
             setattr(config, H_RETURN_KEY, return_back)
-            setattr(config, H_DUCT_JUNCTION_KEY, duct_junction)
-            setattr(config, H_DUCT_RECT_KEY, duct_rect)
-            setattr(config, H_DUCT_ROUND_KEY, duct_round)
-            setattr(config, H_DUCT_MODE_KEY, duct_mode)
+            for name, (key, _) in H_CATEGORY_SETTINGS.items():
+                setattr(config, key, category[name])
             script.save_config()
         except Exception:
             pass
-    rect = Horizontal_ui.parse_rect(duct_rect)
-    round_mm = Horizontal_ui.parse_round(duct_round)
+    duct_mode = category["duct_size_mode"] if "duct" in kinds else "same"
+    rect = Horizontal_ui.parse_rect(category["duct_rect"])
+    round_mm = Horizontal_ui.parse_round(category["duct_round"])
     if duct_mode not in ("same", "rect", "round") or (duct_mode == "rect" and not rect) or \
             (duct_mode == "round" and not round_mm):
         duct_mode = "same"  # misura salvata non valida: come il canale
     DUCT_SIZE[0] = {"mode": duct_mode,
                     "rect": (rect[0] / MM_PER_FT, rect[1] / MM_PER_FT) if rect else None,
                     "round": round_mm / MM_PER_FT if round_mm else None}
+    pipe_mm = Horizontal_ui.parse_round(category["pipe_diameter"])
+    PIPE_SIZE[0] = pipe_mm / MM_PER_FT if "pipe" in kinds and category["pipe_size_mode"] == "custom" and \
+        pipe_mm else None
+    tray_mm = Horizontal_ui.parse_rect(category["tray_rect"])
+    TRAY_SIZE[0] = (tray_mm[0] / MM_PER_FT, tray_mm[1] / MM_PER_FT) if "tray" in kinds and \
+        category["tray_size_mode"] == "custom" and tray_mm else None
     if angle_deg == 0.0:
         # 0 gradi = stacco di lato: offset e ritorno salvati restano per la prossima volta, ma non si usano
         drop_mm, return_back = 0.0, False
     junctions = {kind: load_settings(config, kind)["junction"] for kind in ("pipe", "tray")}
-    junctions["duct"] = duct_junction  # scelto nella finestra di Horizontal Branch
+    if category["pipe_junction"] in ("tee", "tap"):
+        junctions["pipe"] = category["pipe_junction"]  # scelto nella finestra di Horizontal Branch
+    junctions["duct"] = category["duct_junction"] if category["duct_junction"] in ("tee", "tap") else "tap"
 
     results = []
     run_filter = HorizontalRunFilter()

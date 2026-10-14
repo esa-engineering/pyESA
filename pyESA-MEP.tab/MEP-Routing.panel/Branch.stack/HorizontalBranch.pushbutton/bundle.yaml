@@ -6,12 +6,13 @@ tooltip: >-
 
   CLICK: one window with the angle of the branch from the horizontal (0 = side branch, no change of level, 15, 22.5,
   30, 45 or 90), a tick box for a return run back to the starting level (then a last horizontal run of the same
-  length), the vertical offset (+ up, - down), the length of the horizontal run and, for ducts, the junction (tap or
-  tee) and the branch size: same as the duct, rectangular W x H or circular diameter.
+  length), the vertical offset (+ up, - down) and the length of the horizontal run. If ducts, pipes or cable trays are
+  selected before the click, the window also shows, for each of those categories only, the junction (tap or tee) and
+  a custom branch size; without a selection the branches keep the size of the run.
 
   SHIFT + CLICK: no window, uses the last settings.
 
-  Pipes: tee or tap as set in Vertical Branch, rotated by the angle; the branch keeps the size of the run.
+  Pipes: tee or tap rotated by the angle (as set in Vertical Branch until chosen in this window).
   Ducts: inclined branches start with a short stub with the junction. At 90 degrees the vertical run starts from the
   top face (offset +) or the bottom face (offset -) of a horizontal duct, offset measured from that face.
   Cable trays: the tee is placed only where it exists, i.e. when the branch lies in the plane of the run and its width

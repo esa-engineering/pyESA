@@ -83,7 +83,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                <Border x:Name="DuctSection" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionHeader}" Text="🌬 DUCTS"/>
                         <Grid Margin="0,5">
@@ -125,14 +125,71 @@
                             <TextBox Grid.Column="1" x:Name="DuctDiameterBox" Style="{StaticResource InputField}"/>
                             <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}" Text="mm, diameter"/>
                         </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="PipeSection" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="🚰 PIPES"/>
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Junction:"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <RadioButton x:Name="PipeTee" GroupName="PipeJunction" Content="Tee" Margin="0,0,20,0"/>
+                                <RadioButton x:Name="PipeTap" GroupName="PipeJunction" Content="Tap"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Branch size:" Margin="0,8,0,4"/>
+                        <RadioButton x:Name="PipeSizeSame" GroupName="PipeSize" Content="Same size as the pipe" Margin="20,0,0,6"/>
+                        <Grid Margin="20,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <RadioButton Grid.Column="0" x:Name="PipeSizeCustom" GroupName="PipeSize" Content="Diameter:"
+                                         VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="1" x:Name="PipeDiameterBox" Style="{StaticResource InputField}"/>
+                            <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}" Text="mm, nominal (DN)"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="TraySection" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="⚡ CABLE TRAYS"/>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Branch size:" Margin="0,0,0,4"/>
+                        <RadioButton x:Name="TraySizeSame" GroupName="TraySize" Content="Same size as the cable tray" Margin="20,0,0,6"/>
+                        <Grid Margin="20,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <RadioButton Grid.Column="0" x:Name="TraySizeCustom" GroupName="TraySize" Content="Custom:"
+                                         VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="1" x:Name="TrayWidthBox" Style="{StaticResource InputField}"/>
+                            <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}" Text="x" Margin="6,0,6,0"/>
+                            <TextBox Grid.Column="3" x:Name="TrayHeightBox" Style="{StaticResource InputField}"/>
+                            <TextBlock Grid.Column="4" Style="{StaticResource UnitLabel}" Text="mm, W x H"/>
+                        </Grid>
                         <TextBlock Style="{StaticResource HintText}" Margin="0,8,0,0"
-                                   Text="Pipes and cable trays keep the junction set in Vertical Branch."/>
+                                   Text="Junction: a tee where it exists, otherwise new runs only."/>
                     </StackPanel>
                 </Border>
 
                 <Border BorderBrush="#E8E8E8" BorderThickness="1" CornerRadius="5" Background="#F8F8F8" Padding="10" Margin="0,0,0,10">
-                    <TextBlock Style="{StaticResource HintText}"
-                               Text="Ducts at 90°: from the top face (offset +) or the bottom face (offset -). SHIFT + CLICK: last settings, no window."/>
+                    <StackPanel>
+                        <TextBlock x:Name="NoSelectionHint" Style="{StaticResource HintText}" Margin="0,0,0,4"
+                                   Text="Junction and branch size: select ducts, pipes or cable trays before clicking the button. Now: last junction, same size as the run."/>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="Ducts at 90°: from the top face (offset +) or the bottom face (offset -). SHIFT + CLICK: last settings, no window."/>
+                    </StackPanel>
                 </Border>
             </StackPanel>
         </ScrollViewer>
