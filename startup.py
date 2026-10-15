@@ -28,36 +28,9 @@ def _saved_hidden_titles():
     return titles
 
 
-BUILTIN_TAB_NAMES = set((
-    "architecture", "structure", "steel", "precast", "systems", "insert", "annotate",
-    "analyze", "massing", "massingsite", "collaborate", "view", "manage", "addins",
-    "modify", "create", "extensions"))
-
-
-def _norm(text):
-    return "".join(c for c in str(text).lower() if c.isalnum())
-
-
-def _is_builtin(tab):
-    # stessa logica di TabVisibility.pushbutton/script.py
-    for attr in ("Id", "Name", "Title"):
-        try:
-            value = _norm(getattr(tab, attr))
-        except Exception:
-            continue
-        if value in BUILTIN_TAB_NAMES or value.startswith("modify"):
-            return True
-        if value.startswith("id") and value[2:] in BUILTIN_TAB_NAMES:
-            return True
-    return False
-
-
 def _hide(titles):
     for tab in list(ComponentManager.Ribbon.Tabs):
         try:
-            # i tab nativi di Revit non si toccano (salvataggi di versioni precedenti)
-            if _is_builtin(tab):
-                continue
             if tab.Title in titles and tab.IsVisible:
                 tab.IsVisible = False
         except Exception:
