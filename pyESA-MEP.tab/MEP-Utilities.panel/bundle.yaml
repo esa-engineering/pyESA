@@ -6,5 +6,4 @@ layout:
   - ReLevelMEP
   - MEPAlignToWall
   - IsVertical
-  - QuickSection
-  - TabVisibility
+  - MEPQTO

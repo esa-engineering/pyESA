@@ -1,25 +1,32 @@
 # -*- coding: utf-8 -*-
 __title__ = "Insulation TypeMark\nTo Host"
-__doc__ = """Version = 2.0
-Date = 14.01.2026
+__doc__ = """Version = 2.1
+Date = 14.10.2026
 ________________________________________________________________
-Copia il Type Mark dell'isolamento in un parametro di istanza
-dell'elemento (tubazione o canalizzazione).
+Copies the Type Mark of the insulation to an instance parameter
+of its pipe or duct.
 
-- L'utente sceglie se operare su tubazioni, canali o entrambi
-- L'utente sceglie se operare su elementi selezionati o tutti
-- Esclude automaticamente elementi senza isolamento
-- Copia il Type Mark dall'isolamento all'elemento
+- Choose pipes, ducts or both
+- Work on the selected elements only, or on the whole project
+- Elements without insulation are skipped
+- The target is any writable text instance parameter
 ________________________________________________________________
 Author: Andrea Patti
 """
 
 from pyrevit import revit, DB, forms, script
-from rpw.ui.forms import FlexForm, Label, ComboBox, CheckBox, Separator, Button
+
+import InsulationTypeMarkToHost_ui
 
 doc = revit.doc
 uidoc = revit.uidoc
 output = script.get_output()
+
+XAML_FILE_NAME = "InsulationTypeMarkToHost_form.xaml"
+CONFIG_NAME = "ESA_InsulationTypeMarkToHost"
+DEFAULTS = {"pipe": True, "duct": True, "target_param": ""}
+# Elementi per categoria letti per proporre i parametri di destinazione
+PARAM_SAMPLE_SIZE = 10
 
 # ---------------------------------------------------------------------------
 # Compatibilita ElementId: Revit <= 2025 usa .IntegerValue, Revit >= 2026 usa .Value
@@ -30,358 +37,201 @@ def get_element_id_value(eid):
         return eid.Value          # Revit 2026+
     return eid.IntegerValue       # Revit <= 2025
 
-def get_all_pipes():
-    """Ottiene tutte le tubazioni del modello"""
+def to_bool(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("true", "1", "yes")
+
+def load_settings(config):
+    settings = dict(DEFAULTS)
+    try:
+        settings["pipe"] = to_bool(config.get_option("pipe", DEFAULTS["pipe"]))
+        settings["duct"] = to_bool(config.get_option("duct", DEFAULTS["duct"]))
+        settings["target_param"] = config.get_option("target_param", DEFAULTS["target_param"]) or ""
+    except Exception:
+        pass
+    return settings
+
+def save_settings(config, values):
+    try:
+        for key in DEFAULTS:
+            setattr(config, key, values[key])
+        script.save_config()
+    except Exception:
+        pass
+
+def get_all_of(category):
+    """Ottiene tutte le istanze di una categoria del modello"""
     return list(DB.FilteredElementCollector(doc)
-                .OfCategory(DB.BuiltInCategory.OST_PipeCurves)
+                .OfCategory(category)
                 .WhereElementIsNotElementType()
                 .ToElements())
 
-def get_all_ducts():
-    """Ottiene tutte le canalizzazioni del modello"""
-    return list(DB.FilteredElementCollector(doc)
-                .OfCategory(DB.BuiltInCategory.OST_DuctCurves)
-                .WhereElementIsNotElementType()
-                .ToElements())
-
-def get_selected_pipes():
-    """Ottiene le tubazioni selezionate"""
+def get_selected_of(category):
+    """Ottiene gli elementi selezionati di una categoria"""
     selection = [doc.GetElement(id) for id in uidoc.Selection.GetElementIds()]
-    pipes = []
-    for elem in selection:
-        if elem and elem.Category and get_element_id_value(elem.Category.Id) == int(DB.BuiltInCategory.OST_PipeCurves):
-            pipes.append(elem)
-    return pipes
-
-def get_selected_ducts():
-    """Ottiene le canalizzazioni selezionate"""
-    selection = [doc.GetElement(id) for id in uidoc.Selection.GetElementIds()]
-    ducts = []
-    for elem in selection:
-        if elem and elem.Category and get_element_id_value(elem.Category.Id) == int(DB.BuiltInCategory.OST_DuctCurves):
-            ducts.append(elem)
-    return ducts
+    return [elem for elem in selection
+            if elem and elem.Category and get_element_id_value(elem.Category.Id) == int(category)]
 
 def get_instance_text_parameters(elements):
-    """Ottiene tutti i parametri di istanza di tipo testo scrivibili comuni"""
-    if not elements:
-        return []
-    
+    """Ottiene tutti i parametri di istanza di tipo testo scrivibili"""
     param_names = set()
-    for element in elements[:min(10, len(elements))]:
+    for element in elements:
         for param in element.Parameters:
-            if (not param.IsReadOnly and 
+            if (not param.IsReadOnly and
                 param.StorageType == DB.StorageType.String):
                 param_names.add(param.Definition.Name)
     return sorted(list(param_names))
 
+def get_type_name(insulation_type):
+    param = insulation_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME)
+    return param.AsString() if param else ""
+
+def write_type_marks(elements, insulation_dict, label, selected_param, counts):
+    """Scrive il Type Mark dell'isolamento sugli elementi; aggiorna counts (success, no_typemark, error)."""
+    for element in elements:
+        try:
+            # Ottieni il tipo di isolamento
+            insulation_type = doc.GetElement(insulation_dict[element.Id].GetTypeId())
+            if not insulation_type:
+                counts["error"] += 1
+                output.print_md('✗ {} {}: insulation type not found'.format(label, output.linkify(element.Id)))
+                continue
+
+            # Ottieni il Type Mark
+            type_mark_param = insulation_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_MARK)
+            type_mark = type_mark_param.AsString() if type_mark_param and type_mark_param.HasValue else None
+            if not (type_mark and type_mark.strip()):
+                counts["no_typemark"] += 1
+                output.print_md('⚠ {} {}: empty Type Mark on insulation **{}**'.format(
+                    label, output.linkify(element.Id), get_type_name(insulation_type)))
+                continue
+
+            # Trova il parametro nell'elemento
+            target = element.LookupParameter(selected_param)
+            if target and not target.IsReadOnly:
+                target.Set(type_mark)
+                counts["success"] += 1
+                output.print_md('✓ {} {}: Type Mark = **{}** (insulation: {})'.format(
+                    label, output.linkify(element.Id), type_mark, get_type_name(insulation_type)))
+            else:
+                counts["error"] += 1
+                output.print_md('✗ {} {}: parameter not found or read-only'.format(
+                    label, output.linkify(element.Id)))
+        except Exception as e:
+            counts["error"] += 1
+            output.print_md('✗ {} {}: error - {}'.format(label, output.linkify(element.Id), str(e)))
+
 def main():
     # Ottieni gli elementi selezionati (se presenti)
-    selected_pipes = get_selected_pipes()
-    selected_ducts = get_selected_ducts()
+    selected_pipes = get_selected_of(DB.BuiltInCategory.OST_PipeCurves)
+    selected_ducts = get_selected_of(DB.BuiltInCategory.OST_DuctCurves)
     has_selection = bool(selected_pipes or selected_ducts)
-    
-    # Opzioni per la modalità di selezione
+
+    # Parametri proposti: letti da un campione di tubazioni e canali (selezionati, altrimenti tutti)
     if has_selection:
-        selection_options = ["Solo elementi selezionati", "Tutti gli elementi del progetto"]
+        sample = selected_pipes[:PARAM_SAMPLE_SIZE] + selected_ducts[:PARAM_SAMPLE_SIZE]
     else:
-        selection_options = ["Tutti gli elementi del progetto"]
-    
-    # Form per scegliere la modalità e le categorie
-    components = [
-        Label('Seleziona le categorie su cui operare:'),
-        CheckBox('cat_pipe', 'Tubazioni', True),
-        CheckBox('cat_duct', 'Canalizzazioni', True),
-        Separator(),
-        Label('Modalità di selezione:'),
-        ComboBox('selection_mode', selection_options, selection_options[0]),
-        Separator(),
-        Button('OK')
-    ]
-    
-    form = FlexForm('Copia Type Mark Isolamento', components)
-    form.show()
-    
-    if not form.values:
+        sample = (get_all_of(DB.BuiltInCategory.OST_PipeCurves)[:PARAM_SAMPLE_SIZE] +
+                  get_all_of(DB.BuiltInCategory.OST_DuctCurves)[:PARAM_SAMPLE_SIZE])
+    available_params = get_instance_text_parameters(sample)
+
+    config = script.get_config(CONFIG_NAME)
+    values = InsulationTypeMarkToHost_ui.TypeMarkToHostWindow(
+        script.get_bundle_file(XAML_FILE_NAME), len(selected_pipes), len(selected_ducts),
+        available_params, load_settings(config)).show()
+    if values is None:
         script.exit()
-    
-    # Categorie selezionate
-    process_pipes = form.values.get('cat_pipe', False)
-    process_ducts = form.values.get('cat_duct', False)
-    
-    if not process_pipes and not process_ducts:
-        forms.alert('Nessuna categoria selezionata!', exitscript=True)
-    
-    # Determina la modalità di selezione
-    use_selection = form.values['selection_mode'] == "Solo elementi selezionati"
-    
+    save_settings(config, values)
+
+    process_pipes = values["pipe"]
+    process_ducts = values["duct"]
+    use_selection = values["use_selection"]
+    selected_param = values["target_param"]
+
     # Ottieni gli elementi da processare
     pipes_to_process = []
     ducts_to_process = []
-    
     if process_pipes:
-        if use_selection:
-            pipes_to_process = selected_pipes
-            if not pipes_to_process:
-                forms.alert('Nessuna tubazione selezionata!', exitscript=True)
-        else:
-            pipes_to_process = get_all_pipes()
-    
+        pipes_to_process = selected_pipes if use_selection else get_all_of(DB.BuiltInCategory.OST_PipeCurves)
     if process_ducts:
-        if use_selection:
-            ducts_to_process = selected_ducts
-            if not ducts_to_process:
-                forms.alert('Nessuna canalizzazione selezionata!', exitscript=True)
-        else:
-            ducts_to_process = get_all_ducts()
-    
-    if not pipes_to_process and not ducts_to_process:
-        forms.alert('Nessun elemento trovato!', exitscript=True)
-    
-    output.print_md('## Analisi elementi in corso...')
+        ducts_to_process = selected_ducts if use_selection else get_all_of(DB.BuiltInCategory.OST_DuctCurves)
+
+    output.print_md('## Insulation Type Mark to host')
+    output.print_md('Target parameter: **{}**'.format(selected_param))
     output.print_md('---')
-    if pipes_to_process:
-        output.print_md('Tubazioni totali da analizzare: **{}**'.format(len(pipes_to_process)))
-    if ducts_to_process:
-        output.print_md('Canalizzazioni totali da analizzare: **{}**'.format(len(ducts_to_process)))
-    
-    # Ottieni tutti gli isolamenti
-    pipe_insulations = []
-    duct_insulations = []
-    
     if process_pipes:
-        pipe_insulations = list(DB.FilteredElementCollector(doc)
-                               .OfCategory(DB.BuiltInCategory.OST_PipeInsulations)
-                               .WhereElementIsNotElementType()
-                               .ToElements())
-        output.print_md('Isolamenti tubazioni nel modello: **{}**'.format(len(pipe_insulations)))
-    
+        output.print_md('Pipes to check: **{}**'.format(len(pipes_to_process)))
     if process_ducts:
-        duct_insulations = list(DB.FilteredElementCollector(doc)
-                               .OfCategory(DB.BuiltInCategory.OST_DuctInsulations)
-                               .WhereElementIsNotElementType()
-                               .ToElements())
-        output.print_md('Isolamenti canalizzazioni nel modello: **{}**'.format(len(duct_insulations)))
-    
+        output.print_md('Ducts to check: **{}**'.format(len(ducts_to_process)))
+
+    if not pipes_to_process and not ducts_to_process:
+        output.print_md('Nothing to process: {}.'.format(
+            'the selection contains no element of the chosen categories' if use_selection
+            else 'the model contains no element of the chosen categories'))
+        script.exit()
+
     # Crea dizionari: element_id -> insulation
     pipe_insulation_dict = {}
-    for insulation in pipe_insulations:
-        host_id = insulation.HostElementId
-        if host_id and host_id != DB.ElementId.InvalidElementId:
-            pipe_insulation_dict[host_id] = insulation
-    
     duct_insulation_dict = {}
-    for insulation in duct_insulations:
-        host_id = insulation.HostElementId
-        if host_id and host_id != DB.ElementId.InvalidElementId:
-            duct_insulation_dict[host_id] = insulation
-    
+    for wanted, category, insulation_dict in (
+            (process_pipes, DB.BuiltInCategory.OST_PipeInsulations, pipe_insulation_dict),
+            (process_ducts, DB.BuiltInCategory.OST_DuctInsulations, duct_insulation_dict)):
+        if not wanted:
+            continue
+        for insulation in get_all_of(category):
+            host_id = insulation.HostElementId
+            if host_id and host_id != DB.ElementId.InvalidElementId:
+                insulation_dict[host_id] = insulation
+
     # Filtra gli elementi che hanno isolamento
-    pipes_with_insulation = []
-    pipes_without_insulation = []
-    ducts_with_insulation = []
-    ducts_without_insulation = []
-    
-    for pipe in pipes_to_process:
-        if pipe.Id in pipe_insulation_dict:
-            pipes_with_insulation.append(pipe)
-        else:
-            pipes_without_insulation.append(pipe)
-    
-    for duct in ducts_to_process:
-        if duct.Id in duct_insulation_dict:
-            ducts_with_insulation.append(duct)
-        else:
-            ducts_without_insulation.append(duct)
-    
+    pipes_with_insulation = [p for p in pipes_to_process if p.Id in pipe_insulation_dict]
+    ducts_with_insulation = [d for d in ducts_to_process if d.Id in duct_insulation_dict]
+
     output.print_md('---')
-    if pipes_to_process:
-        output.print_md('**Tubazioni:**')
-        output.print_md('- Con isolamento: **{}**'.format(len(pipes_with_insulation)))
-        output.print_md('- Senza isolamento: **{}**'.format(len(pipes_without_insulation)))
-    
-    if ducts_to_process:
-        output.print_md('**Canalizzazioni:**')
-        output.print_md('- Con isolamento: **{}**'.format(len(ducts_with_insulation)))
-        output.print_md('- Senza isolamento: **{}**'.format(len(ducts_without_insulation)))
-    
+    if process_pipes:
+        output.print_md('**Pipes:** with insulation **{}**, without insulation **{}**'.format(
+            len(pipes_with_insulation), len(pipes_to_process) - len(pipes_with_insulation)))
+    if process_ducts:
+        output.print_md('**Ducts:** with insulation **{}**, without insulation **{}**'.format(
+            len(ducts_with_insulation), len(ducts_to_process) - len(ducts_with_insulation)))
     output.print_md('---')
-    
-    # Verifica che ci siano elementi con isolamento
+
     elements_with_insulation = pipes_with_insulation + ducts_with_insulation
-    
     if not elements_with_insulation:
-        message = 'Nessun elemento con isolamento trovato!\n\n'
-        if pipes_to_process:
-            message += 'Tubazioni senza isolamento: {}\n'.format(len(pipes_without_insulation))
-        if ducts_to_process:
-            message += 'Canalizzazioni senza isolamento: {}'.format(len(ducts_without_insulation))
-        forms.alert(message, title='Nessun isolamento trovato', exitscript=True)
-    
-    # Ottieni i parametri disponibili
-    available_params = get_instance_text_parameters(elements_with_insulation)
-    
-    if not available_params:
-        forms.alert('Nessun parametro di istanza di testo disponibile negli elementi!\n\n'
-                   'Crea un parametro di progetto o condiviso di tipo TESTO.',
-                   title='Parametri non trovati', exitscript=True)
-    
-    # Form per selezionare il parametro di destinazione
-    param_components = [
-        Label('Seleziona il parametro di destinazione:'),
-        ComboBox('target_param', available_params, available_params[0]),
-        Separator(),
-        Button('OK')
-    ]
-    
-    param_form = FlexForm('Parametro di destinazione', param_components)
-    param_form.show()
-    
-    if not param_form.values:
+        output.print_md('Nothing to write: none of the elements checked has insulation.')
         script.exit()
-    
-    selected_param = param_form.values['target_param']
-    
-    # Inizia la transazione
-    t = DB.Transaction(doc, 'Copia Type Mark Isolamento')
-    t.Start()
-    
-    success_count = 0
-    error_count = 0
-    no_typemark_count = 0
-    
-    output.print_md('## Risultati elaborazione')
-    output.print_md('Parametro di destinazione: **{}**'.format(selected_param))
-    output.print_md('---')
-    
+
+    counts = {"success": 0, "no_typemark": 0, "error": 0}
+
     try:
-        # Processa le tubazioni
-        if pipes_with_insulation:
-            output.print_md('### Tubazioni')
-            for pipe in pipes_with_insulation:
-                try:
-                    # Ottieni l'isolamento della tubazione
-                    insulation = pipe_insulation_dict[pipe.Id]
-                    
-                    # Ottieni il tipo di isolamento
-                    insulation_type = doc.GetElement(insulation.GetTypeId())
-                    
-                    if not insulation_type:
-                        error_count += 1
-                        continue
-                    
-                    # Ottieni il Type Mark
-                    type_mark_param = insulation_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_MARK)
-                    
-                    if type_mark_param and type_mark_param.HasValue:
-                        type_mark = type_mark_param.AsString()
-                        
-                        if type_mark and type_mark.strip():
-                            # Trova il parametro nella tubazione
-                            pipe_param = pipe.LookupParameter(selected_param)
-                            
-                            if pipe_param and not pipe_param.IsReadOnly:
-                                pipe_param.Set(type_mark)
-                                success_count += 1
-                                
-                                type_name = insulation_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString()
-                                output.print_md('✓ Pipe ID {}: Type Mark = **{}** (Isolamento: {})'.format(
-                                    output.linkify(pipe.Id), type_mark, type_name))
-                            else:
-                                error_count += 1
-                                output.print_md('✗ Pipe ID {}: Parametro non trovato o in sola lettura'.format(
-                                    output.linkify(pipe.Id)))
-                        else:
-                            no_typemark_count += 1
-                            type_name = insulation_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString()
-                            output.print_md('⚠ Pipe ID {}: Type Mark vuoto per isolamento **{}**'.format(
-                                output.linkify(pipe.Id), type_name))
-                    else:
-                        no_typemark_count += 1
-                        type_name = insulation_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString()
-                        output.print_md('⚠ Pipe ID {}: Type Mark non disponibile per isolamento **{}**'.format(
-                            output.linkify(pipe.Id), type_name))
-                        
-                except Exception as e:
-                    error_count += 1
-                    output.print_md('✗ Pipe ID {}: Errore - {}'.format(
-                        output.linkify(pipe.Id), str(e)))
-        
-        # Processa le canalizzazioni
-        if ducts_with_insulation:
-            output.print_md('---')
-            output.print_md('### Canalizzazioni')
-            for duct in ducts_with_insulation:
-                try:
-                    # Ottieni l'isolamento della canalizzazione
-                    insulation = duct_insulation_dict[duct.Id]
-                    
-                    # Ottieni il tipo di isolamento
-                    insulation_type = doc.GetElement(insulation.GetTypeId())
-                    
-                    if not insulation_type:
-                        error_count += 1
-                        continue
-                    
-                    # Ottieni il Type Mark
-                    type_mark_param = insulation_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_MARK)
-                    
-                    if type_mark_param and type_mark_param.HasValue:
-                        type_mark = type_mark_param.AsString()
-                        
-                        if type_mark and type_mark.strip():
-                            # Trova il parametro nella canalizzazione
-                            duct_param = duct.LookupParameter(selected_param)
-                            
-                            if duct_param and not duct_param.IsReadOnly:
-                                duct_param.Set(type_mark)
-                                success_count += 1
-                                
-                                type_name = insulation_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString()
-                                output.print_md('✓ Duct ID {}: Type Mark = **{}** (Isolamento: {})'.format(
-                                    output.linkify(duct.Id), type_mark, type_name))
-                            else:
-                                error_count += 1
-                                output.print_md('✗ Duct ID {}: Parametro non trovato o in sola lettura'.format(
-                                    output.linkify(duct.Id)))
-                        else:
-                            no_typemark_count += 1
-                            type_name = insulation_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString()
-                            output.print_md('⚠ Duct ID {}: Type Mark vuoto per isolamento **{}**'.format(
-                                output.linkify(duct.Id), type_name))
-                    else:
-                        no_typemark_count += 1
-                        type_name = insulation_type.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString()
-                        output.print_md('⚠ Duct ID {}: Type Mark non disponibile per isolamento **{}**'.format(
-                            output.linkify(duct.Id), type_name))
-                        
-                except Exception as e:
-                    error_count += 1
-                    output.print_md('✗ Duct ID {}: Errore - {}'.format(
-                        output.linkify(duct.Id), str(e)))
-        
-        t.Commit()
-        
+        with revit.Transaction('Copy Insulation Type Mark'):
+            if pipes_with_insulation:
+                output.print_md('### Pipes')
+                write_type_marks(pipes_with_insulation, pipe_insulation_dict, 'Pipe', selected_param, counts)
+            if ducts_with_insulation:
+                output.print_md('---')
+                output.print_md('### Ducts')
+                write_type_marks(ducts_with_insulation, duct_insulation_dict, 'Duct', selected_param, counts)
     except Exception as e:
-        t.RollBack()
-        forms.alert('Errore durante l\'elaborazione: {}'.format(str(e)), exitscript=True)
-    
+        forms.alert('Error while processing, no change was made:\n{}'.format(str(e)), exitscript=True)
+
     # Stampa riepilogo
     output.print_md('---')
-    output.print_md('## Riepilogo')
-    output.print_md('- Modalità: **{}**'.format(form.values['selection_mode']))
-    output.print_md('- Categorie: **{}**'.format(
-        ', '.join([c for c in ['Tubazioni' if process_pipes else None, 
-                                'Canalizzazioni' if process_ducts else None] if c])))
+    output.print_md('## Summary')
+    output.print_md('- Scope: **{}**'.format('selected elements' if use_selection else 'all elements in the project'))
+    output.print_md('- Categories: **{}**'.format(
+        ', '.join([c for c in ['Pipes' if process_pipes else None,
+                                'Ducts' if process_ducts else None] if c])))
     if use_selection:
         if selected_pipes:
-            output.print_md('- Tubazioni selezionate: **{}**'.format(len(selected_pipes)))
+            output.print_md('- Selected pipes: **{}**'.format(len(selected_pipes)))
         if selected_ducts:
-            output.print_md('- Canalizzazioni selezionate: **{}**'.format(len(selected_ducts)))
-    output.print_md('- Elementi con isolamento trovati: **{}**'.format(len(elements_with_insulation)))
-    output.print_md('- ✓ **Successo**: {}'.format(success_count))
-    output.print_md('- ⚠ **Type Mark vuoto**: {}'.format(no_typemark_count))
-    output.print_md('- ✗ **Errori**: {}'.format(error_count))
+            output.print_md('- Selected ducts: **{}**'.format(len(selected_ducts)))
+    output.print_md('- Elements with insulation: **{}**'.format(len(elements_with_insulation)))
+    output.print_md('- ✓ **Written**: {}'.format(counts["success"]))
+    output.print_md('- ⚠ **Empty Type Mark**: {}'.format(counts["no_typemark"]))
+    output.print_md('- ✗ **Errors**: {}'.format(counts["error"]))
     output.print_md('---')
 
 if __name__ == '__main__':

@@ -10,13 +10,16 @@ from System.Windows.Markup import XamlReader
 
 
 class TabWindow(object):
-    """Finestra modale: una spunta per scheda del ribbon (spuntata = visibile). show() ritorna {id: visibile} o None."""
+    """Finestra modale: una spunta per scheda del ribbon (spuntata = visibile).
+    show() ritorna ({id: visibile}, ricorda_al_riavvio) o None."""
 
-    def __init__(self, xaml_path, items):
-        # items: [(id della scheda, titolo, visibile adesso)]
+    def __init__(self, xaml_path, items, remember):
+        # items: [(id della scheda, titolo, visibile adesso)]; remember: stato iniziale della spunta
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
         find = self.window.FindName
         self.list = find("TabList")
+        self.remember = find("RememberCheck")
+        self.remember.IsChecked = bool(remember)
         self.boxes = []
         for key, title, visible in sorted(items, key=lambda i: i[1].lower()):
             box = CheckBox()
@@ -35,7 +38,8 @@ class TabWindow(object):
             box.IsChecked = value
 
     def _on_ok(self, sender, args):
-        self.result = dict((box.Tag, bool(box.IsChecked)) for box in self.boxes)
+        visible = dict((box.Tag, bool(box.IsChecked)) for box in self.boxes)
+        self.result = (visible, bool(self.remember.IsChecked))
         self.window.DialogResult = True
 
     def show(self):

@@ -2,8 +2,7 @@ title:
   MEP-Tools
 
 layout:
-  - SplitGap
-  - MatchElevation
-  - Spacing
   - Stub
+  - SplitGap
+  - ExtendRemove
   - Select

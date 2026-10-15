@@ -2,10 +2,7 @@ title:
   MEP-Routing
 
 layout:
-  - MEPConnect
+  - Connect
   - Rise&Turn
-  - Turn
-  - Multi Turn
-  - ClashOverpass
-  - QuickOverpass
   - Branch
+  - Overpass
