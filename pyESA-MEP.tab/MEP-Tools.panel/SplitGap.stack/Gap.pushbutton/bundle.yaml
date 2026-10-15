@@ -10,3 +10,4 @@ tooltip: >-
   elements need a section, elevation or 3D view. Elements that cannot be cut are left unchanged, and an alert with the reason appears (no report).
   To cut the same gap in many elements at once use Multi Gap.
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

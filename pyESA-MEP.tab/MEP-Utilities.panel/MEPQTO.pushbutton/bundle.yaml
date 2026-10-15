@@ -46,3 +46,4 @@ tooltip: >
   Missing Type Marks, codes, descriptions, units, dimensions or pipe densities are listed in
   the Issues tab and in the Issues sheet of the Excel export, with their Element Ids.
 author: ESA Engineering
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

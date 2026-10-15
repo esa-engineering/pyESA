@@ -14,3 +14,4 @@ tooltip: >-
   The report shows the number of clashes found and the result of each one. The new parts keep the parameters and the
   insulation of the starting element. For a manual overpass between two clicked points use Quick Overpass.
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

@@ -4,3 +4,4 @@ tooltip: >
   Source of elements: manual selection or active view.
   Target level: selected manually or calculated for each element as the first level below the insertion point.
 author: ESA Engineering
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

@@ -7,3 +7,4 @@ tooltip: >-
   SHIFT + CLICK: after the search, a list of the categories found, all checked: uncheck the ones you do not want
   selected (for example the fittings, to keep only the pipes). The choice is saved and used by the normal click.
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx
