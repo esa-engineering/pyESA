@@ -8,3 +8,4 @@ tooltip: >-
   type are left unchanged. A report lists, per type, what was copied, skipped and failed. Instance parameters are
   copied by Param Copy Instance.
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

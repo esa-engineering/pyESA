@@ -14,3 +14,4 @@ tooltip: >-
   Opening: e_GEN_PFV_ID = Ids of its MEP elements, e_GEN_PFV_Status = MEC / ELE / MEC+ELE - New. MEP elements:
   e_GEN_PFV_ID = PFV + Id of their openings, e_GEN_PFV_Status = MEC / ELE - New. Comments and Mark are not touched.
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

@@ -3,3 +3,4 @@ tooltip: >-
   Chooses when the tools of the MEP-Routing and MEP-Tools panels open their full report: only on problems (default, otherwise a short
   notification), always, or never (notification only). The choice is saved and shared by all the tools of both panels.
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

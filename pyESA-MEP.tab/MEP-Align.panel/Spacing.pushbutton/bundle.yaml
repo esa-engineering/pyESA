@@ -13,3 +13,4 @@ tooltip: >-
   Accessories connected to the elements (valves, dampers) are checked for clashes with the neighbouring elements and
   their insulation. A report lists the distances obtained; clashing accessories are listed and selected.
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx
