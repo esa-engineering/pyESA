@@ -1,6 +1,0 @@
-title: Section Check
-tooltip: >-
-  Read-only: lists the section views whose crop and symbol in the active plan differ by more than a threshold
-  (default 300 mm). Nothing is changed: fix the listed sections by dragging the section line in plan.
-author: Matteo Maiorano
-help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx
