@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "Clash\nOverpass"
-__doc__ = """Version = 0.4
-Date    = 12.10.2026
+__doc__ = """Version = 0.5
+Date    = 16.10.2026
 ________________________________________________________________
 Route with clash check, solved automatically.
 1. Select one or more pipes, ducts or cable trays (or select them first)
@@ -22,6 +22,13 @@ left at its elevation between two overpasses would be shorter than the
 merge distance (default 2000 mm).
 If overpasses keep creating new clashes, after 10 automatic rounds in a
 row the remaining ones are left as they are and listed in the report.
+If an obstacle is too close to an end of the run (or the run already
+starts inside it) and that end is free, the run is extended there to
+make room for the elbows.
+The leg angle has priority over the clearance: if the two elbows do
+not fit on a leg with the elevation given by the clearance, the
+overpass is moved farther from the run (higher when passing over,
+lower when passing under) until they fit, and the report says so.
 A manual overpass between two clicked points is done by Quick Overpass.
 The new parts keep the parameters and the insulation of the starting element.
 ________________________________________________________________
@@ -122,6 +129,41 @@ PHYSICAL_TYPES = (DB.ConnectorType.End, DB.ConnectorType.Curve, DB.ConnectorType
 
 class OverpassError(Exception):
     """Errore atteso (es. spazio insufficiente): il messaggio va nel report."""
+
+
+class ElbowSpaceError(OverpassError):
+    """I gomiti non stanno sulla salita (dislivello troppo piccolo): si riprova allontanando la quota."""
+
+
+class RollbackOnError(DB.IFailuresPreprocessor):
+    """Errori di Revit al commit (es. gomito che non sta): si annulla la transazione invece di lasciare che Revit
+    cancelli gli elementi. Gli avvisi restano come sono."""
+
+    def __init__(self):
+        self.messages = []
+
+    def PreprocessFailures(self, accessor):
+        errors = False
+        for failure in accessor.GetFailureMessages():
+            if failure.GetSeverity() != DB.FailureSeverity.Warning:
+                errors = True
+                try:
+                    self.messages.append(failure.GetDescriptionText())
+                except Exception:
+                    pass
+        return DB.FailureProcessingResult.ProceedWithRollBack if errors else DB.FailureProcessingResult.Continue
+
+
+def start_guarded(name):
+    """Transazione avviata con RollbackOnError. Ritorna (transazione, preprocessore)."""
+    transaction = DB.Transaction(doc, name)
+    preprocessor = RollbackOnError()
+    options = transaction.GetFailureHandlingOptions()
+    options.SetFailuresPreprocessor(preprocessor)
+    options.SetClearAfterRollback(True)
+    transaction.SetFailureHandlingOptions(options)
+    transaction.Start()
+    return transaction, preprocessor
 
 
 def category_name(element):
@@ -353,8 +395,10 @@ def check_remaining_space(parts):
     for name, element in parts:
         remaining = element.Location.Curve.Length * MM_PER_FT
         if remaining < MIN_REMAINING_MM:
-            raise OverpassError("Not enough space for the elbows: the {} would be only {:.0f} mm long "
-                                "(minimum {:.0f} mm)".format(name, remaining, MIN_REMAINING_MM))
+            # sulle salite si rimedia allontanando la quota (apply_group); sugli altri tratti no
+            error = ElbowSpaceError if name.endswith("leg") else OverpassError
+            raise error("Not enough space for the elbows: the {} would be only {:.0f} mm long "
+                        "(minimum {:.0f} mm)".format(name, remaining, MIN_REMAINING_MM))
 
 
 def project_on_run(reference, element, curve):
@@ -679,7 +723,10 @@ def find_clashes(runs, ignored, scope):
                 if pair in seen:
                     continue
                 seen.add(pair)
-                clashes.append({"run": run, "piece": piece, "obstacle": obstacle})
+                # gli Id e il nome della categoria restano validi anche dopo un RollBack, gli oggetti no
+                clashes.append({"run": run, "piece": piece, "obstacle": obstacle,
+                                "piece_id": piece.Id, "obstacle_id": obstacle.Id,
+                                "obstacle_cat": obstacle.Category.Name if obstacle.Category else ""})
     return clashes
 
 
@@ -799,6 +846,16 @@ def plan_groups(piece, clashes, action, clearance_ft, angle_deg, merge_ft):
 
 CLEARANCE_TOL_FT = 1.0 / MM_PER_FT  # tolleranza sulla distanza verificata (1 mm)
 MAX_CLEARANCE_ATTEMPTS = 4
+MAX_OFFSET_ATTEMPTS = 6  # tentativi allontanando la quota dello scavalco perche' i gomiti stiano sulla salita
+ELBOW_RADIUS_FACTOR = 1.0  # raggio del gomito stimato, in sezioni: solo per la quota minima di partenza
+
+
+def min_offset_ft(size_ft, angle_deg):
+    """Dislivello minimo perche' sulla salita stiano i due gomiti piu' un tratto utile, con l'angolo scelto.
+    Stima: ingombro di ogni gomito = raggio * tan(deviazione / 2); i tentativi successivi correggono la stima."""
+    angle = math.radians(angle_deg)
+    elbow_ft = ELBOW_RADIUS_FACTOR * size_ft * math.tan(angle / 2.0)
+    return (2.0 * elbow_ft + MIN_REMAINING_MM / MM_PER_FT) * math.sin(angle)
 
 
 def profile_loop(origin, axis_w, axis_h, half_w, half_h, round_section):
@@ -907,18 +964,61 @@ def grow_free_end(piece, idx, amount_ft):
     return True
 
 
-def apply_group(piece, group, angle_deg, clearance_ft):
-    """Scavalco di un gruppo di ostacoli, con verifica della distanza dopo la costruzione: se salite o gomiti
-    stanno troppo vicini all'ostacolo si annulla, si allarga lo scavalco e si riprova. Se dopo l'ostacolo manca
-    tratto e l'estremo e' libero, lo si allunga della quantita' mancante (grown).
-    Ritorna (nuovi tratti, raccordi, allargamento in mm, distanza verificata del tutto, allungamento in mm)."""
-    obstacles = [c["obstacle"] for c in group["clashes"]]
+LEG_STAGES = ("first leg", "raised run", "second leg", "last part of the run")  # passi che piazzano i gomiti
+
+
+def apply_group(piece_id, group, angle_deg, clearance_ft):
+    """Scavalco di un gruppo. L'angolo scelto ha la precedenza: se sulla salita non stanno i due gomiti (dislivello
+    troppo piccolo per la distanza impostata) la quota si allontana dal tratto, verso l'alto se lo scavalco sale e
+    verso il basso se scende, finche' gomiti e salita ci stanno. La distanza dall'ostacolo resta almeno quella
+    richiesta. Imposta group["offset_used"]. Ritorna come build_group, piu' l'allontanamento in mm."""
+    base = group["offset"]
+    if abs(base) < MIN_REMAINING_MM / MM_PER_FT:
+        raise OverpassError("No change of elevation is needed (offset {:.0f} mm)".format(base * MM_PER_FT))
+    sign = 1.0 if base > 0 else -1.0
+    size = 2.0 * half_sizes(doc.GetElement(piece_id))[1]
+    step = max(size, 50.0 / MM_PER_FT)
+    added = max(0.0, min_offset_ft(size, angle_deg) - abs(base))
+    error = None
+    for _ in range(MAX_OFFSET_ATTEMPTS):
+        group["offset_used"] = base + sign * added
+        try:
+            return try_group(piece_id, group, angle_deg, clearance_ft) + (added * MM_PER_FT,)
+        except ElbowSpaceError as ex:
+            error = ex
+        added += step
+    raise OverpassError("{} (tried moving the overpass up to {:.0f} mm farther from the run)".format(
+        error, (added - step) * MM_PER_FT))
+
+
+def try_group(piece_id, group, angle_deg, clearance_ft):
+    """Come build_group, in un TransactionGroup: se lo scavalco non riesce si annullano anche gli allungamenti.
+    Dopo il RollBack gli oggetti letti prima non sono piu' validi: si lavora solo con gli Id."""
+    transaction_group = DB.TransactionGroup(doc, "Overpass")
+    transaction_group.Start()
+    done = False
+    try:
+        result = build_group(piece_id, group, angle_deg, clearance_ft)
+        done = True
+        return result
+    finally:
+        if done:
+            transaction_group.Assimilate()
+        else:
+            transaction_group.RollBack()
+
+
+def build_group(piece_id, group, angle_deg, clearance_ft):
+    """Scavalco di un gruppo di ostacoli alla quota group["offset_used"], con verifica della distanza dopo la
+    costruzione: se salite o gomiti stanno troppo vicini all'ostacolo si annulla, si allarga lo scavalco e si
+    riprova. Se prima o dopo l'ostacolo manca tratto (ostacolo a ridosso dell'estremo, o tratto che parte gia' in
+    interferenza) e quell'estremo e' libero, lo si allunga della quantita' mancante (grown).
+    Ritorna (id nuovi tratti, id raccordi, allargamento in mm, distanza verificata del tutto, allungamento in mm)."""
+    piece = doc.GetElement(piece_id)
     min_ft = MIN_REMAINING_MM / MM_PER_FT
     # il gomito finale ha bisogno di spazio: il tratto dopo lo scavalco e' almeno TAIL_MIN_MM (o 3 diametri)
     tail_ft = max(TAIL_MIN_MM / MM_PER_FT, 3.0 * 2.0 * half_sizes(piece)[1])
-    offset_ft = group["offset"]
-    if abs(offset_ft) < min_ft:
-        raise OverpassError("No change of elevation is needed (offset {:.0f} mm)".format(offset_ft * MM_PER_FT))
+    offset_ft = group["offset_used"]
     level_id = get_level_id(piece)
     if level_id is None:
         raise OverpassError("No reference level on the element")
@@ -926,14 +1026,24 @@ def apply_group(piece, group, angle_deg, clearance_ft):
     step = max(half_sizes(piece)[1], 25.0 / MM_PER_FT)
     extra = 0.0
     grown = 0.0
-    for _ in range(MAX_CLEARANCE_ATTEMPTS + 2):  # due passi in piu' per gli allungamenti
+    shift = 0.0  # allungamento all'inizio del tratto: lo/hi del gruppo sono misurati dall'inizio originale
+    attempts = 0
+    for _ in range(3 * MAX_CLEARANCE_ATTEMPTS):  # ogni tentativo puo' richiedere un allungamento per lato
+        # dopo un RollBack gli oggetti vanno riletti
+        piece = doc.GetElement(piece_id)
+        obstacles = [doc.GetElement(c["obstacle_id"]) for c in group["clashes"]]
         curve = piece.Location.Curve
         start, d = curve.GetEndPoint(0), curve.Direction
-        t1, t2 = group["lo"] - extra - inset_ft, group["hi"] + extra + inset_ft
+        t1, t2 = group["lo"] + shift - extra - inset_ft, group["hi"] + shift + extra + inset_ft
         why = " to keep the clearance near the elbows" if extra > 0 else ""
         if t1 < tail_ft:
-            raise OverpassError("Not enough run before the obstacle{}: {:.0f} mm more are needed".format(
-                why, (tail_ft - t1) * MM_PER_FT))
+            missing = tail_ft - t1 + 1.0 / MM_PER_FT
+            if grow_free_end(piece, 0, missing):
+                grown += missing
+                shift += missing
+                continue
+            raise OverpassError("Not enough run before the obstacle{}: {:.0f} mm more are needed, and the start "
+                                "of the run is connected".format(why, (missing - 1.0 / MM_PER_FT) * MM_PER_FT))
         if curve.Length - t2 < tail_ft:
             missing = tail_ft - (curve.Length - t2) + 1.0 / MM_PER_FT
             if grow_free_end(piece, 1, missing):
@@ -941,8 +1051,7 @@ def apply_group(piece, group, angle_deg, clearance_ft):
                 continue
             raise OverpassError("Not enough run after the obstacle{}: {:.0f} mm more are needed, and the free end "
                                 "is connected".format(why, (missing - 1.0 / MM_PER_FT) * MM_PER_FT))
-        transaction = DB.Transaction(doc, "Overpass")
-        transaction.Start()
+        transaction, preprocessor = start_guarded("Overpass")
         try:
             _, new_elements, _, _, fittings = build_overpass(piece, curve, start.Add(d.Multiply(t1)),
                                                              start.Add(d.Multiply(t2)), offset_ft, inset_ft,
@@ -950,43 +1059,72 @@ def apply_group(piece, group, angle_deg, clearance_ft):
             STAGE[0] = "checking the clearance from the obstacle"
             # salite, tratto rialzato e gomiti: il primo e l'ultimo tratto restano alla quota originale
             violated, verified = clearance_check(new_elements[:3] + fittings, piece, obstacles, clearance_ft)
-        except Exception:
+            new_ids = [e.Id for e in new_elements]
+            fitting_ids = [f.Id for f in fittings]
+        except OverpassError:
             transaction.RollBack()
             raise
+        except Exception as ex:
+            transaction.RollBack()
+            if STAGE[0] in LEG_STAGES:  # Revit non riesce a piazzare un gomito: salita troppo corta
+                raise ElbowSpaceError("Revit could not place the elbows ({}): {}".format(STAGE[0], ex))
+            raise
         if not violated:
-            transaction.Commit()
-            return new_elements, fittings, extra * MM_PER_FT, verified, grown * MM_PER_FT
+            STAGE[0] = "saving the overpass"
+            status = transaction.Commit()
+            # un errore al commit (gomito che non sta) annulla la transazione: vedi RollbackOnError
+            if status != DB.TransactionStatus.Committed:
+                raise ElbowSpaceError("Revit rejected the overpass: {}".format(
+                    "; ".join(preprocessor.messages) or status))
+            if any(doc.GetElement(i) is None for i in new_ids + fitting_ids):
+                raise ElbowSpaceError("Revit deleted part of the overpass while saving it")
+            return new_ids, fitting_ids, extra * MM_PER_FT, verified, grown * MM_PER_FT
         transaction.RollBack()
+        attempts += 1
+        if attempts >= MAX_CLEARANCE_ATTEMPTS:
+            break
         extra += step
     raise OverpassError("The clearance of {:.0f} mm is not reached near the elbows, even starting the legs "
                         "{:.0f} mm farther from the obstacle".format(clearance_ft * MM_PER_FT,
-                                                                    (extra - step) * MM_PER_FT))
+                                                                    extra * MM_PER_FT))
 
 
-def make_row(run_index, piece, obstacle, action, result):
-    return {"run": run_index, "piece": piece.Id, "obstacle": obstacle.Id if obstacle is not None else None,
-            "obstacle_cat": obstacle.Category.Name if obstacle is not None and obstacle.Category else "",
+def make_row(run_index, piece_id, obstacle_id, obstacle_cat, action, result):
+    """Riga del report: solo Id e testi, validi anche dopo un RollBack."""
+    return {"run": run_index, "piece": piece_id, "obstacle": obstacle_id, "obstacle_cat": obstacle_cat,
             "action": action, "result": result}
+
+
+def clash_row(clash, action, result, piece_id=None):
+    return make_row(clash["run"]["index"], piece_id or clash["piece_id"], clash["obstacle_id"],
+                    clash["obstacle_cat"], action, result)
 
 
 def give_up(clashes, message, action, ignored, rows):
     """Interferenze non risolte: nel report e non piu' riproposte."""
     for clash in clashes:
-        ignored.add((clash["run"]["index"], id_value(clash["obstacle"].Id)))
-        rows.append(make_row(clash["run"]["index"], clash["piece"], clash["obstacle"], action,
-                             "Unchanged. {}".format(message)))
+        ignored.add((clash["run"]["index"], id_value(clash["obstacle_id"])))
+        rows.append(clash_row(clash, action, "Unchanged. {}".format(message)))
 
 
 def resolve(todo, answer, ignored):
-    """Scavalca sopra o sotto le interferenze spuntate. Ritorna le righe del report."""
+    """Scavalca sopra o sotto le interferenze spuntate. Ritorna le righe del report.
+    Uno scavalco non riuscito annulla un TransactionGroup, e dopo il RollBack gli oggetti letti prima non sono piu'
+    validi: tratti e ostacoli si rileggono dagli Id."""
     rows = []
     action = "Over" if answer["action"] == "over" else "Under"
     clearance_ft = answer["clearance_mm"] / MM_PER_FT
     by_piece = {}
     for clash in todo:
-        by_piece.setdefault(id_value(clash["piece"].Id), []).append(clash)
+        by_piece.setdefault(id_value(clash["piece_id"]), []).append(clash)
     for clashes in by_piece.values():
-        piece, run = clashes[0]["piece"], clashes[0]["run"]
+        piece_id, run = clashes[0]["piece_id"], clashes[0]["run"]
+        piece = doc.GetElement(piece_id)
+        for clash in clashes:
+            clash["obstacle"] = doc.GetElement(clash["obstacle_id"])
+        if piece is None or any(c["obstacle"] is None for c in clashes):
+            give_up(clashes, "The run or the obstacle no longer exists", action, ignored, rows)
+            continue
         if not is_horizontal_line(piece):
             give_up(clashes, "Only straight horizontal runs can pass over or under an obstacle", action, ignored, rows)
             continue
@@ -999,8 +1137,8 @@ def resolve(todo, answer, ignored):
         # dal gruppo piu' lontano: il tratto originale resta quello iniziale, gli altri gruppi restano su di lui
         for group in sorted(groups, key=lambda g: -g["lo"]):
             try:
-                new_elements, fittings, extra_mm, verified, grown_mm = apply_group(
-                    piece, group, answer["angle_deg"], clearance_ft)
+                new_ids, fitting_ids, extra_mm, verified, grown_mm, raised_mm = apply_group(
+                    piece_id, group, answer["angle_deg"], clearance_ft)
             except OverpassError as ex:
                 give_up(group["clashes"], str(ex), action, ignored, rows)
                 continue
@@ -1008,18 +1146,23 @@ def resolve(todo, answer, ignored):
                 give_up(group["clashes"], "The overpass could not be built (step: {}): {}".format(STAGE[0], ex),
                         action, ignored, rows)
                 continue
-            for element in list(new_elements) + list(fittings):
-                run["chain"][id_value(element.Id)] = element.Id
-            note = "Created: offset {:+.0f} mm, {} new elements".format(group["offset"] * MM_PER_FT, len(new_elements))
+            for element_id in list(new_ids) + list(fitting_ids):
+                run["chain"][id_value(element_id)] = element_id
+            note = "Created: offset {:+.0f} mm, {} new elements".format(group["offset_used"] * MM_PER_FT,
+                                                                       len(new_ids))
             if len(group["clashes"]) > 1:
                 note += ", one overpass for {} obstacles".format(len(group["clashes"]))
             if grown_mm > 0:
-                note += ", run extended {:.0f} mm beyond the obstacle to make room for the overpass".format(grown_mm)
+                note += ", free end of the run extended {:.0f} mm to make room for the elbows".format(grown_mm)
+            if raised_mm > 0:
+                note += (", overpass moved {:.0f} mm farther from the run so that the elbows fit with {:g} degree "
+                         "legs (clearance larger than {:g} mm)".format(raised_mm, answer["angle_deg"],
+                                                                      answer["clearance_mm"]))
             if extra_mm > 0:
                 note += ", legs moved {:.0f} mm farther from the obstacle to keep the clearance".format(extra_mm)
             note += "" if verified else ", clearance near the elbows not fully verified"
             for clash in group["clashes"]:
-                rows.append(make_row(run["index"], piece, clash["obstacle"], action, note))
+                rows.append(clash_row(clash, action, note, piece_id))
     return rows
 
 
@@ -1062,9 +1205,10 @@ def extend_runs(runs, click):
     for run in runs:
         try:
             piece, length_mm = extend_run(run, click)
-            rows.append(make_row(run["index"], piece, None, "Extend", "Extended by {:.0f} mm".format(length_mm)))
+            rows.append(make_row(run["index"], piece.Id, None, "", "Extend",
+                                 "Extended by {:.0f} mm".format(length_mm)))
         except Exception as ex:
-            rows.append(make_row(run["index"], run["source"], None, "Extend", "Unchanged. {}".format(ex)))
+            rows.append(make_row(run["index"], run["source_id"], None, "", "Extend", "Unchanged. {}".format(ex)))
     return rows
 
 
@@ -1143,7 +1287,7 @@ def route_main():
     selected = get_route_selection()
     if not selected:
         script.exit()
-    runs = [{"index": i + 1, "source": e, "chain": {id_value(e.Id): e.Id}} for i, e in enumerate(selected)]
+    runs = [{"index": i + 1, "source_id": e.Id, "chain": {id_value(e.Id): e.Id}} for i, e in enumerate(selected)]
     xaml_path = script.get_bundle_file(CLASH_XAML_FILE_NAME)
     ignored, rows = set(), []
 
@@ -1172,9 +1316,8 @@ def route_main():
             clashes_found += len(clashes)
             if settings["action"] == "none":
                 for clash in clashes:
-                    ignored.add((clash["run"]["index"], id_value(clash["obstacle"].Id)))
-                    rows.append(make_row(clash["run"]["index"], clash["piece"], clash["obstacle"],
-                                         "Report only", "Left as it is"))
+                    ignored.add((clash["run"]["index"], id_value(clash["obstacle_id"])))
+                    rows.append(clash_row(clash, "Report only", "Left as it is"))
             else:
                 rows += resolve(clashes, settings, ignored)
             clashes = find_clashes(runs, ignored, settings["scope"])
