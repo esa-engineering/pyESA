@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "Spring"
-__doc__ = """Version = 0.1
-Date    = 07.10.2026
+__doc__ = """Version = 0.2
+Date    = 16.10.2026
 ________________________________________________________________
 Description:
 Creates short pipe / duct stubs that start from the free mechanical
@@ -10,7 +10,10 @@ connectors of equipment (any element with piping or HVAC connectors).
 Instruction:
 - CLICK: a window sets the standard stub length, whether each stub
   gets a different length (+50 mm per connector), whether to use all
-  connectors or choose them for each object, and the pipe / duct type
+  connectors or choose them for each object, the pipe type and one
+  duct type per shape (round, rectangular, oval)
+- Duct stubs take the type matching the shape of the connector they
+  start from, size and system come from the connector
 - Click each element, press ESC to finish: a report lists the stubs
 - SHIFT + CLICK: no window; stubs on all free connectors of each
   clicked element, starting from the last length and adding 50 mm for
@@ -34,7 +37,15 @@ import Stub_ui
 
 XAML_FILE_NAME = "Stub_form.xaml"
 CONFIG_NAME = "ESA_Stub"
-DEFAULTS = {"length_mm": 200.0, "different": False, "choose": False, "pipe_type": "", "duct_type": ""}
+DEFAULTS = {"length_mm": 200.0, "different": False, "choose": False, "pipe_type": "",
+            "duct_round_type": "", "duct_rect_type": "", "duct_oval_type": ""}
+
+# forma del connettore -> (chiave del tipo di canale, nome nel report)
+DUCT_SHAPES = {
+    DB.ConnectorProfileType.Round: ("duct_round", "round duct"),
+    DB.ConnectorProfileType.Rectangular: ("duct_rect", "rectangular duct"),
+    DB.ConnectorProfileType.Oval: ("duct_oval", "oval duct"),
+}
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -90,6 +101,24 @@ def get_types(cls):
     for element_type in DB.FilteredElementCollector(doc).OfClass(cls):
         types[type_name(element_type)] = element_type.Id
     return types
+
+
+def get_duct_types():
+    """{chiave forma: {nome: ElementId}}: i tipi di canale divisi per forma (tondo, rettangolare, ovale).
+    Il connettore decide la forma, quindi a ogni forma serve il suo tipo."""
+    by_shape = dict((key, {}) for key, _ in DUCT_SHAPES.values())
+    for element_type in DB.FilteredElementCollector(doc).OfClass(DuctType):
+        shape = DUCT_SHAPES.get(element_type.Shape)
+        if shape is not None:
+            by_shape[shape[0]][type_name(element_type)] = element_type.Id
+    return by_shape
+
+
+def type_key(conn):
+    """(chiave del tipo, descrizione) per il connettore: tubo, oppure canale della forma del connettore."""
+    if conn.Domain == DB.Domain.DomainPiping:
+        return "pipe", "pipe"
+    return DUCT_SHAPES.get(conn.Shape, (None, "duct of shape {}".format(conn.Shape)))
 
 
 def get_mechanical_connectors(element):
@@ -205,10 +234,10 @@ def process_element(element, settings, type_ids, base_length_mm):
             row = {"element": element, "connector": connector_label(conn, number),
                    "length_mm": length_mm, "new": None, "status": ""}
             rows.append(row)
-            domain_key = "pipe" if conn.Domain == DB.Domain.DomainPiping else "duct"
-            type_id = type_ids.get(domain_key)
+            key, kind = type_key(conn)
+            type_id = type_ids.get(key) if key else None
             if type_id is None:
-                row["status"] = "No {} type selected or available".format(domain_key)
+                row["status"] = "No {} type selected or available".format(kind)
                 continue
             level_id = get_level_id(element, conn.Origin)
             if level_id is None:
@@ -240,7 +269,10 @@ def resolve_type_ids(settings, pipe_types, duct_types):
         if wanted in types:
             return types[wanted]
         return types[sorted(types)[0]] if types else None
-    return {"pipe": pick(pipe_types, settings["pipe_type"]), "duct": pick(duct_types, settings["duct_type"])}
+    type_ids = {"pipe": pick(pipe_types, settings["pipe_type"])}
+    for key, _ in DUCT_SHAPES.values():
+        type_ids[key] = pick(duct_types[key], settings[key + "_type"])
+    return type_ids
 
 
 def load_settings(config):
@@ -250,7 +282,10 @@ def load_settings(config):
         settings["different"] = to_bool(config.get_option("different", DEFAULTS["different"]))
         settings["choose"] = to_bool(config.get_option("choose", DEFAULTS["choose"]))
         settings["pipe_type"] = config.get_option("pipe_type", DEFAULTS["pipe_type"])
-        settings["duct_type"] = config.get_option("duct_type", DEFAULTS["duct_type"])
+        # versioni precedenti: un solo tipo di canale; vale per la forma a cui appartiene (pick lo ignora altrove)
+        legacy = config.get_option("duct_type", "")
+        for key, _ in DUCT_SHAPES.values():
+            settings[key + "_type"] = config.get_option(key + "_type", legacy)
     except Exception:
         pass
     return settings
@@ -291,7 +326,7 @@ def print_report(results, settings):
 def main():
     config = script.get_config(CONFIG_NAME)
     settings = load_settings(config)
-    pipe_types, duct_types = get_types(PipeType), get_types(DuctType)
+    pipe_types, duct_types = get_types(PipeType), get_duct_types()
 
     if __shiftclick__:  # noqa: F821
         # automatico: tutti i connettori liberi, ultima lunghezza + 50 mm per ogni connettore
@@ -299,7 +334,8 @@ def main():
         settings["choose"] = False
     else:
         xaml_path = script.get_bundle_file(XAML_FILE_NAME)
-        values = Stub_ui.StubWindow(xaml_path, sorted(pipe_types), sorted(duct_types), settings).show()
+        duct_names = dict((key, sorted(names)) for key, names in duct_types.items())
+        values = Stub_ui.StubWindow(xaml_path, sorted(pipe_types), duct_names, settings).show()
         if values is None:
             script.exit()
         settings = values
