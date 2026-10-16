@@ -28,24 +28,33 @@ def fill_combo(combo, names, selected_name):
     return True
 
 
+# chiave del tipo di canale -> nome del menu nella finestra
+DUCT_COMBOS = (("duct_round", "DuctRoundCombo"), ("duct_rect", "DuctRectCombo"), ("duct_oval", "DuctOvalCombo"))
+
+
 class StubWindow(object):
     """Finestra modale: lunghezza, lunghezze diverse, scelta dei connettori, tipi."""
 
     def __init__(self, xaml_path, pipe_types, duct_types, settings):
-        # pipe_types / duct_types: liste di nomi; settings: dict con le ultime impostazioni
+        # pipe_types: lista di nomi; duct_types: {chiave forma: lista di nomi}; settings: ultime impostazioni
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
         self.length_box = self.window.FindName("LengthBox")
         self.different = self.window.FindName("DifferentCheck")
         self.mode_all = self.window.FindName("ModeAll")
         self.mode_choose = self.window.FindName("ModeChoose")
         self.pipe_combo = self.window.FindName("PipeTypeCombo")
-        self.duct_combo = self.window.FindName("DuctTypeCombo")
         self.window.FindName("OkButton").Click += self._on_ok
         self.result = None
 
-        self.pipe_names, self.duct_names = pipe_types, duct_types
+        self.pipe_names = pipe_types
         self.has_pipe_types = fill_combo(self.pipe_combo, pipe_types, settings["pipe_type"])
-        self.has_duct_types = fill_combo(self.duct_combo, duct_types, settings["duct_type"])
+        # per forma: (menu, nomi, ci sono tipi)
+        self.duct = {}
+        for key, combo_name in DUCT_COMBOS:
+            combo = self.window.FindName(combo_name)
+            names = duct_types.get(key, [])
+            self.duct[key] = (combo, names, fill_combo(combo, names, settings[key + "_type"]))
+        self.has_duct_types = any(has for _, _, has in self.duct.values())
 
         self.length_box.Text = "{:g}".format(settings["length_mm"])
         self.different.IsChecked = bool(settings["different"])
@@ -59,13 +68,15 @@ class StubWindow(object):
             return False, "The length must be a number greater than zero (mm).", None
         if not (self.has_pipe_types or self.has_duct_types):
             return False, "The model has no pipe types and no duct types.", None
-        return True, "", {
+        values = {
             "length_mm": length,
             "different": bool(self.different.IsChecked),
             "choose": bool(self.mode_choose.IsChecked),
             "pipe_type": self.pipe_names[self.pipe_combo.SelectedIndex] if self.has_pipe_types else "",
-            "duct_type": self.duct_names[self.duct_combo.SelectedIndex] if self.has_duct_types else "",
         }
+        for key, (combo, names, has) in self.duct.items():
+            values[key + "_type"] = names[combo.SelectedIndex] if has else ""
+        return True, "", values
 
     def _on_ok(self, sender, args):
         ok, message, values = self._validate()
