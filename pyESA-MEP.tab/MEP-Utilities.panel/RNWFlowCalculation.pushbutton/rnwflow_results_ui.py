@@ -2,7 +2,9 @@
 """
 rnwflow_results_ui.py - finestra dei risultati per tratto di RNWFlowCalculation.
 
-Una riga per tratto (SectionResult di rnwflow_check). L'utente sceglie da una
+Una riga per tratto (SectionResult di rnwflow_check) e una per terminale
+(FixtureItem: bocchettone con la sua portata, non modificabile), nell'ordine
+della rete da monte a valle (colonna "#", da rnwflow_check.order_network). L'utente sceglie da una
 tendina la nuova misura fra quelle del tipo di tubazione (PipeSize del tratto,
 lette dallo script dai segmenti del tipo) e spunta i tratti da modificare. A
 ogni scelta la riga ricalcola portata ammissibile, velocita', riempimento ed
@@ -229,7 +231,8 @@ class ResultsForm(Window):
             ("QNew", System.Double), ("VNew", System.Double), ("FillNew", System.Double),
             ("CheckNew", System.String),
             ("Status", System.String), ("Notes", System.String), ("Severity", System.String),
-            ("Action", System.Boolean),
+            ("Action", System.Boolean), ("Order", System.Int32), ("Kind", System.String),
+            ("FedBy", System.String),
         ]
         for name, kind in columns:
             table.Columns.Add(name, kind)
@@ -237,6 +240,9 @@ class ResultsForm(Window):
         for index, section in enumerate(self.sections):
             key = str(index)
             self._by_key[key] = section
+            if getattr(section, "is_fixture", False):
+                table.Rows.Add(self._fixture_row(table, key, index, section))
+                continue
             options = List[System.String]()
             for size in section.sizes or []:
                 options.Add(size.label)
@@ -269,13 +275,60 @@ class ResultsForm(Window):
             row["Notes"] = "; ".join(section.notes)
             row["Severity"] = SEVERITY.get(section.status, "")
             row["Action"] = bool(section.needs_action)
+            row["Order"] = index + 1
+            row["Kind"] = "section"
             self._fill_new(row, section)
             table.Rows.Add(row)
 
+        self._fill_fed_by(table)
         table.AcceptChanges()
         table.ColumnChanged += self._column_handler
         self.table = table
         self.dg_sections.ItemsSource = table.DefaultView
+
+    def _fill_fed_by(self, table):
+        """Colonna "Fed by": le righe che confluiscono direttamente in ogni riga,
+        da rnwflow_check.order_network, in forma breve: "Fixture <id>" per un
+        terminale, "<Section>V" / "<Section>O" per la parte verticale / orizzontale
+        di una Section, unite da "+" (per esempio "1V+2O"); "-" se a monte non c'e'
+        nulla."""
+        def label(entry):
+            if getattr(entry, "is_fixture", False):
+                return "Fixture {0}".format(entry.id)
+            letter = "V" if entry.run == rc.ORIENT_STACK else "O"
+            if entry.section:
+                return "{0}{1}".format(entry.section, letter)
+            return "pipe {0} {1}".format(entry.pipe_ids[0], letter)
+
+        for row in table.Rows:
+            entry = self._by_key[row["Key"]]
+            sources = getattr(entry, "upstream", None) or []
+            row["FedBy"] = "+".join(label(source) for source in sources) or "-"
+
+    def _fixture_row(self, table, key, index, item):
+        """Riga di un terminale: portata e attacco, nessuna modifica possibile."""
+        row = table.NewRow()
+        row["Key"] = key
+        row["Apply"] = False
+        row["System"] = item.system
+        row["Section"] = "-"
+        row["SectionSort"] = item.section_sort()
+        row["Run"] = item.run
+        row["Flow"] = _value(item.flow)
+        row["ModelDn"] = fmt_de(item.dn_mm)
+        row["ModelDe"] = ""
+        row["Suggested"] = ""
+        row["Options"] = List[System.String]()
+        row["HasSizes"] = False
+        row["NewSize"] = ""
+        row["CheckNew"] = ""
+        row["Status"] = item.status
+        row["Notes"] = "; ".join([item.label] + item.notes)
+        row["Severity"] = "fixture"
+        row["Action"] = False
+        row["Order"] = index + 1
+        row["Kind"] = "fixture"
+        return row
 
     # ------------------------------------------------------- misura nuova
 
@@ -323,13 +376,14 @@ class ResultsForm(Window):
     def _apply_filter(self):
         parts = []
         if self.chk_only_action.IsChecked:
-            parts.append("Action = true")
+            # I terminali restano sempre visibili: danno il punto di partenza dei rami.
+            parts.append("(Action = true OR Kind = 'fixture')")
         needle = (self.txt_search.Text or "").strip()
         if needle:
             like = escape_like(needle)
             parts.append("(" + " OR ".join(
                 "{0} LIKE '%{1}%'".format(col, like)
-                for col in ("System", "Section", "Status", "Notes", "Run")) + ")")
+                for col in ("System", "Section", "Status", "Notes", "Run", "FedBy")) + ")")
         self.table.DefaultView.RowFilter = " AND ".join(parts)
         self._update_count()
 
@@ -481,7 +535,8 @@ class ResultsForm(Window):
             chosen.setdefault(section.group_key, []).append((section, size))
         parts = {}
         for section in self.sections:
-            parts.setdefault(section.group_key, []).append(section)
+            if section.group_key is not None:
+                parts.setdefault(section.group_key, []).append(section)
         warnings = []
         for key, items in chosen.items():
             siblings = parts.get(key, [])

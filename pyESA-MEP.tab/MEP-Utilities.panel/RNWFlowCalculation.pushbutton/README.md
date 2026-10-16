@@ -104,6 +104,37 @@ del tubo. Ogni misura porta De (diametro esterno) e DN (diametro nominale).
 
 ## Finestra dei risultati
 
+**Terminali e ordine della rete.** La finestra elenca anche i terminali (plumbing fixtures,
+per esempio i bocchettoni) collegati ai tubi verificati, come righe verdi in corsivo
+"Fixture" con la portata di ognuno (Fixture Units del connettore, `fixture_flow`),
+l'attacco (DN del connettore) e la famiglia; non si spuntano e non hanno misura nuova, il
+pulsante 🔍 li seleziona.
+
+Le righe seguono la rete **dal punto di monte al punto di valle** (colonna `#`):
+
+1. `network_topology` visita la rete dai tubi verificati attraverso i raccordi (fermandosi
+   ai tubi fuori ambito) e raccoglie i **nodi**, cioè i tubi che si incontrano in un
+   raccordo o in una catena di raccordi (due in una curva, tre in una braga), e i
+   terminali raggiunti;
+2. in ogni nodo il tratto di valle è quello più carico (la portata cresce verso valle), a
+   parità di portata il più basso; gli altri vi confluiscono, quindi i rami di una braga
+   restano fratelli e non uno a monte dell'altro. I terminali sono sempre a monte;
+3. `rnwflow_check.order_network` parte da ogni punto di valle (il più carico per primo) e
+   risale i rami scrivendo prima ciò che sta a monte: ogni ramo compare dal suo terminale in
+   giù, prima del tratto in cui confluisce, e lo sbocco è l'ultima riga.
+
+La colonna **Fed by** dice da quali righe deriva ciascuna riga: le righe che vi confluiscono
+direttamente, in forma breve: "Fixture <id>" per un terminale, numero di Section seguito
+da V (parte verticale) o O (parte orizzontale) per i tratti, uniti da "+" quando sono più
+d'uno, per esempio "1V+2O"; "-" se a monte non c'è nulla. Il
+dato è il grafo da monte a valle di `order_network` (attributi `upstream` / `downstream`
+di ogni riga) ed entra anche nella ricerca.
+
+Con il filtro "Only sections that need attention" i terminali restano visibili, perché
+danno il punto di partenza dei rami. Cliccando un'intestazione la griglia si riordina per
+quella colonna; cliccando `#` si torna all'ordine della rete.
+
+
 `rnwflow_results_ui.py` + `RNWFlowCalculation_results.xaml`: una riga per parte di Section
 (colonna *Run*: Horizontal / Vertical), legata a una `DataTable` come in MEPQTO. Righe rosse per `UNDERSIZED` / `FLOW BEYOND TABLE`, gialle
 per i tratti non verificabili, blu per `OVERSIZED`, grigie senza portata.

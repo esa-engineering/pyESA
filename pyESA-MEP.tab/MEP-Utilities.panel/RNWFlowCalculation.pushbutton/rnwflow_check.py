@@ -131,7 +131,7 @@ class PipeCheck(object):
     """Un tubo ridotto a dati semplici, piu' il risultato della verifica."""
 
     def __init__(self, pipe_id, system, system_type, level, section, flow,
-                 angle, slope, model_de_mm, model_dn_mm, sizes):
+                 angle, slope, model_de_mm, model_dn_mm, sizes, z_mid=None):
         self.id = pipe_id
         self.system = system
         self.system_type = system_type
@@ -142,6 +142,7 @@ class PipeCheck(object):
         self.model_de_mm = model_de_mm
         self.model_dn_mm = model_dn_mm
         self.sizes = sizes                # [PipeSize] disponibili, None se ignote
+        self.z_mid = z_mid                # quota del punto medio [mm], per il verso del flusso
         if angle is not None and angle > STACK_MIN_ANGLE_DEG:
             self.orientation = ORIENT_STACK
             self.slope = None
@@ -299,6 +300,8 @@ class SectionResult(object):
         self.rows = rows
         self.limits = limits
         self.pipe_ids = [r.id for r in rows]
+        quotes = [r.z_mid for r in rows if r.z_mid is not None]
+        self.z = sum(quotes) / len(quotes) if quotes else None
         self.system_type = rows[0].system_type
         self.level = rows[0].level
         self.flow = max(r.flow for r in rows)
@@ -444,3 +447,130 @@ def group_sections(rows, limits):
                                  s.section_sort(), s.section or "", s.pipe_ids[0] if s.section is None else 0,
                                  RUN_ORDER.get(s.run, 2)))
     return sections
+
+
+# =============================================================================
+# TERMINALI E ORDINE DELLA RETE
+# =============================================================================
+
+STATUS_TERMINAL = "TERMINAL"
+RUN_FIXTURE = "Fixture"
+
+
+class FixtureItem(object):
+    """Un terminale (plumbing fixture, per esempio un bocchettone) della rete.
+
+    Ha gli stessi attributi di un SectionResult che servono alla finestra, ma non
+    si puo' modificare: nessuna misura, nessuna spunta.
+    """
+
+    is_fixture = True
+
+    def __init__(self, element_id, system, label, flow, dn_mm, z=None, notes=None):
+        self.id = element_id
+        self.key = ("fixture", element_id)
+        self.group_key = None
+        self.pipe_ids = [element_id]
+        self.system = system
+        self.label = label
+        self.flow = flow
+        self.dn_mm = dn_mm
+        self.z = z
+        self.notes = list(notes or [])
+        self.section = None
+        self.run = RUN_FIXTURE
+        self.status = STATUS_TERMINAL
+        self.sizes = None
+        self.default_apply = False
+        self.needs_action = False
+
+    def section_sort(self):
+        return 1e12
+
+
+def _flow_of(entry):
+    return entry.flow if entry.flow is not None else 0.0
+
+
+def order_network(sections, fixtures, row_edges, fixture_edges):
+    """Ordina tratti e terminali dal punto di monte al punto di valle.
+
+    sections: [SectionResult]; fixtures: [FixtureItem];
+    row_edges: coppie (chiave tratto, chiave tratto) collegate (attraverso raccordi);
+    fixture_edges: coppie (chiave terminale, chiave tratto).
+
+    Verso del flusso fra due tratti collegati: a valle quello con portata maggiore
+    (la portata cresce verso valle); a parita' di portata quello piu' basso; poi la
+    chiave. I terminali sono sempre a monte. L'elenco parte da ogni punto di valle
+    (tratto senza tratti a valle, il piu' carico per primo) e risale i rami
+    scrivendo prima cio' che sta a monte: ogni ramo compare dal terminale in giu',
+    prima del tratto in cui confluisce. Ritorna l'elenco ordinato.
+
+    Ogni elemento riceve anche upstream (le righe che confluiscono direttamente
+    in esso) e downstream (quelle in cui confluisce), per la colonna "Fed by".
+    """
+    entries = {}
+    for entry in list(sections) + list(fixtures):
+        entries[entry.key] = entry
+    upstream = dict((key, set()) for key in entries)
+    downstream = dict((key, set()) for key in entries)
+
+    def add(up, down):
+        if up == down or up not in entries or down not in entries:
+            return
+        upstream[down].add(up)
+        downstream[up].add(down)
+
+    tolerance = 0.01
+    for a, b in row_edges:
+        if a not in entries or b not in entries or a == b:
+            continue
+        ea, eb = entries[a], entries[b]
+        fa, fb = _flow_of(ea), _flow_of(eb)
+        if abs(fa - fb) > tolerance:
+            up, down = (a, b) if fa < fb else (b, a)
+        elif ea.z is not None and eb.z is not None and abs(ea.z - eb.z) > 1.0:
+            up, down = (a, b) if ea.z > eb.z else (b, a)
+        else:
+            up, down = (a, b) if str(a) < str(b) else (b, a)
+        if up in downstream.get(down, set()):
+            continue        # gia' collegati nel verso opposto: niente anelli
+        add(up, down)
+    for fixture_key, row_key in fixture_edges:
+        add(fixture_key, row_key)
+
+    def upstream_sort(key):
+        entry = entries[key]
+        return (0 if getattr(entry, "is_fixture", False) else 1, _flow_of(entry), str(key))
+
+    order = []
+    placed = set()
+
+    def visit(root):
+        # Visita in post-ordine iterativa (niente ricorsione profonda in IronPython).
+        stack = [(root, False)]
+        while stack:
+            key, expanded = stack.pop()
+            if key in placed:
+                continue
+            if expanded:
+                placed.add(key)
+                order.append(entries[key])
+                continue
+            stack.append((key, True))
+            for up in sorted(upstream[key], key=upstream_sort, reverse=True):
+                if up not in placed:
+                    stack.append((up, False))
+
+    sinks = [key for key in entries if not downstream[key]]
+    sinks.sort(key=lambda k: ((entries[k].system or "").lower(), -_flow_of(entries[k]), str(k)))
+    for key in sinks:
+        visit(key)
+    for key in sorted(entries, key=lambda k: (_flow_of(entries[k]), str(k))):
+        if key not in placed:
+            visit(key)
+    position = dict((entry.key, index) for index, entry in enumerate(order))
+    for key, entry in entries.items():
+        entry.upstream = [entries[k] for k in sorted(upstream[key], key=lambda k: position[k])]
+        entry.downstream = [entries[k] for k in sorted(downstream[key], key=lambda k: position[k])]
+    return order

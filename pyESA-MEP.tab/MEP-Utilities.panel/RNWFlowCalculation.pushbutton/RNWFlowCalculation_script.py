@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __title__ = "RNW Flow\nCalculation"
-__doc__ = """Version = 3.4
+__doc__ = """Version = 3.5
 Date    = 16.10.2026
 _____________________________________________________________________
 Description:
@@ -38,7 +38,9 @@ __author__ = "ESA Engineering"
 #      DN, Section, misure del tipo di tubazione) verificato da rnwflow_check;
 #      le misure vengono dalle preferenze di instradamento del tipo (tutti i
 #      segmenti, ciascuno nel suo campo di diametri), vedi pipe_type_sizes;
-#   4. raggruppamento per tratto (sistema + Section) e finestra dei risultati
+#   4. raggruppamento per tratto (sistema + Section), terminali (plumbing
+#      fixtures) collegati con la loro portata, ordine della rete da monte a valle
+#      (network_topology + rnwflow_check.order_network) e finestra dei risultati
 #      (rnwflow_results_ui), dove l'utente sceglie i tratti da modificare;
 #   5. modifica: tubi, poi raccordi e accessori collegati (resize_fittings);
 #      una Transaction per Section (le parti orizzontale e verticale insieme)
@@ -403,8 +405,136 @@ def build_check(pipe, type_name, limits, size_cache):
         model_de_mm=outer_diameter_mm(pipe),
         model_dn_mm=nominal_diameter_mm(pipe),
         sizes=pipe_type_sizes(pipe, size_cache),
+        z_mid=pipe_mid_z(pipe),
     )
     return rc.check_pipe(row, limits)
+
+
+def pipe_mid_z(pipe):
+    """Quota del punto medio del tubo [mm]."""
+    try:
+        curve = pipe.Location.Curve
+        return (curve.GetEndPoint(0).Z + curve.GetEndPoint(1).Z) / 2.0 * FT_TO_MM
+    except Exception:
+        return None
+
+
+# -----------------------------------------------------------------------------
+# Terminali e topologia della rete
+# -----------------------------------------------------------------------------
+
+PLUMBING_FIXTURE_CATEGORY = int(DB.BuiltInCategory.OST_PlumbingFixtures)
+
+
+def fixture_flow(fixture):
+    """Portata del terminale [l/s] = Fixture Units dei suoi connettori; None se illeggibili."""
+    total = None
+    fu_id = DB.ElementId(BIP.RBS_PIPE_FIXTURE_UNITS_PARAM)
+    for connector in piping_connectors(fixture):
+        try:
+            value = connector.GetMEPConnectorInfo().GetConnectorParameterValue(fu_id)
+        except Exception:
+            continue
+        if value is None:
+            continue
+        try:
+            total = (total or 0.0) + float(value.Value)
+        except Exception:
+            continue
+    return total
+
+
+def network_topology(pipes):
+    """Collegamenti della rete fra i tubi dell'elenco, attraverso i raccordi.
+
+    Ritorna (nodi, coppie (id terminale, id tubo), {id terminale: elemento}).
+    Un nodo e' l'insieme dei tubi che si incontrano in un raccordo (o in una
+    catena di raccordi): due per una curva, tre per una braga. La visita si ferma
+    ai tubi fuori dall'elenco.
+    """
+    ids = set(get_element_id_value(pipe.Id) for pipe in pipes)
+    nodes = set()
+    fixture_pairs = set()
+    fixtures = {}
+    for pipe in pipes:
+        pipe_id = get_element_id_value(pipe.Id)
+        for connector in piping_connectors(pipe):
+            stack = list(linked_connectors(connector))
+            visited = set()
+            node = set([pipe_id])
+            while stack:
+                ref = stack.pop()
+                owner = ref.Owner
+                owner_id = get_element_id_value(owner.Id)
+                if is_pipe(owner):
+                    if owner_id in ids:
+                        node.add(owner_id)
+                    continue
+                if category_value(owner) == PLUMBING_FIXTURE_CATEGORY:
+                    fixtures[owner_id] = owner
+                    fixture_pairs.add((owner_id, pipe_id))
+                    continue
+                if not is_fitting(owner) or owner_id in visited:
+                    continue
+                visited.add(owner_id)
+                for other in piping_connectors(owner):
+                    try:
+                        if other.Id == ref.Id:
+                            continue
+                    except Exception:
+                        pass
+                    stack.extend(linked_connectors(other))
+            if len(node) > 1:
+                nodes.add(frozenset(node))
+    return nodes, fixture_pairs, fixtures
+
+
+def fixture_item(fixture):
+    flow = fixture_flow(fixture)
+    connectors = piping_connectors(fixture)
+    dn = (radius_mm(connectors[0]) or 0) * 2.0 if connectors else None
+    try:
+        z = fixture.Location.Point.Z * FT_TO_MM
+    except Exception:
+        z = None
+    notes = [] if flow is not None else ["Fixture Units not readable from the connector"]
+    return rc.FixtureItem(get_element_id_value(fixture.Id), system_name(fixture),
+                          fitting_label(fixture), flow, dn, z, notes)
+
+
+def ordered_entries(sections, pipes_by_id):
+    """Tratti e terminali dal punto di monte al punto di valle.
+
+    Ritorna (elenco ordinato, {id: elemento} dei terminali).
+    """
+    row_of = {}
+    pipes = []
+    for section in sections:
+        for pipe_id in section.pipe_ids:
+            row_of[pipe_id] = section.key
+            pipes.append(pipes_by_id[pipe_id])
+    nodes, fixture_pairs, fixtures = network_topology(pipes)
+    by_key = dict((section.key, section) for section in sections)
+
+    def downstream_rank(key):
+        section = by_key[key]
+        return (section.flow or 0.0, -(section.z if section.z is not None else 0.0))
+
+    # In ogni nodo il tratto di valle e' quello piu' carico (a parita', il piu'
+    # basso): gli altri vi confluiscono. I rami di una braga restano fratelli.
+    row_edges = set()
+    for node in nodes:
+        rows_here = set(row_of[pipe_id] for pipe_id in node)
+        if len(rows_here) < 2:
+            continue
+        down = max(rows_here, key=downstream_rank)
+        for key in rows_here:
+            if key != down:
+                row_edges.add((key, down))
+    items = [fixture_item(fixture) for fixture in fixtures.values()]
+    fixture_edges = [(("fixture", fixture_id), row_of[pipe_id])
+                     for fixture_id, pipe_id in fixture_pairs]
+    return rc.order_network(sections, items, row_edges, fixture_edges), fixtures
 
 
 # =============================================================================
@@ -1647,10 +1777,11 @@ NAVIGATE_PROMPT = ("Rainwater Sections: the pipes of the row are selected. Navig
                    "(pan, zoom, orbit), then press Finish or Esc to return to the table")
 
 
-def navigate(ids, pipes_by_id):
-    """Seleziona e inquadra i tubi, poi lascia navigare la vista attiva finche'
-    l'utente non preme Fine o Esc."""
-    pipes = [pipes_by_id[i] for i in ids if i in pipes_by_id and pipes_by_id[i].IsValidObject]
+def navigate(ids, elements_by_id):
+    """Seleziona e inquadra tubi (o terminali), poi lascia navigare la vista attiva
+    finche' l'utente non preme Fine o Esc."""
+    pipes = [elements_by_id[i] for i in ids
+             if i in elements_by_id and elements_by_id[i].IsValidObject]
     if not pipes:
         return
     element_ids = List[DB.ElementId]([pipe.Id for pipe in pipes])
@@ -1897,15 +2028,18 @@ def main():
         return
 
     sections = rc.group_sections(rows, limits)
+    entries, fixtures = ordered_entries(sections, pipes_by_id)
+    elements_by_id = dict(pipes_by_id)
+    elements_by_id.update(fixtures)
     text = settings_text(config)
 
     # Finestra e navigazione si alternano finche' l'utente non applica o chiude.
     state = None
     while True:
-        form = rres.show_results(sections, text, state)
+        form = rres.show_results(entries, text, state)
         state = form.state
         if form.kind == rres.KIND_SHOW:
-            navigate(form.show_ids, pipes_by_id)
+            navigate(form.show_ids, elements_by_id)
             continue
         break
     if form.kind != rres.KIND_APPLY or not form.changes:

@@ -13,7 +13,9 @@ tooltip: >
   for the chosen pipe series (PE, PP, Triplus, Silere). Sloped pipes are also checked for
   velocity (minimum and maximum set in the dialog) and fill degree at the design flow.
 
-  CLICK: the results open in a window with one row per section part, horizontal and
+  CLICK: the results open in a window that follows the network from upstream to
+  downstream: every branch starts at its fixture (with the flow of each fixture) and comes
+  before the section it drains into. One row per section part, horizontal and
   vertical (System + Section parameter of the pipes): flow, nominal and outer diameter in the model, capacity,
   velocity, fill degree, suggested diameter and status. Pick the new size from a dropdown
   with the sizes of the pipe type (from the segments of its routing preferences): capacity,
