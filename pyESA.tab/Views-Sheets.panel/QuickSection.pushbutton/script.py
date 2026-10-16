@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "Quick\nSection"
-__doc__ = """Version = 0.1
-Date    = 12.10.2026
+__doc__ = """Version = 0.2
+Date    = 16.10.2026
 ________________________________________________________________
 Description:
 Places a section quickly from a plan view, always reusing the same
@@ -385,14 +385,15 @@ def desired_transform(geo, z_mid):
 
 def section_box(transform, geo, z_min, z_max):
     """Riquadro della sezione nelle coordinate locali di transform: larghezza attorno al centro, quote, profondita'
-    dalla linea di sezione (Max.Z) verso il lato guardato (Min.Z)."""
+    dalla linea di sezione (Z = 0) verso il lato guardato (Min.Z). Revit disegna la linea e misura il far clip dal
+    piano Z = 0 del sistema: un Max.Z diverso da 0 allarga il riquadro ma non sposta la linea. Per questo la linea
+    si porta sul bersaglio spostando il simbolo (align_line), non il riquadro."""
     rel = geo["center"].Subtract(transform.Origin)
     x0 = flat(rel).DotProduct(transform.BasisX)
-    cut = flat(rel).DotProduct(transform.BasisZ)
     box = DB.BoundingBoxXYZ()
     box.Transform = transform
-    box.Min = DB.XYZ(x0 - geo["half"], z_min - transform.Origin.Z, cut - geo["depth"])
-    box.Max = DB.XYZ(x0 + geo["half"], z_max - transform.Origin.Z, cut)
+    box.Min = DB.XYZ(x0 - geo["half"], z_min - transform.Origin.Z, -geo["depth"])
+    box.Max = DB.XYZ(x0 + geo["half"], z_max - transform.Origin.Z, 0)
     return box
 
 
@@ -442,10 +443,11 @@ def actual_look(section):
 
 
 def line_point(section):
-    """Centro della linea di sezione, ricavato dal ritaglio: meta' della larghezza sul piano di taglio (Max.Z).
-    L'origine della vista NON sta sulla linea (verificato: stava circa 9 m fuori), quindi non si usa."""
+    """Centro della linea di sezione: meta' della larghezza sul piano Z = 0 del sistema del ritaglio, dove Revit
+    disegna la linea. NON su Max.Z: con un Max.Z diverso da 0 la linea restava a meta' del riquadro. L'origine del
+    sistema sta sulla linea ma non al suo centro (lungo la linea puo' stare anche a metri), quindi si prende X medio."""
     box = section.CropBox
-    return box.Transform.OfPoint(DB.XYZ((box.Min.X + box.Max.X) / 2.0, 0, box.Max.Z))
+    return box.Transform.OfPoint(DB.XYZ((box.Min.X + box.Max.X) / 2.0, 0, 0))
 
 
 def line_offset(section, geo):
@@ -657,12 +659,13 @@ def place_section(plan, geo, z_min, z_max, settings, changed_keys, previous_name
         doc.Regenerate()
         set_extent(section, geo, z_min, z_max, notes, created=(action == "created"))
         off = align_line(section, geo, z_min, z_max, created=(action == "created"))
-        # il ritaglio e' il riferimento: la linea del ritaglio deve stare sull'asse voluto. La linea disegnata in
-        # pianta NON e' verificata (vedi SectionProbe): per questo la diagnosi dice cosa e' misurato
-        diag = "crop line {:.0f} mm from the target (crop is the reference; the drawn line in plan is not checked)"\
-            .format(abs(off) * MM_PER_FT)
+        # linea misurata sul piano Z = 0 del ritaglio (dove Revit la disegna); il riquadro parte da li'
+        box = section.CropBox
+        diag = "section line {:.0f} mm from the target; crop near side {:.0f} mm from the line".format(
+            abs(off) * MM_PER_FT, abs(box.Max.Z) * MM_PER_FT)
         if abs(off) * MM_PER_FT > 1.0:
-            notes.append("WARNING: the crop line is {:.0f} mm away from the target line".format(abs(off) * MM_PER_FT))
+            notes.append("WARNING: the section line is {:.0f} mm away from the target line".format(
+                abs(off) * MM_PER_FT))
         facing = actual_look(section).DotProduct(geo["look"])
         if facing < math.cos(math.radians(0.1)):
             notes.append("WARNING: the section does not look towards the clicked side ({:.0f} degrees off)".format(
