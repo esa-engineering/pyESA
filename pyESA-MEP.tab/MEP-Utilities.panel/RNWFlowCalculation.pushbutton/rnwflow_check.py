@@ -1,0 +1,446 @@
+# -*- coding: utf-8 -*-
+"""
+rnwflow_check.py - verifica dei tubi e aggregazione per tratto (Section).
+
+Modulo puro Python (nessun import di Revit): lo script legge il modello e
+riduce ogni tubo a un PipeCheck con dati semplici; qui si fanno la verifica
+contro le tabelle (rnwflow_tables) e il raggruppamento per tratto.
+
+Tratto = (nome del sistema, parametro Section del tubo, orientamento). Revit
+numera i tratti per sistema: un tratto e' una sequenza di tubi a portata e
+dimensione costanti. Ogni Section si divide in una parte orizzontale (tubi
+orizzontali e inclinati fino a STACK_MIN_ANGLE_DEG, quindi anche i 45 gradi) e
+una verticale, verificate e modificate come righe separate. group_key riunisce
+le righe della stessa Section: lo script le modifica nella stessa transazione.
+I tubi senza Section formano un tratto ciascuno.
+
+Verifica di un tubo a un De (evaluate): portata ammissibile dalla tabella,
+grado di riempimento e velocita' alla portata di progetto (solo orizzontali,
+rnwflow_tables.partial_state), confronto con le velocita' minima e massima
+scelte dall'utente. La stessa funzione serve per il De del modello e per il De
+scelto nella tendina della finestra dei risultati.
+
+Regole di aggregazione del tratto:
+
+* portata = massima portata dei suoi tubi;
+* stato = il piu' grave fra i tubi; OK / OVERSIZED si decidono sul tratto;
+* De suggerito = il massimo De suggerito fra i tubi con portata; nessuno se un
+  tubo non e' verificabile (pendenza sotto tabella, portata oltre tabella);
+* portata ammissibile = la minima fra i tubi; velocita' minima e massima e
+  riempimento massimo fra i tubi orizzontali;
+* misure disponibili = quelle comuni ai tubi del tratto (dai segmenti del tipo
+  di tubazione, vedi lo script).
+"""
+
+import rnwflow_tables as rt
+
+# Inclinazione sull'orizzontale oltre la quale un tubo e' una colonna: i tratti a
+# 45 gradi restano orizzontali (verificati con le tabelle 6.3 - 6.5, riga 10 cm/m).
+STACK_MIN_ANGLE_DEG = 60.0
+
+ORIENT_HORIZONTAL = "Horizontal"
+ORIENT_STACK = "Vertical"
+ORIENT_MIXED = "Mixed"
+
+STATUS_OK = "OK"
+STATUS_OVERSIZED = "OVERSIZED"
+STATUS_UNDERSIZED = "UNDERSIZED"
+STATUS_NOT_IN_TABLE = "DE NOT IN TABLE"
+STATUS_LOW_SLOPE = "SLOPE UNDER 0.5 cm/m"
+STATUS_BEYOND = "FLOW BEYOND TABLE"
+STATUS_HIGH_VELOCITY = "HIGH VELOCITY"
+STATUS_LOW_VELOCITY = "LOW VELOCITY"
+STATUS_NO_FLOW = "NO FLOW"
+
+# Dal piu' grave al meno grave
+STATUS_ORDER = [STATUS_UNDERSIZED, STATUS_BEYOND, STATUS_NOT_IN_TABLE,
+                STATUS_LOW_SLOPE, STATUS_HIGH_VELOCITY, STATUS_LOW_VELOCITY,
+                STATUS_OVERSIZED, STATUS_OK, STATUS_NO_FLOW]
+
+# Stati per cui si propone di cambiare diametro (tratti spuntati in apertura)
+STATUS_TO_RESIZE = (STATUS_UNDERSIZED, STATUS_NOT_IN_TABLE, STATUS_HIGH_VELOCITY)
+
+# Stati che non richiedono nessuna azione
+STATUS_PASS = (STATUS_OK, STATUS_NO_FLOW)
+
+# Tolleranza [mm] per riconoscere un diametro esterno fra le misure disponibili
+OD_TOLERANCE_MM = 1.0
+
+# Differenza di portata [l/s] oltre la quale i tubi di un tratto sono segnalati
+FLOW_TOLERANCE = 0.01
+
+
+class Limits(object):
+    """Parametri della verifica scelti dall'utente."""
+
+    def __init__(self, fill, series, vmin=None, vmax=None):
+        self.fill = fill
+        self.series = series
+        self.vmin = vmin
+        self.vmax = vmax
+
+
+class PipeSize(object):
+    """Una misura disponibile per il tubo: diametro esterno e nominale [mm].
+
+    nominal e' il valore da scrivere nel parametro Diameter (unita' interne);
+    resta opaco per questo modulo.
+    """
+
+    __slots__ = ("od_mm", "dn_mm", "nominal")
+
+    def __init__(self, od_mm, dn_mm, nominal=None):
+        self.od_mm = od_mm
+        self.dn_mm = dn_mm
+        self.nominal = nominal
+
+    @property
+    def label(self):
+        return "De {0}  /  DN {1}".format(fmt_mm(self.od_mm), fmt_mm(self.dn_mm))
+
+
+def fmt_mm(value):
+    if value is None:
+        return "-"
+    value = float(value)
+    if abs(value - round(value)) < 0.05:
+        return "{0:.0f}".format(value)
+    return "{0:.1f}".format(value)
+
+
+def od_in(value_mm, ods):
+    """True se value_mm e' fra i diametri ods, entro la tolleranza."""
+    if value_mm is None or ods is None:
+        return False
+    return any(abs(od - value_mm) <= OD_TOLERANCE_MM for od in ods)
+
+
+def find_size(sizes, od_mm):
+    """Misura di sizes con diametro esterno od_mm (entro la tolleranza), o None."""
+    if sizes is None or od_mm is None:
+        return None
+    best = None
+    for size in sizes:
+        delta = abs(size.od_mm - od_mm)
+        if delta <= OD_TOLERANCE_MM and (best is None or delta < abs(best.od_mm - od_mm)):
+            best = size
+    return best
+
+
+class PipeCheck(object):
+    """Un tubo ridotto a dati semplici, piu' il risultato della verifica."""
+
+    def __init__(self, pipe_id, system, system_type, level, section, flow,
+                 angle, slope, model_de_mm, model_dn_mm, sizes):
+        self.id = pipe_id
+        self.system = system
+        self.system_type = system_type
+        self.level = level
+        self.section = section            # stringa, None se il tubo non ha Section
+        self.flow = flow if flow is not None else 0.0
+        self.angle = angle
+        self.model_de_mm = model_de_mm
+        self.model_dn_mm = model_dn_mm
+        self.sizes = sizes                # [PipeSize] disponibili, None se ignote
+        if angle is not None and angle > STACK_MIN_ANGLE_DEG:
+            self.orientation = ORIENT_STACK
+            self.slope = None
+            self.table_slope = None
+            self.slope_reason = None
+        else:
+            self.orientation = ORIENT_HORIZONTAL
+            self.slope = slope if slope is not None else 0.0
+            self.table_slope, self.slope_reason = rt.slope_row(self.slope)
+        self.model_de = None
+        self.capacity = None
+        self.velocity = None
+        self.fill_actual = None
+        self.suggested_de = None
+        self.suggested_capacity = None
+        self.status = STATUS_OK
+        self.notes = []
+
+
+class Evaluation(object):
+    """Esito di un tubo (o di un tratto) a un De dato."""
+
+    __slots__ = ("capacity", "velocity", "fill_actual", "status")
+
+    def __init__(self, capacity=None, velocity=None, fill_actual=None, status=STATUS_OK):
+        self.capacity = capacity
+        self.velocity = velocity
+        self.fill_actual = fill_actual
+        self.status = status
+
+
+def table_de(row, de_mm):
+    """De di tabella corrispondente a de_mm per l'orientamento del tubo."""
+    if row.orientation == ORIENT_STACK:
+        return rt.match_de(de_mm, rt.all_stack_diameters())
+    return rt.match_de(de_mm, rt.HORIZONTAL_DE)
+
+
+def evaluate(row, de_mm, limits):
+    """Verifica il tubo come se avesse diametro esterno de_mm.
+
+    Stati possibili: NO FLOW, SLOPE UNDER 0.5, DE NOT IN TABLE (De non in
+    tabella o non nella serie), UNDERSIZED, HIGH / LOW VELOCITY, OK.
+    """
+    if row.flow <= 0:
+        return Evaluation(status=STATUS_NO_FLOW)
+    de = table_de(row, de_mm)
+    if row.orientation == ORIENT_STACK:
+        capacity = rt.stack_capacity(limits.series, de)
+        if capacity is None:
+            return Evaluation(status=STATUS_NOT_IN_TABLE)
+        if capacity < row.flow:
+            return Evaluation(capacity, status=STATUS_UNDERSIZED)
+        return Evaluation(capacity, status=STATUS_OK)
+
+    if row.table_slope is None:
+        return Evaluation(status=STATUS_LOW_SLOPE)
+    cell = rt.horizontal_cell(limits.fill, row.table_slope, de)
+    if cell is None:
+        return Evaluation(status=STATUS_NOT_IN_TABLE)
+    capacity = cell[1]
+    state = rt.partial_state(row.flow, de, row.table_slope)
+    fill_actual, velocity = state if state is not None else (None, None)
+    if capacity < row.flow:
+        return Evaluation(capacity, velocity, fill_actual, STATUS_UNDERSIZED)
+    if velocity is not None and limits.vmax is not None and velocity > limits.vmax:
+        return Evaluation(capacity, velocity, fill_actual, STATUS_HIGH_VELOCITY)
+    if velocity is not None and limits.vmin is not None and velocity < limits.vmin:
+        return Evaluation(capacity, velocity, fill_actual, STATUS_LOW_VELOCITY)
+    return Evaluation(capacity, velocity, fill_actual, STATUS_OK)
+
+
+def check_pipe(row, limits):
+    """Verifica il tubo al De del modello e ne imposta stato e De suggerito."""
+    series = limits.series
+    row.model_de = table_de(row, row.model_de_mm)
+    result = evaluate(row, row.model_de_mm, limits)
+    row.capacity = result.capacity
+    row.velocity = result.velocity
+    row.fill_actual = result.fill_actual
+
+    if result.status == STATUS_NO_FLOW:
+        row.status = STATUS_NO_FLOW
+        return row
+    if result.status == STATUS_LOW_SLOPE:
+        row.status = STATUS_LOW_SLOPE
+        return row
+    if row.slope_reason == "ABOVE":
+        row.notes.append("Slope over {0:.0f} cm/m: {0:.0f} cm/m row used".format(rt.MAX_SLOPE))
+
+    if row.orientation == ORIENT_STACK:
+        if row.model_de is not None and rt.stack_capacity(series, row.model_de) is None:
+            row.notes.append("De {0} not in the {1} series".format(
+                row.model_de, rt.SERIES_LABELS[series]))
+        suggestion = rt.suggest_stack(row.flow, series)
+        if suggestion is not None:
+            row.suggested_de, row.suggested_capacity = suggestion
+    else:
+        if row.model_de is not None and row.capacity is not None \
+                and row.model_de not in rt.horizontal_diameters(series):
+            row.notes.append("De {0} not in the {1} series".format(
+                row.model_de, rt.SERIES_LABELS[series]))
+        suggestion = rt.suggest_horizontal(limits.fill, row.table_slope, row.flow,
+                                           series, limits.vmax)
+        if suggestion is not None:
+            row.suggested_de = suggestion[0]
+            row.suggested_capacity = suggestion[2]
+
+    status = result.status
+    if status in (STATUS_UNDERSIZED, STATUS_NOT_IN_TABLE) and row.suggested_de is None:
+        status = STATUS_BEYOND
+    if status == STATUS_OK and row.suggested_de is not None and row.model_de is not None \
+            and row.model_de > row.suggested_de:
+        status = STATUS_OVERSIZED
+    row.status = status
+
+    if status == STATUS_LOW_VELOCITY and row.suggested_de is not None:
+        state = rt.partial_state(row.flow, row.suggested_de, row.table_slope)
+        if state is not None and state[1] is not None and \
+                (limits.vmin is None or state[1] < limits.vmin):
+            row.notes.append("Velocity stays low at every De: increase the slope")
+    if status == STATUS_HIGH_VELOCITY:
+        state = rt.partial_state(row.flow, row.suggested_de, row.table_slope) \
+            if row.suggested_de is not None else None
+        if state is None or state[1] is None or state[1] > limits.vmax:
+            row.notes.append("Velocity stays high at every De: reduce the slope")
+    return row
+
+
+def _common_sizes(rows):
+    """Misure presenti per tutti i tubi (per diametro esterno); None se una e' ignota."""
+    common = None
+    for row in rows:
+        if row.sizes is None:
+            return None
+        if common is None:
+            common = sorted(row.sizes, key=lambda s: s.od_mm)
+        else:
+            common = [s for s in common if find_size(row.sizes, s.od_mm) is not None]
+    return common or []
+
+
+def _worst(statuses):
+    return min(statuses, key=STATUS_ORDER.index)
+
+
+class SectionResult(object):
+    """Un tratto: i suoi tubi e la proposta di diametro."""
+
+    def __init__(self, key, system, section, rows, limits):
+        self.key = key
+        self.group_key = key[:2]
+        self.system = system
+        self.section = section
+        self.rows = rows
+        self.limits = limits
+        self.pipe_ids = [r.id for r in rows]
+        self.system_type = rows[0].system_type
+        self.level = rows[0].level
+        self.flow = max(r.flow for r in rows)
+
+        orientations = set(r.orientation for r in rows)
+        self.run = orientations.pop() if len(orientations) == 1 else ORIENT_MIXED
+        slopes = [r.slope for r in rows if r.orientation == ORIENT_HORIZONTAL
+                  and r.slope is not None]
+        self.min_slope = min(slopes) if slopes else None
+
+        self.model_des = sorted(set(round(r.model_de_mm, 1) for r in rows
+                                    if r.model_de_mm is not None))
+        self.model_dns = sorted(set(round(r.model_dn_mm, 1) for r in rows
+                                    if r.model_dn_mm is not None))
+
+        active = [r for r in rows if r.status != STATUS_NO_FLOW]
+        self.status = _worst([r.status for r in rows])
+
+        capacities = [r.capacity for r in active]
+        self.capacity = min(capacities) if active and all(c is not None for c in capacities) \
+            else None
+        velocities = [r.velocity for r in active if r.velocity is not None]
+        self.v_min = min(velocities) if velocities else None
+        self.v_max = max(velocities) if velocities else None
+        fills = [r.fill_actual for r in active if r.fill_actual is not None]
+        self.fill_max = max(fills) if fills else None
+
+        suggested = [r.suggested_de for r in active]
+        self.suggested_de = max(suggested) if active and all(s is not None for s in suggested) \
+            else None
+
+        # OK / OVERSIZED si decidono sul tratto, non sul singolo tubo: un tubo a
+        # portata minore puo' risultare sovradimensionato mentre il De del
+        # tratto (quello del tubo piu' caricato) e' proprio quello del modello.
+        if self.status in (STATUS_OK, STATUS_OVERSIZED):
+            model_des = [r.model_de for r in active if r.model_de is not None]
+            if self.suggested_de is not None and model_des \
+                    and min(model_des) > self.suggested_de:
+                self.status = STATUS_OVERSIZED
+            else:
+                self.status = STATUS_OK
+
+        self.sizes = _common_sizes(rows)
+        self.model_size = find_size(self.sizes, self.model_des[0]) \
+            if len(self.model_des) == 1 else None
+        self.suggested_size = find_size(self.sizes, self.suggested_de)
+
+        notes = []
+        for r in rows:
+            for note in r.notes:
+                if note not in notes:
+                    notes.append(note)
+        if section is None:
+            notes.append("No Section value: pipe checked on its own")
+        if max(r.flow for r in rows) - min(r.flow for r in rows) > FLOW_TOLERANCE:
+            notes.append("Pipes of the section carry different flows: the highest is used")
+        if len(self.model_des) > 1:
+            notes.append("Pipes of the section have different diameters")
+        if self.sizes is None:
+            notes.append("Pipe type sizes unknown")
+        elif self.suggested_de is not None and self.suggested_size is None:
+            notes.append("Suggested De not among the sizes of the pipe type")
+        # Un tubo sottodimensionato e' in pressione: la velocita' a pelo libero
+        # non esiste e la nota confonderebbe.
+        if self.run != ORIENT_STACK and self.v_min is None and \
+                self.status in (STATUS_OK, STATUS_OVERSIZED):
+            notes.append("Velocity not available")
+        self.notes = notes
+
+        self.default_apply = (
+            self.status in STATUS_TO_RESIZE
+            and self.suggested_size is not None
+            and not od_in(self.suggested_size.od_mm, self.model_des))
+
+    def evaluate_at(self, de_mm):
+        """Esito del tratto se tutti i suoi tubi avessero diametro esterno de_mm."""
+        active = [r for r in self.rows if r.status != STATUS_NO_FLOW]
+        if not active:
+            return Evaluation(status=STATUS_NO_FLOW)
+        results = [evaluate(r, de_mm, self.limits) for r in active]
+        capacities = [e.capacity for e in results]
+        velocities = [e.velocity for e in results if e.velocity is not None]
+        fills = [e.fill_actual for e in results if e.fill_actual is not None]
+        return Evaluation(
+            capacity=min(capacities) if all(c is not None for c in capacities) else None,
+            velocity=min(velocities) if velocities else None,
+            fill_actual=max(fills) if fills else None,
+            status=_worst([e.status for e in results]))
+
+    @property
+    def use_pct(self):
+        if self.capacity is None or self.capacity <= 0:
+            return None
+        return self.flow / self.capacity * 100.0
+
+    @property
+    def needs_action(self):
+        return self.status not in STATUS_PASS
+
+    @property
+    def model_de_label(self):
+        return "/".join(fmt_mm(d) for d in self.model_des) or "-"
+
+    @property
+    def model_dn_label(self):
+        return "/".join(fmt_mm(d) for d in self.model_dns) or "-"
+
+    def section_sort(self):
+        """Chiave numerica del Section per l'ordinamento (testo in coda).
+
+        Controllo esplicito di None: in IronPython float(None) solleva una
+        NullReferenceException di .NET, non un TypeError.
+        """
+        if self.section is None:
+            return 1e12
+        try:
+            return float(self.section)
+        except Exception:
+            return 1e12
+
+
+RUN_ORDER = {ORIENT_HORIZONTAL: 0, ORIENT_STACK: 1}
+
+
+def group_sections(rows, limits):
+    """Tratti nell'ordine sistema, Section, orizzontale prima del verticale.
+
+    Una riga per (sistema, Section, orientamento); i tubi senza Section in coda
+    al sistema, uno per riga.
+    """
+    groups = {}
+    order = []
+    for row in rows:
+        section_key = row.section if row.section else "#{0}".format(row.id)
+        key = (row.system, section_key, row.orientation)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(row)
+    sections = [SectionResult(key, key[0], groups[key][0].section or None, groups[key], limits)
+                for key in order]
+    sections.sort(key=lambda s: (s.system.lower(), s.section is None,
+                                 s.section_sort(), s.section or "", s.pipe_ids[0] if s.section is None else 0,
+                                 RUN_ORDER.get(s.run, 2)))
+    return sections
