@@ -1,0 +1,14 @@
+title: Quick SectionBox
+tooltip: >-
+  CLICK, from a plan view: opens a 3D view boxed around a part of the model, always updating the same one (one per
+  user, "ESA Quick SectionBox - <user name>"). Click an element (also in linked RVT and IFC models): the section box
+  wraps it, plus a margin on every side. Or press ESC and drag a rectangle in the plan: the box covers it, as high as
+  the view range of the plan plus the margins below and above. The box follows the axes of the plan on screen.
+
+  Once created, only the section box of the 3D view changes: template, visibility, orientation and the other settings
+  you give it are kept.
+
+  SHIFT + CLICK: settings first (3D view name, margin, margins below and above the view range, view template). A new
+  name renames your existing 3D view. The template is applied to the existing view only if you change it in the
+  window.
+author: Matteo Maiorano
