@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 __title__ = "Tab\nVisibility"
-<<<<<<< HEAD
 __doc__ = """Version = 1.3
 Date    = 15.10.2026
 ________________________________________________________________
@@ -11,14 +10,6 @@ each tab (checked = shown). The list shows the tabs as they are now.
 The default Revit tabs (Architecture, Structure, Insert, View...) are
 not listed: they are managed in File > Options > User Interface >
 Configure.
-=======
-__doc__ = """Version = 1.2
-Date    = 14.10.2026
-________________________________________________________________
-Description:
-Shows or hides the tabs of the Revit ribbon with a checkbox for each
-tab (checked = shown). The list shows the tabs as they are now.
->>>>>>> main
 
 With "Keep these tabs hidden when Revit restarts" ticked, the hidden
 tabs are saved and hidden again at every Revit start. Tabs are saved
@@ -49,7 +40,6 @@ SEPARATOR = "|"
 output = script.get_output()
 
 
-<<<<<<< HEAD
 # Id dei tab nativi di Revit (non localizzati): non si gestiscono da qui
 BUILTIN_TAB_NAMES = set((
     "architecture", "structure", "steel", "precast", "systems", "insert", "annotate",
@@ -61,13 +51,10 @@ def _norm(text):
     return "".join(c for c in str(text).lower() if c.isalnum())
 
 
-=======
->>>>>>> main
 def tab_key(tab):
     return str(tab.Id)
 
 
-<<<<<<< HEAD
 def is_builtin(tab):
     try:
         if tab.IsContextualTab:
@@ -87,8 +74,6 @@ def is_builtin(tab):
     return False
 
 
-=======
->>>>>>> main
 def tab_title(tab):
     try:
         return tab.Title or ""
@@ -129,7 +114,6 @@ def main():
     except Exception as ex:
         output.print_md("**The ribbon could not be read:** {}".format(ex))
         return
-<<<<<<< HEAD
     builtin_titles = set(tab_title(t) for t in tabs if is_builtin(t))
     listed = [t for t in tabs
               if tab_title(t) and tab_title(t) != OWN_TAB and not is_builtin(t)]
@@ -137,12 +121,6 @@ def main():
     if not items:
         output.print_md("No add-in tab can be listed. The default Revit tabs are managed in "
                         "**File > Options > User Interface > Configure**.")
-=======
-    listed = [t for t in tabs if tab_title(t) and tab_title(t) != OWN_TAB]
-    items = [(tab_key(t), tab_title(t), bool(t.IsVisible)) for t in listed]
-    if not items:
-        output.print_md("No tab can be listed.")
->>>>>>> main
         return
 
     config = script.get_config(CONFIG_NAME)
@@ -170,10 +148,7 @@ def main():
     hidden_now = set(tab_title(t) for t in listed if visible_by_key.get(tab_key(t)) is False)
     hidden_titles = (saved_hidden - listed_titles) | hidden_now
     hidden_titles.discard(OWN_TAB)
-<<<<<<< HEAD
     hidden_titles -= builtin_titles  # salvataggi di versioni precedenti
-=======
->>>>>>> main
     saved = save(config, hidden_titles, remember)
 
     if failed:
