@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
 __title__ = "Bone"
-__doc__ = """Version = 0.7
-Date    = 12.10.2026
+__doc__ = """Version = 0.8
+Date    = 16.10.2026
 ________________________________________________________________
-Bends the selected parallel horizontal pipes, ducts or cable trays to the left or
-right, keeping their spacing.
+Bends the selected pipes, ducts or cable trays to the left or right in plan,
+keeping their spacing. The elements may be sloped and need not be exactly
+parallel (within 5 degrees in plan): each one is cut where it meets the line of
+the bends, and all new runs come out parallel.
 CLICK opens the settings window first, before any selection or click:
 - angle (common angles or a custom one), or a direction of the view (arrows up,
-  down, left, right: the angle is computed from the direction of the row)
+  down, left, right and the four diagonals at 45 degrees: the angle is computed
+  from the direction of the row)
 - length after the bend (all ends aligned)
+- sloped elements: keep the slope of each element after the bend, or make the
+  new runs horizontal
 - align to an element: the row bends to run parallel to a clicked wall, beam,
   column, pipe, duct or vertical face, also in linked RVT and IFC models
 Then select the elements and click where the bend starts (on one of them, or any
@@ -48,7 +53,7 @@ import MultiTurn_ui as Turn_ui  # nome unico: con Rocket mode i moduli restano i
 
 XAML_FILE_NAME = "Comb_form.xaml"
 CONFIG_NAME = "ESA_Comb"
-BEND_DEFAULTS = {"angle_deg": 90.0, "length_mm": 1500.0, "mode": "angle", "direction": "up"}
+BEND_DEFAULTS = {"angle_deg": 90.0, "length_mm": 1500.0, "mode": "angle", "direction": "up", "keep_slope": True}
 ANGLE_XAML_FILE_NAME = "Angle_form.xaml"
 QUICK_ANGLES = (10.0, 15.0, 22.5, 30.0, 45.0, 60.0, 90.0)
 MIN_ANGLE, MAX_ANGLE = 5.0, 90.0  # limiti dell'angolo di curva, anche quando si calcola da freccia o elemento
@@ -198,6 +203,12 @@ def tray_turned_copy(source, conn, end_point):
     if abs(angle) > 1e-6:
         axis = DB.Line.CreateBound(origin, origin.Add(DB.XYZ.BasisZ))
         DB.ElementTransformUtils.RotateElement(doc, copy_id, axis, angle)
+    # la rotazione attorno a Z conserva la pendenza del tratto di partenza: se il nuovo tratto ne ha un'altra
+    # (es. reso orizzontale) si sposta l'estremo finale
+    doc.Regenerate()
+    curve = new.Location.Curve
+    if curve.GetEndPoint(1).DistanceTo(end_point) > 1e-4:
+        new.Location.Curve = DB.Line.CreateBound(curve.GetEndPoint(0), end_point)
     mark = new.get_Parameter(DB.BuiltInParameter.ALL_MODEL_MARK)
     if mark is not None and not mark.IsReadOnly:
         mark.Set("")  # la copia eredita il Mark: duplicato
@@ -607,12 +618,17 @@ def signed_angle_to(forward, target):
 
 def view_direction(name):
     """Direzione orizzontale della freccia scelta, come si vede nella vista attiva: destra = RightDirection della
-    vista, su = 90 gradi a sinistra della destra (in pianta: verso l'alto dello schermo, anche con la vista ruotata)."""
+    vista, su = 90 gradi a sinistra della destra (in pianta: verso l'alto dello schermo, anche con la vista ruotata).
+    Le frecce diagonali (es. "up_left") stanno a 45 gradi fra le due."""
     right = doc.ActiveView.RightDirection
     right = DB.XYZ(right.X, right.Y, 0)
     right = right.Normalize() if right.GetLength() > 1e-6 else DB.XYZ.BasisX
     up = DB.XYZ(-right.Y, right.X, 0)
-    return {"right": right, "left": right.Negate(), "up": up, "down": up.Negate()}[name]
+    axes = {"right": right, "left": right.Negate(), "up": up, "down": up.Negate()}
+    if "_" in name:
+        vertical, horizontal = name.split("_")
+        return axes[vertical].Add(axes[horizontal]).Normalize()
+    return axes[name]
 
 
 def hit_face_normal(reference, element, link_instance):
@@ -739,54 +755,105 @@ def resolve_turn(pipes, d, settings, side_click, pick):
     return abs(signed_deg), signed_deg > 0, note
 
 
+NEAR_PARALLEL_DEG = 5.0  # scarto massimo in pianta fra gli elementi della fila
+MIN_PLAN_COMPONENT = 0.2  # sotto questa componente orizzontale l'elemento e' (quasi) verticale: niente curva in pianta
+SLOPE_TOL = 1e-4
+
+
+def cross_z(a, b):
+    return a.X * b.Y - a.Y * b.X
+
+
+def run_directions(pipes):
+    """Direzione 3D e in pianta di ogni elemento, tutte concordi con il primo. Ammessi elementi inclinati e non
+    paralleli fino a NEAR_PARALLEL_DEG in pianta rispetto al primo. Ritorna [(direzione 3D, direzione in pianta)]."""
+    dirs, first = [], None
+    for pipe in pipes:
+        curve = pipe.Location.Curve
+        if not isinstance(curve, DB.Line):
+            raise CombError("Element {} is not straight".format(pipe.Id))
+        d3 = curve.Direction
+        flat = DB.XYZ(d3.X, d3.Y, 0)
+        if flat.GetLength() < MIN_PLAN_COMPONENT:
+            raise CombError("Element {} is vertical or nearly vertical: only horizontal or sloped runs can be bent "
+                            "in plan".format(pipe.Id))
+        dp = flat.Normalize()
+        if first is None:
+            first = dp
+        elif dp.DotProduct(first) < 0:
+            d3, dp = d3.Negate(), dp.Negate()
+        skew = abs(signed_angle_to(first, dp))
+        if skew > NEAR_PARALLEL_DEG:
+            raise CombError("Element {} is {:.1f} degrees off the first one in plan: the elements must be parallel "
+                            "within {:g} degrees".format(pipe.Id, skew, NEAR_PARALLEL_DEG))
+        dirs.append((d3, dp))
+    return dirs
+
+
 def analyse_bend(pipes, start_click, settings, side_click=None, pick=None):
     """Geometria di partenza della curva, senza toccare il modello. Ritorna (piani dei tubi, dati comuni).
     start_click: punto qualsiasi (anche fuori dai tubi o su un link): il tubo piu' vicino fa da riferimento e la
     curva parte dalla proiezione del punto sulla sua linea (i tubi vengono prolungati fino li').
     side_click (modalita' angolo): punto a lato della fila che sceglie il verso della piega.
-    pick (modalita' allineamento): elemento cliccato a cui la fila diventa parallela dopo la curva."""
-    d0 = check_straight_parallel(pipes)
-    d0 = DB.XYZ(d0.X, d0.Y, 0).Normalize()
-    perp = DB.XYZ(-d0.Y, d0.X, 0)
-    anchor = min(pipes, key=lambda p: abs(ends_of(p)[0].Subtract(start_click).DotProduct(perp)))
+    pick (modalita' allineamento): elemento cliccato a cui la fila diventa parallela dopo la curva.
+    Il calcolo e' in pianta: elementi inclinati e non paralleli (entro NEAR_PARALLEL_DEG) sono ammessi."""
+    dirs = run_directions(pipes)
+
+    def plan_distance(i):
+        dp = dirs[i][1]
+        return abs(cross_z(dp, start_click.Subtract(ends_of(pipes[i])[0])))
+
+    ia = min(range(len(pipes)), key=plan_distance)
+    anchor, d0 = pipes[ia], dirs[ia][1]
     a0, a1 = ends_of(anchor)
     along = start_click.Subtract(a0).DotProduct(d0)
     start_point = DB.XYZ(a0.X + d0.X * along, a0.Y + d0.Y * along, a0.Z)
     mid = a0.Add(a1).Multiply(0.5)
     # verso della curva: la parte del tubo oltre il punto di partenza viene sostituita
-    d = d0 if start_point.Subtract(mid).DotProduct(d0) >= 0 else d0.Negate()
+    sign = 1.0 if start_point.Subtract(mid).DotProduct(d0) >= 0 else -1.0
+    d = d0.Multiply(sign)
     angle_deg, turn_left, note = resolve_turn(pipes, d, settings, side_click, pick)
     left = DB.XYZ(-d.Y, d.X, 0)
     n = left if turn_left else left.Negate()
-    base = min(ends_of(anchor), key=lambda e: e.DotProduct(d))
     items = []
-    for pipe in pipes:
+    for pipe, (d3, dp) in zip(pipes, dirs):
+        d3, dp = d3.Multiply(sign), dp.Multiply(sign)
         back, forward = sorted(ends_of(pipe), key=lambda e: e.DotProduct(d))
-        items.append({"element": pipe, "back": back, "forward": forward,
-                      "w": back.Subtract(base).DotProduct(n),
-                      "u0": start_point.Subtract(back).DotProduct(d)})
-    geo = {"d": d, "n": n, "left": turn_left, "angle_deg": angle_deg, "note": note}
+        plan_len = DB.XYZ(d3.X, d3.Y, 0).GetLength()
+        items.append({"element": pipe, "back": back, "forward": forward, "d3": d3, "dp": dp,
+                      "plan_len": plan_len, "slope": d3.Z / plan_len,
+                      "skew": abs(signed_angle_to(d, dp))})
+    geo = {"d": d, "n": n, "left": turn_left, "angle_deg": angle_deg, "note": note, "start": start_point,
+           "sloped": any(abs(i["slope"]) > SLOPE_TOL for i in items),
+           "max_skew": max(i["skew"] for i in items)}
     return items, geo
 
 
 def compute_bend(plans, geo, settings):
-    """Angolo di curva di ogni tubo: gli angoli stanno sulla bisettrice, cosi' l'interasse si conserva."""
+    """Punto di curva di ogni tubo: gli angoli stanno sulla bisettrice (in pianta), cosi' l'interasse si conserva.
+    La bisettrice passa per il punto di partenza con direzione n - d * tan(theta / 2); ogni tubo si taglia dove la
+    sua linea in pianta la incontra (anche se non e' parallelo agli altri), e il punto si riporta in 3D lungo il suo
+    asse inclinato. Dopo la curva tutti vanno nella direzione d_new: con la pendenza originale o in orizzontale."""
     theta = math.radians(geo["angle_deg"])
     d, n = geo["d"], geo["n"]
     d_new = d.Multiply(math.cos(theta)).Add(n.Multiply(math.sin(theta)))
     geo["d_new"] = d_new
+    bisector = n.Subtract(d.Multiply(math.tan(theta / 2.0)))
     min_ft = MIN_REMAINING_MM / MM_PER_FT
+    keep_slope = settings.get("keep_slope", True)
     for plan in plans:
-        u = plan["u0"] - plan["w"] * math.tan(theta / 2.0)
-        if u < min_ft:
+        # back + dp * t = start + bisector * k, in pianta
+        t = -cross_z(plan["back"].Subtract(geo["start"]), bisector) / cross_z(plan["dp"], bisector)
+        if t < min_ft:
             raise CombError("The bend of pipe {} falls outside the pipe, too close to its start. "
                             "Click farther along the pipes".format(plan["element"].Id))
-        plan["corner"] = plan["back"].Add(d.Multiply(u))
+        plan["corner"] = plan["back"].Add(plan["d3"].Multiply(t / plan["plan_len"]))
         plan["q"] = plan["corner"].DotProduct(d_new)
     q_end = max(p["q"] for p in plans) + settings["length_mm"] / MM_PER_FT
     for plan in plans:
         plan["leg"] = q_end - plan["q"]
-        plan["leg_end"] = plan["corner"].Add(d_new.Multiply(plan["leg"]))
+        rise = plan["slope"] * plan["leg"] if keep_slope else 0.0
+        plan["leg_end"] = plan["corner"].Add(d_new.Multiply(plan["leg"])).Add(DB.XYZ(0, 0, rise))
 
 
 def build_bend_pipe(plan):
@@ -863,6 +930,12 @@ def print_bend_report(results, geo, settings, detail):
         "left" if geo["left"] else "right", geo["angle_deg"], settings["length_mm"]))
     if geo.get("note"):
         output.print_md("Direction: **{}**".format(geo["note"]))
+    if geo.get("sloped"):
+        output.print_md("Sloped elements: the new runs **{}**".format(
+            "keep the slope of each element" if settings.get("keep_slope", True) else "are horizontal"))
+    if geo.get("max_skew", 0.0) > 0.05:
+        output.print_md("Elements not parallel (up to **{:.1f} deg** in plan): each one is cut where it meets the "
+                        "line of the bends, and all new runs are parallel".format(geo["max_skew"]))
     done = [r for r in results if r["status"].startswith("Created")]
     output.print_md("Pipes: **{}** | bent: **{}** | new pipes: **{}** | elbows: **{}**".format(
         len(results), len(done), sum(len(r["new"]) for r in done), sum(r["elbows"] for r in done)))
@@ -889,6 +962,8 @@ def load_bend_settings(config):
         settings["mode"] = mode if mode in ("angle", "direction", "align") else BEND_DEFAULTS["mode"]
         direction = config.get_option("direction", BEND_DEFAULTS["direction"])
         settings["direction"] = direction if direction in Turn_ui.DIRECTIONS else BEND_DEFAULTS["direction"]
+        keep = config.get_option("keep_slope", BEND_DEFAULTS["keep_slope"])
+        settings["keep_slope"] = keep if isinstance(keep, bool) else str(keep).strip().lower() in ("true", "1", "yes")
     except Exception:
         pass
     return settings
@@ -900,6 +975,7 @@ def save_bend_settings(config, settings):
         config.leg_mm = settings["length_mm"]
         config.mode = settings["mode"]
         config.direction = settings["direction"]
+        config.keep_slope = bool(settings.get("keep_slope", True))
         script.save_config()
     except Exception:
         pass
@@ -908,8 +984,9 @@ def save_bend_settings(config, settings):
 WINDOW_TEXTS = {
     "caption": "Multi Turn",
     "title": u"↪ MULTI TURN",
-    "length_header": u"\U0001F4CF LENGTH",
+    "length_header": u"\U0001F4CF LENGTH AND SLOPE",
     "length_unit": "mm after the farthest bend (all ends aligned)",
+    "slope_hint": "Only for sloped elements: horizontal ones stay horizontal.",
     "align_hint": "After selecting the elements and clicking where the bend starts, click the element to follow: a "
                   "wall, beam, column, pipe, duct or vertical face, also in linked RVT and IFC models. The row bends "
                   "to run parallel to it (at most 90 degrees). If the element is perpendicular to the row, click it "
@@ -927,13 +1004,14 @@ def bend_main():
     # CLICK: la finestra si apre sempre, prima di selezione e clic; SHIFT + CLICK: ultime impostazioni, senza finestra
     if not __shiftclick__:  # noqa: F821
         settings = Turn_ui.TurnWindow(script.get_bundle_file(ANGLE_XAML_FILE_NAME), settings, WINDOW_TEXTS,
-                                      QUICK_ANGLES, MIN_ANGLE, MAX_ANGLE, show_slope=False).show()
+                                      QUICK_ANGLES, MIN_ANGLE, MAX_ANGLE, show_slope=True).show()
         if settings is None:
             script.exit()
         save_bend_settings(config, settings)
 
     steps = 3 if settings["mode"] in ("angle", "align") else 2
-    pipes = pick_pipes("Step 1 of {}: select the pipes, ducts or cable trays to bend, then press Finish".format(steps),
+    pipes = pick_pipes("Step 1 of {}: select the pipes, ducts or cable trays to bend (also sloped, parallel within "
+                       "{:g} degrees), then press Finish".format(steps, NEAR_PARALLEL_DEG),
                        CurveFilter())
     if not pipes:
         script.exit()

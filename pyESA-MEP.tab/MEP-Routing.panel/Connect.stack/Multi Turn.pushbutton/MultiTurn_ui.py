@@ -8,8 +8,12 @@ from System.IO import File
 from System.Windows import MessageBox, Visibility
 from System.Windows.Markup import XamlReader
 
-DIRECTIONS = ("up", "down", "left", "right")
-DIRECTION_BUTTONS = {"up": "DirUp", "down": "DirDown", "left": "DirLeft", "right": "DirRight"}
+DIRECTIONS = ("up", "down", "left", "right", "up_left", "up_right", "down_left", "down_right")
+DIRECTION_BUTTONS = {"up": "DirUp", "down": "DirDown", "left": "DirLeft", "right": "DirRight",
+                     "up_left": "DirUpLeft", "up_right": "DirUpRight", "down_left": "DirDownLeft",
+                     "down_right": "DirDownRight"}
+DIRECTION_NAMES = {"up": "top", "down": "bottom", "left": "left", "right": "right", "up_left": "top left",
+                   "up_right": "top right", "down_left": "bottom left", "down_right": "bottom right"}
 
 
 def parse_number(text):
@@ -26,7 +30,7 @@ def describe(settings):
         return "parallel to a clicked element"
     if settings.get("mode") == "direction":
         return "towards the {} of the view".format(
-            {"up": "top", "down": "bottom"}.get(settings.get("direction"), settings.get("direction")))
+            DIRECTION_NAMES.get(settings.get("direction"), settings.get("direction")))
     return "{:g} degrees".format(settings["angle_deg"])
 
 
@@ -50,11 +54,12 @@ class TurnWindow(object):
         self.window.Title = texts["caption"]
         # testi propri del comando; quelli non passati restano come nel XAML
         for name, key in (("TitleText", "title"), ("LengthUnit", "length_unit"), ("LengthHeader", "length_header"),
-                          ("AlignHint", "align_hint"), ("InfoText", "info")):
+                          ("AlignHint", "align_hint"), ("InfoText", "info"), ("SlopeHint", "slope_hint")):
             if key in texts:
                 self.window.FindName(name).Text = texts[key]
-        self.window.FindName("SavedText").Text = "Click an angle or an arrow, or type a custom angle. Last used: {}.".format(
-            describe(settings))
+        if "slope_hint" in texts:
+            self.window.FindName("SlopeHint").Visibility = Visibility.Visible
+        self.window.FindName("SavedText").Text = "Last used: {}.".format(describe(settings))
         self.window.FindName("RangeText").Text = "degrees ({:g} to {:g})".format(min_deg, max_deg)
         self.custom_box = self.window.FindName("CustomBox")
         self.custom_box.Text = "{:g}".format(settings["angle_deg"])
@@ -73,8 +78,8 @@ class TurnWindow(object):
         for angle in angles:
             button = Button()
             button.Content = u"{:g}°".format(angle)
-            button.Width, button.Height = 52, 30
-            button.Margin = Thickness(0, 0, 6, 6)
+            button.Width, button.Height = 40, 26  # compatti: gli angoli stanno su una riga accanto alle frecce
+            button.Margin = Thickness(0, 0, 4, 4)
             button.Click += self._angle_picker(angle)
             panel.Children.Add(button)
         for direction in DIRECTIONS:
