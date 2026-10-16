@@ -1,0 +1,7 @@
+title: Last Report
+tooltip: >-
+  Opens the last New Report of this model again, same scope, without checking: quick. Statuses as written in the
+  model now.
+
+  Then a Text Report (export to Excel) or an Interactive Report; its actions run a New Report first.
+author: Matteo Maiorano

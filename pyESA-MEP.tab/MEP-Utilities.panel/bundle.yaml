@@ -6,4 +6,5 @@ layout:
   - ReLevelMEP
   - MEPAlignToWall
   - IsVertical
+  - Openings
   - MEPQTO
