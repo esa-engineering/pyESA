@@ -1,9 +1,0 @@
-title: Families
-tooltip: >-
-  Creates the four opening families used by Place and Refresh (e_GM.PH.PFV_Wall_Rect, e_GM.PH.PFV_Wall_Round,
-  e_GM.PH.PFV_Floor_Rect, e_GM.PH.PFV_Floor_Round): Generic Model, not hosted, origin at the centre, instance parameters
-  e_DIM_Width_1, e_DIM_Height_1, e_DIM_Depth_1, e_DIM_Diameter_1 (shared, from the shared parameter file), symmetric about the origin. Saves them as .rfa in a folder you choose and loads them
-  into the model (overwriting the ones already loaded). Each family is flexed after creation and the report says if a
-  parameter does not drive the geometry.
-author: Matteo Maiorano
-help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

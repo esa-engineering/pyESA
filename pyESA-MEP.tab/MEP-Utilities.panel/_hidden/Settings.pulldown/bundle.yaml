@@ -1,9 +1,0 @@
-title: Settings
-tooltip: >-
-  Settings and checks shared by the tools of the MEP-Routing and MEP-Tools panels. Report Mode chooses when the tools
-  open their full report; Section Check lists the sections whose crop and symbol in the plan do not match.
-author: Matteo Maiorano
-
-layout:
-  - ReportMode
-  - SectionCheck
