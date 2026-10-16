@@ -18,11 +18,15 @@ Regole di lettura adottate:
   (portata ammissibile minore, quindi a favore di sicurezza);
 * pendenza oltre 10 cm/m -> si usa la riga 10 cm/m e si segnala;
 * pendenza sotto 0,5 cm/m -> fuori tabella, il tratto non e' verificabile;
-* diametro suggerito = il minimo De della serie scelta con Q tabellare >= Q di
-  progetto.
+* diametro suggerito = il minimo De fra quelli candidati (le misure del tipo di
+  tubazione, passate dallo script) con Q tabellare >= Q di progetto;
+* colonna della tabella 6.2 = la serie del tubo, riconosciuta dallo script dal
+  materiale del segmento (series_from_text); se non e' riconosciuta si usa il
+  valore piu' cautelativo fra le colonne disponibili per quel De.
 """
 
 import math
+import re
 
 # -----------------------------------------------------------------------------
 # Serie di tubo (colonne della tabella 6.2)
@@ -217,16 +221,39 @@ def horizontal_diameters(series):
     return [de for de in HORIZONTAL_DE if de in available]
 
 
-def suggest_horizontal(fill, table_slope, flow, series, vmax=None):
-    """Minimo De della serie con Q >= flow. Ritorna (De, v, Q) o None.
+def series_from_text(text):
+    """Serie (colonna della tabella 6.2) riconosciuta da un testo (nome del
+    materiale, del segmento o del tipo di tubazione); None se non riconosciuta."""
+    lowered = " {0} ".format((text or "").lower())
+    if "silere" in lowered:
+        return SERIES_SILERE
+    if "triplus" in lowered:
+        return SERIES_TRIPLUS
+
+    def token(word):
+        return re.search(r"(^|[^a-z])" + word + r"([^a-z]|$)", lowered) is not None
+
+    if "polipropilene" in lowered or "polypropylene" in lowered or token("pp"):
+        return SERIES_PP
+    if "polietilene" in lowered or "polyethylene" in lowered or token("pe") \
+            or token("hdpe") or token("pead") or token("pe-hd"):
+        return SERIES_PE
+    return None
+
+
+def suggest_horizontal(fill, table_slope, flow, candidates=None, vmax=None):
+    """Minimo De fra i candidati (default: tutti quelli della tabella) con
+    Q >= flow. Ritorna (De, v, Q) o None.
 
     Con vmax, il minimo De che rispetta anche la velocita' massima alla portata
     di progetto; se nessun De la rispetta si torna al solo criterio di portata.
     """
     if table_slope is None:
         return None
+    if candidates is None:
+        candidates = HORIZONTAL_DE
     adequate = []
-    for de in horizontal_diameters(series):
+    for de in sorted(de for de in candidates if de in HORIZONTAL_DE):
         v, q = HORIZONTAL_TABLE[fill][table_slope][de]
         if q >= flow:
             adequate.append((de, v, q))
@@ -241,17 +268,27 @@ def suggest_horizontal(fill, table_slope, flow, series, vmax=None):
 
 
 def stack_capacity(series, de):
-    """Qmax della colonna (tabella 6.2), None se il De non esiste nella serie."""
+    """Qmax della colonna (tabella 6.2), None se il De non esiste nella serie.
+
+    Serie None (non riconosciuta): il valore minimo fra le colonne che hanno quel
+    De, a favore di sicurezza.
+    """
     if de is None:
         return None
+    if series is None:
+        values = [STACK_TABLE[s][de] for s in SERIES_ORDER if de in STACK_TABLE.get(s, {})]
+        return min(values) if values else None
     return STACK_TABLE.get(series, {}).get(de)
 
 
-def suggest_stack(flow, series):
-    """Minimo De della serie con Qmax >= flow. Ritorna (De, Qmax) o None."""
-    for de in SERIES_DIAMETERS.get(series, []):
-        q = STACK_TABLE[series][de]
-        if q >= flow:
+def suggest_stack(flow, series, candidates=None):
+    """Minimo De fra i candidati (default: quelli della serie) con Qmax >= flow.
+    Ritorna (De, Qmax) o None."""
+    if candidates is None:
+        candidates = SERIES_DIAMETERS.get(series, []) if series else all_stack_diameters()
+    for de in sorted(candidates):
+        q = stack_capacity(series, de)
+        if q is not None and q >= flow:
             return de, q
     return None
 

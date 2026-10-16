@@ -2,15 +2,17 @@ title: "RNW Flow\nCalculation"
 tooltip: >
   Rainwater network sizing. The rainwater fixtures write their design flow [l/s] in the
   Fixture Units of their connector and Revit sums it along the network: the Fixture Units
-  value of every pipe is read as its design flow in l/s. The piping system type of the
-  rainwater drainage is chosen from a dropdown; its pipes are checked in the whole model,
-  in the active view or in the selection.
+  value of every pipe is read as its design flow in l/s. Choose the piping system type of
+  the rainwater drainage and tick the systems to calculate (one or more); their pipes are
+  checked in the whole model, in the active view or in the selection. The pipe series is
+  read from the model: the column of Table 6.2 comes from the material of the pipe segment,
+  and the suggested diameters are the sizes of the pipe type.
 
   Sloped horizontal pipes are checked against Table 6.3, 6.4 or 6.5 (fill degree 0.5, 0.6
   or 0.7, chosen in the dialog), using the table row with the next lower slope; 45 degree
   runs count as horizontal. Pipes steeper than 60 degrees are checked as vertical stacks
-  against Table 6.2 (fill degree 0.33)
-  for the chosen pipe series (PE, PP, Triplus, Silere). Sloped pipes are also checked for
+  against Table 6.2 (fill degree 0.33), in the column of their pipe series (PE, PP,
+  Triplus, Silere; the most conservative one if not recognized). Sloped pipes are also checked for
   velocity (minimum and maximum set in the dialog) and fill degree at the design flow.
 
   CLICK: the results open in a window that follows the network from upstream to
@@ -31,7 +33,9 @@ tooltip: >
   report opens only at the end, and only if a section could not be resized.
 
   The search button of a row (or Select in Model) selects its pipes and lets you navigate
-  the active view; Finish or Esc returns to the table as it was.
+  the active view; Finish or Esc returns to the table as it was. Export Excel writes the
+  calculation (every row in network order with the calculation size and its results, not
+  the current state of the model) and the settings to an .xlsx file.
 
   SHIFT + CLICK: fitting test. Pick a fitting, a connector and a DN: the tool tries the connector
   size and the family parameter in a transaction that is rolled back, and reports what is

@@ -18,6 +18,11 @@ un'azione (kind):
     stesso ResultsState, cioe' con spunte, misure, ricerca e filtro di prima;
   * None: chiusa senza modifiche.
 
+Export Excel (rnwflow_xlsx) scrive il calcolo: tutte le righe nell'ordine della
+rete, con le sole colonne del risultato (misura di calcolo, Qmax, utilizzo,
+velocita', riempimento ed esito della misura nuova), senza lo stato attuale del
+modello; piu' un foglio con le impostazioni (ExportInfo, dallo script).
+
 Griglia legata a una System.Data.DataTable come in MEPQTO: il binding a due
 vie lo gestisce .NET, senza oggetti INotifyPropertyChanged in IronPython. La
 tendina di ogni riga ha le sue voci nella colonna Options (oggetto List[str]).
@@ -35,6 +40,8 @@ clr.AddReference('System.Data')
 
 import System
 from System import Action
+from System.Diagnostics import Process
+from Microsoft.Win32 import SaveFileDialog
 from System.Collections.Generic import List
 from System.Data import DataTable, DataRowVersion
 from System.Windows import (Window, MessageBox, MessageBoxButton, MessageBoxResult,
@@ -48,6 +55,7 @@ from System.IO import FileStream, FileMode
 from pyrevit import script
 
 import rnwflow_check as rc
+import rnwflow_xlsx as rx
 
 XAML_FILE_NAME = 'RNWFlowCalculation_results.xaml'
 CONFIG_SECTION = 'ESA_RNWFlowCalculation'
@@ -119,10 +127,59 @@ class ResultsState(object):
         self.last_key = None
 
 
+class ExportInfo(object):
+    """Dati dello script per l'esportazione Excel."""
+
+    def __init__(self, title, settings_rows, folder, file_name):
+        self.title = title
+        self.settings_rows = list(settings_rows)
+        self.folder = folder
+        self.file_name = file_name
+
+
+# Colonne del foglio Calculation: solo il risultato del calcolo (la misura nuova),
+# niente stato attuale del modello. L'esito e' la penultima, l'elemento l'ultima.
+EXPORT_COLUMNS = [
+    rx.Column("#", 5, rx.STYLE_NUM0),
+    rx.Column("System", 14),
+    rx.Column("Section", 9),
+    rx.Column("Part", 11),
+    rx.Column("Fed by", 16),
+    rx.Column("Pipes", 7, rx.STYLE_NUM0),
+    rx.Column("Min slope [cm/m]", 10, rx.STYLE_NUM2),
+    rx.Column("Q [l/s]", 9, rx.STYLE_NUM2),
+    rx.Column("DN [mm]", 9),
+    rx.Column("De [mm]", 9),
+    rx.Column("Qmax [l/s]", 10, rx.STYLE_NUM1),
+    rx.Column("Use [%]", 8, rx.STYLE_NUM0),
+    rx.Column("v [m/s]", 8, rx.STYLE_NUM2),
+    rx.Column("Fill [%]", 8, rx.STYLE_NUM0),
+    rx.Column("Check", 22),
+    rx.Column("Element", 42),
+]
+
+CHECK_STYLES = {
+    rc.STATUS_UNDERSIZED: rx.STYLE_ERROR,
+    rc.STATUS_BEYOND: rx.STYLE_ERROR,
+    rc.STATUS_NOT_IN_TABLE: rx.STYLE_WARNING,
+    rc.STATUS_LOW_SLOPE: rx.STYLE_WARNING,
+    rc.STATUS_HIGH_VELOCITY: rx.STYLE_WARNING,
+    rc.STATUS_LOW_VELOCITY: rx.STYLE_WARNING,
+    rc.STATUS_OK: rx.STYLE_PASS,
+}
+
+
+def _number(value):
+    if value is None or value is System.DBNull.Value:
+        return None
+    return float(value)
+
+
 class ResultsForm(Window):
     """Finestra dei tratti."""
 
-    def __init__(self, sections, settings_text, state=None):
+    def __init__(self, sections, settings_text, state=None, export_info=None):
+        self._export_info = export_info
         self.sections = list(sections)
         self.changes = None
         self.kind = None
@@ -178,6 +235,7 @@ class ResultsForm(Window):
         self.btn_tick_resize = root.FindName('btn_tick_resize')
         self.btn_untick_all = root.FindName('btn_untick_all')
         self.btn_show = root.FindName('btn_show')
+        self.btn_export = root.FindName('btn_export')
         self.btn_ok = root.FindName('btn_ok')
         self.btn_cancel = root.FindName('btn_cancel')
 
@@ -188,6 +246,8 @@ class ResultsForm(Window):
         self.btn_tick_resize.Click += self.OnTickResize
         self.btn_untick_all.Click += self.OnUntickAll
         self.btn_show.Click += self.OnShow
+        self.btn_export.Click += self.OnExport
+        self.btn_export.IsEnabled = self._export_info is not None
         self.btn_ok.Click += self.OnOK
         self.btn_cancel.Click += self.OnCancel
         # Pulsante "seleziona" di ogni riga: un solo gestore sulla griglia.
@@ -515,6 +575,71 @@ class ResultsForm(Window):
         args.Handled = True
         self._request_show([key])
 
+    # ---------------------------------------------------------------- Excel
+
+    def export_rows(self):
+        """Righe del foglio Calculation, nell'ordine della rete (#), tutte (il
+        filtro e la ricerca della griglia non contano)."""
+        result = []
+        rows = sorted(self.table.Rows, key=lambda r: r["Order"])
+        for row in rows:
+            entry = self._by_key[row["Key"]]
+            if getattr(entry, "is_fixture", False):
+                values = [row["Order"], entry.system, "-", rc.RUN_FIXTURE, row["FedBy"], None,
+                          None, entry.flow, entry.dn_mm, None, None, None, None, None,
+                          "-", "; ".join([entry.label] + entry.notes)]
+                result.append((values, None, True))
+                continue
+            size = self._size_of(row, entry)
+            flow = entry.flow
+            capacity = _number(row["QNew"])
+            use = flow / capacity * 100.0 if capacity else None
+            check = _text(row["CheckNew"]) or "-"
+            values = [row["Order"], entry.system, entry.section or "-", entry.run, row["FedBy"],
+                      len(entry.pipe_ids), entry.min_slope, flow,
+                      size.dn_mm if size is not None else None,
+                      size.od_mm if size is not None else None,
+                      capacity, use, _number(row["VNew"]), _number(row["FillNew"]), check, ""]
+            result.append((values, CHECK_STYLES.get(check), False))
+        return result
+
+    def export_to(self, path):
+        """Scrive il file. Solleva rx.FileLockedError se e' aperto in Excel."""
+        self._commit_edits()
+        info = self._export_info
+        rx.export_calculation(path, info.title, info.settings_rows, EXPORT_COLUMNS,
+                              self.export_rows())
+
+    def OnExport(self, sender, args):
+        if self._export_info is None:
+            return
+        dialog = SaveFileDialog()
+        dialog.Title = "Export the calculation to Excel"
+        dialog.Filter = "Excel workbook (*.xlsx)|*.xlsx"
+        dialog.DefaultExt = ".xlsx"
+        dialog.FileName = self._export_info.file_name
+        if self._export_info.folder and os.path.isdir(self._export_info.folder):
+            dialog.InitialDirectory = self._export_info.folder
+        if dialog.ShowDialog(self) != True:     # noqa: E712 (Nullable[bool] di .NET)
+            return
+        path = dialog.FileName
+        try:
+            self.export_to(path)
+        except rx.FileLockedError:
+            MessageBox.Show("The file is open in Excel: close it and export again.\n" + path,
+                            WINDOW_TITLE)
+            return
+        except Exception as error:
+            MessageBox.Show("The export failed:\n{0}".format(error), WINDOW_TITLE)
+            return
+        answer = MessageBox.Show("Calculation exported to\n{0}\n\nOpen it now?".format(path),
+                                 WINDOW_TITLE, MessageBoxButton.YesNo)
+        if answer == MessageBoxResult.Yes:
+            try:
+                Process.Start(path)
+            except Exception:
+                pass
+
     def _commit_edits(self):
         try:
             self.dg_sections.CommitEdit(DataGridEditingUnit.Cell, True)
@@ -621,8 +746,8 @@ class ResultsForm(Window):
         self.Close()
 
 
-def show_results(sections, settings_text, state=None):
+def show_results(sections, settings_text, state=None, export_info=None):
     """Mostra la finestra (modale) e la ritorna chiusa: kind, changes, show_ids, state."""
-    form = ResultsForm(sections, settings_text, state)
+    form = ResultsForm(sections, settings_text, state, export_info)
     form.ShowDialog()
     return form

@@ -2,14 +2,18 @@
 """
 rnwflow_ui.py - finestra XAML di configurazione per RNWFlowCalculation.
 
-Raccoglie il tipo di sistema di tubazioni degli scarichi meteorici, la serie
-di tubo, il grado di riempimento dei collettori orizzontali e l'ambito, e
+Raccoglie il tipo di sistema di tubazioni degli scarichi meteorici, i sistemi di
+quel tipo da calcolare (uno o piu', non per forza tutti), il grado di
+riempimento dei collettori orizzontali, le velocita' limite e l'ambito, e
 restituisce un RunConfig allo script. Le ultime scelte sono salvate nella
 config di pyRevit (sezione ESA_RNWFlowCalculation).
 
-La finestra non legge Revit: lo script le passa i tipi di sistema come dati
-semplici (SystemTypeItem). Compatibile con Rocket mode: nessun documento o
-output a livello di modulo.
+La serie di tubo non si sceglie: lo script la legge per ogni tubo dal
+materiale del suo segmento (vedi pipe_series nello script).
+
+La finestra non legge Revit: lo script le passa tipi e sistemi come dati
+semplici (SystemTypeItem, SystemItem). Compatibile con Rocket mode: nessun
+documento o output a livello di modulo.
 """
 
 import os
@@ -20,6 +24,7 @@ clr.AddReference('PresentationCore')
 clr.AddReference('WindowsBase')
 
 from System.Windows import Window, MessageBox
+from System.Windows.Controls import CheckBox
 from System.Windows.Markup import XamlReader
 from System.Windows.Media import SolidColorBrush, Colors
 from System.IO import FileStream, FileMode
@@ -36,7 +41,6 @@ SCOPE_VIEW = "VIEW"
 SCOPE_SELECTION = "SELECTION"
 
 DEFAULT_FILL = 0.5
-DEFAULT_SERIES = rt.SERIES_PE
 DEFAULT_VMIN = "0.6"
 DEFAULT_VMAX = ""
 
@@ -49,17 +53,33 @@ RED_BRUSH = SolidColorBrush(Colors.Firebrick)
 RED_BRUSH.Freeze()
 
 
-class SystemTypeItem(object):
-    """Voce della tendina dei tipi di sistema."""
+class SystemItem(object):
+    """Un sistema (istanza, per esempio SS.RNW 1) del tipo scelto."""
 
     def __init__(self, name, pipe_count, flow_count):
         self.Name = name
         self.PipeCount = pipe_count
         self.FlowCount = flow_count
+        self.IsSelected = True
 
     @property
     def label(self):
-        return "{0}   ({1} pipes)".format(self.Name, self.PipeCount)
+        return "{0}   ({1} pipes, {2} with flow)".format(self.Name, self.PipeCount, self.FlowCount)
+
+
+class SystemTypeItem(object):
+    """Voce della tendina dei tipi di sistema, con i suoi sistemi."""
+
+    def __init__(self, name, pipe_count, flow_count, systems=None):
+        self.Name = name
+        self.PipeCount = pipe_count
+        self.FlowCount = flow_count
+        self.systems = list(systems or [])
+
+    @property
+    def label(self):
+        return "{0}   ({1} pipes, {2} systems)".format(self.Name, self.PipeCount,
+                                                       len(self.systems))
 
 
 class RunConfig(object):
@@ -67,11 +87,12 @@ class RunConfig(object):
 
     def __init__(self):
         self.system_type = None
+        self.systems = []
         self.fill = DEFAULT_FILL
-        self.series = DEFAULT_SERIES
         self.scope = SCOPE_ALL
         self.vmin = None
         self.vmax = None
+        self.series_summary = ""
 
 
 def fill_label(fill):
@@ -117,10 +138,14 @@ class RNWFlowForm(Window):
         self._items = list(system_items)
         self._view_available = view_available
         self._selected_pipe_count = selected_pipe_count
+        self._saved_systems = None
+        self._filtered = []
+        self._loading = True
         self._load_xaml()
         self._init_controls()
         self._restore_settings()
-        self._update_system_info()
+        self._loading = False
+        self._on_type_changed()
 
     # ------------------------------------------------------------------ setup
 
@@ -148,7 +173,13 @@ class RNWFlowForm(Window):
 
         self.cbo_system = root.FindName('cbo_system')
         self.txt_system_info = root.FindName('txt_system_info')
-        self.cbo_series = root.FindName('cbo_series')
+        self.txt_search = root.FindName('txt_search')
+        self.btn_clear_search = root.FindName('btn_clear_search')
+        self.lst_systems = root.FindName('lst_systems')
+        self.thumb_resize = root.FindName('thumb_resize')
+        self.btn_select_all = root.FindName('btn_select_all')
+        self.btn_select_none = root.FindName('btn_select_none')
+        self.txt_system_count = root.FindName('txt_system_count')
         self.cbo_fill = root.FindName('cbo_fill')
         self.txt_vmin = root.FindName('txt_vmin')
         self.txt_vmax = root.FindName('txt_vmax')
@@ -159,6 +190,11 @@ class RNWFlowForm(Window):
         self.btn_cancel = root.FindName('btn_cancel')
 
         self.cbo_system.SelectionChanged += self.OnSystemChanged
+        self.txt_search.TextChanged += self.OnSearchTextChanged
+        self.btn_clear_search.Click += self.OnClearSearch
+        self.btn_select_all.Click += self.OnSelectAll
+        self.btn_select_none.Click += self.OnSelectNone
+        self.thumb_resize.DragDelta += self.OnResizeList
         self.btn_ok.Click += self.OnOK
         self.btn_cancel.Click += self.OnCancel
 
@@ -168,11 +204,8 @@ class RNWFlowForm(Window):
         if self._items:
             self.cbo_system.SelectedIndex = default_system_index(self._items)
 
-        for series in rt.SERIES_ORDER:
-            self.cbo_series.Items.Add(rt.SERIES_LABELS[series])
         for fill in rt.FILL_OPTIONS:
             self.cbo_fill.Items.Add(fill_label(fill))
-        self.cbo_series.SelectedIndex = rt.SERIES_ORDER.index(DEFAULT_SERIES)
         self.cbo_fill.SelectedIndex = rt.FILL_OPTIONS.index(DEFAULT_FILL)
         self.txt_vmin.Text = DEFAULT_VMIN
         self.txt_vmax.Text = DEFAULT_VMAX
@@ -189,7 +222,7 @@ class RNWFlowForm(Window):
             self.rdo_scope_selection.Content = "Only the selected pipes (no pipe is selected)"
             self.rdo_scope_selection.IsEnabled = False
 
-    # --------------------------------------------------------- tipo di sistema
+    # --------------------------------------------------------- tipo e sistemi
 
     def _selected_item(self):
         index = self.cbo_system.SelectedIndex
@@ -213,8 +246,89 @@ class RNWFlowForm(Window):
         self.txt_system_info.Text = "{0} pipes, {1} of them with Fixture Units.".format(
             item.PipeCount, item.FlowCount)
 
-    def OnSystemChanged(self, sender, args):
+    def _on_type_changed(self):
+        """Nuovo tipo: si ricarica l'elenco dei sistemi. Spuntati quelli salvati
+        l'ultima volta, se ce ne sono di questo tipo; altrimenti tutti."""
         self._update_system_info()
+        item = self._selected_item()
+        systems = item.systems if item is not None else []
+        names = set(system.Name for system in systems)
+        saved = set(self._saved_systems or []) & names
+        for system in systems:
+            system.IsSelected = (system.Name in saved) if saved else True
+        self.txt_search.Text = ""
+        self._filter_systems()
+
+    def _filter_systems(self):
+        item = self._selected_item()
+        systems = item.systems if item is not None else []
+        needle = (self.txt_search.Text or "").strip().lower()
+        self._filtered = [s for s in systems if not needle or needle in s.Name.lower()]
+        self._loading = True
+        try:
+            self.lst_systems.Items.Clear()
+            for system in self._filtered:
+                checkbox = CheckBox()
+                checkbox.Content = system.label
+                checkbox.IsChecked = system.IsSelected
+                checkbox.Tag = system
+                checkbox.Checked += self.OnCheckboxChanged
+                checkbox.Unchecked += self.OnCheckboxChanged
+                self.lst_systems.Items.Add(checkbox)
+        finally:
+            self._loading = False
+        self._update_count()
+
+    def _selected_systems(self):
+        item = self._selected_item()
+        return [s for s in (item.systems if item is not None else []) if s.IsSelected]
+
+    def _update_count(self):
+        item = self._selected_item()
+        total = len(item.systems) if item is not None else 0
+        selected = self._selected_systems()
+        self.txt_system_count.Foreground = GRAY_BRUSH if selected else RED_BRUSH
+        self.txt_system_count.Text = "{0} of {1} systems selected, {2} pipes.".format(
+            len(selected), total, sum(s.PipeCount for s in selected))
+
+    def OnSystemChanged(self, sender, args):
+        if not self._loading:
+            self._on_type_changed()
+
+    def OnSearchTextChanged(self, sender, args):
+        if not self._loading:
+            self._filter_systems()
+
+    def OnClearSearch(self, sender, args):
+        self.txt_search.Text = ""
+
+    def OnCheckboxChanged(self, sender, args):
+        if self._loading or sender is None or sender.Tag is None:
+            return
+        sender.Tag.IsSelected = bool(sender.IsChecked)
+        self._update_count()
+
+    def _set_selection(self, value):
+        self._loading = True
+        try:
+            for system in self._filtered:
+                system.IsSelected = value
+            for checkbox in self.lst_systems.Items:
+                checkbox.IsChecked = checkbox.Tag.IsSelected
+        finally:
+            self._loading = False
+        self._update_count()
+
+    def OnSelectAll(self, sender, args):
+        self._set_selection(True)
+
+    def OnSelectNone(self, sender, args):
+        self._set_selection(False)
+
+    def OnResizeList(self, sender, args):
+        new_height = self.lst_systems.Height + args.VerticalChange
+        if 60 <= new_height <= 500:
+            self.lst_systems.Height = new_height
 
     # --------------------------------------------------------------- settings
 
@@ -225,9 +339,7 @@ class RNWFlowForm(Window):
             saved = cfg.get_option('system_type', None)
             if saved in names:
                 self.cbo_system.SelectedIndex = names.index(saved)
-            series = cfg.get_option('series', DEFAULT_SERIES)
-            if series in rt.SERIES_ORDER:
-                self.cbo_series.SelectedIndex = rt.SERIES_ORDER.index(series)
+            self._saved_systems = list(cfg.get_option('systems', []) or [])
             fill = float(cfg.get_option('fill', DEFAULT_FILL))
             if fill in rt.FILL_OPTIONS:
                 self.cbo_fill.SelectedIndex = rt.FILL_OPTIONS.index(fill)
@@ -244,7 +356,7 @@ class RNWFlowForm(Window):
         try:
             cfg = script.get_config(CONFIG_SECTION)
             cfg.set_option('system_type', self.config.system_type)
-            cfg.set_option('series', self.config.series)
+            cfg.set_option('systems', list(self.config.systems))
             cfg.set_option('fill', self.config.fill)
             cfg.set_option('scope', self.config.scope)
             cfg.set_option('vmin', self.txt_vmin.Text.strip())
@@ -260,6 +372,8 @@ class RNWFlowForm(Window):
         errors = []
         if self._selected_item() is None:
             errors.append("Choose the piping system type of the rainwater drainage.")
+        elif not self._selected_systems():
+            errors.append("Tick at least one system to calculate.")
         vmin, vmin_ok = parse_speed(self.txt_vmin.Text)
         vmax, vmax_ok = parse_speed(self.txt_vmax.Text)
         if not vmin_ok:
@@ -279,7 +393,7 @@ class RNWFlowForm(Window):
         self.config.vmin = parse_speed(self.txt_vmin.Text)[0]
         self.config.vmax = parse_speed(self.txt_vmax.Text)[0]
         self.config.system_type = item.Name
-        self.config.series = rt.SERIES_ORDER[max(self.cbo_series.SelectedIndex, 0)]
+        self.config.systems = [s.Name for s in self._selected_systems()]
         self.config.fill = rt.FILL_OPTIONS[max(self.cbo_fill.SelectedIndex, 0)]
         if self.rdo_scope_selection.IsChecked:
             self.config.scope = SCOPE_SELECTION

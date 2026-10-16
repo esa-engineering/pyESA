@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __title__ = "RNW Flow\nCalculation"
-__doc__ = """Version = 3.5
+__doc__ = """Version = 3.7
 Date    = 16.10.2026
 _____________________________________________________________________
 Description:
@@ -33,7 +33,9 @@ __author__ = "ESA Engineering"
 #
 # Flusso:
 #   1. raccolta dei tubi e dei tipi di sistema di tubazioni;
-#   2. finestra delle impostazioni (rnwflow_ui);
+#   2. finestra delle impostazioni (rnwflow_ui): tipo di sistema e sistemi da
+#      calcolare (uno o piu'); la serie di tubo non si sceglie, si legge per ogni
+#      tubo dal materiale del suo segmento (pipe_series);
 #   3. ogni tubo diventa un PipeCheck (dati semplici: portata, geometria, De,
 #      DN, Section, misure del tipo di tubazione) verificato da rnwflow_check;
 #      le misure vengono dalle preferenze di instradamento del tipo (tutti i
@@ -58,6 +60,7 @@ __author__ = "ESA Engineering"
 # -----------------------------------------------------------------------------
 
 import math
+import os
 import re
 
 from System.Collections.Generic import List
@@ -380,19 +383,71 @@ def view_pipe_ids():
     return set(get_element_id_value(el.Id) for el in collector)
 
 
-def system_type_items(pipes, type_names):
+def system_type_items(pipes, type_names, system_names):
+    """Tipi di sistema con i loro sistemi (istanze), e per ciascuno il numero di
+    tubi e di tubi con Fixture Units."""
     counts = {}
+    systems = {}
     for pipe in pipes:
-        name = type_names[get_element_id_value(pipe.Id)]
-        total, with_flow = counts.get(name, (0, 0))
+        pipe_id = get_element_id_value(pipe.Id)
+        type_name = type_names[pipe_id]
+        system = system_names[pipe_id]
         flow = pipe_flow(pipe)
-        counts[name] = (total + 1, with_flow + (1 if flow is not None and flow > 0 else 0))
-    return [rui.SystemTypeItem(name, counts[name][0], counts[name][1])
-            for name in sorted(counts.keys(), key=lambda n: n.lower())]
+        has_flow = 1 if flow is not None and flow > 0 else 0
+        total, with_flow = counts.get(type_name, (0, 0))
+        counts[type_name] = (total + 1, with_flow + has_flow)
+        per_type = systems.setdefault(type_name, {})
+        s_total, s_flow = per_type.get(system, (0, 0))
+        per_type[system] = (s_total + 1, s_flow + has_flow)
+    items = []
+    for type_name in sorted(counts.keys(), key=lambda n: n.lower()):
+        system_items = [rui.SystemItem(name, values[0], values[1])
+                        for name, values in sorted(systems[type_name].items(),
+                                                   key=lambda kv: kv[0].lower())]
+        items.append(rui.SystemTypeItem(type_name, counts[type_name][0],
+                                        counts[type_name][1], system_items))
+    return items
 
 
-def build_check(pipe, type_name, limits, size_cache):
+def pipe_series(pipe, cache):
+    """(serie, descrizione) del tubo, per la colonna della tabella 6.2.
+
+    Si legge dal materiale del segmento del tubo; se non si riconosce, dal nome
+    del segmento, poi dal nome del tipo di tubazione. Serie None = non
+    riconosciuta. Cache per segmento e tipo.
+    """
+    segment = pipe_segment(pipe)
+    key = (get_element_id_value(segment.Id) if segment is not None else None,
+           get_element_id_value(pipe.GetTypeId()))
+    if key in cache:
+        return cache[key]
+    texts = []
+    if segment is not None:
+        try:
+            material = doc.GetElement(segment.MaterialId)
+            if material is not None:
+                texts.append(("material", element_name(material)))
+        except Exception:
+            pass
+        texts.append(("segment", element_name(segment)))
+    try:
+        texts.append(("pipe type", element_name(doc.GetElement(pipe.GetTypeId()))))
+    except Exception:
+        pass
+    result = (None, "not recognized ({0})".format(
+        ", ".join("{0} '{1}'".format(kind, text) for kind, text in texts) or "no segment"))
+    for kind, text in texts:
+        series = rt.series_from_text(text)
+        if series is not None:
+            result = (series, "{0} from {1} '{2}'".format(rt.SERIES_LABELS[series], kind, text))
+            break
+    cache[key] = result
+    return result
+
+
+def build_check(pipe, type_name, limits, size_cache, series_cache):
     angle, slope = pipe_geometry(pipe)
+    series, _description = pipe_series(pipe, series_cache)
     row = rc.PipeCheck(
         pipe_id=get_element_id_value(pipe.Id),
         system=system_name(pipe),
@@ -406,6 +461,7 @@ def build_check(pipe, type_name, limits, size_cache):
         model_dn_mm=nominal_diameter_mm(pipe),
         sizes=pipe_type_sizes(pipe, size_cache),
         z_mid=pipe_mid_z(pipe),
+        series=series,
     )
     return rc.check_pipe(row, limits)
 
@@ -1680,26 +1736,51 @@ def speed_label(config):
 
 
 def settings_text(config):
-    return ("System type: {0}   |   Series: {1}   |   Horizontal pipes: f = {2} ({3})   |   "
+    return ("System type: {0}   |   Systems: {9}   |   Horizontal pipes: f = {2} ({3})   |   "
             "Velocity: {8}   |   Vertical: f = {4} ({5}, steeper than {6:.0f} deg)   |   "
-            "Scope: {7}   |   Flow = Fixture Units [l/s]").format(
-        config.system_type, rt.SERIES_LABELS[config.series], config.fill,
+            "Scope: {7}   |   Flow = Fixture Units [l/s]   |   Pipe series: {1}").format(
+        config.system_type, config.series_summary, config.fill,
         rt.TABLE_NAMES[config.fill], rt.STACK_FILL, rt.STACK_TABLE_NAME,
-        rc.STACK_MIN_ANGLE_DEG, scope_label(config), speed_label(config))
+        rc.STACK_MIN_ANGLE_DEG, scope_label(config), speed_label(config),
+        ", ".join(config.systems))
+
+
+def settings_rows(config):
+    """Impostazioni del calcolo come coppie (voce, valore), per report ed Excel."""
+    return [
+        ("Flow of each pipe", "Fixture Units value, read as l/s"),
+        ("System type", config.system_type),
+        ("Systems", ", ".join(config.systems)),
+        ("Scope", scope_label(config)),
+        ("Pipe series (Table 6.2 column, from the pipe segments)", config.series_summary),
+        ("Horizontal pipes", "f = {0}, {1}".format(config.fill, rt.TABLE_NAMES[config.fill])),
+        ("Velocity of sloped pipes at the design flow", speed_label(config)),
+        ("Vertical pipes", "f = {0}, {1} (steeper than {2:.0f} deg; 45 deg runs are "
+                           "horizontal)".format(rt.STACK_FILL, rt.STACK_TABLE_NAME,
+                                                rc.STACK_MIN_ANGLE_DEG)),
+    ]
+
+
+def export_info(config):
+    """Dati per l'esportazione Excel della finestra dei risultati."""
+    import datetime
+    model = doc.Title or "Model"
+    if model.lower().endswith(".rvt"):
+        model = model[:-4]
+    try:
+        folder = os.path.dirname(doc.PathName) if doc.PathName else ""
+    except Exception:
+        folder = ""
+    now = datetime.datetime.now()
+    rows = [("Model", model), ("Date", now.strftime("%d.%m.%Y %H:%M"))] + settings_rows(config)
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in model)
+    name = "{0}_RainwaterCalculation_{1}.xlsx".format(safe, now.strftime("%Y%m%d"))
+    return rres.ExportInfo("Rainwater flow calculation - " + model, rows, folder, name)
 
 
 def print_settings(config):
     output.print_table(
-        table_data=[
-            ["Flow of each pipe", "Fixture Units value, read as l/s"],
-            ["System type", config.system_type],
-            ["Scope", scope_label(config)],
-            ["Pipe series", rt.SERIES_LABELS[config.series]],
-            ["Horizontal pipes", "f = {0}, {1}".format(config.fill, rt.TABLE_NAMES[config.fill])],
-            ["Velocity of sloped pipes at the design flow", speed_label(config)],
-            ["Vertical pipes", "f = {0}, {1} (steeper than {2:.0f} deg; 45 deg runs are horizontal)".format(
-                rt.STACK_FILL, rt.STACK_TABLE_NAME, rc.STACK_MIN_ANGLE_DEG)],
-        ],
+        table_data=[list(row) for row in settings_rows(config)],
         title="Settings",
         columns=["Setting", "Value"],
     )
@@ -1995,12 +2076,13 @@ def main():
     type_cache = {}
     pipes_by_id = dict((get_element_id_value(p.Id), p) for p in pipes)
     type_names = dict((pid, system_type_name(p, type_cache)) for pid, p in pipes_by_id.items())
+    system_names = dict((pid, system_name(p)) for pid, p in pipes_by_id.items())
 
     selected_pipe_ids = set(get_element_id_value(eid)
                             for eid in uidoc.Selection.GetElementIds()) & set(pipes_by_id)
     view_available = view_scope_available()
 
-    config = rui.show_dialog(system_type_items(pipes, type_names),
+    config = rui.show_dialog(system_type_items(pipes, type_names, system_names),
                              view_available, len(selected_pipe_ids))
     if config is None:
         script.exit()
@@ -2012,19 +2094,25 @@ def main():
     else:
         scope_ids = set(pipes_by_id)
 
-    limits = rc.Limits(config.fill, config.series, config.vmin, config.vmax)
+    limits = rc.Limits(config.fill, None, config.vmin, config.vmax)
     size_cache = {}
+    series_cache = {}
+    wanted_systems = set(config.systems)
     rows = []
     for pipe_id, pipe in pipes_by_id.items():
         if pipe_id not in scope_ids or type_names[pipe_id] != config.system_type:
             continue
-        rows.append(build_check(pipe, type_names[pipe_id], limits, size_cache))
+        if system_names[pipe_id] not in wanted_systems:
+            continue
+        rows.append(build_check(pipe, type_names[pipe_id], limits, size_cache, series_cache))
+    descriptions = sorted(set(description for _series, description in series_cache.values()))
+    config.series_summary = "; ".join(descriptions) or "-"
 
     if not rows:
-        forms.alert("No pipe of the system type '{0}' is in the chosen scope.".format(
-            config.system_type),
-            sub_msg="Choose another system type or widen the scope.",
-            title="Rainwater Flow Calculation")
+        forms.alert("No pipe of the chosen systems is in the chosen scope.",
+                    sub_msg="Systems: {0}. Choose other systems or widen the scope.".format(
+                        ", ".join(config.systems)),
+                    title="Rainwater Flow Calculation")
         return
 
     sections = rc.group_sections(rows, limits)
@@ -2036,7 +2124,7 @@ def main():
     # Finestra e navigazione si alternano finche' l'utente non applica o chiude.
     state = None
     while True:
-        form = rres.show_results(entries, text, state)
+        form = rres.show_results(entries, text, state, export_info(config))
         state = form.state
         if form.kind == rres.KIND_SHOW:
             navigate(form.show_ids, elements_by_id)

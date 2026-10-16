@@ -22,13 +22,30 @@ scarichi delle acque meteoriche; ogni voce riporta il numero di tubi. Senza impo
 salvate la tendina propone il primo tipo il cui nome contiene *meteor*, *pluv*, *bianc*,
 *storm*, *rain* o *RNW*, altrimenti il tipo con più tubi dotati di Fixture Units; poi vale
 l'ultima scelta. Se nessun tubo del tipo scelto ha Fixture Units, la finestra lo segnala in
-rosso. L'ambito può essere l'intero modello, la vista attiva oppure i tubi selezionati.
+rosso.
+
+Sotto la tendina, l'elenco dei **sistemi** di quel tipo (istanze, per esempio SS.RNW 1,
+SS.RNW 2), ciascuno con il numero di tubi e di tubi con Fixture Units, con ricerca e
+Select All / Deselect All: il calcolo riguarda solo i sistemi spuntati (almeno uno). La
+scelta si ricorda per nome: riaprendo, restano spuntati i sistemi scelti l'ultima volta, se
+ci sono ancora; altrimenti tutti. Cambiando tipo l'elenco si ricarica.
+
+L'ambito può essere l'intero modello, la vista attiva oppure i tubi selezionati, sempre
+dentro i sistemi spuntati.
+
+**La serie di tubo non si sceglie**: si legge per ogni tubo dal modello (`pipe_series`):
+dal nome del materiale del suo segmento, se non basta dal nome del segmento, poi dal nome
+del tipo di tubazione (`rnwflow_tables.series_from_text`: polietilene / PE / HDPE / PEAD,
+polipropilene / PP, Triplus, Silere). La serie dà la colonna della tabella 6.2; se non è
+riconosciuta si usa il valore più cautelativo fra le colonne che hanno quel De, con una
+nota sulla riga. Il riepilogo delle serie riconosciute per segmento è nel testo in cima alla
+finestra dei risultati e nel report.
 
 ## Verifica del singolo tubo
 
 - **Verticali (colonne)**: tubi inclinati di più di 60° sull'orizzontale
-  (`STACK_MIN_ANGLE_DEG`). Tabella 6.2, f = 0,33, colonna della serie scelta (PE, PP,
-  Triplus, Silere). I tratti a 45° sono **orizzontali**: si verificano con le tabelle 6.3 -
+  (`STACK_MIN_ANGLE_DEG`). Tabella 6.2, f = 0,33, colonna della serie del tubo (PE, PP,
+  Triplus, Silere), letta dal segmento. I tratti a 45° sono **orizzontali**: si verificano con le tabelle 6.3 -
   6.5, alla riga 10 cm/m (la loro pendenza supera la tabella), con una nota.
 - **Collettori orizzontali**: pendenza dalla geometria del tubo, in cm/m. Tabelle 6.3 / 6.4 /
   6.5 secondo il grado di riempimento scelto (0,5 / 0,6 / 0,7). Pendenza fra due righe: riga
@@ -36,10 +53,10 @@ rosso. L'ambito può essere l'intero modello, la vista attiva oppure i tubi sele
   la riga 10 cm/m.
 - Il De del modello è il diametro esterno (`RBS_PIPE_OUTER_DIAMETER`) riconosciuto entro
   ±1 mm da un De di tabella.
-- Il **diametro suggerito** è il minimo De della serie con portata di tabella ≥ Q (e, se è
-  impostata una velocità massima, che la rispetta). La serie limita anche i diametri
-  suggeriti per gli orizzontali (per esempio PP arriva a 160, Silere usa 135 al posto di
-  125).
+- Il **diametro suggerito** è il minimo De fra le misure del tipo di tubazione del tubo
+  (preferenze di instradamento, vedi "Misure disponibili") con portata di tabella ≥ Q (e,
+  se è impostata una velocità massima, che la rispetta). Per le colonne conta anche che il
+  De abbia un valore nella colonna della serie.
 
 ### Velocità e grado di riempimento
 
@@ -169,6 +186,24 @@ per i tratti non verificabili, blu per `OVERSIZED`, grigie senza portata.
   pulsante predefinito: Invio nella griglia non modifica il modello. **Close** chiude senza
   modificare nulla.
 
+### Esportazione Excel
+
+**Export Excel** nella finestra dei risultati scrive un .xlsx (`rnwflow_xlsx.py`, writer
+zip + XML senza Excel installato, parte generica copiata da `mepqto_xlsx.py`):
+
+- foglio **Calculation**: tutte le righe, tratti e terminali, nell'ordine della rete da
+  monte a valle (filtro e ricerca della griglia non contano), con le sole colonne del
+  **risultato del calcolo**: #, System, Section, Part (Horizontal / Vertical / Fixture),
+  Fed by, Pipes, Min slope, Q, DN e De della misura di calcolo (la tendina New size), Qmax,
+  Use, v e Fill con quella misura, Check (colorato come nella finestra), Element (famiglia e
+  id dei terminali). Lo stato attuale del modello (DN / De, Qmax, utilizzo, velocità e
+  riempimento attuali, stato) non viene esportato;
+- foglio **Settings**: modello, data e impostazioni del calcolo (`settings_rows`, le stesse
+  del report).
+
+Il nome proposto è `<Modello>_RainwaterCalculation_<aaaammgg>.xlsx` nella cartella del
+modello. Un file aperto in Excel non si sovrascrive: la finestra lo segnala.
+
 ## Modifica del modello
 
 Per ogni tubo dei tratti scelti si imposta il diametro nominale (`RBS_PIPE_DIAMETER_PARAM`)
@@ -261,6 +296,7 @@ diametri si rilancia lo strumento.
 | `rnwflow_tables.py` | tabelle 6.2 - 6.5 e regole di lettura (Python puro) |
 | `rnwflow_ui.py` + `RNWFlowCalculation_form.xaml` | finestra delle impostazioni |
 | `rnwflow_results_ui.py` + `RNWFlowCalculation_results.xaml` | finestra dei risultati |
+| `rnwflow_xlsx.py` | writer .xlsx e foglio del calcolo (Python + .NET, nessun Revit) |
 
 Le impostazioni si salvano nella sezione `ESA_RNWFlowCalculation` della config di pyRevit.
 

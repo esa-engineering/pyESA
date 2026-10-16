@@ -131,7 +131,7 @@ class PipeCheck(object):
     """Un tubo ridotto a dati semplici, piu' il risultato della verifica."""
 
     def __init__(self, pipe_id, system, system_type, level, section, flow,
-                 angle, slope, model_de_mm, model_dn_mm, sizes, z_mid=None):
+                 angle, slope, model_de_mm, model_dn_mm, sizes, z_mid=None, series=None):
         self.id = pipe_id
         self.system = system
         self.system_type = system_type
@@ -143,6 +143,7 @@ class PipeCheck(object):
         self.model_dn_mm = model_dn_mm
         self.sizes = sizes                # [PipeSize] disponibili, None se ignote
         self.z_mid = z_mid                # quota del punto medio [mm], per il verso del flusso
+        self.series = series              # colonna della tabella 6.2, None se non riconosciuta
         if angle is not None and angle > STACK_MIN_ANGLE_DEG:
             self.orientation = ORIENT_STACK
             self.slope = None
@@ -191,7 +192,7 @@ def evaluate(row, de_mm, limits):
         return Evaluation(status=STATUS_NO_FLOW)
     de = table_de(row, de_mm)
     if row.orientation == ORIENT_STACK:
-        capacity = rt.stack_capacity(limits.series, de)
+        capacity = rt.stack_capacity(row_series(row, limits), de)
         if capacity is None:
             return Evaluation(status=STATUS_NOT_IN_TABLE)
         if capacity < row.flow:
@@ -215,9 +216,31 @@ def evaluate(row, de_mm, limits):
     return Evaluation(capacity, velocity, fill_actual, STATUS_OK)
 
 
+def row_series(row, limits):
+    """Serie del tubo (dal segmento); in mancanza quella dei limiti (di solito None)."""
+    return row.series if row.series is not None else limits.series
+
+
+def _candidates(row, table):
+    """De di tabella fra le misure del tipo di tubazione del tubo; None se ignote."""
+    if not row.sizes:
+        return None
+    found = set()
+    for size in row.sizes:
+        de = rt.match_de(size.od_mm, table)
+        if de is not None:
+            found.add(de)
+    return sorted(found) or None
+
+
 def check_pipe(row, limits):
-    """Verifica il tubo al De del modello e ne imposta stato e De suggerito."""
-    series = limits.series
+    """Verifica il tubo al De del modello e ne imposta stato e De suggerito.
+
+    I De suggeriti si scelgono fra le misure del tipo di tubazione del tubo; per
+    le colonne la portata ammissibile e' quella della serie del tubo (colonna
+    della tabella 6.2), o la piu' cautelativa se la serie non e' riconosciuta.
+    """
+    series = row_series(row, limits)
     row.model_de = table_de(row, row.model_de_mm)
     result = evaluate(row, row.model_de_mm, limits)
     row.capacity = result.capacity
@@ -234,19 +257,19 @@ def check_pipe(row, limits):
         row.notes.append("Slope over {0:.0f} cm/m: {0:.0f} cm/m row used".format(rt.MAX_SLOPE))
 
     if row.orientation == ORIENT_STACK:
-        if row.model_de is not None and rt.stack_capacity(series, row.model_de) is None:
-            row.notes.append("De {0} not in the {1} series".format(
+        if series is None:
+            row.notes.append("Pipe series not recognized from the pipe segment: the most "
+                             "conservative column of Table 6.2 is used")
+        elif row.model_de is not None and rt.stack_capacity(series, row.model_de) is None:
+            row.notes.append("De {0} not in Table 6.2 for {1}".format(
                 row.model_de, rt.SERIES_LABELS[series]))
-        suggestion = rt.suggest_stack(row.flow, series)
+        suggestion = rt.suggest_stack(row.flow, series,
+                                      _candidates(row, rt.all_stack_diameters()))
         if suggestion is not None:
             row.suggested_de, row.suggested_capacity = suggestion
     else:
-        if row.model_de is not None and row.capacity is not None \
-                and row.model_de not in rt.horizontal_diameters(series):
-            row.notes.append("De {0} not in the {1} series".format(
-                row.model_de, rt.SERIES_LABELS[series]))
         suggestion = rt.suggest_horizontal(limits.fill, row.table_slope, row.flow,
-                                           series, limits.vmax)
+                                           _candidates(row, rt.HORIZONTAL_DE), limits.vmax)
         if suggestion is not None:
             row.suggested_de = suggestion[0]
             row.suggested_capacity = suggestion[2]

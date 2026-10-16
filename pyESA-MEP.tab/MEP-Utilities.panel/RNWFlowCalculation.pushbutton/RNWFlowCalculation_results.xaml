@@ -260,6 +260,8 @@
                 <Button x:Name="btn_untick_all" Content="Untick All" Padding="10,3" Margin="0,0,5,0"/>
                 <Button x:Name="btn_show" Content="Select in Model" Padding="10,3" Margin="15,0,0,0"
                         ToolTip="Select in Revit the pipes of the highlighted rows and navigate the active view; Finish or Esc returns to this table"/>
+                <Button x:Name="btn_export" Content="Export Excel" Padding="10,3" Margin="15,0,0,0"
+                        ToolTip="Write the calculation to an .xlsx file: every row in network order, with the results of the calculation (calculation size, capacity, use, velocity, fill and check), not the current state of the model; plus a sheet with the settings"/>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal">
                 <Button x:Name="btn_cancel" Content="Close" Width="100" Height="30"
