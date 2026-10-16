@@ -8,8 +8,8 @@ non toccato.
 
 | Pulsante | Cosa fa |
 | --- | --- |
-| Place | Selezione di muri e solai, poi un foro per ogni attraversamento (accorpati se vicini) |
-| New Report | Check di fori e MEP (tutto il modello, selezione MEP o ARC), pulizia degli Id vecchi, fori mancanti, riepilogo, Text Report (export Excel) o Interactive Report |
+| Place | Selezione di muri e solai, di elementi MEP o di un'area, poi un foro per ogni attraversamento (accorpati se vicini) |
+| New Report | Check di fori e MEP (tutto il modello, selezione MEP o ARC, area), pulizia degli Id vecchi, fori mancanti, riepilogo, Text Report (export Excel) o Interactive Report |
 | Last Report | L'ultimo New Report del modello, senza controllo ne' domande |
 | Settings | Impostazioni per utente (`script.get_config("ESA_Openings")`) |
 
@@ -270,6 +270,29 @@ modello host), l'attraversamento viene allungato strato per strato:
 
 La chiave di accorpamento e' l'intera pila: scegliendo piu' strati della stessa struttura si ottiene un foro solo.
 Il report conta gli attraversamenti allungati e, nella colonna "Crossed element", elenca gli strati aggiunti.
+
+## Area (Place e New Report)
+
+Terza scelta della finestra di Place (`PICK_AREA`) e quarto ambito del New Report (`SCOPE_AREA`). `pick_area()`
+legge l'area dalla vista attiva:
+
+- pianta (floor, ceiling, engineering plan): riquadro trascinato (`PickBox`), allineato agli assi dello schermo
+  (riquadro di taglio ruotato compreso), quote dal fondo alla cima del view range (`view_range_z()`, come Quick
+  SectionBox; view range illimitato: livello + 4000 mm);
+- vista 3D: la section box attiva, senza trascinare; senza section box un messaggio;
+- altre viste: messaggio.
+
+L'area e' un dict di soli numeri (`make_area()`: asse destra, min / max in destra, alto, quota) salvato nel file del
+Last Report (`scope.area`), cosi' Refresh e Last Report la ritrovano. Un attraversamento e' nell'area
+(`crossing_in_area()`) se il punto medio sta nel rettangolo in pianta e il tratto tocca l'intervallo di quote: con il
+view range consueto (fondo al livello) il solaio sotto il livello ha il centro fuori quota ma il tratto lo tocca.
+Gli elementi MEP che escono dall'area contano, ma solo per gli attraversamenti dentro (`stats["outside_area"]`).
+
+- **Place**: tutti i MEP rettilinei dell'host che toccano l'area (`meps_in_area()`) contro muri, solai e strutture
+  dell'host e dei link che la toccano (`hosts_in_area()`), poi come la modalita' normale (anteprima, fori nuovi).
+- **New Report**: fori gestiti nell'area (`opening_in_area()`, centro del bounding box) e scansione dei MEP dell'area;
+  attraversamenti senza foro in *Missing openings*. A ogni controllo (Refresh, azioni) MEP e fori comparsi nell'area
+  nel frattempo entrano nell'ambito; i fori usciti dall'area restano (per Id).
 
 ## Place: modalita' dalla selezione
 

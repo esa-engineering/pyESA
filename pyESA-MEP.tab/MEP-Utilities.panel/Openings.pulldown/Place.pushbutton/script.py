@@ -13,7 +13,8 @@ PLACE: with elements already selected, those already associated with an
 opening (openings, MEP elements listing an existing opening) are
 checked; the other MEP elements, walls, floors and structural elements
 get openings. With nothing selected, a window asks what to select: walls
-and floors (host model or RVT links) or MEP elements. Every straight pipe, duct, cable tray or conduit of the host
+and floors (host model or RVT links), MEP elements, or an area (rectangle
+dragged in a plan view, or the section box of a 3D view). Every straight pipe, duct, cable tray or conduit of the host
 model that crosses them gets a Generic Model opening at the centre of
 the crossing, sized with the outer section (insulation included) plus
 the clearance, rounded up; the depth is the thickness plus the extra
@@ -29,7 +30,7 @@ Parameter names can be changed in Settings. Comments and Mark are not
 touched. Crossings that already have an opening are skipped.
 
 NEW REPORT: choose the scope (whole model, MEP selection, ARC
-selection). Every opening is compared with its MEP elements: still
+selection, area). Every opening is compared with its MEP elements: still
 there, still crossing, in the same place and size? Statuses: Valid,
 To Be Refreshed (the elements moved but are still inside the opening;
 optional), Not Associated (elements removed or moved out, no element
@@ -63,7 +64,7 @@ from Autodesk.Revit.DB.Mechanical import Duct
 from Autodesk.Revit.DB.Electrical import CableTray, Conduit
 from Autodesk.Revit.DB.Structure import StructuralType
 from Autodesk.Revit.UI import ExternalEvent, IExternalEventHandler
-from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
+from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter, PickBoxStyle
 from Autodesk.Revit.Exceptions import OperationCanceledException
 from System.Collections.Generic import List
 
@@ -558,6 +559,165 @@ def hosts_from_meps(meps):
     return hosts
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# Area: riquadro trascinato in pianta (quote dal view range, come Quick SectionBox) o section box della vista 3D
+# ----------------------------------------------------------------------------------------------------------------
+MIN_AREA_MM = 10.0           # riquadro piu' stretto di cosi': e' un clic, non un trascinamento
+FALLBACK_HEIGHT_MM = 4000.0  # altezza se il view range non e' leggibile (livelli illimitati)
+PLAN_TYPES = (DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan, DB.ViewType.EngineeringPlan)
+HOST_CATEGORIES = (DB.BuiltInCategory.OST_Walls, DB.BuiltInCategory.OST_Floors,
+                   DB.BuiltInCategory.OST_StructuralFraming, DB.BuiltInCategory.OST_StructuralColumns,
+                   DB.BuiltInCategory.OST_StructuralFoundation)
+
+
+def flat_unit(vector):
+    flat = DB.XYZ(vector.X, vector.Y, 0)
+    return flat.Normalize() if flat.GetLength() > 1e-9 else None
+
+
+def area_axes(area):
+    right = DB.XYZ(area["right"][0], area["right"][1], 0)
+    return right, Z.CrossProduct(right)
+
+
+def make_area(right, points, z_min, z_max, source):
+    """Area allineata agli assi della vista: min / max = (destra, alto, quota) dei punti proiettati. Solo numeri: si
+    salva cosi' com'e' nel file del Last Report e si rilegge per il Refresh."""
+    up = Z.CrossProduct(right)
+    us = [p.DotProduct(right) for p in points]
+    vs = [p.DotProduct(up) for p in points]
+    return {"right": [right.X, right.Y], "min": [min(us), min(vs), z_min], "max": [max(us), max(vs), z_max],
+            "source": source}
+
+
+def area_hit(area, point, z_low, z_high):
+    """Il punto sta nel rettangolo in pianta e l'intervallo di quote [z_low, z_high] tocca quello dell'area."""
+    right, up = area_axes(area)
+    tol = MOVE_TOL_MM / MM_PER_FT
+    u, v = point.DotProduct(right), point.DotProduct(up)
+    return area["min"][0] - tol <= u <= area["max"][0] + tol and area["min"][1] - tol <= v <= area["max"][1] + tol \
+        and z_high >= area["min"][2] - tol and z_low <= area["max"][2] + tol
+
+
+def crossing_in_area(area, p0, p1):
+    """Attraversamento nell'area: punto medio nel rettangolo, tratto che tocca le quote. Il tratto e non il solo punto
+    medio: con il view range consueto (fondo al livello) il solaio sotto il livello ha il centro fuori quota."""
+    return area_hit(area, p0.Add(p1).Divide(2.0), min(p0.Z, p1.Z), max(p0.Z, p1.Z))
+
+
+def opening_in_area(area, opening):
+    box = opening.get_BoundingBox(None)
+    if box is None:
+        return False
+    return area_hit(area, box.Min.Add(box.Max).Divide(2.0), box.Min.Z, box.Max.Z)
+
+
+def area_outline(area, transform=None):
+    """Outline allineato agli assi del documento (del link, con transform) che contiene l'area: filtro grossolano per
+    i collector, il test vero e' area_hit."""
+    right, up = area_axes(area)
+    inverse = transform.Inverse if transform is not None else None
+    corners = []
+    for u in (area["min"][0], area["max"][0]):
+        for v in (area["min"][1], area["max"][1]):
+            for z in (area["min"][2], area["max"][2]):
+                corner = right.Multiply(u).Add(up.Multiply(v)).Add(Z.Multiply(z))
+                corners.append(inverse.OfPoint(corner) if inverse is not None else corner)
+    return DB.Outline(DB.XYZ(min(c.X for c in corners), min(c.Y for c in corners), min(c.Z for c in corners)),
+                      DB.XYZ(max(c.X for c in corners), max(c.Y for c in corners), max(c.Z for c in corners)))
+
+
+def area_text(area):
+    return "{}, {:.0f} x {:.0f} mm, height {:.0f} to {:.0f} mm".format(
+        area["source"], (area["max"][0] - area["min"][0]) * MM_PER_FT, (area["max"][1] - area["min"][1]) * MM_PER_FT,
+        area["min"][2] * MM_PER_FT, area["max"][2] * MM_PER_FT)
+
+
+def plan_right(view):
+    """Destra dello schermo nella pianta; con il riquadro di taglio ruotato (scope box) quella del riquadro."""
+    right = flat_unit(view.RightDirection) or DB.XYZ.BasisX
+    try:
+        if view.CropBoxActive:
+            right = flat_unit(view.CropBox.Transform.BasisX) or right
+    except Exception:
+        pass
+    return right
+
+
+def view_range_z(view):
+    """(z min, z max, nota): dal fondo alla cima del view range della pianta, coordinate interne."""
+    def plane_z(view_range, plane):
+        level = doc.GetElement(view_range.GetLevelId(plane))
+        if not isinstance(level, DB.Level):
+            return None  # livello illimitato o relativo
+        return level_elevation(level) + view_range.GetOffset(plane)
+
+    bottom = top = None
+    try:
+        view_range = view.GetViewRange()
+        bottom = plane_z(view_range, DB.PlanViewPlane.BottomClipPlane)
+        top = plane_z(view_range, DB.PlanViewPlane.TopClipPlane)
+    except Exception:
+        pass
+    note = "view range"
+    if bottom is None or top is None:
+        base = level_elevation(view.GenLevel) if view.GenLevel is not None else 0.0
+        note = "view range not readable, level + {:g} mm".format(FALLBACK_HEIGHT_MM)
+        bottom = base if bottom is None else bottom
+        top = base + FALLBACK_HEIGHT_MM / MM_PER_FT if top is None else top
+    return min(bottom, top), max(bottom, top), note  # nei controsoffitti l'ordine dei piani e' rovesciato
+
+
+def pick_area():
+    """Area dalla vista attiva: riquadro trascinato in pianta, o section box della vista 3D (senza trascinare)."""
+    view = doc.ActiveView
+    if isinstance(view, DB.View3D) and not view.IsTemplate:
+        if not view.IsSectionBoxActive:
+            forms.alert("This 3D view has no section box. Turn it on (or use Quick SectionBox), or drag a rectangle "
+                        "in a plan view.", title=TITLE, exitscript=True)
+        box = view.GetSectionBox()
+        corners = [box.Transform.OfPoint(DB.XYZ(x, y, z)) for x in (box.Min.X, box.Max.X)
+                   for y in (box.Min.Y, box.Max.Y) for z in (box.Min.Z, box.Max.Z)]
+        right = flat_unit(box.Transform.BasisX) or DB.XYZ.BasisX
+        return make_area(right, corners, min(c.Z for c in corners), max(c.Z for c in corners),
+                         "section box of the 3D view '{}'".format(view.Name))
+    if isinstance(view, DB.ViewPlan) and not view.IsTemplate and view.ViewType in PLAN_TYPES:
+        try:
+            picked = uidoc.Selection.PickBox(PickBoxStyle.Enclosing,
+                                             "Openings: drag a rectangle from corner to corner (ESC to cancel)")
+        except OperationCanceledException:
+            script.exit()
+        z_min, z_max, note = view_range_z(view)
+        area = make_area(plan_right(view), [picked.Min, picked.Max], z_min, z_max,
+                         "rectangle in the plan '{}' ({})".format(view.Name, note))
+        if min(area["max"][0] - area["min"][0], area["max"][1] - area["min"][1]) * MM_PER_FT < MIN_AREA_MM:
+            forms.alert("The rectangle is less than {:g} mm wide or high: drag from corner to corner.".format(
+                MIN_AREA_MM), title=TITLE, exitscript=True)
+        return area
+    forms.alert("Area: run it from a floor or ceiling plan (drag a rectangle) or from a 3D view with a section box.",
+                title=TITLE, exitscript=True)
+
+
+def hosts_in_area(area):
+    """Muri, solai e strutture del modello host e dei link caricati che toccano l'area. Stesso formato di
+    pick_hosts."""
+    categories = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](HOST_CATEGORIES))
+    hosts = []
+    for source_doc, transform, link_id in model_sources():
+        model = source_doc.Title if link_id else "Host model"
+        for element in DB.FilteredElementCollector(source_doc).WherePasses(categories).WhereElementIsNotElementType()\
+                .WherePasses(DB.BoundingBoxIntersectsFilter(area_outline(area, transform))):
+            hosts.append(((link_id, id_value(element.Id)), element, transform, model))
+    return hosts
+
+
+def meps_in_area(area):
+    """Elementi MEP rettilinei del modello host che toccano l'area (anche solo in parte)."""
+    categories = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](MEP_CATEGORIES))
+    return [e for e in DB.FilteredElementCollector(doc).WherePasses(categories).WhereElementIsNotElementType()
+            .WherePasses(DB.BoundingBoxIntersectsFilter(area_outline(area))) if is_straight_mep(e)]
+
+
 def host_normal(element, transform, point):
     """Normale del muro (o della trave) nel punto, anche curvo, in coordinate host."""
     curve = element.Location.Curve
@@ -695,11 +855,12 @@ def extend_through(p0, p1, layers, options, kind, w):
 
 
 
-def find_crossings(hosts, stats, only=None, keep_existing=False, progress=None):
+def find_crossings(hosts, stats, only=None, keep_existing=False, progress=None, area=None):
     """Attraversamenti degli elementi MEP con muri, solai e strutture, allungati attraverso gli strati a contatto
     (muri o solai separati di una struttura composita). only: id degli elementi MEP da considerare (modalita'
     inversa), None = tutti quelli vicini. Quelli che hanno gia' un foro si saltano (Place) o, con keep_existing (check),
-    restano con item["opening"] = il foro che li contiene. progress(i, n): avanzamento sugli elementi attraversati."""
+    restano con item["opening"] = il foro che li contiene. progress(i, n): avanzamento sugli elementi attraversati.
+    area: solo gli attraversamenti dentro l'area (crossing_in_area), gli altri contati in stats["outside_area"]."""
     boxes = []
     for opening in existing_openings():
         box = opening.get_BoundingBox(None)
@@ -753,6 +914,9 @@ def find_crossings(hosts, stats, only=None, keep_existing=False, progress=None):
                         stats["inside"] += 1  # corre dentro il muro o il solaio: nessun foro
                         continue
                     p0, p1, used = extend_through(p0, p1, layers, options, kind, w)
+                    if area is not None and not crossing_in_area(area, p0, p1):
+                        stats["outside_area"] = stats.get("outside_area", 0) + 1
+                        continue
                     mid = p0.Add(p1).Divide(2.0)
                     opening = inside_existing(mid, boxes)
                     if opening is not None:
@@ -918,7 +1082,7 @@ def missing_families_exit(missing_families):
 def place_main():
     import OpeningsPlace_ui  # solo nella cartella di Place
     symbols, missing_families = family_symbols()
-    meps, hosts, ignored = [], [], 0
+    meps, hosts, ignored, area = [], [], 0, None
     if uidoc.Selection.GetElementIds().Count:
         # selezione: gli elementi gia' associati a un foro vanno al check, gli altri ai fori nuovi
         openings, linked, meps, hosts, ignored = split_selection()
@@ -944,11 +1108,23 @@ def place_main():
         remember_pick(pick)
         if pick == OpeningsPlace_ui.PICK_MEPS:
             meps = pick_meps()
+        elif pick == OpeningsPlace_ui.PICK_AREA:
+            area = pick_area()
         else:
             hosts = pick_hosts()
 
-    stats = {"inside": 0, "existing": 0, "extended": 0, "problems": []}
+    stats = {"inside": 0, "existing": 0, "extended": 0, "outside_area": 0, "problems": []}
     items, modes = [], []
+    if area is not None:
+        # ogni elemento MEP dell'area contro ogni muro, solaio e struttura dell'area (anche nei link); fori solo per
+        # gli attraversamenti dentro l'area, anche se l'elemento MEP ne esce
+        area_meps, area_hosts = meps_in_area(area), hosts_in_area(area)
+        if area_meps and area_hosts:
+            with forms.ProgressBar(title="Openings: looking for crossings ({value} of {max_value})") as bar:
+                items.extend(find_crossings(area_hosts, stats, only=set(id_value(m.Id) for m in area_meps),
+                                            progress=lambda i, n: bar.update_progress(i + 1, n), area=area))
+        modes.append("area: {}; MEP elements {}, walls, floors and structural elements {}".format(
+            area_text(area), len(area_meps), len(area_hosts)))
     if hosts:
         items.extend(find_crossings(hosts, stats))
         modes.append("walls, floors and structural elements selected: {}".format(len(hosts)))
@@ -967,6 +1143,9 @@ def place_main():
     output.print_md("Mode: **{}** | crossings: **{}** | openings to create: **{}** | already with an opening: **{}** | "
                     "MEP running inside (no opening): **{}** | extended through adjacent layers: **{}**".format(
                         mode_text, len(items), len(groups), stats["existing"], stats["inside"], stats["extended"]))
+    if stats["outside_area"]:
+        output.print_md("Crossings of these MEP elements outside the area (skipped): **{}**".format(
+            stats["outside_area"]))
     if ignored:
         output.print_md("Selected elements not used (not MEP, opening, wall, floor or structure, or not straight): "
                         "**{}**".format(ignored))
@@ -1332,10 +1511,12 @@ def linked_openings(openings, sel_meps, sel_openings):
 class CheckScope(object):
     """Fori del check: tutti (ids None) o un insieme di Id di fori, aggiornato dopo ricreazioni. meps: elementi MEP
     scelti, le cui liste si riscrivono anche se non hanno piu' fori. removed: fori cancellati dalle ricreazioni: i MEP
-    che li citano ancora si riscrivono anche se il foro non e' piu' nell'ambito."""
+    che li citano ancora si riscrivono anche se il foro non e' piu' nell'ambito. area (make_area): ambito Area, a
+    ogni controllo entrano anche i fori e gli elementi MEP comparsi nell'area nel frattempo."""
 
-    def __init__(self, kind, description, ids=None, meps=None, released=None):
+    def __init__(self, kind, description, ids=None, meps=None, released=None, area=None):
         self.kind, self.description, self.ids, self.meps = kind, description, ids, list(meps or [])
+        self.area = area
         self.removed = set()
         # {Id elemento (testo): [codici dei fori cancellati che lo elencavano]}: elementi rimasti senza foro dopo un
         # Delete, tenuti nell'ambito e nel report finche' un foro nuovo non li circonda
@@ -1354,7 +1535,9 @@ class CheckScope(object):
 
     def openings(self):
         found = existing_openings()
-        return found if self.ids is None else [o for o in found if code_of(o) in self.ids]
+        if self.ids is None:
+            return found
+        return [o for o in found if code_of(o) in self.ids or (self.area is not None and opening_in_area(self.area, o))]
 
     def replace(self, removed, created):
         self.removed |= set(removed)
@@ -1425,6 +1608,11 @@ def ask_check_scope(ui):
         chosen = openings_on_hosts(openings, hosts)
         description = "ARC selection ({} walls, floors and structural elements)".format(len(hosts))
         return CheckScope(kind, description, set(code_of(o) for o in chosen))
+    if kind == ui.SCOPE_AREA:
+        area = pick_area()
+        chosen = [o for o in openings if opening_in_area(area, o)]
+        return CheckScope(kind, "Area: {}".format(area_text(area)), set(code_of(o) for o in chosen),
+                          meps_in_area(area), area=area)
     return CheckScope(kind, "whole model")
 
 
@@ -1727,7 +1915,7 @@ def save_last_check(rows, removed, scope=None, missing_rows=None):
             "scope": {"kind": scope.kind, "description": scope.description,
                       "ids": sorted(scope.ids) if scope.ids is not None else None,
                       "meps": [id_value(m.Id) for m in scope.meps if m.IsValidObject],
-                      "released": scope.released},
+                      "released": scope.released, "area": scope.area},
             "missing": [dict((key, row[key]) for key in MISSING_SAVED) for row in (missing_rows or [])]}
     try:
         temp = path + ".tmp"
@@ -1940,9 +2128,12 @@ def report_data(report):
 # Scansione degli attraversamenti dell'ambito (New Report): elementi non associati e fori mancanti
 # ----------------------------------------------------------------------------------------------------------------
 def scan_meps(scope):
-    """Elementi MEP del report: quelli elencati nei fori dell'ambito, piu' quelli scelti (selezione MEP)."""
+    """Elementi MEP del report: quelli elencati nei fori dell'ambito, piu' quelli scelti (selezione MEP) o nell'area
+    (ambito Area, riletti a ogni controllo)."""
     meps = {}
-    for mep in scope.meps:
+    for mep in list(scope.meps) + (meps_in_area(scope.area) if scope.area is not None else []):
+        if not mep.IsValidObject:
+            continue
         if is_straight_mep(mep):
             meps[id_value(mep.Id)] = mep
     for opening in scope.openings():
@@ -1957,17 +2148,19 @@ def scan_crossings(scope):
     """Attraversamenti degli elementi MEP del report (scan_meps), come li trova Place: muri, solai e strutture del
     modello e dei link toccati da quegli elementi, con il foro che contiene ogni attraversamento (item["opening"]) o
     None. Solo questi elementi, qualunque sia l'ambito: non si cercano attraversamenti di altri elementi del modello.
-    Ritorna (attraversamenti, statistiche)."""
-    stats = {"inside": 0, "existing": 0, "extended": 0, "problems": []}
+    Ambito Area: muri, solai e strutture dell'area (non uno per elemento MEP, che sarebbero migliaia di ricerche) e
+    solo gli attraversamenti dentro l'area. Ritorna (attraversamenti, statistiche)."""
+    stats = {"inside": 0, "existing": 0, "extended": 0, "outside_area": 0, "problems": []}
     meps = scan_meps(scope)
     if not meps:
         return [], stats
-    hosts, only = hosts_from_meps(meps), set(id_value(m.Id) for m in meps)
+    only = set(id_value(m.Id) for m in meps)
+    hosts = hosts_in_area(scope.area) if scope.area is not None else hosts_from_meps(meps)
     if not hosts:
         return [], stats
     with forms.ProgressBar(title="Openings: looking for crossings ({value} of {max_value})") as bar:
         items = find_crossings(hosts, stats, only=only, keep_existing=True,
-                               progress=lambda i, n: bar.update_progress(i + 1, n))
+                               progress=lambda i, n: bar.update_progress(i + 1, n), area=scope.area)
     return items, stats
 
 
@@ -2121,6 +2314,8 @@ class CheckSession(object):
                 "an opening ({} elements not associated before, now added), {} running inside a wall or floor (no "
                 "opening).".format(sum(m["crossings"] for m in self.missing_rows), len(self.missing_rows),
                                    stats["existing"], self.added, stats["inside"])] + \
+               (["Crossings outside the area (not checked): {}.".format(stats["outside_area"])]
+                if stats.get("outside_area") else []) + \
                ["- {}".format(p) for p in stats["problems"]] + [
                 "Stale Ids removed: {} on openings (elements deleted), {} on {} MEP elements (openings deleted, or not "
                 "listing them). Ids added to MEP elements: {}.".format(
@@ -2222,7 +2417,8 @@ class LastReport(object):
         ids = scope.get("ids")
         meps = [m for m in (element_by_id(i) for i in scope.get("meps") or []) if m is not None]
         self.scope = CheckScope(scope.get("kind", "all"), scope.get("description", ""),
-                                set(ids) if ids is not None else None, meps, scope.get("released"))
+                                set(ids) if ids is not None else None, meps, scope.get("released"),
+                                scope.get("area"))
         self.date = saved.get("date", "")
         self.log = []
         self.stale_meps = []

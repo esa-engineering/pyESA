@@ -53,6 +53,9 @@
                                      Content="MEP elements (pipes, ducts, cable trays, conduits)"/>
                         <TextBlock Style="{StaticResource HintText}" Margin="20,0,0,5"
                                    Text="Their crossings with the walls, floors and structural elements of the host model and of the loaded RVT links get an opening."/>
+                        <RadioButton x:Name="AreaRadio" GroupName="Pick" Margin="0,5" Content="Area"/>
+                        <TextBlock Style="{StaticResource HintText}" Margin="20,0,0,5"
+                                   Text="In a plan view drag a rectangle (height: view range of the plan); in a 3D view the section box is used. Every crossing inside it, between MEP elements of the host model and walls, floors and structural elements of the host model or of the loaded RVT links, gets an opening."/>
                     </StackPanel>
                 </Border>
                 <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1" CornerRadius="5" Padding="10"
