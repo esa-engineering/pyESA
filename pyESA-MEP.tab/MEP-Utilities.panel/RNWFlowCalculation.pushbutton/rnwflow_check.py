@@ -131,7 +131,8 @@ class PipeCheck(object):
     """Un tubo ridotto a dati semplici, piu' il risultato della verifica."""
 
     def __init__(self, pipe_id, system, system_type, level, section, flow,
-                 angle, slope, model_de_mm, model_dn_mm, sizes, z_mid=None, series=None):
+                 angle, slope, model_de_mm, model_dn_mm, sizes, z_mid=None, series=None,
+                 code=None):
         self.id = pipe_id
         self.system = system
         self.system_type = system_type
@@ -144,6 +145,7 @@ class PipeCheck(object):
         self.sizes = sizes                # [PipeSize] disponibili, None se ignote
         self.z_mid = z_mid                # quota del punto medio [mm], per il verso del flusso
         self.series = series              # colonna della tabella 6.2, None se non riconosciuta
+        self.code = code                  # e_MEC_ElementCode_1, None se assente o vuoto
         if angle is not None and angle > STACK_MIN_ANGLE_DEG:
             self.orientation = ORIENT_STACK
             self.slope = None
@@ -339,6 +341,8 @@ class SectionResult(object):
                                     if r.model_de_mm is not None))
         self.model_dns = sorted(set(round(r.model_dn_mm, 1) for r in rows
                                     if r.model_dn_mm is not None))
+        # Codice elemento dei tubi del tratto (valori diversi uniti da "/")
+        self.element_code = "/".join(sorted(set(r.code for r in rows if r.code)))
 
         active = [r for r in rows if r.status != STATUS_NO_FLOW]
         self.status = _worst([r.status for r in rows])
@@ -489,8 +493,9 @@ class FixtureItem(object):
 
     is_fixture = True
 
-    def __init__(self, element_id, system, label, flow, dn_mm, z=None, notes=None):
+    def __init__(self, element_id, system, label, flow, dn_mm, z=None, notes=None, code=None):
         self.id = element_id
+        self.element_code = code or ""
         self.key = ("fixture", element_id)
         self.group_key = None
         self.pipe_ids = [element_id]

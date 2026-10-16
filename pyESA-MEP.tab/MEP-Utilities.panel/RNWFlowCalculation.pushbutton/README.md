@@ -124,8 +124,8 @@ del tubo. Ogni misura porta De (diametro esterno) e DN (diametro nominale).
 **Terminali e ordine della rete.** La finestra elenca anche i terminali (plumbing fixtures,
 per esempio i bocchettoni) collegati ai tubi verificati, come righe verdi in corsivo
 "Fixture" con la portata di ognuno (Fixture Units del connettore, `fixture_flow`),
-l'attacco (DN del connettore) e la famiglia; non si spuntano e non hanno misura nuova, il
-pulsante 🔍 li seleziona.
+l'attacco (DN del connettore), il codice elemento e la famiglia; non hanno misura nuova, il
+pulsante 🔍 li seleziona. I loro parametri si modificano nella scheda **Fixtures**.
 
 Le righe seguono la rete **dal punto di monte al punto di valle** (colonna `#`):
 
@@ -152,39 +152,97 @@ danno il punto di partenza dei rami. Cliccando un'intestazione la griglia si rio
 quella colonna; cliccando `#` si torna all'ordine della rete.
 
 
-`rnwflow_results_ui.py` + `RNWFlowCalculation_results.xaml`: una riga per parte di Section
-(colonna *Run*: Horizontal / Vertical), legata a una `DataTable` come in MEPQTO. Righe rosse per `UNDERSIZED` / `FLOW BEYOND TABLE`, gialle
-per i tratti non verificabili, blu per `OVERSIZED`, grigie senza portata.
+`rnwflow_results_ui.py` + `RNWFlowCalculation_results.xaml`: due schede, **Sections** e
+**Fixtures**, griglie legate a `DataTable` come in MEPQTO.
+
+### Scheda Sections
+
+Una riga per parte di Section (colonna *Run*: Horizontal / Vertical). Prima colonna **Show**
+(🔍), poi `#`, System, **Element code** (`e_MEC_ElementCode_1` dei tubi della riga, istanza
+poi tipo; valori diversi uniti da "/"), Section e le altre.
 
 - Colonne del modello: DN, De, portata ammissibile, utilizzo, velocità e riempimento alla
   portata di progetto, De suggerito.
-- **New size**: tendina con le misure del tipo di tubazione ("De 160 / DN 150"), proposta
-  sulla misura suggerita. A ogni scelta la riga ricalcola, con sfondo azzurro, Qmax, v,
-  riempimento ed esito della misura nuova (`SectionResult.evaluate_at`). Scegliere una
-  misura diversa da quella del modello spunta il tratto.
-- **Apply**: spunta il tratto da modificare. All'apertura sono spuntati i tratti
-  `UNDERSIZED`, `DE NOT IN TABLE` e `HIGH VELOCITY` il cui De suggerito è una misura del
-  tipo di tubazione.
-- **Tick Sections to Resize** ripete la spunta automatica (e riporta la tendina sulla
-  misura suggerita), **Untick All** toglie tutto.
-- **Show** (🔍, una colonna per riga) e **Select in Model** (righe evidenziate)
-  selezionano i tubi in Revit e li inquadrano. La finestra si chiude e lo script resta in
-  una selezione (`PickObjects`, con i tubi già selezionati e cliccabili solo quelli):
-  si naviga la vista attiva (pan, zoom, orbita); con **Fine** o **Esc** la finestra si
-  riapre con lo stesso `ResultsState` (stessa `DataTable`: spunte, misure, ricerca,
-  filtro) e torna sulla riga di partenza. I tubi restano selezionati. La finestra resta
-  modale di proposito: una finestra non modale richiederebbe `ExternalEvent` e
-  lascerebbe modificare il modello mentre la tabella mostra dati superati; durante la
+- **New size**: tendina con le misure del tipo di tubazione ("De 160 / DN 150"). A ogni
+  scelta la riga ricalcola Qmax, v, riempimento ed esito della misura nuova
+  (`SectionResult.evaluate_at`).
+- **Non ci sono spunte**: Apply Changes modifica tutte le righe la cui misura nuova è
+  diversa da quella del modello (colonna nascosta `Changed`, `is_change()`; per un tratto
+  con tubi di misure diverse qualunque scelta è un cambio, perché li uniforma). Queste
+  righe sono **azzurre e in grassetto**, con le celle della misura nuova in azzurro più
+  scuro. Per questo la tendina parte dalla misura suggerita solo nei tratti da cambiare
+  (`default_apply`: `UNDERSIZED`, `DE NOT IN TABLE`, `HIGH VELOCITY` con De suggerito fra le
+  misure del tipo), altrimenti dalla misura del modello: un tratto `OVERSIZED` non si
+  riduce se l'utente non lo sceglie. Si annulla un cambio riportando la tendina sulla misura
+  del modello.
+- Il colore dell'esito sta solo sulle celle **Status** (stato attuale) e **Check new**
+  (misura nuova): rosso per `UNDERSIZED` / `FLOW BEYOND TABLE`, giallo per i tratti non
+  verificabili, testo blu per `OVERSIZED`; testo grigio per le righe senza portata. La riga
+  resta libera per il colore del cambio di misura.
+- **Show** (🔍) seleziona in Revit gli elementi della riga e li inquadra. La finestra si
+  chiude e lo script resta in una selezione (`PickObjects`, con gli elementi già selezionati
+  e cliccabili solo quelli): si naviga la vista attiva (pan, zoom, orbita); con **Fine** o
+  **Esc** la finestra si riapre con lo stesso `ResultsState` (stesse `DataTable`: misure,
+  modifiche ai terminali, ricerca, filtro, scheda) e torna sulla riga di partenza. La
+  finestra resta modale di proposito: una finestra non modale richiederebbe `ExternalEvent`
+  e lascerebbe modificare il modello mentre la tabella mostra dati superati; durante la
   selezione invece il modello non si può modificare.
-- Filtro "Only sections that need attention" (salvato) e ricerca su sistema, Section,
-  stato e note.
-- **Apply Changes** controlla tutti i tratti spuntati, chiede conferma e chiude la
-  finestra. La conferma elenca i tratti che con la misura scelta non superano ancora la
-  verifica e le Section di cui è spuntata una parte sola, o le cui parti ricevono misure
-  diverse: la curva fra la parte orizzontale e la verticale ha una sola misura e farebbe
-  annullare la modifica. Non è il
-  pulsante predefinito: Invio nella griglia non modifica il modello. **Close** chiude senza
-  modificare nulla.
+- Filtro "Only sections that need attention" (salvato; restano visibili i terminali e le
+  righe che cambiano misura) e ricerca su sistema, codice elemento, Section, stato, note e
+  Fed by.
+
+### Scheda Fixtures
+
+I terminali collegati ai tratti calcolati, nell'ordine della rete, con 🔍, portata e i
+valori modificabili (celle gialle):
+
+| Colonna | Parametro |
+| --- | --- |
+| Family and type | tipo del terminale (`ChangeTypeId`), tendina con tutti i tipi di plumbing fixture del modello |
+| Collection area [m²] | `u_PLU_Area_1` |
+| Runoff coeff. C1 | `C1` |
+| Risk coeff. C2 | `C2` |
+| Element code | `e_MEC_ElementCode_1` |
+
+Ogni valore si cerca prima sull'istanza, poi sul tipo; la colonna **from** dice dove sta
+(`instance`, `type`, `missing`, `read-only ...`). Le celle di un parametro mancante o in sola
+lettura (per esempio guidato da una formula) sono grigie e non si modificano.
+
+- Lo script legge i valori e li passa già ridotti a testo (`read_fixture_data` ->
+  `rres.FixtureData`: valori di istanza per terminale, valori di tipo per tipo). I numeri
+  sono nelle unità di visualizzazione del parametro; un parametro di tipo Area si mostra e
+  si scrive sempre in m² (`_display_unit`). Si scrive con virgola o punto (`parse_decimal`);
+  un valore non numerico o negativo viene rifiutato e la cella torna com'era.
+- **Un parametro di tipo cambia tutte le istanze di quel tipo nel modello**, come in Revit:
+  modificandolo su una riga cambiano anche le altre righe dello stesso tipo
+  (`ResultsState.pending_type`). Cambiando tipo, la riga mostra i valori di tipo del tipo
+  nuovo e conserva i valori di istanza già modificati.
+- Le righe con modifiche da scrivere sono azzurre (confronto numerico: "0,90" e "0.9" non
+  sono una modifica). Il codice elemento modificato si vede anche nella scheda Sections e
+  nell'export.
+- **Apply and Recalculate** scrive le modifiche (`write_fixture_edits`, una `Transaction`
+  "Edit rainwater fixtures": prima i cambi di tipo, poi i parametri di tipo, poi quelli di
+  istanza), lascia a Revit l'aggiornamento delle portate, rilegge la rete (`analyze`) e
+  riapre la finestra con i risultati nuovi. Restano le misure scelte a mano
+  (`ResultsState.carry`, per chiave della Section: le proposte automatiche si ricalcolano
+  con le portate nuove), la ricerca, il filtro e la scheda. I tubi non vengono ancora
+  modificati.
+- Chiudere la finestra con modifiche ai terminali non scritte chiede conferma.
+
+### Applicazione
+
+**Apply Changes** chiede conferma e chiude la finestra. La conferma riassume tubi da
+ridimensionare e modifiche ai terminali, e segnala:
+
+- che con modifiche ai terminali in sospeso le misure sono calcolate con le portate attuali
+  (per verificarle con i valori nuovi si usa prima Apply and Recalculate);
+- i tratti che con la misura scelta non superano ancora la verifica;
+- le Section di cui cambia una parte sola, o le cui parti ricevono misure diverse: la curva
+  fra la parte orizzontale e la verticale ha una sola misura e farebbe annullare la modifica.
+
+Lo script scrive prima le modifiche ai terminali, poi ridimensiona i tubi. Non è il pulsante
+predefinito: Invio nella griglia non modifica il modello. **Close** chiude senza modificare
+nulla.
 
 ### Esportazione Excel
 
@@ -193,7 +251,8 @@ zip + XML senza Excel installato, parte generica copiata da `mepqto_xlsx.py`):
 
 - foglio **Calculation**: tutte le righe, tratti e terminali, nell'ordine della rete da
   monte a valle (filtro e ricerca della griglia non contano), con le sole colonne del
-  **risultato del calcolo**: #, System, Section, Part (Horizontal / Vertical / Fixture),
+  **risultato del calcolo**: #, System, Element code, Section, Part (Horizontal / Vertical /
+  Fixture),
   Fed by, Pipes, Min slope, Q, DN e De della misura di calcolo (la tendina New size), Qmax,
   Use, v e Fill con quella misura, Check (colorato come nella finestra), Element (famiglia e
   id dei terminali). Lo stato attuale del modello (DN / De, Qmax, utilizzo, velocità e
@@ -268,7 +327,7 @@ connettore o parametro associato, con il valore).
 Non si toccano gli apparecchi sanitari (i bocchettoni): il loro attacco ha una misura
 propria.
 
-Una `Transaction` per **Section** (le righe orizzontale e verticale spuntate insieme, così la
+Una `Transaction` per **Section** (le righe orizzontale e verticale che cambiano insieme, così la
 curva fra le due vede subito entrambe le misure) dentro un `TransactionGroup` ("Resize
 rainwater sections", un solo passo di annulla). Il preprocessor dei failure è dedicato, come
 in MEPAlignToWall, e non è il `FailureSwallower` di pyRevit, che può sbloccare vincoli o
@@ -278,9 +337,12 @@ raccordi) torna com'era e non annulla le altre.
 
 ### Report
 
-Il report di pyRevit si apre **solo in uscita e solo se una Section non si è potuta
-modificare**: avviso in testa con il numero di parti non modificate, impostazioni, poi
-la tabella di tutte le modifiche con esito e messaggi. Se tutto riesce, o se la finestra
+Il report di pyRevit si apre **solo in uscita e solo se una Section o una modifica ai
+terminali non si è potuta applicare**: avviso in testa con il numero di parti non
+modificate, tabella dei parametri dei terminali non scritti (parametro mancante o in sola
+lettura, valore rifiutato da Revit, transazione annullata), impostazioni, poi la tabella di
+tutte le modifiche dei tubi con esito e messaggi. Gli errori di scrittura durante Apply and
+Recalculate compaiono anche subito, in un avviso. Se tutto riesce, o se la finestra
 si chiude senza applicare, non compare nessun report. I casi senza nulla da verificare
 (nessun tubo, nessun tubo del tipo scelto nell'ambito) danno un avviso a finestra.
 
@@ -305,7 +367,13 @@ Le impostazioni si salvano nella sezione `ESA_RNWFlowCalculation` della config d
 - Lo script si fida del valore calcolato da Revit: se la rete è scollegata o il sistema non
   è configurato perché Revit sommi le Fixture Units, i tubi compaiono come `NO FLOW`.
 - Non è controllato che il diametro non diminuisca nel verso del flusso.
-- **Select in Model** lavora mentre la finestra è aperta (modale): la selezione e lo zoom
-  sono da verificare in Revit.
+- Il pulsante 🔍 lavora mentre la finestra è aperta (modale): la selezione e lo zoom sono da
+  verificare in Revit.
+- Apply and Recalculate si affida a Revit per aggiornare le Fixture Units dopo la scrittura
+  dei parametri: se le impostazioni di calcolo MEP del progetto non ricalcolano i sistemi,
+  le portate restano quelle di prima. Da verificare sul modello.
+- Cambiare la famiglia di un terminale (non solo il tipo) può staccarlo dal tubo, se
+  l'attacco della famiglia nuova non coincide: la rete si rilegge dopo il ricalcolo e un
+  terminale staccato non compare più.
 - La velocità è stimata dalla relazione di riempimento parziale tarata sulle tabelle, non
   dalla scabrezza o dal diametro interno del tubo del modello.

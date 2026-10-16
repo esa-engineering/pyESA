@@ -21,21 +21,30 @@ tooltip: >
   vertical (System + Section parameter of the pipes): flow, nominal and outer diameter in the model, capacity,
   velocity, fill degree, suggested diameter and status. Pick the new size from a dropdown
   with the sizes of the pipe type (from the segments of its routing preferences): capacity,
-  velocity, fill and check of the new size update at once. Tick the sections to resize
-  (the undersized ones can be ticked in one click); Apply Changes sets the size on all the
-  pipes of the ticked rows, after confirmation, one section at a time. Pipes always keep the
+  velocity, fill and check of the new size update at once. The rows whose new size differs
+  from the model are coloured; the new size starts at the suggested one only for the
+  sections that must change (undersized, not tabulated, high velocity). Apply Changes sets
+  the size on all the pipes of the coloured rows, after confirmation, one section at a
+  time. Pipes always keep the
   calculated size. The fittings connected to them take the new size, as with the Diameter field
   of the options bar (connector size, or the family parameter tied to it, for example NR);
   where a resized fitting still meets a pipe that keeps its size, or a fitting cannot take the
   new size, a transition from the routing preferences of the pipe type is added, as Revit
   does. No fitting is deleted and no pipe is moved. A section that cannot be resized is rolled
   back and the others are kept. The
-  report opens only at the end, and only if a section could not be resized.
+  report opens only at the end, and only if a section could not be resized or a fixture
+  value could not be written.
 
-  The search button of a row (or Select in Model) selects its pipes and lets you navigate
-  the active view; Finish or Esc returns to the table as it was. Export Excel writes the
-  calculation (every row in network order with the calculation size and its results, not
-  the current state of the model) and the settings to an .xlsx file.
+  The Fixtures tab lists the connected fixtures with family and type, collection area
+  (u_PLU_Area_1), C1, C2 and element code (e_MEC_ElementCode_1), instance or type
+  parameters, all editable; a type value changes every fixture of that type. Apply and
+  Recalculate writes them, lets Revit update the flows and recalculates the network,
+  keeping the sizes chosen by hand.
+
+  The search button of a row selects its elements and lets you navigate the active view;
+  Finish or Esc returns to the window as it was. Export Excel writes the calculation (every
+  row in network order with element code, calculation size and its results, not the
+  current state of the model) and the settings to an .xlsx file.
 
   SHIFT + CLICK: fitting test. Pick a fitting, a connector and a DN: the tool tries the connector
   size and the family parameter in a transaction that is rolled back, and reports what is

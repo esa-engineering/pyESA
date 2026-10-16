@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __title__ = "RNW Flow\nCalculation"
-__doc__ = """Version = 3.7
+__doc__ = """Version = 4.0
 Date    = 16.10.2026
 _____________________________________________________________________
 Description:
@@ -12,9 +12,11 @@ The flow is compared with the tables of the technical manual: Tables
 dialog), Table 6.2 for vertical stacks (fill degree 0.33). Sloped pipes
 are also checked for velocity and fill degree at the design flow.
 The results are listed per section (System + Section parameter) in a
-window where the user picks the new size from the sizes of the pipe type
-and ticks the sections to resize; only those are changed in the model,
-after confirmation. The fittings and accessories connected to the resized
+window where the user picks the new size from the sizes of the pipe type;
+the rows whose new size differs from the model are changed, after
+confirmation. A second tab lists the connected fixtures with their
+collection area, C1, C2, element code and type, all editable; the tool
+can write them and recalculate the network with the new flows. The fittings and accessories connected to the resized
 pipes are resized too, as with the Diameter field of the options bar:
 connector size, or the family parameter tied to it. Each section is listed as a
 horizontal part (horizontal and 45 degree pipes) and a vertical part.
@@ -43,16 +45,23 @@ __author__ = "ESA Engineering"
 #   4. raggruppamento per tratto (sistema + Section), terminali (plumbing
 #      fixtures) collegati con la loro portata, ordine della rete da monte a valle
 #      (network_topology + rnwflow_check.order_network) e finestra dei risultati
-#      (rnwflow_results_ui), dove l'utente sceglie i tratti da modificare;
-#   5. modifica: tubi, poi raccordi e accessori collegati (resize_fittings);
+#      (rnwflow_results_ui), dove l'utente sceglie le misure nuove (si
+#      modificano le righe con misura diversa da quella del modello) e i
+#      parametri dei terminali (scheda Fixtures, read_fixture_data);
+#   4b. "Apply and Recalculate": write_fixture_edits scrive i parametri dei
+#      terminali, Revit aggiorna le portate, analyze rilegge la rete e la
+#      finestra si riapre (ResultsState.carry conserva le misure scelte);
+#   5. modifica: parametri dei terminali in sospeso, poi tubi, poi raccordi e
+#      accessori collegati (resize_fittings);
 #      una Transaction per Section (le parti orizzontale e verticale insieme)
 #      dentro un TransactionGroup, con un
 #      IFailuresPreprocessor dedicato (non il FailureSwallower di pyRevit, vedi
 #      la docstring di ResizeFailurePreprocessor). Un tratto che fallisce torna
 #      com'era e non annulla gli altri;
-#   6. report solo in uscita e solo se una Section non si e' potuta modificare.
+#   6. report solo in uscita e solo se una Section o un parametro dei
+#      terminali non si e' potuto modificare.
 #
-# Navigazione: il pulsante di una riga (o "Select in Model") chiude la finestra,
+# Navigazione: il pulsante di una riga (scheda Sections o Fixtures) chiude la finestra,
 # seleziona i tubi, li inquadra e lascia l'utente in una selezione (PickObjects)
 # durante la quale puo' navigare la vista attiva; con Fine o Esc la finestra si
 # riapre con lo stesso stato. Una finestra non modale richiederebbe ExternalEvent
@@ -91,6 +100,11 @@ NO_SYSTEM_TYPE = "(No piping system)"
 SECTION_PARAM = "Section"
 
 TRANSACTION_GROUP_NAME = "Resize rainwater sections"
+FIXTURE_TRANSACTION_NAME = "Edit rainwater fixtures"
+
+# Codice elemento: colonna della scheda Sections e dell'export, modificabile per
+# i terminali nella scheda Fixtures (istanza, poi tipo).
+ELEMENT_CODE_PARAM = rres.PARAM_CODE
 
 VIEW_TYPES = (DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan, DB.ViewType.EngineeringPlan,
               DB.ViewType.Section, DB.ViewType.Elevation, DB.ViewType.Detail,
@@ -445,7 +459,43 @@ def pipe_series(pipe, cache):
     return result
 
 
-def build_check(pipe, type_name, limits, size_cache, series_cache):
+def _param_text(param):
+    """Valore di un parametro come testo; None se vuoto."""
+    if param is None or not param.HasValue:
+        return None
+    try:
+        if param.StorageType == DB.StorageType.String:
+            text = param.AsString()
+        else:
+            text = param.AsValueString()
+    except Exception:
+        return None
+    text = (text or "").strip()
+    return text or None
+
+
+def element_code(element, type_cache=None):
+    """e_MEC_ElementCode_1 dell'elemento: parametro di istanza, poi di tipo."""
+    param = element.LookupParameter(ELEMENT_CODE_PARAM)
+    if param is not None:
+        return _param_text(param)
+    try:
+        type_id = element.GetTypeId()
+        key = get_element_id_value(type_id)
+    except Exception:
+        return None
+    if type_cache is not None and key in type_cache:
+        return type_cache[key]
+    element_type = doc.GetElement(type_id) if key > 0 else None
+    value = None
+    if element_type is not None:
+        value = _param_text(element_type.LookupParameter(ELEMENT_CODE_PARAM))
+    if type_cache is not None:
+        type_cache[key] = value
+    return value
+
+
+def build_check(pipe, type_name, limits, size_cache, series_cache, code_cache=None):
     angle, slope = pipe_geometry(pipe)
     series, _description = pipe_series(pipe, series_cache)
     row = rc.PipeCheck(
@@ -462,6 +512,7 @@ def build_check(pipe, type_name, limits, size_cache, series_cache):
         sizes=pipe_type_sizes(pipe, size_cache),
         z_mid=pipe_mid_z(pipe),
         series=series,
+        code=element_code(pipe, code_cache),
     )
     return rc.check_pipe(row, limits)
 
@@ -555,7 +606,7 @@ def fixture_item(fixture):
         z = None
     notes = [] if flow is not None else ["Fixture Units not readable from the connector"]
     return rc.FixtureItem(get_element_id_value(fixture.Id), system_name(fixture),
-                          fitting_label(fixture), flow, dn, z, notes)
+                          fitting_label(fixture), flow, dn, z, notes, element_code(fixture))
 
 
 def ordered_entries(sections, pipes_by_id):
@@ -591,6 +642,203 @@ def ordered_entries(sections, pipes_by_id):
     fixture_edges = [(("fixture", fixture_id), row_of[pipe_id])
                      for fixture_id, pipe_id in fixture_pairs]
     return rc.order_network(sections, items, row_edges, fixture_edges), fixtures
+
+
+# -----------------------------------------------------------------------------
+# Parametri dei terminali (scheda Fixtures)
+# -----------------------------------------------------------------------------
+
+def _display_unit(param):
+    """Unita' con cui il valore si mostra e si scrive: m2 per un'area, altrimenti
+    l'unita' di visualizzazione del parametro; None se non ha unita'."""
+    try:
+        spec = param.Definition.GetDataType()
+        if spec.TypeId.split("-")[0] == DB.SpecTypeId.Area.TypeId.split("-")[0]:
+            return DB.UnitTypeId.SquareMeters
+    except Exception:
+        pass
+    try:
+        return param.GetUnitTypeId()
+    except Exception:
+        return None
+
+
+number_text = rres.number_text
+
+
+def param_value(param, where):
+    """Il parametro ridotto a rres.ParamValue (testo nelle unita' di _display_unit)."""
+    editable = not param.IsReadOnly
+    storage = param.StorageType
+    try:
+        if storage == DB.StorageType.String:
+            return rres.ParamValue(param.AsString() or "", where, rres.VALUE_TEXT, editable)
+        if storage == DB.StorageType.Double:
+            text = ""
+            if param.HasValue:
+                value = param.AsDouble()
+                unit = _display_unit(param)
+                if unit is not None:
+                    try:
+                        value = DB.UnitUtils.ConvertFromInternalUnits(value, unit)
+                    except Exception:
+                        pass
+                text = number_text(value)
+            return rres.ParamValue(text, where, rres.VALUE_NUMBER, editable)
+        if storage == DB.StorageType.Integer:
+            text = str(param.AsInteger()) if param.HasValue else ""
+            return rres.ParamValue(text, where, rres.VALUE_INTEGER, editable)
+    except Exception:
+        pass
+    return rres.ParamValue(param.AsValueString() or "", where, rres.VALUE_TEXT, False)
+
+
+def symbol_label(symbol):
+    try:
+        return "{0} : {1}".format(symbol.Family.Name, element_name(symbol))
+    except Exception:
+        return element_name(symbol)
+
+
+def fixture_types(fixtures):
+    """{id testo: FamilySymbol} dei tipi di plumbing fixture del documento, piu'
+    quelli dei terminali collegati se mancassero."""
+    symbols = {}
+    collector = DB.FilteredElementCollector(doc) \
+        .OfCategory(DB.BuiltInCategory.OST_PlumbingFixtures).WhereElementIsElementType()
+    for symbol in collector:
+        if isinstance(symbol, DB.FamilySymbol):
+            symbols[str(get_element_id_value(symbol.Id))] = symbol
+    for fixture in fixtures.values():
+        key = str(get_element_id_value(fixture.GetTypeId()))
+        if key not in symbols:
+            symbol = doc.GetElement(fixture.GetTypeId())
+            if symbol is not None:
+                symbols[key] = symbol
+    return symbols
+
+
+def read_fixture_data(entries, fixtures, symbols):
+    """Dati della scheda Fixtures: terminali in ordine di rete, valori di istanza
+    per terminale e valori di tipo per tipo (rres.FixtureData)."""
+    names = [name for name, _prefix in rres.FIXTURE_PARAMS]
+    types = []
+    type_values = {}
+    for key, symbol in symbols.items():
+        types.append((key, symbol_label(symbol)))
+        values = {}
+        for name in names:
+            param = symbol.LookupParameter(name)
+            if param is not None:
+                values[name] = param_value(param, rres.WHERE_TYPE)
+        type_values[key] = values
+    types.sort(key=lambda item: item[1].lower())
+    records = []
+    for entry in entries:
+        if not getattr(entry, "is_fixture", False):
+            continue
+        fixture = fixtures.get(entry.id)
+        if fixture is None:
+            continue
+        instance = {}
+        for name in names:
+            param = fixture.LookupParameter(name)
+            if param is not None:
+                instance[name] = param_value(param, rres.WHERE_INSTANCE)
+        type_key = str(get_element_id_value(fixture.GetTypeId()))
+        notes = list(entry.notes)
+        missing = [name for name in names
+                   if name not in instance and name not in type_values.get(type_key, {})]
+        if missing:
+            notes.append("Parameter(s) not found: " + ", ".join(missing))
+        records.append(rres.FixtureRecord(entry.id, entry.system, entry.flow, type_key,
+                                          instance, notes))
+    return rres.FixtureData(records, types, type_values)
+
+
+def _write_param(param, text):
+    """Scrive il testo nel parametro; ritorna il motivo dell'errore o None."""
+    if param is None:
+        return "parameter not found"
+    if param.IsReadOnly:
+        return "parameter is read-only"
+    try:
+        storage = param.StorageType
+        if storage == DB.StorageType.String:
+            done = param.Set(text)
+        elif storage in (DB.StorageType.Double, DB.StorageType.Integer):
+            number = rres.parse_decimal(text)
+            if number is None:
+                return "'{0}' is not a number".format(text)
+            if storage == DB.StorageType.Integer:
+                done = param.Set(int(round(number)))
+            else:
+                unit = _display_unit(param)
+                if unit is not None:
+                    try:
+                        number = DB.UnitUtils.ConvertToInternalUnits(number, unit)
+                    except Exception:
+                        pass
+                done = param.Set(float(number))
+        else:
+            return "parameter type not supported"
+    except Exception as error:
+        return _error_text(error)
+    return None if done else "Revit refused the value"
+
+
+def write_fixture_edits(edits, fixtures, symbols):
+    """Scrive tipo e parametri dei terminali in una Transaction. Ritorna gli errori.
+
+    Ordine: cambio di tipo, poi parametri di tipo, poi di istanza (un parametro di
+    istanza si cerca sul terminale gia' col tipo nuovo).
+    """
+    errors = []
+    by_id = dict((str(key), fixture) for key, fixture in fixtures.items())
+    preprocessor = ResizeFailurePreprocessor()
+    transaction = DB.Transaction(doc, FIXTURE_TRANSACTION_NAME)
+    handling = transaction.GetFailureHandlingOptions()
+    handling = handling.SetForcedModalHandling(False)
+    handling = handling.SetClearAfterRollback(True)
+    handling = handling.SetFailuresPreprocessor(preprocessor)
+    transaction.SetFailureHandlingOptions(handling)
+    transaction.Start()
+    try:
+        for fixture_id, type_id in sorted(edits.types.items()):
+            fixture = by_id.get(fixture_id)
+            symbol = symbols.get(type_id)
+            if fixture is None or symbol is None:
+                errors.append("Fixture {0}: type not found".format(fixture_id))
+                continue
+            try:
+                if not symbol.IsActive:
+                    symbol.Activate()
+                fixture.ChangeTypeId(symbol.Id)
+            except Exception as error:
+                errors.append("Fixture {0}: type not changed to {1}: {2}".format(
+                    fixture_id, symbol_label(symbol), _error_text(error)))
+        for (type_id, name), text in sorted(edits.type_params.items()):
+            symbol = symbols.get(type_id)
+            problem = _write_param(symbol.LookupParameter(name) if symbol else None, text)
+            if problem:
+                errors.append("Type {0}: {1} not written: {2}".format(
+                    symbol_label(symbol) if symbol else type_id, name, problem))
+        for (fixture_id, name), text in sorted(edits.instance.items()):
+            fixture = by_id.get(fixture_id)
+            problem = _write_param(fixture.LookupParameter(name) if fixture else None, text)
+            if problem:
+                errors.append("Fixture {0}: {1} not written: {2}".format(
+                    fixture_id, name, problem))
+        doc.Regenerate()
+        status = transaction.Commit()
+        if status == DB.TransactionStatus.RolledBack:
+            errors.insert(0, "Revit rolled the fixture changes back: nothing was written")
+            errors.extend(preprocessor.messages)
+    except Exception as error:
+        if transaction.GetStatus() == DB.TransactionStatus.Started:
+            transaction.RollBack()
+        errors.append("Fixture changes not written: {0}".format(_error_text(error)))
+    return errors
 
 
 # =============================================================================
@@ -1854,7 +2102,7 @@ class OnlyThesePipes(ISelectionFilter):
         return False
 
 
-NAVIGATE_PROMPT = ("Rainwater Sections: the pipes of the row are selected. Navigate the view "
+NAVIGATE_PROMPT = ("Rainwater Sections: the elements of the row are selected. Navigate the view "
                    "(pan, zoom, orbit), then press Finish or Esc to return to the table")
 
 
@@ -1886,17 +2134,25 @@ def navigate(ids, elements_by_id):
         pass
 
 
-def print_error_report(config, results, pipes_by_id):
-    """Report in uscita, solo se almeno una Section non e' stata modificata."""
+def print_error_report(config, results, pipes_by_id, fixture_errors=None):
+    """Report in uscita, solo se una Section o un parametro dei terminali non e'
+    stato modificato."""
     output.close_others()
     output.set_title("Rainwater Flow Calculation")
     report_header()
     failed = [o for o in results if o.result == RESULT_FAILED]
-    output.print_md(":warning: **{0} of {1} section part(s) could not be resized.** "
-                    "The reason is in the Messages column; the other parts were "
-                    "changed.".format(len(failed), len(results)))
+    if failed:
+        output.print_md(":warning: **{0} of {1} section part(s) could not be resized.** "
+                        "The reason is in the Messages column; the other parts were "
+                        "changed.".format(len(failed), len(results)))
+    if fixture_errors:
+        output.print_md(":warning: **{0} fixture change(s) could not be written.** The "
+                        "other changes were written.".format(len(fixture_errors)))
+        output.print_table(table_data=[[message] for message in fixture_errors],
+                           title="Fixtures", columns=["Message"])
     print_settings(config)
-    print_changes(results, pipes_by_id)
+    if results:
+        print_changes(results, pipes_by_id)
 
 
 class OnlyFittings(ISelectionFilter):
@@ -2060,6 +2316,50 @@ def run_fitting_test():
                     "transitions by itself when the fitting size changes.")
 
 
+class Analysis(object):
+    """Risultato di un calcolo della rete, per la finestra e per le modifiche."""
+
+    def __init__(self, entries, fixtures, symbols, fixture_data, elements_by_id):
+        self.entries = entries
+        self.fixtures = fixtures            # {id: plumbing fixture}
+        self.symbols = symbols              # {id testo: FamilySymbol}
+        self.fixture_data = fixture_data
+        self.elements_by_id = elements_by_id
+
+
+def analyze(config, pipes_by_id, type_names, system_names, scope_ids):
+    """Verifica i tubi scelti e ordina la rete; None se non c'e' nessun tubo.
+
+    Rilegge portate e parametri dal modello: dopo la scrittura dei terminali
+    (Apply and Recalculate) da' le portate aggiornate da Revit.
+    """
+    limits = rc.Limits(config.fill, None, config.vmin, config.vmax)
+    size_cache = {}
+    series_cache = {}
+    code_cache = {}
+    wanted_systems = set(config.systems)
+    rows = []
+    for pipe_id, pipe in pipes_by_id.items():
+        if pipe_id not in scope_ids or type_names[pipe_id] != config.system_type:
+            continue
+        if system_names[pipe_id] not in wanted_systems:
+            continue
+        rows.append(build_check(pipe, type_names[pipe_id], limits, size_cache, series_cache,
+                                code_cache))
+    descriptions = sorted(set(description for _series, description in series_cache.values()))
+    config.series_summary = "; ".join(descriptions) or "-"
+    if not rows:
+        return None
+
+    sections = rc.group_sections(rows, limits)
+    entries, fixtures = ordered_entries(sections, pipes_by_id)
+    elements_by_id = dict(pipes_by_id)
+    elements_by_id.update(fixtures)
+    symbols = fixture_types(fixtures)
+    fixture_data = read_fixture_data(entries, fixtures, symbols)
+    return Analysis(entries, fixtures, symbols, fixture_data, elements_by_id)
+
+
 def main():
     if int(doc.Application.VersionNumber) < 2022:
         forms.alert("This tool requires Revit 2022 or later.", exitscript=True)
@@ -2094,48 +2394,51 @@ def main():
     else:
         scope_ids = set(pipes_by_id)
 
-    limits = rc.Limits(config.fill, None, config.vmin, config.vmax)
-    size_cache = {}
-    series_cache = {}
-    wanted_systems = set(config.systems)
-    rows = []
-    for pipe_id, pipe in pipes_by_id.items():
-        if pipe_id not in scope_ids or type_names[pipe_id] != config.system_type:
-            continue
-        if system_names[pipe_id] not in wanted_systems:
-            continue
-        rows.append(build_check(pipe, type_names[pipe_id], limits, size_cache, series_cache))
-    descriptions = sorted(set(description for _series, description in series_cache.values()))
-    config.series_summary = "; ".join(descriptions) or "-"
-
-    if not rows:
+    analysis = analyze(config, pipes_by_id, type_names, system_names, scope_ids)
+    if analysis is None:
         forms.alert("No pipe of the chosen systems is in the chosen scope.",
                     sub_msg="Systems: {0}. Choose other systems or widen the scope.".format(
                         ", ".join(config.systems)),
                     title="Rainwater Flow Calculation")
         return
 
-    sections = rc.group_sections(rows, limits)
-    entries, fixtures = ordered_entries(sections, pipes_by_id)
-    elements_by_id = dict(pipes_by_id)
-    elements_by_id.update(fixtures)
-    text = settings_text(config)
-
-    # Finestra e navigazione si alternano finche' l'utente non applica o chiude.
+    # Finestra, navigazione e ricalcolo si alternano finche' l'utente non applica
+    # o chiude.
     state = None
+    fixture_errors = []
     while True:
-        form = rres.show_results(entries, text, state, export_info(config))
+        form = rres.show_results(analysis.entries, settings_text(config), state,
+                                 export_info(config), analysis.fixture_data)
         state = form.state
         if form.kind == rres.KIND_SHOW:
-            navigate(form.show_ids, elements_by_id)
+            navigate(form.show_ids, analysis.elements_by_id)
+            continue
+        if form.kind == rres.KIND_RECALC:
+            errors = write_fixture_edits(form.fixture_edits, analysis.fixtures,
+                                         analysis.symbols)
+            if errors:
+                fixture_errors.extend(errors)
+                forms.alert("{0} fixture change(s) could not be written.".format(len(errors)),
+                            sub_msg="\n".join(errors[:10]) +
+                            "\n\nThe report at the end lists them all.",
+                            title="Rainwater Flow Calculation")
+            refreshed = analyze(config, pipes_by_id, type_names, system_names, scope_ids)
+            if refreshed is None:
+                break
+            analysis = refreshed
+            state = state.carry()
             continue
         break
-    if form.kind != rres.KIND_APPLY or not form.changes:
-        return
 
-    results = apply_changes(form.changes, pipes_by_id)
-    if any(o.result == RESULT_FAILED for o in results):
-        print_error_report(config, results, pipes_by_id)
+    results = []
+    if form.kind == rres.KIND_APPLY:
+        if form.fixture_edits is not None and form.fixture_edits.count:
+            fixture_errors.extend(write_fixture_edits(form.fixture_edits, analysis.fixtures,
+                                                      analysis.symbols))
+        if form.changes:
+            results = apply_changes(form.changes, pipes_by_id)
+    if fixture_errors or any(o.result == RESULT_FAILED for o in results):
+        print_error_report(config, results, pipes_by_id, fixture_errors)
 
 
 main()
