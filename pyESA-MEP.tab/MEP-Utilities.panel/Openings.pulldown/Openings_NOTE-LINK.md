@@ -52,7 +52,8 @@ cancella mai da solo**: resta, e' *Not Associated* nel report, l'utente sceglie 
 - **Recreate** su quel foro riscrive gli Id associati (`<modello>:<id>`) con gli elementi trovati dentro e
   ricalcola dimensioni e stato. E' l'unico modo per riassociare, e vale anche come migrazione dei fori vecchi.
 
-**Differenza con il codice di oggi** (da cambiare in fase 4). `check_opening()` associa in automatico gli elementi
+**Differenza con il codice di allora** (fatto in fase 4, 19.10.2026; in piu': ricerca nel bounding box del foro,
+perche' la scansione non vede i MEP mai associati). `check_opening()` associa in automatico gli elementi
 non elencati che attraversano il foro (`ELEMENT_ADDED`, "crossing it, now associated"): un foro orfano spostato su
 altri tubi diventa *Partial* / *To Be Refreshed*, non *Not Associated*. `recreate_openings()` salta i fori senza
 `items` (`skipped`), quindi oggi Recreate non puo' riassociare un orfano. Da fare:
@@ -148,8 +149,12 @@ Last Report riconosce il caso: nessun foro gestito nel modello aperto, e il mode
    stato del comando in `openings_core.ctx`.
    **Fase 3 scritta (19.10.2026), da provare in Revit:** `MepRef` in tutto il codice (Place, New Report, Last
    Report), MEP cercati anche nei link, riferimenti `<modello>:<id>`, selezione MEP nei link, modelli e percorsi nel
-   report, link non caricato = riferimento tenuto e stato invariato. Fase 2 (fasi, workset, lettura unica) rinviata
-   a dopo questo test. Verifiche fatte fuori da Revit: compilazione con l'IronPython 2.7 di pyRevit
+   report, link non caricato = riferimento tenuto e stato invariato. Provata in Revit, commit `adeb102` (con la
+   scelta dei link in Place&Check e la finestra dell'esito). Fase 2 (fasi, workset, lettura unica) ancora da fare.
+   **Fase 4 scritta (19.10.2026), da provare in Revit:** formato dei riferimenti
+   `111,222; PRJ_MEC: 333,444` (`parse_refs` / `format_refs`, legge anche i formati vecchi), niente scrittura sui MEP
+   (tolti `write_mep`, `mep_candidates`, `plan_writes` e le righe "Stale Ids" del report), fori orfani come deciso
+   sotto (ricerca nel bounding box, Recreate sugli elementi trovati dentro). Verifiche fatte fuori da Revit: compilazione con l'IronPython 2.7 di pyRevit
    (`bin\netfx\engines\IPY2712PR`), nessun nome globale indefinito nella catena di `import *`, nessun nome definito
    in due moduli, AST di 181 blocchi identico all'originale (con `ctx.x` riportato al nome globale); diversi solo
    `load_settings`, `bundle_path`, `revit_owner`, `family_line`, `place_main`, `ReportController` (voluti).

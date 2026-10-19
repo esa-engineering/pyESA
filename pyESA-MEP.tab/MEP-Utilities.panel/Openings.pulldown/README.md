@@ -47,9 +47,12 @@ fori (come prima) e il modello Openings con MEP e ARC linkati (piano in `Opening
 - Ogni elemento MEP e' un `MepRef` (`openings_geometry`): elemento, modello (`Source`), curva e sezione gia' in
   coordinate host (sezione misurata nel documento dell'elemento, assi portati con il transform del link).
   `mep_near()`, `meps_in_area()` e `hosts_from_meps()` cercano in tutti i modelli (`link_sources()`).
-- Riferimento scritto sul foro (`MepRef.text`): `123456` per un elemento del modello aperto (come prima),
-  `PRJ_MEC:123456` per un elemento di un link (titolo del file linkato; `PRJ_MEC#2` se il link e' inserito piu'
-  volte). `mep_by_ref()` lo risolve.
+- **Riferimenti sul foro** (`e_GEN_RelatedElement_ID`): gli Id del modello aperto senza prefisso, poi un gruppo per
+  link, in ordine di nome: `111,222; PRJ_MEC: 333,444; PRJ_ELE: 555` (titolo del file linkato; `PRJ_MEC#2` se il
+  link e' inserito piu' volte). Leggibile in un abaco, "contiene 333" trova il foro, gli Id di un gruppo si
+  incollano in *Select by ID*. `format_refs()` scrive, `parse_refs()` legge (anche gli Id nudi dei modelli unici e
+  il formato di prova `PRJ_MEC:333,PRJ_ELE:555`; alla prima scrittura passano al formato nuovo). Internamente ogni
+  elemento e' `MepRef.text` = `"333"` o `"PRJ_MEC:333"`, risolto da `mep_by_ref()`.
 - **Link letti da Place**: sezione *Linked models* della finestra di Place (spunta = leggi, per MEP e per muri,
   solai e strutture; il modello aperto si legge sempre). Ricordata per modello in `ESA_Openings`
   (`place_skipped_links`: `"<percorso del modello>::<chiave>|<chiave>"`, al massimo 50); i link nuovi compaiono
@@ -58,7 +61,9 @@ fori (come prima) e il modello Openings con MEP e ARC linkati (piano in `Opening
   rifiutano. New Report e Last Report leggono sempre tutti i link.
 - **Selezione MEP**: Revit non seleziona insieme elementi del modello e dei link. Se il modello aperto ha MEP propri si
   scelgono quelli, altrimenti quelli dei link (`pick_meps()`).
-- Sui MEP dei link non si scrive niente: il legame sta solo sul foro. I MEP del modello aperto si scrivono come prima.
+- **Sui MEP non si scrive niente**, ne' nei link ne' nel modello aperto (decisione del 19.10.2026): il legame sta
+  solo sul foro. I parametri `e_GEN` rimasti sui MEP da versioni precedenti non si toccano piu'; `linked_openings()`
+  li legge ancora per la selezione MEP.
 - **Link non caricato**: i riferimenti a quel modello restano sul foro (non sono "deleted"), il foro mantiene lo
   stato scritto, non si ricrea ne' si unisce (`keep_status()`); riga dell'elemento "link not loaded".
 - Report: Place e i dettagli del New Report elencano i modelli letti con il percorso (`models_lines()`), i link non
@@ -72,8 +77,9 @@ Nomi predefiniti; i tre `e_GEN` si possono cambiare in Settings (le misure no).
 
 | Elemento | e_GEN_RelatedElement_ID | e_GEN_RelatedElement_Cat | e_GEN_Void_Status |
 | --- | --- | --- | --- |
-| Foro (Generic Model) | Id degli elementi MEP: `111,222` | `Pipes, Ducts, Cable Trays, Conduits` (solo quelle presenti) | stato del foro |
-| Elemento MEP | Id dei fori: `123456,123999` | `Generic Models` | il peggiore dei suoi fori |
+| Foro (Generic Model) | elementi MEP: `111,222; PRJ_MEC: 333` | `Pipes, Ducts, Cable Trays, Conduits` (solo quelle presenti) | stato del foro |
+
+Sugli elementi MEP non si scrive niente.
 
 Le categorie sono nomi fissi in inglese, non `Category.Name` (che dipende dalla lingua di Revit). MEC = tubi e
 canali, ELE = passerelle e conduit: la disciplina non si scrive piu', si ricava dalla classe dell'elemento.
@@ -228,17 +234,22 @@ quelli cancellati, e sostituisce `report`. Errori di lettura o scrittura silenzi
 
 Stato di ogni elemento elencato nel foro (`ELEMENT_*`): inside, partly outside (la sezione tocca ancora il foro),
 moved out (non lo tocca piu': anche entro la distanza di unione, `overlaps_opening()`), no longer crosses, section
-not readable, deleted.
+not readable, deleted, link not loaded; per gli elementi non elencati: crossing it, now associated (o partly
+outside), inside, not associated (foro orfano).
 
-**Associazioni e Id vecchi** (`plan_writes()`):
+**Associazioni e Id vecchi** (`CheckSession.run()`):
 
-- Foro: si scrivono gli Id dei suoi elementi che **esistono ancora**, anche se usciti dal foro: restano associati
-  (e visibili nel report) finche' il foro non si ricrea. Gli Id di elementi cancellati, o che non sono piu' MEP, si
-  tolgono.
-- Elemento MEP: la lista e' lo **specchio dei fori**: gli Id dei fori che lo citano, letti da tutti i fori gestiti
-  del modello (quelli fuori ambito con il valore che hanno). Id di fori cancellati o che non lo citano piu' si
-  tolgono; fori che lo citano ma mancavano si aggiungono. Stato = il peggiore di quei fori; nessun foro: Not
-  Associated. Fuori dall'ambito si toccano solo i MEP legati ai fori controllati (o scelti).
+- Foro: si scrivono i riferimenti dei suoi elementi che **esistono ancora**, anche se usciti dal foro: restano
+  associati (e visibili nel report) finche' il foro non si ricrea. Gli Id di elementi cancellati, o che non sono piu'
+  MEP, si tolgono; quelli di link non caricati restano.
+- Elementi MEP: non si scrive niente.
+- **Foro orfano** (decisione del 19.10.2026): aveva elementi associati e nessuno e' piu' dentro, nemmeno in parte.
+  Non si cancella mai da solo: e' Not Associated e lo decide l'utente (Delete). Se ora lo attraversano altri
+  elementi (es. foro spostato a mano) **non si associano da soli**: righe "inside, not associated (Recreate
+  associates it)" e nota in testa; il foro resta Not Associated. Per trovarli `check_opening()` cerca anche nel
+  bounding box del foro, in tutti i modelli (la scansione vede solo i MEP gia' citati dai fori). Recreate lo rifa'
+  su quegli elementi; quelli elencati prima perdono l'associazione. Move non c'e'. Un foro con almeno un elemento
+  ancora dentro, invece, prende in automatico gli elementi nuovi che lo attraversano (come prima).
 - Ricreando un foro, gli elementi che non lo attraversano piu' (`outside_meps()`) non entrano nel foro nuovo, che
   e' Valid, e perdono l'associazione (Not Associated); restano nell'ambito (`CheckScope.release()`) e vengono
   scansionati, ma un foro nuovo per loro lo trova Place&Check.
@@ -273,10 +284,8 @@ attraversanti. Un foro ricreato e' Valid e ha un nuovo Id.
 - Muri e solai si rileggono solo attraverso la scansione degli elementi del report: un foro senza elementi
   (Not Associated, nessun elemento rimasto) non si confronta con il muro.
 - La scansione degli attraversamenti riguarda solo gli elementi MEP del report: un elemento mai associato a un foro
-  che attraversa un muro senza foro non viene segnalato (si usa Place). Si ripete dopo ogni azione dell'Interactive
-  Report.
-- I MEP mai passati da Place non hanno stato: Not Associated si scrive solo sui MEP che avevano un foro e lo hanno
-  perso, non su tutti i MEP del modello che attraversano un muro senza foro.
+  che attraversa un muro senza foro non viene segnalato (si usa Place&Check). Si ripete dopo ogni azione
+  dell'Interactive Report.
 
 ## New Report: ambito e spunta MEC/ELE
 

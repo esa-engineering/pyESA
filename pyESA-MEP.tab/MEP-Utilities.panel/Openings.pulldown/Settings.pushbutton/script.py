@@ -51,10 +51,10 @@ def main():
                    "Width = length through the wall. Floor, round: cylinder along Z, Height = length through the "
                    "floor. Rectangular: Depth = length through.\n"
                    "Status: {} (elements in place), {} (elements moved but still inside the opening), {} (elements "
-                   "removed or moved out, opening without elements, element without opening).\n"
-                   "Opening: related Ids = Ids of its MEP elements, related categories = Pipes, Ducts, Cable Trays, "
-                   "Conduits.\nMEP element: related Ids = Ids of its openings, related categories = Generic Models, "
-                   "status = the worst of its openings.").format(
+                   "removed or moved out, opening without elements inside).\n"
+                   "Opening: related Ids = its MEP elements, those of this model first, then one group per linked "
+                   "model: \"111,222; PRJ_MEC: 333,444\"; related categories = Pipes, Ducts, Cable Trays, Conduits.\n"
+                   "MEP elements are not written: the link is on the opening.").format(
         PARAM_WIDTH, PARAM_HEIGHT, PARAM_DEPTH, PARAM_DIAMETER, VALID, TO_REFRESH, NOT_ASSOCIATED)
     xaml = script.get_bundle_file(XAML_FILE_NAME) or op.join(op.dirname(__file__), XAML_FILE_NAME)
     result = Settings_ui.SettingsWindow(xaml, settings, DEFAULTS, generic_model_families(), params_text).show()

@@ -143,44 +143,28 @@ def place_main():
 
     missing = set()
     rows, ids = [], []
-    mep_codes = {}  # riferimento MEP -> (MepRef, codici dei fori nuovi); si scrivono solo i MEP del modello
-    managed = set(code_of(o) for o in existing_openings())  # sui MEP si tengono solo i codici di fori esistenti
     transaction = DB.Transaction(ctx.doc, ctx.title)
     transaction.Start()
     try:
         for group in groups:
             frame, kind = group[0]["frame"], group[0]["kind"]
             data = sizes(group, frame)
-            meps = []
-            for item in group:
-                if all(m != item["mep"] for m in meps):
-                    meps.append(item["mep"])
+            meps = unique_meps(group)
             instance = create_opening(data, frame, kind, symbols, meps, NEW, missing)
-            code = code_of(instance)
-            for mep in meps:
-                mep_codes.setdefault(mep.text, (mep, []))[1].append(code)
             key, host, model = group[0]["host"]
             ids.append(id_value(instance.Id))
-            rows.append(" | ".join([code, "{} {}".format(kind, data["shape"]), size_text(data),
+            rows.append(" | ".join([code_of(instance), "{} {}".format(kind, data["shape"]), size_text(data),
                                     disciplines_text(meps) or "-",
                                     "{} {} ({})".format(host.Category.Name, id_value(host.Id), model),
-                                    ", ".join(m.text for m in meps)]))
-        for mep, new_codes in [v for v in mep_codes.values() if v[0].is_host]:
-            old = [c for c in split_list(get_text(mep.element, ctx.id_param)) if c in managed]
-            # con altri fori gia' presenti resta il loro stato, se peggiore
-            status = worst([VALID] + ([get_text(mep.element, ctx.status_param) or VALID] if old else []))
-            write_mep(mep.element, old + [c for c in new_codes if c not in old], status, missing)
+                                    format_refs([m.text for m in meps])]))
         transaction.Commit()
     except Exception:
         if transaction.GetStatus() == DB.TransactionStatus.Started:
             transaction.RollBack()
         raise
-    linked = len([v for v in mep_codes.values() if not v[0].is_host])
-    written = "{} = {} on the new openings{}.".format(
-        ctx.status_param, VALID, "" if linked == len(mep_codes) else " and on their MEP elements in this model")
-    if linked:
-        written += " MEP elements of linked models ({}) are not written: their link is on the opening ({}).".format(
-            linked, ctx.id_param)
+    # sui MEP non si scrive niente: il legame sta solo sul foro
+    written = "On the new openings: {} = {}, {} = their MEP elements. MEP elements are not written.".format(
+        ctx.status_param, VALID, ctx.id_param)
     warnings = (["Parameters not found (not written): {}.".format(missing_text(missing))] if missing else []) + \
         (["Not read:\n" + problems] if problems else [])
     show_result("OPENINGS CREATED", "{} new openings, in one transaction (one Undo).".format(len(groups)),

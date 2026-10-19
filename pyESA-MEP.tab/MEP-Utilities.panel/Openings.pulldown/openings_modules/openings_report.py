@@ -128,7 +128,7 @@ def stored_row(instance, saved):
     info = saved.get(code)
     states = dict((e[0], e[1]) for e in info.get("elements", [])) if info else {}
     elements, found = [], []
-    for text in split_list(get_text(instance, ctx.id_param)):
+    for text in parse_refs(get_text(instance, ctx.id_param)):
         mep = mep_by_ref(text)
         if mep is None:
             state = ELEMENT_LINK_NOT_LOADED if link_not_loaded(text) else ELEMENT_DELETED
@@ -215,14 +215,6 @@ def report_groups(ui, report):
     other = [row_entry(ui, row, owners) for row in report.rows if row["status"] not in known]
     if other:
         groups.append(("Other status", other))
-    stale = []
-    for mep, removed in report.stale_meps:
-        text = "{} {} | removed Ids: {}".format(mep_name(mep), mep.text, ", ".join(removed))
-        stale.append(ui.OpeningEntry("mep" + mep.text, text, text + "\n\nThese Ids pointed to openings "
-                                     "that are deleted or no longer list this element.", mep.select_ids(), [],
-                                     checkable=False))
-    if stale:
-        groups.append(("Stale Ids removed from MEP elements", stale))
     return groups
 
 
@@ -255,8 +247,7 @@ def link(element, fallback):
 
 def report_data(report):
     """Dati del Text Report e dell'export Excel (solo testo: la finestra e l'Excel non leggono Revit). Sezioni per
-    stato: Missing openings (solo New Report), Not Associated, To Be Refreshed, Valid (compatti), Id vecchi tolti
-    dai MEP. Ogni voce: codice, titolo, descrizione, note, righe (elemento, categoria, stato dell'elemento)."""
+    stato: Not Associated, To Be Refreshed, Valid (compatti). Ogni voce: codice, titolo, descrizione, note, righe (elemento, categoria, stato dell'elemento)."""
     sections = []
     owners = owners_of(report)
     if report.missing_rows is not None:
@@ -281,13 +272,6 @@ def report_data(report):
                           "notes": list(row["notes"]),
                           "rows": [(e["id"], e["name"], e["state"]) for e in row["elements"]]})
         sections.append({"title": status, "items": items})
-    if report.stale_meps:
-        sections.append({"title": "Stale Ids removed from MEP elements",
-                         "items": [{"code": "-", "title": "{} {} | removed Ids: {}".format(
-                             mep_name(mep), mep.text, ", ".join(removed)),
-                             "description": "removed Ids: {}".format(", ".join(removed)),
-                             "notes": ["These Ids pointed to openings that are deleted or no longer list it."],
-                             "rows": []} for mep, removed in report.stale_meps if mep.IsValidObject]})
     settings = "Settings: MEC/ELE {}, To Be Refreshed {}, minimum angle {:g} deg, layers joined across {:g} mm.".format(
         "separate" if ctx.settings["separate"] else "together", "on" if ctx.settings["misaligned"] else "off",
         ctx.settings["min_angle_deg"], ctx.settings["layer_gap_mm"])
@@ -351,15 +335,13 @@ class CheckSession(object):
         discipline_checks(self.results)
         self.missing_rows = None  # i fori mancanti li cerca Place&Check: qui solo lo stato dei fori presenti
         self.added = sum(len(r["added"]) for r in self.results)
-        self.plan = plan_writes(self.results, self.scope)
-        self.stale_meps = self.plan["stale_meps"]
+        self.stale = sum(len(r["stale"]) for r in self.results)  # Id di elementi cancellati, tolti dai fori
+        # si scrivono solo i fori (stato, riferimenti, categorie): sui MEP niente
         transaction = DB.Transaction(ctx.doc, "Openings: check")
         transaction.Start()
         try:
             for r in self.results:
                 write_opening(r["instance"], r["found_meps"], r["state"], self.missing, r["unloaded"])
-            for mep, codes, status in self.plan["meps"]:
-                write_mep(mep.element, codes, status, self.missing)
             transaction.Commit()
         except Exception:
             if transaction.GetStatus() == DB.TransactionStatus.Started:
@@ -375,7 +357,8 @@ class CheckSession(object):
     def details(self):
         """Righe in piu' del report testuale."""
         stats = self.scan_stats
-        return models_lines() + ["Statuses and Ids written, stale Ids removed, in one transaction (one Undo).",
+        return models_lines() + ["Statuses and element Ids written on the openings, in one transaction (one Undo). "
+                                 "MEP elements are not written.",
                 "Only the openings already in the model are checked; new openings: Place&Check.",
                 "Crossings of the MEP elements in this report: {} inside an opening ({} elements not associated "
                 "before, now added), {} running inside a wall or floor (no opening).".format(
@@ -383,10 +366,7 @@ class CheckSession(object):
                (["Crossings outside the area (not checked): {}.".format(stats["outside_area"])]
                 if stats.get("outside_area") else []) + \
                ["- {}".format(p) for p in stats["problems"]] + [
-                "Stale Ids removed: {} on openings (elements deleted), {} on {} MEP elements (openings deleted, or not "
-                "listing them). Ids added to MEP elements: {}.".format(
-                    self.plan["stale_openings"], sum(len(c) for _, c in self.stale_meps), len(self.stale_meps),
-                    self.plan["added"])]
+                "Ids of deleted elements removed from the openings: {}.".format(self.stale)]
 
     def warning(self):
         """Avviso del riepilogo, solo se qualcosa non si e' potuto scrivere."""
@@ -441,11 +421,10 @@ class CheckSession(object):
             self.origins.pop(code, None)
         self.origins.update(origins)
         self.scope.replace(removed, created)
-        self.run(removed)  # ricontrollo e scrittura: Id dei fori nuovi sugli elementi MEP, vecchi tolti
-        lines = events + ["Ids updated on {} MEP elements ({} left without an opening: {}).".format(
-            self.plan["updated"], self.plan["orphaned"], NOT_ASSOCIATED)]
+        self.run(removed)  # ricontrollo e scrittura degli stati
+        lines = list(events) or ["Nothing recreated"]
         if skipped:
-            lines.append("Skipped, no element crossing: {}.".format(", ".join(skipped)))
+            lines.append("Skipped (no element crossing, or link not loaded): {}.".format(", ".join(skipped)))
         message = " ".join(line if line.endswith(".") else line + "." for line in lines)
         self.log.append(message)
         return message
@@ -487,7 +466,6 @@ class LastReport(object):
                                 scope.get("area"))
         self.date = saved.get("date", "")
         self.log = []
-        self.stale_meps = []
         self.missing_rows = None  # file di versioni precedenti: i fori mancanti li cerca Place&Check
         self.added = 0
         details = load_last_check()
@@ -600,7 +578,7 @@ class ReportController(object):
         if not codes:
             return "None of the ticked openings is still in the model.", self.groups()
         for code in codes:  # gli elementi dei fori cancellati restano nell'ambito e nel report
-            for text in split_list(get_text(managed[code], ctx.id_param)):
+            for text in parse_refs(get_text(managed[code], ctx.id_param)):
                 mep = mep_by_ref(text)
                 if mep is not None:
                     self.report.scope.release(mep, [code])
@@ -619,8 +597,7 @@ class ReportController(object):
             self.report.run(codes)
         else:
             self.report = CheckSession(self.report.scope)
-        message = "Deleted {} openings ({}); Ids updated on {} MEP elements ({} left without an opening).".format(
-            len(codes), ", ".join(codes), self.report.plan["updated"], self.report.plan["orphaned"])
+        message = "Deleted {} openings ({}).".format(len(codes), ", ".join(codes))
         self.report.log.append(message)
         return message, self.groups()
 

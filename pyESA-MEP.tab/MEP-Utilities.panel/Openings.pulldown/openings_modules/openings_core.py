@@ -121,7 +121,6 @@ NEW, OK, MISALIGNED, REGROUP, PARTIAL, CHANGED, OBSOLETE = "New", "OK", "Misalig
 WRITTEN = {NEW: VALID, OK: VALID, MISALIGNED: TO_REFRESH, REGROUP: TO_REFRESH, PARTIAL: TO_REFRESH,
            CHANGED: NOT_ASSOCIATED, OBSOLETE: NOT_ASSOCIATED}
 WRITTEN_RANK = {VALID: 0, TO_REFRESH: 1, NOT_ASSOCIATED: 2}
-OPENING_CATEGORY = "Generic Models"  # e_GEN_RelatedElement_Cat sugli elementi MEP
 
 MOVE_TOL_MM = 5.0
 SIZE_TOL_MM = 1.0
@@ -144,6 +143,8 @@ ELEMENT_ADDED = "crossing it, now associated"
 ELEMENT_ADDED_OUT = "crossing it partly outside, now associated"
 ELEMENT_NO_OPENING = "no opening"  # attraversamento senza foro (Missing openings)
 ELEMENT_LINK_NOT_LOADED = "link not loaded"  # elemento di un link non caricato: Id tenuto, stato del foro invariato
+# attraversa un foro orfano (nessun elemento associato e' piu' dentro): non si associa da solo, lo fa Recreate
+ELEMENT_FOUND_INSIDE = "inside, not associated (Recreate associates it)"
 MISSING = "Missing openings"  # gruppo del report: attraversamenti senza foro
 MEP_CATEGORIES = (DB.BuiltInCategory.OST_PipeCurves, DB.BuiltInCategory.OST_DuctCurves,
                   DB.BuiltInCategory.OST_CableTray, DB.BuiltInCategory.OST_Conduit)
@@ -244,6 +245,39 @@ def split_ref(text):
     return model, number
 
 
+def parse_refs(value):
+    """Riferimenti (ref_text) scritti nel parametro Id di un foro. Formato: elementi del modello aperto senza prefisso,
+    poi un gruppo per link: "111,222; PRJ_MEC: 333,444; PRJ_ELE: 555". Si leggono anche gli Id nudi dei modelli
+    unici e il formato di prova "PRJ_MEC:333,PRJ_ELE:555": in un gruppo, un "<modello>:" vale per quell'Id e per i
+    seguenti; ";" torna al modello aperto."""
+    refs = []
+    for group in (value or "").split(";"):
+        model = ""
+        for token in group.split(","):
+            token = token.strip()
+            if ":" in token:
+                model, _, token = token.rpartition(":")
+                model, token = model.strip(), token.strip()
+            if token:
+                text = ref_text(model, token)
+                if text not in refs:
+                    refs.append(text)
+    return refs
+
+
+def format_refs(refs):
+    """Valore del parametro Id di un foro (inverso di parse_refs): Id del modello aperto, poi "; <modello>: Id,Id"
+    per ogni link, in ordine di nome. Leggibile in un abaco; gli Id di un modello si incollano in Select by ID."""
+    groups = {}
+    for text in refs:
+        model, number = split_ref(text)
+        if number not in groups.setdefault(model, []):
+            groups[model].append(number)
+    parts = [",".join(groups.pop(""))] if "" in groups else []
+    parts += ["{}: {}".format(model, ",".join(groups[model])) for model in sorted(groups)]
+    return "; ".join(parts)
+
+
 def discipline(mep):
     return "MEC" if isinstance(element_of(mep), (Pipe, Duct)) else "ELE"
 
@@ -272,7 +306,7 @@ def write_opening(instance, meps, state, missing, kept=()):
     """Stato, riferimenti e categorie degli elementi MEP del foro (MepRef). kept: riferimenti da non perdere anche
     se non leggibili ora (elementi di link non caricati); le loro categorie restano quelle gia' scritte."""
     set_text(instance, ctx.status_param, WRITTEN[state], missing)
-    set_text(instance, ctx.id_param, ",".join([m.text for m in meps] + list(kept)), missing)
+    set_text(instance, ctx.id_param, format_refs([m.text for m in meps] + list(kept)), missing)
     if not kept:
         set_text(instance, ctx.cat_param, categories_text(meps), missing)
 
@@ -292,14 +326,6 @@ def size_text(data):
     if data["shape"] == "round":
         return "D{:.0f} x {:.0f}".format(data["diameter"], data["depth"])
     return "{:.0f} x {:.0f} x {:.0f}".format(data["width"], data["height"], data["depth"])
-
-
-def write_mep(mep, codes, status, missing):
-    """Id dei fori del MEP, categoria e stato scritto (il peggiore dei suoi fori). Senza fori: Id e categoria
-    vuoti, stato Not Associated."""
-    set_text(mep, ctx.id_param, ",".join(codes), missing)
-    set_text(mep, ctx.cat_param, OPENING_CATEGORY if codes else "", missing)
-    set_text(mep, ctx.status_param, status if codes else NOT_ASSOCIATED, missing)
 
 
 def settings_line():

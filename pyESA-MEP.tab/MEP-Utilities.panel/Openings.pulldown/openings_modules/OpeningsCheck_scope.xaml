@@ -47,7 +47,7 @@
                         <TextBlock Style="{StaticResource SectionHeader}" Text="🎯 SCOPE"/>
                         <RadioButton x:Name="AllRadio" GroupName="Scope" Margin="0,5" Content="Whole model"/>
                         <TextBlock Style="{StaticResource HintText}" Margin="20,0,0,5"
-                                   Text="Every opening with a status, and every MEP element pointing to an opening."/>
+                                   Text="Every opening with a status."/>
                         <RadioButton x:Name="MepRadio" GroupName="Scope" Margin="0,5" Content="MEP selection"/>
                         <TextBlock Style="{StaticResource HintText}" Margin="20,0,0,5" x:Name="MepHint"/>
                         <RadioButton x:Name="ArcRadio" GroupName="Scope" Margin="0,5"
