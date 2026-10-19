@@ -4,8 +4,11 @@ rnwflow_ui.py - finestra XAML di configurazione per RNWFlowCalculation.
 
 Raccoglie il tipo di sistema di tubazioni degli scarichi meteorici, i sistemi di
 quel tipo da calcolare (uno o piu', non per forza tutti), il grado di
-riempimento dei collettori orizzontali, le velocita' limite e l'ambito, e
-restituisce un RunConfig allo script. Le ultime scelte sono salvate nella
+riempimento dei collettori orizzontali e le velocita' limite, e restituisce un
+RunConfig allo script. Si calcolano sempre i sistemi interi: se lo strumento
+parte con una selezione, lo script passa i sistemi degli elementi selezionati
+(preselected) e la finestra li propone gia' spuntati, al posto delle scelte
+salvate. Le ultime scelte sono salvate nella
 config di pyRevit (sezione ESA_RNWFlowCalculation).
 
 La serie di tubo non si sceglie: lo script la legge per ogni tubo dal
@@ -26,7 +29,8 @@ clr.AddReference('WindowsBase')
 from System.Windows import Window, MessageBox
 from System.Windows.Controls import CheckBox
 from System.Windows.Markup import XamlReader
-from System.Windows.Media import SolidColorBrush, Colors
+from System.Windows import Visibility
+from System.Windows.Media import SolidColorBrush, Colors, Color
 from System.IO import FileStream, FileMode
 
 from pyrevit import script
@@ -35,10 +39,6 @@ import rnwflow_tables as rt
 
 XAML_FILE_NAME = 'RNWFlowCalculation_form.xaml'
 CONFIG_SECTION = 'ESA_RNWFlowCalculation'
-
-SCOPE_ALL = "ALL"
-SCOPE_VIEW = "VIEW"
-SCOPE_SELECTION = "SELECTION"
 
 DEFAULT_FILL = 0.5
 DEFAULT_VMIN = "0.6"
@@ -51,6 +51,8 @@ GRAY_BRUSH = SolidColorBrush(Colors.Gray)
 GRAY_BRUSH.Freeze()
 RED_BRUSH = SolidColorBrush(Colors.Firebrick)
 RED_BRUSH.Freeze()
+BLUE_BRUSH = SolidColorBrush(Color.FromRgb(0x2D, 0x5A, 0x8A))
+BLUE_BRUSH.Freeze()
 
 
 class SystemItem(object):
@@ -89,7 +91,7 @@ class RunConfig(object):
         self.system_type = None
         self.systems = []
         self.fill = DEFAULT_FILL
-        self.scope = SCOPE_ALL
+        self.from_selection = False     # sistemi presi dalla selezione all'avvio
         self.vmin = None
         self.vmax = None
         self.series_summary = ""
@@ -132,18 +134,22 @@ def default_system_index(items):
 class RNWFlowForm(Window):
     """Finestra unica di configurazione."""
 
-    def __init__(self, system_items, view_available, selected_pipe_count):
+    def __init__(self, system_items, preselected=None, selected_count=0):
         self.result = False
         self.config = RunConfig()
         self._items = list(system_items)
-        self._view_available = view_available
-        self._selected_pipe_count = selected_pipe_count
+        # {tipo: [sistemi]} degli elementi selezionati all'avvio
+        self._preselected = {}
+        for name, type_name in preselected or []:
+            self._preselected.setdefault(type_name, []).append(name)
+        self._selected_count = selected_count
         self._saved_systems = None
         self._filtered = []
         self._loading = True
         self._load_xaml()
         self._init_controls()
         self._restore_settings()
+        self._apply_preselection()
         self._loading = False
         self._on_type_changed()
 
@@ -183,9 +189,7 @@ class RNWFlowForm(Window):
         self.cbo_fill = root.FindName('cbo_fill')
         self.txt_vmin = root.FindName('txt_vmin')
         self.txt_vmax = root.FindName('txt_vmax')
-        self.rdo_scope_all = root.FindName('rdo_scope_all')
-        self.rdo_scope_view = root.FindName('rdo_scope_view')
-        self.rdo_scope_selection = root.FindName('rdo_scope_selection')
+        self.txt_selection_info = root.FindName('txt_selection_info')
         self.btn_ok = root.FindName('btn_ok')
         self.btn_cancel = root.FindName('btn_cancel')
 
@@ -210,17 +214,32 @@ class RNWFlowForm(Window):
         self.txt_vmin.Text = DEFAULT_VMIN
         self.txt_vmax.Text = DEFAULT_VMAX
 
-        self.rdo_scope_all.IsChecked = True
-        if not self._view_available:
-            self.rdo_scope_view.Content = "Only pipes visible in the active view (not a model view)"
-            self.rdo_scope_view.IsEnabled = False
-        if self._selected_pipe_count > 0:
-            self.rdo_scope_selection.Content = \
-                "Only the {0} selected pipe(s)".format(self._selected_pipe_count)
-            self.rdo_scope_selection.IsChecked = True
-        else:
-            self.rdo_scope_selection.Content = "Only the selected pipes (no pipe is selected)"
-            self.rdo_scope_selection.IsEnabled = False
+        self.txt_selection_info.Visibility = Visibility.Collapsed
+
+    def _apply_preselection(self):
+        """Selezione all'avvio: tipo con piu' sistemi selezionati, e un avviso."""
+        if not self._selected_count:
+            return
+        self.txt_selection_info.Visibility = Visibility.Visible
+        names = [item.Name for item in self._items]
+        usable = [t for t in self._preselected if t in names]
+        if not usable:
+            self.txt_selection_info.Foreground = RED_BRUSH
+            self.txt_selection_info.Text = (
+                "The {0} selected element(s) belong to no piping system of the model: "
+                "choose the systems below.").format(self._selected_count)
+            return
+        chosen = max(usable, key=lambda t: (len(self._preselected[t]), -names.index(t)))
+        self.cbo_system.SelectedIndex = names.index(chosen)
+        self.config.from_selection = True
+        text = ("Started with {0} selected element(s): the whole system(s) {1} are "
+                "ticked.").format(self._selected_count, ", ".join(self._preselected[chosen]))
+        others = [n for t in usable if t != chosen for n in self._preselected[t]]
+        if others:
+            text += (" The selection also touches systems of another type, not "
+                     "calculated: {0}.").format(", ".join(others))
+        self.txt_selection_info.Foreground = BLUE_BRUSH
+        self.txt_selection_info.Text = text
 
     # --------------------------------------------------------- tipo e sistemi
 
@@ -247,13 +266,15 @@ class RNWFlowForm(Window):
             item.PipeCount, item.FlowCount)
 
     def _on_type_changed(self):
-        """Nuovo tipo: si ricarica l'elenco dei sistemi. Spuntati quelli salvati
-        l'ultima volta, se ce ne sono di questo tipo; altrimenti tutti."""
+        """Nuovo tipo: si ricarica l'elenco dei sistemi. Spuntati quelli degli
+        elementi selezionati all'avvio, se ce ne sono di questo tipo; altrimenti
+        quelli salvati l'ultima volta; altrimenti tutti."""
         self._update_system_info()
         item = self._selected_item()
         systems = item.systems if item is not None else []
         names = set(system.Name for system in systems)
-        saved = set(self._saved_systems or []) & names
+        preselected = set(self._preselected.get(item.Name, [])) if item is not None else set()
+        saved = (preselected or set(self._saved_systems or [])) & names
         for system in systems:
             system.IsSelected = (system.Name in saved) if saved else True
         self.txt_search.Text = ""
@@ -345,20 +366,18 @@ class RNWFlowForm(Window):
                 self.cbo_fill.SelectedIndex = rt.FILL_OPTIONS.index(fill)
             self.txt_vmin.Text = str(cfg.get_option('vmin', DEFAULT_VMIN))
             self.txt_vmax.Text = str(cfg.get_option('vmax', DEFAULT_VMAX))
-            # La selezione corrente vince sull'ambito salvato.
-            if self._selected_pipe_count == 0 and \
-                    cfg.get_option('scope', SCOPE_ALL) == SCOPE_VIEW and self._view_available:
-                self.rdo_scope_view.IsChecked = True
         except Exception:
             pass
 
     def _save_settings(self):
         try:
             cfg = script.get_config(CONFIG_SECTION)
-            cfg.set_option('system_type', self.config.system_type)
-            cfg.set_option('systems', list(self.config.systems))
+            # I sistemi presi dalla selezione non diventano le scelte salvate: la
+            # partenza senza selezione resta quella dell'ultima scelta manuale.
+            if not self.config.from_selection:
+                cfg.set_option('system_type', self.config.system_type)
+                cfg.set_option('systems', list(self.config.systems))
             cfg.set_option('fill', self.config.fill)
-            cfg.set_option('scope', self.config.scope)
             cfg.set_option('vmin', self.txt_vmin.Text.strip())
             cfg.set_option('vmax', self.txt_vmax.Text.strip())
             script.save_config()
@@ -395,12 +414,6 @@ class RNWFlowForm(Window):
         self.config.system_type = item.Name
         self.config.systems = [s.Name for s in self._selected_systems()]
         self.config.fill = rt.FILL_OPTIONS[max(self.cbo_fill.SelectedIndex, 0)]
-        if self.rdo_scope_selection.IsChecked:
-            self.config.scope = SCOPE_SELECTION
-        elif self.rdo_scope_view.IsChecked:
-            self.config.scope = SCOPE_VIEW
-        else:
-            self.config.scope = SCOPE_ALL
         self._save_settings()
         self.result = True
         self.Close()
@@ -410,9 +423,13 @@ class RNWFlowForm(Window):
         self.Close()
 
 
-def show_dialog(system_items, view_available, selected_pipe_count):
-    """Mostra la finestra; ritorna RunConfig oppure None se annullata."""
-    form = RNWFlowForm(system_items, view_available, selected_pipe_count)
+def show_dialog(system_items, preselected=None, selected_count=0):
+    """Mostra la finestra; ritorna RunConfig oppure None se annullata.
+
+    preselected: [(sistema, tipo)] degli elementi selezionati all'avvio;
+    selected_count: numero di elementi selezionati (0 = nessuna selezione).
+    """
+    form = RNWFlowForm(system_items, preselected, selected_count)
     form.ShowDialog()
     if not form.result:
         return None

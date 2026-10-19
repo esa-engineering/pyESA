@@ -78,6 +78,8 @@
                             <ComboBox x:Name="cbo_system" Grid.Column="1" Style="{StaticResource ComboStyle}"
                                       ToolTip="Piping system type of the rainwater drainage"/>
                         </Grid>
+                        <TextBlock x:Name="txt_selection_info" Style="{StaticResource HintText}"
+                                   Foreground="#2D5A8A" Text=""/>
 
                         <TextBlock x:Name="txt_system_info" Style="{StaticResource HintText}" Margin="0,6,0,0"
                                    Text=""/>
@@ -188,23 +190,6 @@
                     </StackPanel>
                 </Border>
 
-                <!-- SECTION: Scope -->
-                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
-                    <StackPanel>
-                        <TextBlock Text="🎯 SCOPE" Style="{StaticResource SectionHeader}"/>
-
-                        <StackPanel Margin="20,5,0,0">
-                            <RadioButton x:Name="rdo_scope_all" GroupName="scope"
-                                         Content="All pipes of the system type in the model"/>
-                            <RadioButton x:Name="rdo_scope_view" GroupName="scope" Margin="0,4,0,0"
-                                         Content="Only pipes visible in the active view"/>
-                            <RadioButton x:Name="rdo_scope_selection" GroupName="scope" Margin="0,4,0,0"
-                                         Content="Only the selected pipes"/>
-                        </StackPanel>
-
-                    </StackPanel>
-                </Border>
-
                 <!-- INFO -->
                 <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
                         CornerRadius="5" Padding="10" Margin="0,0,0,10">
@@ -212,9 +197,11 @@
                         <TextBlock Text="ℹ️ OUTPUT"
                                    Style="{StaticResource SectionHeader}" Foreground="Gray"/>
                         <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
-                            <Run Text="The results open in a second window, one row per section (System + Section parameter)."/>
+                            <Run Text="The whole systems ticked above are calculated, in the whole model. Start the tool with an element selected to tick its system."/>
                             <LineBreak/>
-                            <Run Text="The model is changed only for the sections ticked there, after confirmation."/>
+                            <Run Text="The results open in a second window, one row per section part (System + Section parameter)."/>
+                            <LineBreak/>
+                            <Run Text="The model is changed only for the rows whose new size differs from the model, after confirmation."/>
                         </TextBlock>
                     </StackPanel>
                 </Border>

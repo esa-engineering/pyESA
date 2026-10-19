@@ -38,6 +38,18 @@ import rnwflow_tables as rt
 # 45 gradi restano orizzontali (verificati con le tabelle 6.3 - 6.5, riga 10 cm/m).
 STACK_MIN_ANGLE_DEG = 60.0
 
+# Inclinazione da cui un tubo orizzontale e' un tratto a 45 gradi: si verifica come
+# gli altri (riga 10 cm/m), ma senza la nota "Slope over 10 cm/m", che su questi
+# tubi comparirebbe sempre. Fra 10 cm/m e questo angolo la nota resta.
+RUN_45_MIN_ANGLE_DEG = 30.0
+
+# Pendenze [cm/m] della simulazione nella finestra dei risultati: tutte le righe
+# delle tabelle 6.3 - 6.5 (0,5 - 5 ogni 0,5, poi 6 - 10 ogni 1)
+SIMULATED_SLOPES = list(rt.HORIZONTAL_SLOPES)
+
+# Testo della colonna Pipe Type per un tipo di tubazione senza Type Mark
+NO_TYPE_MARK = "(no type mark)"
+
 ORIENT_HORIZONTAL = "Horizontal"
 ORIENT_STACK = "Vertical"
 ORIENT_MIXED = "Mixed"
@@ -132,7 +144,7 @@ class PipeCheck(object):
 
     def __init__(self, pipe_id, system, system_type, level, section, flow,
                  angle, slope, model_de_mm, model_dn_mm, sizes, z_mid=None, series=None,
-                 code=None):
+                 code=None, type_mark=None):
         self.id = pipe_id
         self.system = system
         self.system_type = system_type
@@ -146,6 +158,7 @@ class PipeCheck(object):
         self.z_mid = z_mid                # quota del punto medio [mm], per il verso del flusso
         self.series = series              # colonna della tabella 6.2, None se non riconosciuta
         self.code = code                  # e_MEC_ElementCode_1, None se assente o vuoto
+        self.type_mark = type_mark        # Type Mark del tipo di tubazione, None se vuoto
         if angle is not None and angle > STACK_MIN_ANGLE_DEG:
             self.orientation = ORIENT_STACK
             self.slope = None
@@ -184,11 +197,13 @@ def table_de(row, de_mm):
     return rt.match_de(de_mm, rt.HORIZONTAL_DE)
 
 
-def evaluate(row, de_mm, limits):
+def evaluate(row, de_mm, limits, table_slope=None):
     """Verifica il tubo come se avesse diametro esterno de_mm.
 
     Stati possibili: NO FLOW, SLOPE UNDER 0.5, DE NOT IN TABLE (De non in
     tabella o non nella serie), UNDERSIZED, HIGH / LOW VELOCITY, OK.
+    table_slope: riga di tabella simulata per un tubo orizzontale, al posto di
+    quella della pendenza del modello.
     """
     if row.flow <= 0:
         return Evaluation(status=STATUS_NO_FLOW)
@@ -201,13 +216,14 @@ def evaluate(row, de_mm, limits):
             return Evaluation(capacity, status=STATUS_UNDERSIZED)
         return Evaluation(capacity, status=STATUS_OK)
 
-    if row.table_slope is None:
+    slope = table_slope if table_slope is not None else row.table_slope
+    if slope is None:
         return Evaluation(status=STATUS_LOW_SLOPE)
-    cell = rt.horizontal_cell(limits.fill, row.table_slope, de)
+    cell = rt.horizontal_cell(limits.fill, slope, de)
     if cell is None:
         return Evaluation(status=STATUS_NOT_IN_TABLE)
     capacity = cell[1]
-    state = rt.partial_state(row.flow, de, row.table_slope)
+    state = rt.partial_state(row.flow, de, slope)
     fill_actual, velocity = state if state is not None else (None, None)
     if capacity < row.flow:
         return Evaluation(capacity, velocity, fill_actual, STATUS_UNDERSIZED)
@@ -255,7 +271,8 @@ def check_pipe(row, limits):
     if result.status == STATUS_LOW_SLOPE:
         row.status = STATUS_LOW_SLOPE
         return row
-    if row.slope_reason == "ABOVE":
+    run_45 = row.angle is not None and row.angle >= RUN_45_MIN_ANGLE_DEG
+    if row.slope_reason == "ABOVE" and not run_45:
         row.notes.append("Slope over {0:.0f} cm/m: {0:.0f} cm/m row used".format(rt.MAX_SLOPE))
 
     if row.orientation == ORIENT_STACK:
@@ -343,6 +360,9 @@ class SectionResult(object):
                                     if r.model_dn_mm is not None))
         # Codice elemento dei tubi del tratto (valori diversi uniti da "/")
         self.element_code = "/".join(sorted(set(r.code for r in rows if r.code)))
+        # Type Mark dei tipi di tubazione del tratto, piu' tipi uniti da " - "; un
+        # tipo senza Type Mark compare come "(no type mark)"
+        self.pipe_type = " - ".join(sorted(set(r.type_mark or NO_TYPE_MARK for r in rows)))
 
         active = [r for r in rows if r.status != STATUS_NO_FLOW]
         self.status = _worst([r.status for r in rows])
@@ -403,12 +423,20 @@ class SectionResult(object):
             and self.suggested_size is not None
             and not od_in(self.suggested_size.od_mm, self.model_des))
 
-    def evaluate_at(self, de_mm):
-        """Esito del tratto se tutti i suoi tubi avessero diametro esterno de_mm."""
+    @staticmethod
+    def _table_slope(slope):
+        """Riga di tabella per una pendenza simulata [cm/m]; None = pendenza del modello."""
+        return rt.slope_row(slope)[0] if slope is not None else None
+
+    def evaluate_at(self, de_mm, slope=None):
+        """Esito del tratto se tutti i suoi tubi avessero diametro esterno de_mm e,
+        con slope [cm/m], quella pendenza (simulazione: i tubi orizzontali del
+        tratto si verificano tutti a quella riga di tabella)."""
         active = [r for r in self.rows if r.status != STATUS_NO_FLOW]
         if not active:
             return Evaluation(status=STATUS_NO_FLOW)
-        results = [evaluate(r, de_mm, self.limits) for r in active]
+        table_slope = self._table_slope(slope)
+        results = [evaluate(r, de_mm, self.limits, table_slope) for r in active]
         capacities = [e.capacity for e in results]
         velocities = [e.velocity for e in results if e.velocity is not None]
         fills = [e.fill_actual for e in results if e.fill_actual is not None]
@@ -417,6 +445,24 @@ class SectionResult(object):
             velocity=min(velocities) if velocities else None,
             fill_actual=max(fills) if fills else None,
             status=_worst([e.status for e in results]))
+
+    def suggested_at(self, slope):
+        """De suggerito del tratto orizzontale alla pendenza simulata [cm/m], fra le
+        misure del tipo di tubazione; None se un tubo non trova un De in tabella."""
+        table_slope = self._table_slope(slope)
+        if table_slope is None or self.run == ORIENT_STACK:
+            return None
+        found = []
+        for r in self.rows:
+            if r.status == STATUS_NO_FLOW:
+                continue
+            suggestion = rt.suggest_horizontal(self.limits.fill, table_slope, r.flow,
+                                               _candidates(r, rt.HORIZONTAL_DE),
+                                               self.limits.vmax)
+            if suggestion is None:
+                return None
+            found.append(suggestion[0])
+        return max(found) if found else None
 
     @property
     def use_pct(self):

@@ -30,8 +30,18 @@ Select All / Deselect All: il calcolo riguarda solo i sistemi spuntati (almeno u
 scelta si ricorda per nome: riaprendo, restano spuntati i sistemi scelti l'ultima volta, se
 ci sono ancora; altrimenti tutti. Cambiando tipo l'elenco si ricarica.
 
-L'ambito può essere l'intero modello, la vista attiva oppure i tubi selezionati, sempre
-dentro i sistemi spuntati.
+Si calcolano sempre i **sistemi interi** spuntati, in tutto il modello: non c'è più la
+scelta fra modello, vista attiva e tubi selezionati. **Se lo strumento parte con una
+selezione** (tubi, raccordi, accessori o terminali), `selection_systems` legge i sistemi
+degli elementi selezionati (`RBS_SYSTEM_NAME_PARAM`, più sistemi separati da virgola) e
+tiene quelli che sono sistemi dei tubi del modello. La finestra seleziona il tipo con più
+sistemi selezionati e spunta i suoi sistemi, al posto delle scelte salvate; una riga
+azzurra lo dice, e cita i sistemi selezionati di un altro tipo, che non si calcolano.
+L'utente può comunque cambiare la scelta. Se la selezione non tocca nessun sistema, la riga
+diventa rossa e valgono le scelte salvate. Senza selezione la finestra parte dalle scelte
+salvate, come prima. I sistemi di una partenza con selezione non diventano le scelte salvate
+(`RunConfig.from_selection`): la partenza senza selezione resta quella dell'ultima scelta
+manuale.
 
 **La serie di tubo non si sceglie**: si legge per ogni tubo dal modello (`pipe_series`):
 dal nome del materiale del suo segmento, se non basta dal nome del segmento, poi dal nome
@@ -46,7 +56,9 @@ finestra dei risultati e nel report.
 - **Verticali (colonne)**: tubi inclinati di più di 60° sull'orizzontale
   (`STACK_MIN_ANGLE_DEG`). Tabella 6.2, f = 0,33, colonna della serie del tubo (PE, PP,
   Triplus, Silere), letta dal segmento. I tratti a 45° sono **orizzontali**: si verificano con le tabelle 6.3 -
-  6.5, alla riga 10 cm/m (la loro pendenza supera la tabella), con una nota.
+  6.5, alla riga 10 cm/m (la loro pendenza supera la tabella). La nota "Slope over 10 cm/m"
+  compare solo per i tubi fra 10 cm/m e 30° (`RUN_45_MIN_ANGLE_DEG`), non per i tratti a 45°,
+  dove sarebbe sempre presente.
 - **Collettori orizzontali**: pendenza dalla geometria del tubo, in cm/m. Tabelle 6.3 / 6.4 /
   6.5 secondo il grado di riempimento scelto (0,5 / 0,6 / 0,7). Pendenza fra due righe: riga
   con pendenza inferiore. Sotto 0,5 cm/m il tratto non è verificabile; sopra 10 cm/m si usa
@@ -130,7 +142,7 @@ pulsante 🔍 li seleziona. I loro parametri si modificano nella scheda **Fixtur
 Le righe seguono la rete **dal punto di monte al punto di valle** (colonna `#`):
 
 1. `network_topology` visita la rete dai tubi verificati attraverso i raccordi (fermandosi
-   ai tubi fuori ambito) e raccoglie i **nodi**, cioè i tubi che si incontrano in un
+   ai tubi dei sistemi non calcolati) e raccoglie i **nodi**, cioè i tubi che si incontrano in un
    raccordo o in una catena di raccordi (due in una curva, tre in una braga), e i
    terminali raggiunti;
 2. in ogni nodo il tratto di valle è quello più carico (la portata cresce verso valle), a
@@ -159,7 +171,9 @@ quella colonna; cliccando `#` si torna all'ordine della rete.
 
 Una riga per parte di Section (colonna *Run*: Horizontal / Vertical). Prima colonna **Show**
 (🔍), poi `#`, System, **Element code** (`e_MEC_ElementCode_1` dei tubi della riga, istanza
-poi tipo; valori diversi uniti da "/"), Section e le altre.
+poi tipo; valori diversi uniti da "/"), Section, Pipes, **Pipe Type** (Type Mark del tipo
+di tubazione, `ALL_MODEL_TYPE_MARK`; più tipi nella stessa riga uniti da " - ", un tipo senza
+Type Mark compare come "(no type mark)") e le altre. Pipe Type entra anche nella ricerca.
 
 - Colonne del modello: DN, De, portata ammissibile, utilizzo, velocità e riempimento alla
   portata di progetto, De suggerito.
@@ -175,6 +189,18 @@ poi tipo; valori diversi uniti da "/"), Section e le altre.
   misure del tipo), altrimenti dalla misura del modello: un tratto `OVERSIZED` non si
   riduce se l'utente non lo sceglie. Si annulla un cambio riportando la tendina sulla misura
   del modello.
+- **Sim. slope [%]** (dopo New size, solo per le righe orizzontali): pendenza simulata, una
+  per ogni riga delle tabelle 6.3 - 6.5: da 0,5 a 5 cm/m ogni 0,5, poi da 6 a 10 cm/m ogni 1
+  (`rnwflow_check.SIMULATED_SLOPES` = `rnwflow_tables.HORIZONTAL_SLOPES`); "Model" = pendenza del modello. Serve quando la portata non sta in tabella alla
+  pendenza del modello (pendenza sotto 0,5 cm/m, portata oltre la tabella). Tutti i tubi
+  orizzontali della riga si verificano a quella riga di tabella
+  (`SectionResult.evaluate_at(de, slope)`), e De suggerito, Qmax, v, riempimento ed esito
+  della misura nuova seguono la simulazione (`suggested_at`); le colonne del modello no.
+  Una riga simulata è **gialla** e **non si modifica** (colonna `Simulated`, esclusa da
+  `_collect_changes`): cambiare la pendenza nel modello sposterebbe i tubi e romperebbe
+  quasi certamente i collegamenti, quindi la si cambia a mano e si rilancia lo strumento.
+  La conferma di Apply Changes dice quante righe simulate restano escluse. La pendenza
+  simulata sopravvive alla navigazione e ad Apply and Recalculate (`preset_slope`).
 - Il colore dell'esito sta solo sulle celle **Status** (stato attuale) e **Check new**
   (misura nuova): rosso per `UNDERSIZED` / `FLOW BEYOND TABLE`, giallo per i tratti non
   verificabili, testo blu per `OVERSIZED`; testo grigio per le righe senza portata. La riga
@@ -253,7 +279,8 @@ zip + XML senza Excel installato, parte generica copiata da `mepqto_xlsx.py`):
   monte a valle (filtro e ricerca della griglia non contano), con le sole colonne del
   **risultato del calcolo**: #, System, Element code, Section, Part (Horizontal / Vertical /
   Fixture),
-  Fed by, Pipes, Min slope, Q, DN e De della misura di calcolo (la tendina New size), Qmax,
+  Fed by, Pipes, Pipe Type, Min slope (del modello), Simulated slope (vuota se non simulata), Q, DN e De
+  della misura di calcolo (la tendina New size), Qmax,
   Use, v e Fill con quella misura, Check (colorato come nella finestra), Element (famiglia e
   id dei terminali). Lo stato attuale del modello (DN / De, Qmax, utilizzo, velocità e
   riempimento attuali, stato) non viene esportato;
@@ -344,7 +371,7 @@ lettura, valore rifiutato da Revit, transazione annullata), impostazioni, poi la
 tutte le modifiche dei tubi con esito e messaggi. Gli errori di scrittura durante Apply and
 Recalculate compaiono anche subito, in un avviso. Se tutto riesce, o se la finestra
 si chiude senza applicare, non compare nessun report. I casi senza nulla da verificare
-(nessun tubo, nessun tubo del tipo scelto nell'ambito) danno un avviso a finestra.
+(nessun tubo nel modello, nessun tubo nei sistemi scelti) danno un avviso a finestra.
 
 Dopo la modifica Revit ricalcola Fixture Units e Section: per verificare la rete con i nuovi
 diametri si rilancia lo strumento.

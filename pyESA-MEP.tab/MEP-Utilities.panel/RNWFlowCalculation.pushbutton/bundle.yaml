@@ -3,8 +3,9 @@ tooltip: >
   Rainwater network sizing. The rainwater fixtures write their design flow [l/s] in the
   Fixture Units of their connector and Revit sums it along the network: the Fixture Units
   value of every pipe is read as its design flow in l/s. Choose the piping system type of
-  the rainwater drainage and tick the systems to calculate (one or more); their pipes are
-  checked in the whole model, in the active view or in the selection. The pipe series is
+  the rainwater drainage and tick the systems to calculate (one or more); the whole systems
+  are checked. Start the tool with elements selected (pipes, fittings, fixtures) to have
+  their systems ticked. The pipe series is
   read from the model: the column of Table 6.2 comes from the material of the pipe segment,
   and the suggested diameters are the sizes of the pipe type.
 
@@ -23,7 +24,9 @@ tooltip: >
   with the sizes of the pipe type (from the segments of its routing preferences): capacity,
   velocity, fill and check of the new size update at once. The rows whose new size differs
   from the model are coloured; the new size starts at the suggested one only for the
-  sections that must change (undersized, not tabulated, high velocity). Apply Changes sets
+  sections that must change (undersized, not tabulated, high velocity). A horizontal row
+  can be checked at a simulated slope (0.5 to 10 cm/m, the slopes of the tables) when the flow is not in the table at
+  the slope of the model: the row turns yellow and is never changed. Apply Changes sets
   the size on all the pipes of the coloured rows, after confirmation, one section at a
   time. Pipes always keep the
   calculated size. The fittings connected to them take the new size, as with the Diameter field

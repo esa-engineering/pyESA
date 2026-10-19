@@ -106,10 +106,6 @@ FIXTURE_TRANSACTION_NAME = "Edit rainwater fixtures"
 # i terminali nella scheda Fixtures (istanza, poi tipo).
 ELEMENT_CODE_PARAM = rres.PARAM_CODE
 
-VIEW_TYPES = (DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan, DB.ViewType.EngineeringPlan,
-              DB.ViewType.Section, DB.ViewType.Elevation, DB.ViewType.Detail,
-              DB.ViewType.ThreeD)
-
 # Categorie dei raccordi e degli accessori da adeguare ai tubi modificati
 FITTING_CATEGORY = int(DB.BuiltInCategory.OST_PipeFitting)
 ACCESSORY_CATEGORY = int(DB.BuiltInCategory.OST_PipeAccessory)
@@ -369,16 +365,6 @@ def pipe_type_sizes(pipe, cache):
     return sizes
 
 
-def view_scope_available():
-    try:
-        view = doc.ActiveView
-        if view is None or view.IsTemplate:
-            return False
-        return view.ViewType in VIEW_TYPES
-    except Exception:
-        return False
-
-
 # =============================================================================
 # RACCOLTA E VERIFICA
 # =============================================================================
@@ -390,11 +376,30 @@ def collect_pipes():
     return list(collector)
 
 
-def view_pipe_ids():
-    collector = DB.FilteredElementCollector(doc, doc.ActiveView.Id)\
-        .OfClass(DB.Plumbing.Pipe)\
-        .WhereElementIsNotElementType()
-    return set(get_element_id_value(el.Id) for el in collector)
+def selection_systems(type_of_system):
+    """Sistemi degli elementi selezionati all'avvio (tubi, raccordi, accessori,
+    terminali): nomi letti da RBS_SYSTEM_NAME_PARAM (piu' sistemi separati da
+    virgola) e tenuti solo se sono sistemi dei tubi del modello.
+
+    Ritorna (numero di elementi selezionati, [(nome del sistema, tipo)]).
+    """
+    ids = list(uidoc.Selection.GetElementIds())
+    found = []
+    for element_id in ids:
+        element = doc.GetElement(element_id)
+        if element is None:
+            continue
+        try:
+            param = element.get_Parameter(BIP.RBS_SYSTEM_NAME_PARAM)
+        except Exception:
+            param = None
+        if param is None or not param.HasValue:
+            continue
+        for name in (param.AsString() or "").split(","):
+            name = name.strip()
+            if name in type_of_system and (name, type_of_system[name]) not in found:
+                found.append((name, type_of_system[name]))
+    return len(ids), found
 
 
 def system_type_items(pipes, type_names, system_names):
@@ -495,7 +500,21 @@ def element_code(element, type_cache=None):
     return value
 
 
-def build_check(pipe, type_name, limits, size_cache, series_cache, code_cache=None):
+def pipe_type_mark(pipe, cache):
+    """Type Mark del tipo di tubazione (ALL_MODEL_TYPE_MARK); None se vuoto. Cache
+    per tipo."""
+    type_id = pipe.GetTypeId()
+    key = get_element_id_value(type_id)
+    if key not in cache:
+        pipe_type = doc.GetElement(type_id) if key > 0 else None
+        param = pipe_type.get_Parameter(BIP.ALL_MODEL_TYPE_MARK) if pipe_type is not None \
+            else None
+        cache[key] = _param_text(param) if param is not None else None
+    return cache[key]
+
+
+def build_check(pipe, type_name, limits, size_cache, series_cache, code_cache=None,
+                mark_cache=None):
     angle, slope = pipe_geometry(pipe)
     series, _description = pipe_series(pipe, series_cache)
     row = rc.PipeCheck(
@@ -513,6 +532,7 @@ def build_check(pipe, type_name, limits, size_cache, series_cache, code_cache=No
         z_mid=pipe_mid_z(pipe),
         series=series,
         code=element_code(pipe, code_cache),
+        type_mark=pipe_type_mark(pipe, mark_cache if mark_cache is not None else {}),
     )
     return rc.check_pipe(row, limits)
 
@@ -1967,11 +1987,9 @@ def apply_changes(changes, pipes_by_id):
 # =============================================================================
 
 def scope_label(config):
-    if config.scope == rui.SCOPE_VIEW:
-        return "pipes visible in the active view ({0})".format(element_name(doc.ActiveView))
-    if config.scope == rui.SCOPE_SELECTION:
-        return "selected pipes"
-    return "whole model"
+    if config.from_selection:
+        return "whole systems of the elements selected at start"
+    return "whole systems chosen in the dialog"
 
 
 def speed_label(config):
@@ -2327,7 +2345,7 @@ class Analysis(object):
         self.elements_by_id = elements_by_id
 
 
-def analyze(config, pipes_by_id, type_names, system_names, scope_ids):
+def analyze(config, pipes_by_id, type_names, system_names):
     """Verifica i tubi scelti e ordina la rete; None se non c'e' nessun tubo.
 
     Rilegge portate e parametri dal modello: dopo la scrittura dei terminali
@@ -2337,15 +2355,16 @@ def analyze(config, pipes_by_id, type_names, system_names, scope_ids):
     size_cache = {}
     series_cache = {}
     code_cache = {}
+    mark_cache = {}
     wanted_systems = set(config.systems)
     rows = []
     for pipe_id, pipe in pipes_by_id.items():
-        if pipe_id not in scope_ids or type_names[pipe_id] != config.system_type:
+        if type_names[pipe_id] != config.system_type:
             continue
         if system_names[pipe_id] not in wanted_systems:
             continue
         rows.append(build_check(pipe, type_names[pipe_id], limits, size_cache, series_cache,
-                                code_cache))
+                                code_cache, mark_cache))
     descriptions = sorted(set(description for _series, description in series_cache.values()))
     config.series_summary = "; ".join(descriptions) or "-"
     if not rows:
@@ -2378,27 +2397,22 @@ def main():
     type_names = dict((pid, system_type_name(p, type_cache)) for pid, p in pipes_by_id.items())
     system_names = dict((pid, system_name(p)) for pid, p in pipes_by_id.items())
 
-    selected_pipe_ids = set(get_element_id_value(eid)
-                            for eid in uidoc.Selection.GetElementIds()) & set(pipes_by_id)
-    view_available = view_scope_available()
+    # Con una selezione all'avvio si calcolano i sistemi interi degli elementi
+    # selezionati: la finestra li propone gia' spuntati.
+    type_of_system = {}
+    for pipe_id in pipes_by_id:
+        type_of_system.setdefault(system_names[pipe_id], type_names[pipe_id])
+    selected_count, preselected = selection_systems(type_of_system)
 
     config = rui.show_dialog(system_type_items(pipes, type_names, system_names),
-                             view_available, len(selected_pipe_ids))
+                             preselected, selected_count)
     if config is None:
         script.exit()
 
-    if config.scope == rui.SCOPE_SELECTION:
-        scope_ids = selected_pipe_ids
-    elif config.scope == rui.SCOPE_VIEW:
-        scope_ids = view_pipe_ids()
-    else:
-        scope_ids = set(pipes_by_id)
-
-    analysis = analyze(config, pipes_by_id, type_names, system_names, scope_ids)
+    analysis = analyze(config, pipes_by_id, type_names, system_names)
     if analysis is None:
-        forms.alert("No pipe of the chosen systems is in the chosen scope.",
-                    sub_msg="Systems: {0}. Choose other systems or widen the scope.".format(
-                        ", ".join(config.systems)),
+        forms.alert("No pipe of the chosen systems was found.",
+                    sub_msg="Systems: {0}.".format(", ".join(config.systems)),
                     title="Rainwater Flow Calculation")
         return
 
@@ -2422,7 +2436,7 @@ def main():
                             sub_msg="\n".join(errors[:10]) +
                             "\n\nThe report at the end lists them all.",
                             title="Rainwater Flow Calculation")
-            refreshed = analyze(config, pipes_by_id, type_names, system_names, scope_ids)
+            refreshed = analyze(config, pipes_by_id, type_names, system_names)
             if refreshed is None:
                 break
             analysis = refreshed

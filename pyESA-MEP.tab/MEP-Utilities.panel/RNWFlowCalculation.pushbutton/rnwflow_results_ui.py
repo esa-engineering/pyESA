@@ -16,6 +16,9 @@ righe colorate). Per questo la tendina parte dalla misura suggerita solo nei
 tratti da ridimensionare (SectionResult.default_apply: sottodimensionati, De fuori
 tabella, velocita' alta), altrimenti dalla misura del modello: nessun tratto
 cambia senza una scelta dell'utente o una verifica non superata.
+La colonna Sim. slope simula sulle righe orizzontali una pendenza delle tabelle (0,5 - 10 cm/m):
+la riga si verifica a quella pendenza, diventa gialla (Simulated) e non cambia il
+modello, perche' cambiare la pendenza dei tubi romperebbe i collegamenti.
 
 Fixtures: i terminali collegati ai tratti calcolati, con famiglia e tipo e i
 parametri FIXTURE_PARAMS, tutti modificabili. I dati arrivano dallo script gia'
@@ -105,6 +108,14 @@ KIND_RECALC = "recalc"
 
 TAB_SECTIONS = 0
 TAB_FIXTURES = 1
+
+# Tendina della pendenza simulata: prima voce = pendenza del modello (nessuna
+# simulazione), poi le pendenze di rnwflow_check.SIMULATED_SLOPES [cm/m = %].
+SLOPE_MODEL = "Model"
+
+
+def slope_label(slope):
+    return "{0:.1f}".format(slope)
 
 # Parametri dei terminali nella scheda Fixtures: (nome del parametro in Revit,
 # prefisso delle colonne della DataTable). Il codice elemento compare anche nella
@@ -219,6 +230,7 @@ class ResultsState(object):
         self.defaults = {}          # chiave di riga -> misura proposta all'apertura
         self.pending_type = {}      # (id tipo, parametro) -> testo
         self.preset = {}            # SectionResult.key -> misura scelta a mano
+        self.preset_slope = {}      # SectionResult.key -> pendenza simulata
         self.search = ""
         self.only_action = None
         self.last_key = None
@@ -237,6 +249,9 @@ class ResultsState(object):
                 label = _text(row["NewSize"])
                 if label != self.defaults.get(row["Key"], ""):
                     new.preset[entry.key] = label
+                slope = _text(row["SimSlope"])
+                if slope and slope != SLOPE_MODEL:
+                    new.preset_slope[entry.key] = slope
         new.search = self.search
         new.only_action = self.only_action
         new.tab = self.tab
@@ -312,7 +327,9 @@ EXPORT_COLUMNS = [
     rx.Column("Part", 11),
     rx.Column("Fed by", 16),
     rx.Column("Pipes", 7, rx.STYLE_NUM0),
+    rx.Column("Pipe Type", 14),
     rx.Column("Min slope [cm/m]", 10, rx.STYLE_NUM2),
+    rx.Column("Simulated slope [cm/m]", 11, rx.STYLE_NUM2),
     rx.Column("Q [l/s]", 9, rx.STYLE_NUM2),
     rx.Column("DN [mm]", 9),
     rx.Column("De [mm]", 9),
@@ -508,6 +525,7 @@ class ResultsForm(Window):
         table = DataTable("Sections")
         columns = [
             ("Key", System.String), ("System", System.String), ("Code", System.String),
+            ("PipeType", System.String),
             ("Section", System.String), ("SectionSort", System.Double),
             ("Pipes", System.Int32), ("Run", System.String), ("Slope", System.Double),
             ("Flow", System.Double), ("ModelDn", System.String), ("ModelDe", System.String),
@@ -518,12 +536,20 @@ class ResultsForm(Window):
             ("QNew", System.Double), ("VNew", System.Double), ("FillNew", System.Double),
             ("CheckNew", System.String), ("SeverityNew", System.String),
             ("Changed", System.Boolean),
+            ("SimSlope", System.String), ("SlopeOptions", System.Object),
+            ("CanSimulate", System.Boolean), ("Simulated", System.Boolean),
             ("Status", System.String), ("Notes", System.String), ("Severity", System.String),
             ("Action", System.Boolean), ("Order", System.Int32), ("Kind", System.String),
             ("FedBy", System.String),
         ]
         for name, kind in columns:
             table.Columns.Add(name, kind)
+
+        slope_options = List[System.String]()
+        slope_options.Add(SLOPE_MODEL)
+        for slope in rc.SIMULATED_SLOPES:
+            slope_options.Add(slope_label(slope))
+        no_options = List[System.String]()
 
         for index, section in enumerate(self.sections):
             key = str(index)
@@ -550,6 +576,7 @@ class ResultsForm(Window):
             row["Key"] = key
             row["System"] = section.system
             row["Code"] = getattr(section, "element_code", "") or ""
+            row["PipeType"] = getattr(section, "pipe_type", "") or ""
             row["Section"] = section.section if section.section else "-"
             row["SectionSort"] = section.section_sort()
             row["Pipes"] = len(section.pipe_ids)
@@ -566,6 +593,13 @@ class ResultsForm(Window):
             row["Options"] = options
             row["HasSizes"] = options.Count > 0
             row["NewSize"] = chosen
+            # La pendenza si simula solo sui tratti orizzontali
+            can_simulate = section.run == rc.ORIENT_HORIZONTAL
+            row["CanSimulate"] = can_simulate
+            row["SlopeOptions"] = slope_options if can_simulate else no_options
+            preset_slope = self.state.preset_slope.get(section.key)
+            row["SimSlope"] = preset_slope if can_simulate and preset_slope in list(slope_options) \
+                else (SLOPE_MODEL if can_simulate else "")
             row["Status"] = section.status
             row["Notes"] = "; ".join(section.notes)
             row["Severity"] = SEVERITY.get(section.status, "")
@@ -618,6 +652,10 @@ class ResultsForm(Window):
         row["CheckNew"] = ""
         row["SeverityNew"] = ""
         row["Changed"] = False
+        row["SimSlope"] = ""
+        row["SlopeOptions"] = List[System.String]()
+        row["CanSimulate"] = False
+        row["Simulated"] = False
         row["Status"] = item.status
         row["Notes"] = "; ".join([item.label] + item.notes)
         row["Severity"] = "fixture"
@@ -636,17 +674,36 @@ class ResultsForm(Window):
                 return size
         return None
 
+    @staticmethod
+    def _sim_slope(row):
+        """Pendenza simulata della riga [cm/m]; None = pendenza del modello."""
+        text = _text(row["SimSlope"])
+        if not text or text == SLOPE_MODEL:
+            return None
+        return parse_decimal(text)
+
     def _fill_new(self, row, section):
-        """Colonne della misura nuova: Qmax, v, riempimento, esito, cambio."""
+        """Colonne della misura nuova: Qmax, v, riempimento, esito, cambio.
+
+        Con una pendenza simulata la riga si verifica a quella pendenza, il De
+        suggerito segue la simulazione e la riga non cambia il modello
+        (Simulated): cambiare la pendenza nel modello sposterebbe i tubi e
+        romperebbe quasi certamente i collegamenti, quindi la si lascia all'utente.
+        """
         size = self._size_of(row, section)
-        row["Changed"] = is_change(section, size)
+        slope = self._sim_slope(row)
+        simulated = slope is not None
+        row["Simulated"] = simulated
+        row["Changed"] = is_change(section, size) and not simulated
+        suggested = section.suggested_at(slope) if simulated else section.suggested_de
+        row["Suggested"] = fmt_de(suggested)
         if size is None:
             for name in ("NewDeSort", "QNew", "VNew", "FillNew"):
                 row[name] = System.DBNull.Value
             row["CheckNew"] = ""
             row["SeverityNew"] = ""
             return
-        result = section.evaluate_at(size.od_mm)
+        result = section.evaluate_at(size.od_mm, slope)
         row["NewDeSort"] = size.od_mm
         row["QNew"] = _value(result.capacity)
         row["VNew"] = _value(result.velocity)
@@ -897,13 +954,14 @@ class ResultsForm(Window):
         if self.chk_only_action.IsChecked:
             # I terminali restano sempre visibili: danno il punto di partenza dei
             # rami; restano visibili anche le righe che cambiano misura.
-            parts.append("(Action = true OR Kind = 'fixture' OR Changed = true)")
+            parts.append("(Action = true OR Kind = 'fixture' OR Changed = true "
+                         "OR Simulated = true)")
         needle = (self.txt_search.Text or "").strip()
         if needle:
             like = escape_like(needle)
             parts.append("(" + " OR ".join(
                 "{0} LIKE '%{1}%'".format(col, like)
-                for col in ("System", "Code", "Section", "Status", "Notes", "Run",
+                for col in ("System", "Code", "PipeType", "Section", "Status", "Notes", "Run",
                             "FedBy")) + ")")
         self.table.DefaultView.RowFilter = " AND ".join(parts)
         self._update_count()
@@ -912,12 +970,18 @@ class ResultsForm(Window):
         shown = self.table.DefaultView.Count
         changed = 0
         pipes = 0
+        simulated = 0
         for row in self.table.Rows:
-            if row["Changed"] is True:
+            if row["Changed"] is True:      # DBNull non conta
                 changed += 1
                 pipes += row["Pipes"]
-        self.txt_count.Text = "{0} of {1} rows shown; {2} section part(s) change size " \
-                              "({3} pipes)".format(shown, self.table.Rows.Count, changed, pipes)
+            if row["Simulated"] is True:
+                simulated += 1
+        text = "{0} of {1} rows shown; {2} section part(s) change size ({3} pipes)".format(
+            shown, self.table.Rows.Count, changed, pipes)
+        if simulated:
+            text += "; {0} with a simulated slope (not changed)".format(simulated)
+        self.txt_count.Text = text
 
     def OnFilterChanged(self, sender, args):
         if not self._loading:
@@ -931,7 +995,7 @@ class ResultsForm(Window):
     def OnColumnChanged(self, sender, args):
         if self._loading:
             return
-        if args.Column.ColumnName != "NewSize":
+        if args.Column.ColumnName not in ("NewSize", "SimSlope"):
             return
         row = args.Row
         section = self._by_key[row["Key"]]
@@ -1006,7 +1070,8 @@ class ResultsForm(Window):
             code = _text(row["Code"])
             if getattr(entry, "is_fixture", False):
                 values = [row["Order"], entry.system, code, "-", rc.RUN_FIXTURE, row["FedBy"],
-                          None, None, entry.flow, entry.dn_mm, None, None, None, None, None,
+                          None, "", None, None, entry.flow, entry.dn_mm, None, None, None, None,
+                          None,
                           "-", "; ".join([entry.label] + entry.notes)]
                 result.append((values, None, True))
                 continue
@@ -1016,7 +1081,9 @@ class ResultsForm(Window):
             use = flow / capacity * 100.0 if capacity else None
             check = _text(row["CheckNew"]) or "-"
             values = [row["Order"], entry.system, code, entry.section or "-", entry.run,
-                      row["FedBy"], len(entry.pipe_ids), entry.min_slope, flow,
+                      row["FedBy"], len(entry.pipe_ids), _text(row["PipeType"]),
+                      entry.min_slope, self._sim_slope(row),
+                      flow,
                       size.dn_mm if size is not None else None,
                       size.od_mm if size is not None else None,
                       capacity, use, _number(row["VNew"]), _number(row["FillNew"]), check, ""]
@@ -1109,7 +1176,8 @@ class ResultsForm(Window):
             if getattr(section, "is_fixture", False):
                 continue
             size = self._size_of(row, section)
-            if not is_change(section, size):
+            # Una riga con pendenza simulata non cambia il modello
+            if row["Simulated"] is True or not is_change(section, size):
                 continue
             check = _text(row["CheckNew"])
             if check and check not in NEW_CHECK_PASS:
@@ -1131,11 +1199,16 @@ class ResultsForm(Window):
         self._commit_edits()
         changes, failing = self._collect_changes()
         edits = self._fixture_edits()
+        simulated = sum(1 for row in self.table.Rows if row["Simulated"] is True)
+        simulated_note = ("{0} row(s) with a simulated slope (yellow) are not changed: "
+                          "change their slope in the model, then run the tool "
+                          "again.".format(simulated)) if simulated else ""
         if not changes and not edits.count:
             MessageBox.Show("Nothing to apply: every new size is the size of the model and "
                             "no fixture value was edited.\n\nChoose a new size in the "
                             "Sections tab or edit the fixtures in the Fixtures tab, or close "
-                            "the window.", WINDOW_TITLE)
+                            "the window." + ("\n\n" + simulated_note if simulated else ""),
+                            WINDOW_TITLE)
             return
         lines = ["Apply these changes to the model?", ""]
         if changes:
@@ -1145,6 +1218,8 @@ class ResultsForm(Window):
         if edits.count:
             lines.append("- write {0} fixture change(s)".format(edits.count))
         question = "\n".join(lines)
+        if simulated:
+            question += "\n\n" + simulated_note
         if changes and edits.count:
             question += ("\n\nThe sizes were calculated with the current flows. To check "
                          "them with the new fixture values, answer No and use Apply and "

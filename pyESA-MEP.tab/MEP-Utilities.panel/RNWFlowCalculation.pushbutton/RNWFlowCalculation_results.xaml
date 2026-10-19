@@ -85,6 +85,9 @@
                 <DataTrigger Binding="{Binding Changed}" Value="True">
                     <Setter Property="Background" Value="#BDD7EE"/>
                 </DataTrigger>
+                <DataTrigger Binding="{Binding Simulated}" Value="True">
+                    <Setter Property="Background" Value="#FFE699"/>
+                </DataTrigger>
             </Style.Triggers>
         </Style>
         <!-- Esito: il colore della gravita' sta solo sulla cella, la riga resta
@@ -194,7 +197,7 @@
                     </Grid.RowDefinitions>
                     <StackPanel Grid.Row="0">
                         <TextBlock Style="{StaticResource HintText}"
-                                   Text="One row per section part: the horizontal pipes (45° runs included) and the vertical pipes of a section (System + Section parameter) are separate rows. Choose the new size from the sizes of the pipe type: Qmax, v, fill and check of the new size update with the choice. Every row whose new size differs from the model (blue rows) is resized by Apply Changes, with its fittings. The new size starts at the suggested De only for the undersized, not tabulated and high velocity sections; elsewhere it starts at the size of the model."/>
+                                   Text="One row per section part: the horizontal pipes (45° runs included) and the vertical pipes of a section (System + Section parameter) are separate rows. Choose the new size from the sizes of the pipe type: Qmax, v, fill and check of the new size update with the choice. Every row whose new size differs from the model (blue rows) is resized by Apply Changes, with its fittings. The new size starts at the suggested De only for the undersized, not tabulated and high velocity sections; elsewhere it starts at the size of the model. 'Sim. slope' checks a horizontal row at another slope (0.5 to 10 cm/m, the slopes of the tables), for example when the flow is not in the table at the slope of the model: Suggested De, Qmax, v, fill and check follow the simulated slope. A row with a simulated slope turns yellow and is not changed in the model, since changing the slope of the pipes would almost certainly break the connections: change it in the model, then run the tool again."/>
                         <TextBlock Style="{StaticResource HintText}"
                                    Text="'Fed by' lists what drains directly into each row: Fixture and its id, or section number with V (vertical) or O (horizontal), joined by + (for example 1V+2O). v and fill are those at the design flow of the horizontal pipes (lowest velocity and highest fill of the row). Vertical pipes have no velocity check. A fitting between the two parts of a section has one size: give both parts the same size, or keep a transition."/>
                     </StackPanel>
@@ -208,7 +211,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <TextBox x:Name="txt_search" Grid.Column="1" Padding="5,3"
-                                 ToolTip="Filter by system, element code, section, status or notes"/>
+                                 ToolTip="Filter by system, element code, pipe type, section, status or notes"/>
                         <Button x:Name="btn_clear_search" Grid.Column="2"
                                 Content="✕" Width="25" Margin="5,0,0,0"
                                 ToolTip="Clear search"/>
@@ -230,6 +233,10 @@
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Changed}" Value="True">
                                         <Setter Property="Background" Value="#DDEBF7"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Simulated}" Value="True">
+                                        <Setter Property="Background" Value="#FFF2CC"/>
                                         <Setter Property="FontWeight" Value="SemiBold"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Kind}" Value="fixture">
@@ -257,6 +264,8 @@
                                                 SortMemberPath="SectionSort" ElementStyle="{StaticResource NumberCell}"/>
                             <DataGridTextColumn Header="Pipes" Binding="{Binding Pipes}" Width="46" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}"/>
+                            <DataGridTextColumn Header="Pipe Type" Binding="{Binding PipeType}" Width="80" IsReadOnly="True"
+                                                ElementStyle="{StaticResource WrapCell}"/>
                             <DataGridTextColumn Header="Run" Binding="{Binding Run}" Width="70" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Fed by" Binding="{Binding FedBy}" Width="110" IsReadOnly="True"
                                                 ElementStyle="{StaticResource WrapCell}"/>
@@ -274,7 +283,7 @@
                                                 ElementStyle="{StaticResource NumberCell}"/>
                             <DataGridTextColumn Header="v model [m/s]" Binding="{Binding VModel, StringFormat=0.00}" Width="50" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}"/>
-                            <DataGridTextColumn Header="Fill model [%]" Binding="{Binding FillModel, StringFormat=0}" Width="45" IsReadOnly="True"
+                            <DataGridTextColumn Header="Fill model [%]" Binding="{Binding FillModel, StringFormat=0}" Width="50" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}"/>
                             <DataGridTextColumn Header="Suggested De [mm]" Binding="{Binding Suggested}" Width="72" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}"/>
@@ -298,6 +307,27 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Sim. slope [%]" Width="70" SortMemberPath="SimSlope"
+                                                    CellStyle="{StaticResource NewCell}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding SlopeOptions}"
+                                                  SelectedItem="{Binding SimSlope, UpdateSourceTrigger=PropertyChanged}"
+                                                  Padding="4,1" Margin="1"
+                                                  ToolTip="Simulated slope of the horizontal pipes of the row [cm/m = %]: the new size is checked at this slope. A row with a simulated slope turns yellow and is not changed in the model. Model = slope of the model">
+                                            <ComboBox.Style>
+                                                <Style TargetType="ComboBox">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CanSimulate}" Value="False">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ComboBox.Style>
+                                        </ComboBox>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Qmax new [l/s]" Binding="{Binding QNew, StringFormat=0.0}" Width="55" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}" CellStyle="{StaticResource NewCell}"/>
                             <DataGridTextColumn Header="v new [m/s]" Binding="{Binding VNew, StringFormat=0.00}" Width="50" IsReadOnly="True"
@@ -308,7 +338,7 @@
                                                 CellStyle="{StaticResource CheckNewCell}"/>
                             <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="140" IsReadOnly="True"
                                                 CellStyle="{StaticResource StatusCell}"/>
-                            <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*" MinWidth="180" IsReadOnly="True"
+                            <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*" MinWidth="110" IsReadOnly="True"
                                                 ElementStyle="{StaticResource WrapCell}"/>
                         </DataGrid.Columns>
                     </DataGrid>
