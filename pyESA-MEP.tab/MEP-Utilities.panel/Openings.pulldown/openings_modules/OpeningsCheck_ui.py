@@ -8,10 +8,11 @@ import clr
 clr.AddReference("PresentationFramework")
 clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
+clr.AddReference("System.Windows.Forms")
 
-from Microsoft.Win32 import SaveFileDialog
+from Microsoft.Win32 import OpenFileDialog, SaveFileDialog
 from System.Diagnostics import Process
-from System.IO import File
+from System.IO import Directory, File, Path
 from System.Windows import CornerRadius, FontWeights, GridLength, MessageBox, MessageBoxButton, MessageBoxResult, \
     Thickness, TextWrapping, VerticalAlignment, Visibility
 from System.Windows.Controls import Border, CheckBox, ColumnDefinition, Grid, Orientation, Separator, StackPanel, \
@@ -19,11 +20,13 @@ from System.Windows.Controls import Border, CheckBox, ColumnDefinition, Grid, Or
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 from System.Windows.Media import BrushConverter
+from System.Windows.Forms import FolderBrowserDialog, DialogResult as FormsResult
 
 import OpeningsReport_xlsx
 
 SCOPE_ALL, SCOPE_MEP, SCOPE_ARC, SCOPE_AREA = "all", "mep", "arc", "area"
 SHOW_TEXT, SHOW_WINDOW = "text", "window"
+THIRD_EXPORT, THIRD_IMPORT = "export", "import"  # terzo pulsante del riepilogo (ThirdAction)
 TITLE = "Openings Report"
 
 
@@ -104,22 +107,91 @@ class ScopeWindow(object):
         return self.result
 
 
-class SummaryWindow(object):
-    """Totali (del New Report appena fatto o dell'ultimo report) e due schede: Text Report e Interactive Report.
-    show() ritorna SHOW_TEXT, SHOW_WINDOW o None (chiusa)."""
+class ThirdAction(object):
+    """Terzo pulsante del riepilogo. kind: THIRD_EXPORT (si sceglie una cartella) o THIRD_IMPORT (si sceglie un file
+    .json); hint: testo sotto il titolo; folder: cartella proposta; run(percorso) -> {"message", e per l'Import
+    "title", "rows", "warning" del report caricato}; un errore va in un messaggio."""
 
-    def __init__(self, xaml_path, title, rows, warning):
+    def __init__(self, kind, hint, folder, run):
+        self.kind, self.hint, self.folder, self.run = kind, hint, folder, run
+
+
+class SummaryWindow(object):
+    """Totali (del New Report appena fatto, dell'ultimo report o del report importato), due schede (Text Report e
+    Interactive Report) e il terzo pulsante (ThirdAction: Export / Import). enabled: le due schede sono attive
+    (spente se non c'e' ancora un report da mostrare; l'Import le accende). imported: report importato (testo
+    dell'Interactive Report in sola lettura). show() ritorna SHOW_TEXT, SHOW_WINDOW o None (chiusa)."""
+
+    def __init__(self, xaml_path, title, rows, warning, third=None, enabled=True, imported=False):
         self.window = _load(xaml_path)
         find = self.window.FindName
-        find("SummaryTitle").Text = title.upper()
-        _fill_totals(find("TotalsPanel"), rows)
-        if warning:  # riquadro di avviso solo se qualcosa non si e' potuto scrivere
-            find("WarningText").Text = warning
-        else:
-            find("WarningBorder").Visibility = Visibility.Collapsed
+        self.find = find
+        if imported:  # l'avviso di un report importato non riguarda parametri non scritti
+            find("WarningTitle").Text = "CHECK"
+        self._set_report(title, rows, warning)
         find("TextButton").Click += self._on_text
         find("OkButton").Click += self._on_window
+        self._enable(enabled)
+        if imported:
+            find("WindowHint").Text = ("Show and select the elements of this model and the openings that cite them "
+                                       "(through the linked Openings model). Read-only.")
+        self.third = third
+        if third is None:
+            find("ThirdButton").Visibility = Visibility.Collapsed
+        else:
+            export = third.kind == THIRD_EXPORT
+            find("ExportPanel").Visibility = Visibility.Visible if export else Visibility.Collapsed
+            find("ImportPanel").Visibility = Visibility.Collapsed if export else Visibility.Visible
+            find("ExportHint" if export else "ImportHint").Text = third.hint
+            find("ThirdButton").Click += self._on_third
         self.result = None
+
+    def _set_report(self, title, rows, warning):
+        find = self.find
+        find("SummaryTitle").Text = title.upper()
+        find("TotalsPanel").Children.Clear()
+        _fill_totals(find("TotalsPanel"), rows)
+        if warning:  # riquadro di avviso solo se c'e' qualcosa da dire
+            find("WarningText").Text = warning
+            find("WarningBorder").Visibility = Visibility.Visible
+        else:
+            find("WarningBorder").Visibility = Visibility.Collapsed
+
+    def _enable(self, enabled):
+        for name in ("TextButton", "OkButton"):
+            self.find(name).IsEnabled = enabled
+
+    def _on_third(self, sender, args):
+        third = self.third
+        if third.kind == THIRD_EXPORT:
+            dialog = FolderBrowserDialog()
+            dialog.Description = "Folder for the report read by the MEP / ARC models"
+            if third.folder and Directory.Exists(third.folder):
+                dialog.SelectedPath = third.folder
+            if dialog.ShowDialog() != FormsResult.OK:
+                return
+            path = dialog.SelectedPath
+        else:
+            dialog = OpenFileDialog()
+            dialog.Title = "Openings report exported from the Openings model"
+            dialog.Filter = "Openings report (*.json)|*.json"
+            if third.folder and Directory.Exists(third.folder):
+                dialog.InitialDirectory = third.folder
+            if not dialog.ShowDialog():
+                return
+            path = dialog.FileName
+        try:
+            outcome = third.run(path)
+        except Exception as ex:
+            MessageBox.Show(u"{} failed:\n{}".format("Export" if third.kind == THIRD_EXPORT else "Import", ex), TITLE)
+            return
+        third.folder = path if third.kind == THIRD_EXPORT else Path.GetDirectoryName(path)
+        status = self.find("ThirdStatus")
+        status.Text = outcome.get("message", u"")
+        status.Visibility = Visibility.Visible
+        if "rows" in outcome:  # Import: il riepilogo mostra il report caricato
+            self._set_report(outcome["title"], outcome["rows"], outcome.get("warning", ""))
+            self._enable(True)
 
     def _on_text(self, sender, args):
         self.result = SHOW_TEXT
@@ -283,9 +355,16 @@ class ReportWindow(object):
     BUTTONS = ("ShowButton", "SelectCloseButton", "RecreateButton", "MoveButton", "DeleteButton", "TextButton",
                "RefreshButton")
 
-    def __init__(self, xaml_path, groups, actions, owner=None, text_xaml=None):
+    def __init__(self, xaml_path, groups, actions, owner=None, text_xaml=None, readonly=False):
         self.window = _load(xaml_path)
         find = self.window.FindName
+        if readonly:
+            # report importato in un modello MEP / ARC: niente spunte, azioni sui fori e Refresh (solo Show / Select)
+            for name in ("ActionsBorder", "TickButtons", "RefreshButton"):
+                find(name).Visibility = Visibility.Collapsed
+            find("StatusText").Text = ("Report imported from the Openings model: read-only. Show / Select picks the "
+                                       "elements of this model and, if the Openings model is linked here, the "
+                                       "openings.")
         self.actions = actions
         self.owner, self.text_xaml = owner, text_xaml  # per aprire il Text Report da qui
         _set_owner(self.window, owner)

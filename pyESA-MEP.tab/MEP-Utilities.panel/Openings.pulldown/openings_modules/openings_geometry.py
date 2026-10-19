@@ -78,6 +78,22 @@ def doc_path(document):
     return document.PathName or ""
 
 
+def model_name(document):
+    """Nome del modello nei riferimenti e nel report: per i modelli condivisi il nome del file centrale (il titolo
+    di una copia locale ha in coda il nome dell'utente, "PRJ_MEC_m.rossi", e non coinciderebbe con il nome del link
+    negli altri modelli), altrimenti il titolo."""
+    try:
+        if document.IsWorkshared:
+            central = document.GetWorksharingCentralModelPath()
+            if central is not None:
+                name = op.splitext(op.basename(DB.ModelPathUtils.ConvertModelPathToUserVisiblePath(central)))[0]
+                if name:
+                    return name
+    except Exception:
+        pass
+    return document.Title
+
+
 def element_name(element):
     try:
         return element.Name
@@ -154,7 +170,7 @@ def phase_by_name(document, name):
 def link_sources():
     """(modelli letti [Source], host per primo; {nome: [istanze]} dei link non caricati; titoli di link diversi
     con lo stesso nome; link caricati ma non letti [Source], tolti in Place: ctx.skipped_links). Letti una volta per
-    controllo (reset_models). Chiave = titolo del file linkato, uguale a doc.Title nei modelli MEP / ARC; con piu'
+    controllo (reset_models). Chiave = model_name del file linkato (nome del centrale), uguale nei modelli MEP / ARC; con piu'
     istanze dello stesso link "<titolo>#<n>", n in ordine di UniqueId."""
     if ctx.sources is None:
         loaded = [Source(ctx.doc, None, 0, "", doc_path(ctx.doc))]
@@ -167,7 +183,7 @@ def link_sources():
                     name = name[:-4]
                 unloaded.setdefault(name, []).append(id_value(link.Id))
             else:
-                by_title.setdefault(link_doc.Title, []).append((link, link_doc))
+                by_title.setdefault(model_name(link_doc), []).append((link, link_doc))
         clashes, skipped = [], []
         for title in sorted(by_title):
             links = sorted(by_title[title], key=lambda pair: pair[0].UniqueId)

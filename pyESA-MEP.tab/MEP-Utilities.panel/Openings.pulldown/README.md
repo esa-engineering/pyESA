@@ -26,11 +26,13 @@ non toccato.
   | `openings_geometry.py` | sezioni MEP, famiglie e inserimento, area, ricerca degli attraversamenti, lettura dei fori |
   | `openings_pick.py` | selezioni nel modello e smistamento della selezione corrente |
   | `openings_check.py` | controllo dei fori, ambito (`CheckScope`), unioni e divisioni, Recreate, scrittura, Missing openings |
-  | `openings_report.py` | file dell'ultimo report, righe e dati del report, `CheckSession`, `LastReport`, finestra del report, `check_main()`, `last_main()` |
+  | `openings_exchange.py` | file del report JSON: scrittura (escape non ASCII a mano, come MEPQTO), lettura, cartella e file ricordati per modello, trasformazioni |
+  | `openings_report.py` | file dell'ultimo report, righe e dati del report, `CheckSession`, `LastReport`, Export, `ImportedReport`, finestra del report, `check_main()`, `last_main()` |
   | `openings_place.py` | `place_main()` |
   | `OpeningsCheck_ui.py`, `OpeningsPlace_ui.py`, `OpeningsReport_xlsx.py`, XAML | finestre ed export Excel (non leggono Revit) |
 
-  Ogni modulo importa il precedente con `from ... import *` (core <- geometry <- pick <- check <- report <- place):
+  Ogni modulo importa il precedente con `from ... import *` (core <- geometry <- pick <- check <- exchange <- report
+  <- place):
   un modulo non usa funzioni di quelli che vengono dopo. **Rocket mode**: i moduli restano caricati tra un comando e
   l'altro, quindi niente documento, output o impostazioni a livello di modulo. Stanno in `ctx` (`ctx.doc`,
   `ctx.settings`, `ctx.status_param`...), riempito da `start()` a ogni comando; la finestra del report, non modale,
@@ -48,7 +50,7 @@ fori (come prima) e il modello Openings con MEP e ARC linkati (piano in `Opening
   coordinate host (sezione misurata nel documento dell'elemento, assi portati con il transform del link).
   `mep_near()`, `meps_in_area()` e `hosts_from_meps()` cercano in tutti i modelli (`link_sources()`).
 - **Riferimenti sul foro** (`e_GEN_RelatedElement_ID`): gli Id del modello aperto senza prefisso, poi un gruppo per
-  link, in ordine di nome: `111,222; PRJ_MEC: 333,444; PRJ_ELE: 555` (titolo del file linkato; `PRJ_MEC#2` se il
+  link, in ordine di nome: `111,222; PRJ_MEC: 333,444; PRJ_ELE: 555` (`model_name()` del file linkato; `PRJ_MEC#2` se il
   link e' inserito piu' volte). Leggibile in un abaco, "contiene 333" trova il foro, gli Id di un gruppo si
   incollano in *Select by ID*. `format_refs()` scrive, `parse_refs()` legge (anche gli Id nudi dei modelli unici e
   il formato di prova `PRJ_MEC:333,PRJ_ELE:555`; alla prima scrittura passano al formato nuovo). Internamente ogni
@@ -84,6 +86,34 @@ fori (come prima) e il modello Openings con MEP e ARC linkati (piano in `Opening
   caricati e i file diversi con lo stesso nome. Show / Select di un elemento di un link selezionano solo i fori.
 - Link e riferimenti si rileggono a ogni controllo (`reset_models()`): un link ricaricato con la finestra del report
   aperta viene ripreso al Refresh.
+
+## Export e Import del report (modello Openings -> modelli MEP / ARC)
+
+Terzo pulsante del riepilogo (`OpeningsCheck_summary.xaml`, `ThirdAction`), che cambia con il modello:
+
+- **Modello Openings** (New Report e Last Report): **Export report**. Si sceglie una cartella ogni volta (proposta
+  l'ultima, `export_folder` per modello). Scrive `<modello>_Openings.json`, sovrascritto (quello che leggono i
+  modelli MEP / ARC), e una copia datata `<modello>_Openings_AAAAMMGG-HHMM.json` come storico. Contiene **tutti i
+  fori del modello**, non solo lo scope (`build_export()`): stato dal parametro del foro, dettaglio degli elementi
+  dall'ultimo controllo su questo computer (il messaggio dice quanti elementi non sono mai stati controllati qui).
+- **Modello MEP / ARC** (Last Report in un modello senza fori gestiti): **Import report**. Si sceglie il file;
+  il riepilogo si riempie con il report (`ImportedReport`) e il file si ricorda (`report_file` per modello). Le
+  volte dopo Last Report lo riapre da solo, **riletto dal disco**: un Export nuovo nella stessa cartella si vede
+  subito. Senza report (o file non leggibile): solo il messaggio (`NoImportedReport`), schede spente, Import acceso.
+- Report importato: i fori che citano questo modello (riconosciuto per nome, `model_name()`: per i modelli condivisi
+  il nome del file centrale, perche' il titolo di una copia locale ha in coda il nome dell'utente; se il nome non
+  c'e', per percorso del centrale), con stato e note dell'export; gli elementi di questo modello si cercano per Id e si confermano
+  con lo UniqueId ("not in this model any more" se mancano o l'Id e' stato riusato). Riepilogo con *Report of*,
+  *From*, *Exported by*, *File*.
+- Interactive Report di un report importato: **sola lettura** (`ReportWindow(readonly=True)`, `ImportController`):
+  niente spunte, Recreate, Move, Delete, Refresh. Show / Select: elementi di questo modello per Id; fori come
+  riferimenti nel link Openings, se e' linkato qui (`Selection.SetReferences`, Revit 2023+; il foro si ritrova per
+  UniqueId); zoom anche sul box del foro, portato nelle coordinate di questo modello con l'inverso del transform
+  salvato nel report (`models.<modello>.transform`).
+- Last Report nel modello Openings senza un New Report su questo computer: non si ferma piu', mostra tutto il
+  modello con gli stati scritti (e l'Export).
+
+Formato del file in `Openings_NOTE-LINK.md` ("Report JSON").
 
 ## Parametri
 

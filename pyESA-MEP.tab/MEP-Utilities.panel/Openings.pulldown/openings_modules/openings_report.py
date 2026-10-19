@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Openings: New Report e Last Report. File dell'ultimo report, righe e dati del report, sessione di controllo,
 azioni della finestra del report (non modale, tramite ExternalEvent), comandi check_main e last_main."""
-from openings_check import *  # noqa: F401,F403
+from openings_exchange import *  # noqa: F401,F403
 
 
 def ask_check_scope(ui):
@@ -178,12 +178,21 @@ def status_totals(report):
     return totals
 
 
+def opening_select(row):
+    """Cosa selezionare per il foro della riga: il suo Id nel modello aperto, o per un report importato (nessuna
+    istanza qui) "opening:<UniqueId>", risolto nel link Openings da ImportController.select."""
+    if row["instance"] is None:
+        return "opening:" + row.get("unique_id", "")
+    return id_value(row["instance"].Id)
+
+
 def owners_of(report):
-    """{Id elemento (testo): [(codice, stato dell'elemento, Id del foro)]} dei fori del report che lo elencano."""
+    """{Id elemento (testo): [(codice, stato dell'elemento, foro da selezionare)]} dei fori del report che lo
+    elencano."""
     owners = {}
     for row in report.rows:
         for e in row["elements"]:
-            owners.setdefault(e["id"], []).append((row["code"], e["state"], id_value(row["instance"].Id)))
+            owners.setdefault(e["id"], []).append((row["code"], e["state"], opening_select(row)))
     return owners
 
 
@@ -220,8 +229,9 @@ def report_groups(ui, report):
 
 def row_entry(ui, row, owners):
     """owners: owners_of(report). Selezionare un elemento seleziona anche i fori a cui e' associato. Gli elementi
-    dei link non si selezionano per Id: per loro si selezionano solo i fori."""
-    select = [id_value(row["instance"].Id)]
+    dei link non si selezionano per Id: per loro si selezionano solo i fori. Report importato (instance None): niente
+    spunte ne' azioni, solo Show / Select."""
+    select = [opening_select(row)]
     elements = []
     for e in row["elements"]:
         ids = e["element"].select_ids() if e["element"] is not None else []
@@ -230,8 +240,10 @@ def row_entry(ui, row, owners):
                          ids + [i for _, _, i in owners.get(e["id"], []) if e["element"] is not None]))
     label = row_label(row)
     detail = "{}\nStatus: {}\n\n{}".format(label, row["status"], "\n".join(row["notes"]) or "Elements in place.")
+    local = row["instance"] is not None
     return ui.OpeningEntry(row["code"], label, detail, select, elements, can_recreate=row["can_recreate"],
-                           can_move=row["can_move"], can_delete=row["status"] == NOT_ASSOCIATED)
+                           can_move=row["can_move"], can_delete=local and row["status"] == NOT_ASSOCIATED,
+                           checkable=local)
 
 
 def link(element, fallback):
@@ -488,6 +500,185 @@ class LastReport(object):
         return ""
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# Export (modello Openings) e report importato (modelli MEP / ARC)
+# ----------------------------------------------------------------------------------------------------------------
+ELEMENT_NOT_HERE = "not in this model any more"
+
+
+def build_export():
+    """Dati del report esportato: **tutti** i fori del modello, non solo lo scope dell'ultimo report (i modelli MEP /
+    ARC vedono il quadro intero). Stato dal parametro del foro (scritto dall'ultimo New Report, di chiunque),
+    dettaglio degli elementi dall'ultimo controllo su questo computer. Modello di ogni elemento = chiave del link
+    (model_name: nome del file centrale, uguale nel modello MEP / ARC), o il titolo di questo modello per i suoi elementi.
+    Ritorna (dati, elementi mai controllati su questo computer)."""
+    me = model_name(ctx.doc)
+    models = {}
+    for source in link_sources()[0]:
+        models[source.key or me] = {"path": source.path, "transform": transform_list(source.transform),
+                                    "phase_found": source.searchable}
+    details = load_last_check()
+    openings, unchecked = [], 0
+    for instance in existing_openings():
+        row = stored_row(instance, details)
+        box = instance.get_BoundingBox(None)
+        elements = []
+        for e in row["elements"]:
+            model, number = split_ref(e["id"])
+            mep = e["element"]
+            unchecked += e["state"] == ELEMENT_UNCHECKED
+            elements.append({"model": model or me, "id": int(number) if number.isdigit() else number,
+                             "ref": e["id"], "unique_id": mep.element.UniqueId if mep is not None else "",
+                             "category": e["name"], "state": e["state"]})
+        openings.append({"code": row["code"], "unique_id": instance.UniqueId, "status": row["status"],
+                         "no_element": row["no_element"], "family": row["family"], "size": row["size"],
+                         "origin": row["origin"], "notes": row["notes"][1:],  # senza "Last check on this computer"
+                         "box": {"min": xyz_list(box.Min), "max": xyz_list(box.Max)} if box is not None else None,
+                         "elements": elements})
+    data = {"format": REPORT_FORMAT, "version": REPORT_VERSION, "openings_model": me,
+            "openings_path": doc_path(ctx.doc), "date": datetime.now().strftime("%d.%m.%Y %H:%M"),
+            "user": ctx.doc.Application.Username, "phase": phase_name(), "units": "ft",
+            "status_param": ctx.status_param, "models": models, "openings": openings}
+    return data, unchecked
+
+
+def export_report(folder):
+    """Scrive <modello>_Openings.json (sovrascritto: quello che leggono i modelli MEP / ARC) e una copia datata
+    <modello>_Openings_AAAAMMGG-HHMM.json come storico. Ritorna il messaggio per la finestra."""
+    data, unchecked = build_export()
+    name = "{}_Openings".format(model_name(ctx.doc))
+    main = op.join(folder, name + ".json")
+    write_json_file(main, data)
+    write_json_file(op.join(folder, "{}_{}.json".format(name, datetime.now().strftime("%Y%m%d-%H%M"))), data)
+    save_model_value(EXPORT_FOLDER_OPTION, folder)
+    message = "Exported {} openings to {} (and a dated copy).".format(len(data["openings"]), main)
+    if unchecked:
+        message += " {} elements were never checked on this computer: run New Report on the whole model for " \
+                   "their detail.".format(unchecked)
+    return message
+
+
+def imported_element(e, me):
+    """Riga di un elemento di un report importato. Gli elementi di questo modello si cercano per Id e si confermano
+    con lo UniqueId (un Id riusato dopo una cancellazione non e' lo stesso elemento)."""
+    model = e.get("model") or ""
+    number = e.get("id")
+    if model != me:
+        return {"id": e.get("ref") or ref_text(model, number), "element": None, "name": e.get("category", "Element"),
+                "state": e.get("state", "")}
+    element = None
+    try:
+        element = ctx.doc.GetElement(DB.ElementId(int(number)))
+    except Exception:
+        pass
+    if not isinstance(element, MEP_CLASSES) or (e.get("unique_id") and element.UniqueId != e.get("unique_id")):
+        return {"id": str(number), "element": None, "name": e.get("category", "Element"),
+                "state": "{}; {}".format(e.get("state", ""), ELEMENT_NOT_HERE)}
+    return {"id": str(number), "element": mep_ref(element, host_source()), "name": e.get("category", "Element"),
+            "state": e.get("state", "")}
+
+
+def imported_box(entry, inverse):
+    """Box del foro nelle coordinate di questo modello (min, max), o None. inverse: inverso del transform con cui
+    questo modello e' linkato nel modello Openings."""
+    box = entry.get("box")
+    if not box or inverse is None:
+        return None
+    low, high = box["min"], box["max"]
+    corners = [inverse.OfPoint(DB.XYZ(x, y, z)) for x in (low[0], high[0]) for y in (low[1], high[1])
+               for z in (low[2], high[2])]
+    return (DB.XYZ(min(c.X for c in corners), min(c.Y for c in corners), min(c.Z for c in corners)),
+            DB.XYZ(max(c.X for c in corners), max(c.Y for c in corners), max(c.Z for c in corners)))
+
+
+class ImportedReport(object):
+    """Report importato in un modello MEP / ARC (Last Report): i fori del file che citano questo modello, con stato e
+    note dell'export. Niente controllo e niente azioni sui fori (stanno nel modello Openings): solo Show / Select
+    (ImportController). Questo modello si riconosce nel file per nome (model_name: nome del file centrale, uguale
+    alla chiave del link nel modello Openings anche se qui e' aperta una copia locale) o, se il nome non c'e', per
+    percorso del file centrale."""
+    title = "Imported Report"
+
+    def __init__(self, data, path):
+        models = data.get("models") or {}
+        me = model_name(ctx.doc)
+        if me not in models:
+            here = (doc_path(ctx.doc) or "").lower()
+            me = next((key for key, info in models.items() if here and (info.get("path") or "").lower() == here), me)
+        self.data, self.path, self.me = data, path, me
+        self.date = data.get("date", "")
+        self.known = me in models
+        transform = transform_of(models[me].get("transform")) if self.known else None
+        inverse = transform.Inverse if transform is not None else None
+        self.scope = CheckScope("imported", "openings citing this model ({})".format(me))
+        self.log, self.added, self.missing_rows = [], 0, None
+        rows = []
+        for entry in data.get("openings") or []:
+            elements = entry.get("elements") or []
+            if not any(e.get("model") == me for e in elements):
+                continue
+            rows.append({"code": str(entry.get("code", "")), "instance": None,
+                         "unique_id": entry.get("unique_id", ""), "status": entry.get("status", ""),
+                         "no_element": bool(entry.get("no_element")), "family": entry.get("family", ""),
+                         "size": entry.get("size", ""), "origin": entry.get("origin", ""),
+                         "notes": list(entry.get("notes") or []),
+                         "elements": [imported_element(e, me) for e in elements],
+                         "can_recreate": False, "can_move": False, "box": imported_box(entry, inverse)})
+        self.rows = sorted(rows, key=lambda r: int(r["code"]) if r["code"].isdigit() else 0)
+
+    def totals(self):
+        totals = status_totals(self)
+        totals[1:1] = [("Report of", self.date),
+                       ("From", "{} ({})".format(self.data.get("openings_model", "?"),
+                                                 self.data.get("openings_path") or "path unknown")),
+                       ("Exported by", self.data.get("user", "?")), ("File", self.path)]
+        return totals
+
+    def details(self):
+        return ["Report imported from {}, exported on {} by {}; phase {}. Only the openings citing this model ({}) "
+                "are listed. Nothing is checked or written here: openings are created, recreated and checked in "
+                "the Openings model.".format(self.data.get("openings_model", "?"), self.date,
+                                             self.data.get("user", "?"), self.data.get("phase", "?"), self.me),
+                "File: {}. Last Report reopens it from disk every time, so a new Export to the same folder is "
+                "read at once.".format(self.path)]
+
+    def warning(self):
+        if self.known:
+            return ""
+        return "This model ({}) is not among the models of the report ({}). The Openings model must link this " \
+               "file with the same name.".format(self.me, ", ".join(sorted(self.data.get("models") or {})) or "none")
+
+
+class NoImportedReport(object):
+    """Modello MEP / ARC senza un report importato leggibile: solo il messaggio e il pulsante Import."""
+    title = "Imported Report"
+
+    def __init__(self, message):
+        self.message = message
+        self.rows, self.log = [], []
+
+    def totals(self):
+        return [("Report", self.message)]
+
+    def warning(self):
+        return ""
+
+
+def load_imported():
+    """Ultimo report importato per questo modello, riletto dal disco (un Export nuovo nella stessa cartella si vede
+    subito); NoImportedReport se non c'e' o non si legge."""
+    path = model_value(REPORT_FILE_OPTION)
+    if not path:
+        return NoImportedReport("No report imported for this model yet: use Import report below, on the file that "
+                                "the Openings model exports.")
+    if not op.isfile(path):
+        return NoImportedReport("The last imported report is not there any more: {}. Import it again.".format(path))
+    try:
+        return ImportedReport(read_report_file(path), path)
+    except Exception as ex:
+        return NoImportedReport("The last imported report cannot be read ({}): {}".format(path, ex))
+
+
 class ReportRunner(IExternalEventHandler):
     """Esegue nel contesto API di Revit le richieste della finestra del report, che e' non modale: dai suoi pulsanti
     non si puo' chiamare l'API direttamente (selezione, transazioni)."""
@@ -609,16 +800,131 @@ class ReportController(object):
         return report_data(self.report)
 
 
+NOT_IN_THIS_MODEL = "not available here: this report was imported from the Openings model, where openings are " \
+                    "checked, recreated, moved and deleted."
+
+
+class ImportController(ReportController):
+    """Azioni della finestra di un report importato (modello MEP / ARC): solo Show / Select. Gli elementi di questo
+    modello si selezionano per Id; i fori, se il modello Openings e' linkato qui, come riferimenti nel link
+    (Selection.SetReferences, Revit 2023+). Senza link si inquadra solo il box del foro."""
+
+    def check_again(self):
+        raise ValueError(NOT_IN_THIS_MODEL)
+
+    def refresh(self):
+        raise ValueError(NOT_IN_THIS_MODEL)
+
+    def prepare_recreate(self, keys):
+        raise ValueError(NOT_IN_THIS_MODEL)
+
+    def recreate(self, keys):
+        raise ValueError(NOT_IN_THIS_MODEL)
+
+    def move(self, keys):
+        raise ValueError(NOT_IN_THIS_MODEL)
+
+    def delete(self, keys):
+        raise ValueError(NOT_IN_THIS_MODEL)
+
+    def openings_links(self):
+        """Istanze del link del modello Openings in questo modello (per titolo)."""
+        name = self.report.data.get("openings_model")
+        return [link for link in DB.FilteredElementCollector(ctx.doc).OfClass(DB.RevitLinkInstance)
+                if link.GetLinkDocument() is not None and model_name(link.GetLinkDocument()) == name]
+
+    def select(self, ids, zoom):
+        uids = [i[len("opening:"):] for i in ids if isinstance(i, basestring) and i.startswith("opening:")]
+        elements = [ctx.doc.GetElement(DB.ElementId(i)) for i in ids if not isinstance(i, basestring)]
+        elements = [e for e in elements if e is not None]
+        refs = [DB.Reference(e) for e in elements]
+        links = self.openings_links()
+        found = 0
+        for uid in uids:
+            for link in links:
+                opening = link.GetLinkDocument().GetElement(uid)
+                if opening is not None:
+                    refs.append(DB.Reference(opening).CreateLinkReference(link))
+                    found += 1
+                    break
+        selection = ctx.uidoc.Selection
+        if hasattr(selection, "SetReferences"):
+            selection.SetReferences(List[DB.Reference](refs))
+        else:  # Revit 2022: solo gli elementi di questo modello
+            selection.SetElementIds(List[DB.ElementId]([e.Id for e in elements]))
+        if zoom:
+            self.zoom_to(elements, uids)
+        ctx.uidoc.RefreshActiveView()
+        message = "Selected {} elements of this model".format(len(elements))
+        if uids:
+            message += ", {} of {} openings".format(found, len(uids))
+            if not links:
+                message += " (the Openings model is not linked here: only zoomed on them)"
+        return message + "."
+
+    def zoom_to(self, elements, uids):
+        """Inquadra nella vista attiva gli elementi e i box dei fori (salvati nel report, gia' in coordinate di
+        questo modello)."""
+        lows, highs = [], []
+        for element in elements:
+            box = element.get_BoundingBox(None)
+            if box is not None:
+                lows.append(box.Min)
+                highs.append(box.Max)
+        boxes = dict((r["unique_id"], r["box"]) for r in self.report.rows if r.get("box"))
+        for uid in uids:
+            if uid in boxes:
+                lows.append(boxes[uid][0])
+                highs.append(boxes[uid][1])
+        if not lows:
+            return
+        margin = 1.0  # piedi attorno a cio' che si inquadra
+        low = DB.XYZ(min(p.X for p in lows) - margin, min(p.Y for p in lows) - margin, min(p.Z for p in lows) - margin)
+        high = DB.XYZ(max(p.X for p in highs) + margin, max(p.Y for p in highs) + margin,
+                      max(p.Z for p in highs) + margin)
+        for view in ctx.uidoc.GetOpenUIViews():
+            if view.ViewId == ctx.doc.ActiveView.Id:
+                view.ZoomAndCenterRectangle(low, high)
+
+
+def third_action(ui, holder):
+    """Terzo pulsante del riepilogo: Export nel modello Openings, Import nei modelli MEP / ARC (report importato o
+    nessun report). holder[0] e' il report mostrato: l'Import lo sostituisce."""
+    report = holder[0]
+    if not isinstance(report, (ImportedReport, NoImportedReport)):
+        def export(folder):
+            return {"message": export_report(folder)}
+        return ui.ThirdAction(ui.THIRD_EXPORT, "For the MEP / ARC models: choose a folder; writes {}_Openings.json "
+                                               "(every opening of the model) and a dated copy.".format(model_name(ctx.doc)),
+                              model_value(EXPORT_FOLDER_OPTION), export)
+
+    def do_import(path):
+        new = ImportedReport(read_report_file(path), path)
+        save_model_value(REPORT_FILE_OPTION, path)
+        holder[0] = new
+        return {"message": "Imported {}: {} openings cite this model.".format(path, len(new.rows)),
+                "title": new.title, "rows": new.totals(), "warning": new.warning()}
+    last = model_value(REPORT_FILE_OPTION)
+    hint = "Load the report exported from the Openings model (choose the file).{}".format(
+        " Last: {}".format(last) if last else "")
+    return ui.ThirdAction(ui.THIRD_IMPORT, hint, op.dirname(last) if last else "", do_import)
+
+
 def show_report(ui, report):
-    """Riepilogo con le due schede, poi Text Report o Interactive Report (non modali: il comando finisce, la finestra
-    resta aperta; l'Interactive Report lavora tramite ExternalEvent, vedi __persistentengine__)."""
-    choice = ui.SummaryWindow(bundle_path(SUMMARY_XAML), report.title, report.totals(), report.warning()).show()
+    """Riepilogo con le due schede e il terzo pulsante (Export / Import), poi Text Report o Interactive Report (non
+    modali: il comando finisce, la finestra resta aperta; l'Interactive Report lavora tramite ExternalEvent, vedi
+    __persistentengine__)."""
+    holder = [report]
+    imported = isinstance(report, (ImportedReport, NoImportedReport))
+    choice = ui.SummaryWindow(bundle_path(SUMMARY_XAML), report.title, report.totals(), report.warning(),
+                              third_action(ui, holder), not isinstance(report, NoImportedReport), imported).show()
+    report = holder[0]
     if choice == ui.SHOW_TEXT:
         ui.TextReportWindow(bundle_path(TEXT_XAML), report_data(report), revit_owner()).show()
     elif choice == ui.SHOW_WINDOW:
-        controller = ReportController(report, ui)
+        controller = (ImportController if imported else ReportController)(report, ui)
         ui.ReportWindow(bundle_path(REPORT_XAML), controller.groups(), controller, revit_owner(),
-                        bundle_path(TEXT_XAML)).show()
+                        bundle_path(TEXT_XAML), readonly=imported).show()
 
 
 def check_main(scope=None):
@@ -630,10 +936,13 @@ def check_main(scope=None):
 
 
 def last_main():
-    """Last Report: l'ultimo New Report del modello, senza controllo e senza chiedere l'ambito."""
+    """Last Report. Modello con fori: l'ultimo New Report del modello, senza controllo e senza chiedere l'ambito (se
+    su questo computer non ce n'e', tutto il modello con gli stati scritti). Modello senza fori (MEP / ARC): l'ultimo
+    report importato, riletto dal disco, e il pulsante Import."""
     import OpeningsCheck_ui as ui
-    saved = load_last_report()
-    if saved is None:
-        ui.MessageBox.Show("No report yet for this model on this computer: run New Report first.", ui.TITLE)
-        script.exit()
+    if not existing_openings():
+        show_report(ui, load_imported())
+        return
+    saved = load_last_report() or {"date": "-", "scope": {"kind": "all", "description":
+                                                          "whole model (no New Report on this computer yet)"}}
     show_report(ui, LastReport(saved))
