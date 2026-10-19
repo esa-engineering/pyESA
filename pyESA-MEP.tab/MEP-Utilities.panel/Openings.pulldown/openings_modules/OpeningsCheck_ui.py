@@ -461,7 +461,7 @@ class ReportWindow(object):
     def _on_recreate(self, sender, args):
         entries = self._ticked("can_recreate")
         if not entries:
-            MessageBox.Show("Tick the openings to create or recreate: missing openings, or Not Associated / To Be "
+            MessageBox.Show("Tick the openings to recreate: Not Associated / To Be "
                             "Refreshed openings with elements still crossing them.", TITLE)
             return
         keys = [e.key for e in entries]
@@ -473,7 +473,7 @@ class ReportWindow(object):
         preview, groups = result
         self.checked |= set(keys)  # le spunte restano sui fori ancora presenti (_set_groups toglie gli altri)
         self._set_groups(groups)
-        message = (u"Create / recreate {} openings?\n\n{}\n\nEvery new opening gets a new Id and status Valid; the Ids on the "
+        message = (u"Recreate {} openings?\n\n{}\n\nEvery new opening gets a new Id and status Valid; the Ids on the "
                    u"MEP elements are updated.".format(len(keys), preview or u"(nothing to recreate)"))
         if MessageBox.Show(message, TITLE, MessageBoxButton.YesNo) != MessageBoxResult.Yes:
             self.status.Text = "Cancelled; the list was checked again."

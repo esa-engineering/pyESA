@@ -8,8 +8,8 @@ non toccato.
 
 | Pulsante | Cosa fa |
 | --- | --- |
-| Place | Selezione di muri e solai, di elementi MEP o di un'area, poi un foro per ogni attraversamento (accorpati se vicini) |
-| New Report | Check di fori e MEP (tutto il modello, selezione MEP o ARC, area), pulizia degli Id vecchi, fori mancanti, riepilogo, Text Report (export Excel) o Interactive Report |
+| Place&Check (cartella `Place.pushbutton`) | **Verifica dove servono fori nuovi** e li crea: selezione di muri e solai, di elementi MEP o di un'area, link da leggere, anteprima, un foro per ogni attraversamento (accorpati se vicini), esito in una finestra (anche "nessun foro da aggiungere") |
+| New Report | **Solo lo stato dei fori presenti** (tutto il modello, selezione MEP o ARC, area): check di fori e MEP, pulizia degli Id vecchi, riepilogo, Text Report (export Excel) o Interactive Report. Non cerca fori nuovi |
 | Last Report | L'ultimo New Report del modello, senza controllo ne' domande |
 | Settings | Impostazioni per utente (`script.get_config("ESA_Openings")`) |
 
@@ -38,6 +38,33 @@ non toccato.
   pyRevit Reload.
 - Il vecchio pulsante Families (creava le famiglie PFV dal template) e' in `_old/`: le famiglie VD_Void Demand
   vengono dalla libreria aziendale.
+
+## Elementi MEP nei link (modello dei soli fori)
+
+I MEP si leggono dal modello aperto **e da tutti i link RVT caricati**: lo stesso codice serve il modello MEP con i
+fori (come prima) e il modello Openings con MEP e ARC linkati (piano in `Openings_NOTE-LINK.md`).
+
+- Ogni elemento MEP e' un `MepRef` (`openings_geometry`): elemento, modello (`Source`), curva e sezione gia' in
+  coordinate host (sezione misurata nel documento dell'elemento, assi portati con il transform del link).
+  `mep_near()`, `meps_in_area()` e `hosts_from_meps()` cercano in tutti i modelli (`link_sources()`).
+- Riferimento scritto sul foro (`MepRef.text`): `123456` per un elemento del modello aperto (come prima),
+  `PRJ_MEC:123456` per un elemento di un link (titolo del file linkato; `PRJ_MEC#2` se il link e' inserito piu'
+  volte). `mep_by_ref()` lo risolve.
+- **Link letti da Place**: sezione *Linked models* della finestra di Place (spunta = leggi, per MEP e per muri,
+  solai e strutture; il modello aperto si legge sempre). Ricordata per modello in `ESA_Openings`
+  (`place_skipped_links`: `"<percorso del modello>::<chiave>|<chiave>"`, al massimo 50); i link nuovi compaiono
+  spuntati, quelli tolti e ora non caricati restano tolti. Con elementi gia' selezionati la finestra non c'e' e vale
+  l'ultima scelta. `ctx.skipped_links` toglie quei link da `link_sources()`; anche le selezioni nel modello li
+  rifiutano. New Report e Last Report leggono sempre tutti i link.
+- **Selezione MEP**: Revit non seleziona insieme elementi del modello e dei link. Se il modello aperto ha MEP propri si
+  scelgono quelli, altrimenti quelli dei link (`pick_meps()`).
+- Sui MEP dei link non si scrive niente: il legame sta solo sul foro. I MEP del modello aperto si scrivono come prima.
+- **Link non caricato**: i riferimenti a quel modello restano sul foro (non sono "deleted"), il foro mantiene lo
+  stato scritto, non si ricrea ne' si unisce (`keep_status()`); riga dell'elemento "link not loaded".
+- Report: Place e i dettagli del New Report elencano i modelli letti con il percorso (`models_lines()`), i link non
+  caricati e i file diversi con lo stesso nome. Show / Select di un elemento di un link selezionano solo i fori.
+- Link e riferimenti si rileggono a ogni controllo (`reset_models()`): un link ricaricato con la finestra del report
+  aperta viene ripreso al Refresh.
 
 ## Parametri
 
@@ -175,12 +202,12 @@ elementi del modello non si guardano: per quelli c'e' Place.
   alla scrittura; il foro entra nell'ambito (`CheckScope.add()`). Lo stato del foro segue le regole solite: To Be
   Refreshed se il foro ideale cambia misura, Not Associated se l'elemento esce in parte. Gli elementi aggiunti non
   contano come "persi";
-- **attraversamento senza foro** (`missing_openings()`): gruppo **Missing openings** nel riepilogo, nel report
-  testuale e in cima all'Interactive Report, raggruppato come Place (`merge_overlapping()` + `clusters()`),
-  chiavi stabili `new:<elementi attraversati>:<elementi MEP>` (una spunta data nel Last Report resta valida dopo il
-  ricontrollo che precede Create). Sono esclusi gli attraversamenti che il check di un foro dell'elemento gia' copre
-  (elemento uscito ma entro la portata del foro, `handled_by_opening()`), per non creare due fori. *Create /
-  Recreate* li crea come Place (stato Valid, origine "new") insieme alle ricreazioni, in una transazione.
+- **attraversamento senza foro**: il New Report **non lo cerca piu'** (decisione del 19.10.2026: il report verifica
+  solo lo stato dei fori presenti; i fori nuovi li cerca Place&Check). `CheckSession.missing_rows` e
+  `LastReport.missing_rows` valgono `None`: niente gruppo *Missing openings* nel riepilogo, nel Text Report e
+  nell'Interactive Report, e Recreate non crea fori nuovi. `missing_openings()`, `missing_entry()`,
+  `saved_missing_rows()` e il ramo "create" di `CheckSession.recreate()` sono rimasti nel codice ma non si usano.
+
 **Recreate** (`recreate_openings()`):
 
 - prima della conferma, un'anteprima per foro (`recreate_plan()`, anche nel dettaglio del report): ricreato su N
@@ -213,13 +240,10 @@ not readable, deleted.
   tolgono; fori che lo citano ma mancavano si aggiungono. Stato = il peggiore di quei fori; nessun foro: Not
   Associated. Fuori dall'ambito si toccano solo i MEP legati ai fori controllati (o scelti).
 - Ricreando un foro, gli elementi che non lo attraversano piu' (`outside_meps()`) non entrano nel foro nuovo, che
-  e' Valid, e perdono l'associazione (Not Associated); restano pero' nell'ambito (`CheckScope.release()`), cosi' la
-  scansione li riporta in *Missing openings* finche' Create non fa un foro attorno a loro.
-- Delete di un foro Not Associated: allo stesso modo, i suoi elementi ancora esistenti restano nell'ambito (`CheckScope.released`,
-  salvato nel Last Report), cosi' restano scansionati e compaiono in *Missing openings* se attraversano un muro o
-  solaio senza foro. Nelle righe di *Missing openings* un elemento ancora elencato da fori presenti a modello mostra
-  il suo stato in quei fori e i loro Id (es. "moved out (opening 3541063)"), e Show li seleziona; se i fori sono
-  stati cancellati, "no opening (opening N deleted)" (`missing_status()`).
+  e' Valid, e perdono l'associazione (Not Associated); restano nell'ambito (`CheckScope.release()`) e vengono
+  scansionati, ma un foro nuovo per loro lo trova Place&Check.
+- Delete di un foro Not Associated: allo stesso modo, i suoi elementi ancora esistenti restano nell'ambito
+  (`CheckScope.released`, salvato nel Last Report); un foro nuovo per loro lo trova Place&Check.
 - Interactive Report: scegliendo un elemento sotto un foro, Show / Select selezionano anche i fori che lo elencano
   (`owners_of()`).
 
@@ -303,11 +327,11 @@ Last Report (`scope.area`), cosi' Refresh e Last Report la ritrovano. Un attrave
 view range consueto (fondo al livello) il solaio sotto il livello ha il centro fuori quota ma il tratto lo tocca.
 Gli elementi MEP che escono dall'area contano, ma solo per gli attraversamenti dentro (`stats["outside_area"]`).
 
-- **Place**: tutti i MEP rettilinei dell'host che toccano l'area (`meps_in_area()`) contro muri, solai e strutture
-  dell'host e dei link che la toccano (`hosts_in_area()`), poi come la modalita' normale (anteprima, fori nuovi).
-- **New Report**: fori gestiti nell'area (`opening_in_area()`, centro del bounding box) e scansione dei MEP dell'area;
-  attraversamenti senza foro in *Missing openings*. A ogni controllo (Refresh, azioni) MEP e fori comparsi nell'area
-  nel frattempo entrano nell'ambito; i fori usciti dall'area restano (per Id).
+- **Place&Check**: tutti i MEP rettilinei del modello e dei link letti che toccano l'area (`meps_in_area()`) contro
+  muri, solai e strutture che la toccano (`hosts_in_area()`), poi come la modalita' normale (anteprima, fori nuovi).
+- **New Report**: fori gestiti nell'area (`opening_in_area()`, centro del bounding box). I MEP dell'area si
+  scansionano solo per gli elementi entrati in un foro senza esservi associati; niente fori nuovi. A ogni controllo
+  (Refresh, azioni) i fori comparsi nell'area nel frattempo entrano nell'ambito; quelli usciti restano (per Id).
 
 ## Place: modalita' dalla selezione
 
@@ -324,8 +348,11 @@ Gli elementi MEP che escono dall'area contano, ma solo per gli attraversamenti d
     contati nel report come non usati.
 - **Nessuna selezione**: la finestra `OpeningsPlace_pick.xaml` chiede se selezionare muri/solai/strutture o elementi
   MEP (ultima scelta ricordata in `ESA_Openings`, chiave `place_pick`).
-- Prima di creare, l'anteprima `OpeningsPlace_confirm.xaml` (conteggi e problemi di lettura); il report resta nel
-  pannello di output.
+- Prima di creare, l'anteprima `OpeningsPlace_confirm.xaml` (conteggi e problemi di lettura).
+- **Esito in una finestra**, mai nel pannello di output di pyRevit (`show_result()`, `OpeningsPlace_result.xaml`,
+  `ResultWindow`): *Openings created* (riepilogo, elenco dei fori nuovi, parametri non scritti, modelli letti,
+  *Select new openings* li seleziona e li mostra dopo la chiusura), *No new openings needed* (stessi conteggi, cosi'
+  si vede perche') o *Nothing to do* (selezione senza elementi utili). Openings non apre piu' il pannello di output.
 - `OpeningsPlace_ui.py` si importa dentro `place_main()`: New Report e Last Report non lo caricano.
 - **Strutture** (anche nella modalita' normale e nell'ambito del New Report): foro a solaio per elementi MEP verticali
   (oltre 45 gradi), a muro per gli altri, con asse perpendicolare alla trave o, per i pilastri, lungo l'elemento MEP;

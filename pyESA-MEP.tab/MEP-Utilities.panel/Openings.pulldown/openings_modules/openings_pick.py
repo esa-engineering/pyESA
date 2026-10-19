@@ -18,6 +18,8 @@ class HostFilter(ISelectionFilter):
     def AllowReference(self, reference, point):
         host = ctx.doc.GetElement(reference.ElementId)
         if isinstance(host, DB.RevitLinkInstance):
+            if source_by_link(id_value(host.Id)) is None:
+                return False  # link non caricato o tolto nella finestra di Place
             link_doc = host.GetLinkDocument()
             element = link_doc.GetElement(reference.LinkedElementId) if link_doc is not None else None
         else:
@@ -59,13 +61,51 @@ class MepPickFilter(ISelectionFilter):
         return False
 
 
+class LinkedMepPickFilter(ISelectionFilter):
+    """Tubi, canali, passerelle e conduit rettilinei dei link RVT letti (caricati e non tolti in Place)."""
+
+    def AllowElement(self, element):
+        return isinstance(element, DB.RevitLinkInstance)
+
+    def AllowReference(self, reference, point):
+        link = ctx.doc.GetElement(reference.ElementId)
+        source = source_by_link(id_value(link.Id)) if isinstance(link, DB.RevitLinkInstance) else None
+        return source is not None and is_straight_mep(source.doc.GetElement(reference.LinkedElementId))
+
+
+def host_has_meps():
+    """Il modello aperto ha elementi MEP propri (modello MEP con i fori) o no (modello dei soli fori, MEP nei link)."""
+    categories = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](MEP_CATEGORIES))
+    return DB.FilteredElementCollector(ctx.doc).WherePasses(categories).WhereElementIsNotElementType()\
+        .FirstElement() is not None
+
+
 def pick_meps():
+    """Elementi MEP scelti (MepRef). Revit non seleziona insieme elementi del modello e dei link: se il modello ha
+    MEP propri si scelgono quelli, altrimenti quelli dei link."""
+    if host_has_meps():
+        try:
+            refs = ctx.uidoc.Selection.PickObjects(ObjectType.Element, MepPickFilter(),
+                                                   "Openings: select pipes, ducts, cable trays and conduits, then "
+                                                   "Finish")
+        except OperationCanceledException:
+            script.exit()
+        return [mep_ref(ctx.doc.GetElement(r.ElementId), host_source()) for r in refs]
     try:
-        refs = ctx.uidoc.Selection.PickObjects(ObjectType.Element, MepPickFilter(),
-                                           "Openings: select pipes, ducts, cable trays and conduits, then Finish")
+        refs = ctx.uidoc.Selection.PickObjects(ObjectType.LinkedElement, LinkedMepPickFilter(),
+                                               "Openings: select pipes, ducts, cable trays and conduits in the linked "
+                                               "models, then Finish")
     except OperationCanceledException:
         script.exit()
-    return [ctx.doc.GetElement(r.ElementId) for r in refs]
+    meps = []
+    for r in refs:
+        source = source_by_link(id_value(r.ElementId))
+        if source is None:
+            continue
+        mep = mep_ref(source.doc.GetElement(r.LinkedElementId), source)
+        if mep not in meps:
+            meps.append(mep)
+    return meps
 
 
 def plan_right(view):
@@ -137,6 +177,7 @@ def split_selection():
     """Elementi gia' selezionati, divisi per destinazione:
     - fori gestiti, ed elementi MEP che rimandano ad almeno un foro esistente: check;
     - elementi MEP rettilinei senza foro (anche Not Associated), muri/solai/strutture del modello host: Place.
+    Elementi MEP come MepRef (solo quelli del modello: gli elementi dei link non si preselezionano).
     Ritorna (fori, MEP associati, MEP da forare, elementi attraversati, numero di elementi non usati)."""
     managed = set(code_of(o) for o in existing_openings())
     openings, linked, meps, hosts, ignored = [], [], [], [], 0
@@ -148,9 +189,9 @@ def split_selection():
             openings.append(element)
         elif isinstance(element, MEP_CLASSES):
             if any(c in managed for c in split_list(get_text(element, ctx.id_param))):
-                linked.append(element)
+                linked.append(mep_ref(element, host_source()))
             elif is_straight_mep(element):
-                meps.append(element)
+                meps.append(mep_ref(element, host_source()))
             else:
                 ignored += 1
         elif element.Category is not None and id_value(element.Category.Id) in HOST_KINDS:
@@ -171,7 +212,7 @@ def selection_for_check():
         if code_of(element) in managed:
             openings.append(element)
         elif isinstance(element, MEP_CLASSES):
-            meps.append(element)
+            meps.append(mep_ref(element, host_source()))
         elif element.Category is not None and id_value(element.Category.Id) in HOST_KINDS:
             hosts.append(((0, id_value(element.Id)), element, None, "Host model"))
     return meps, openings, hosts

@@ -1,9 +1,9 @@
 title: New Report
 tooltip: >-
-  Checks the openings against their MEP elements and writes statuses and Ids (Valid, To Be Refreshed, Not
-  Associated). Scope: whole model, MEP selection or ARC selection. The MEP elements of the report are also checked for
-  crossings without an opening.
+  Checks the state of the openings already in the model against their MEP elements (also in linked models) and
+  writes statuses and Ids (Valid, To Be Refreshed, Not Associated). Scope: whole model, MEP selection, ARC selection
+  or area. It does not look for new openings: use Place&Check for that.
 
-  Then a Text Report (export to Excel) or an Interactive Report to select elements and create, recreate, move or
-  delete openings.
+  Then a Text Report (export to Excel) or an Interactive Report to select elements and recreate, move or delete
+  openings.
 author: Matteo Maiorano

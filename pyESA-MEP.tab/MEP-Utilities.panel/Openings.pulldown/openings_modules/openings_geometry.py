@@ -37,23 +37,228 @@ def unit(vector):
     return vector.Normalize() if vector.GetLength() > 1e-9 else None
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# Modelli letti (host e link RVT caricati) e riferimenti agli elementi MEP (MepRef)
+# ----------------------------------------------------------------------------------------------------------------
+class Source(object):
+    """Modello da cui si leggono elementi: l'host (link_id 0, transform None, key "") o un'istanza di link caricata.
+    key: nome del modello nei riferimenti ("PRJ_MEC"; "PRJ_MEC#2" se il link e' inserito piu' volte)."""
+
+    def __init__(self, doc, transform, link_id, key, path):
+        self.doc, self.transform, self.link_id, self.key, self.path = doc, transform, link_id, key, path
+
+
+def doc_path(document):
+    """Percorso del file: quello del centrale per i modelli condivisi, altrimenti quello del file."""
+    try:
+        if document.IsWorkshared:
+            central = document.GetWorksharingCentralModelPath()
+            if central is not None:
+                return DB.ModelPathUtils.ConvertModelPathToUserVisiblePath(central)
+    except Exception:
+        pass
+    return document.PathName or ""
+
+
+def element_name(element):
+    try:
+        return element.Name
+    except Exception:
+        return DB.Element.Name.GetValue(element)
+
+
+def link_sources():
+    """(modelli letti [Source], host per primo; {nome: [istanze]} dei link non caricati; titoli di link diversi
+    con lo stesso nome; link caricati ma non letti [Source], tolti in Place: ctx.skipped_links). Letti una volta per
+    controllo (reset_models). Chiave = titolo del file linkato, uguale a doc.Title nei modelli MEP / ARC; con piu'
+    istanze dello stesso link "<titolo>#<n>", n in ordine di UniqueId."""
+    if ctx.sources is None:
+        loaded = [Source(ctx.doc, None, 0, "", doc_path(ctx.doc))]
+        by_title, unloaded = {}, {}
+        for link in DB.FilteredElementCollector(ctx.doc).OfClass(DB.RevitLinkInstance):
+            link_doc = link.GetLinkDocument()
+            if link_doc is None:
+                name = element_name(ctx.doc.GetElement(link.GetTypeId())) or "?"
+                if name.lower().endswith(".rvt"):
+                    name = name[:-4]
+                unloaded.setdefault(name, []).append(id_value(link.Id))
+            else:
+                by_title.setdefault(link_doc.Title, []).append((link, link_doc))
+        clashes, skipped = [], []
+        for title in sorted(by_title):
+            links = sorted(by_title[title], key=lambda pair: pair[0].UniqueId)
+            if len(set(doc_path(d) for _, d in links)) > 1:
+                clashes.append(title)  # file diversi con lo stesso nome: i riferimenti non li distinguono
+            for number, (link, link_doc) in enumerate(links, 1):
+                key = title if len(links) == 1 else "{}#{}".format(title, number)
+                source = Source(link_doc, link.GetTotalTransform(), id_value(link.Id), key, doc_path(link_doc))
+                (skipped if key in ctx.skipped_links else loaded).append(source)
+        ctx.sources = (loaded, unloaded, clashes, skipped)
+    return ctx.sources
+
+
+def loaded_links():
+    """[(chiave, percorso)] di tutti i link caricati, anche quelli tolti in Place (per la finestra di Place)."""
+    loaded, _, _, skipped = link_sources()
+    return sorted((s.key, s.path) for s in loaded[1:] + skipped)
+
+
+def model_sources():
+    """(documento, transform o None, id del link o 0) del modello host e dei link RVT caricati."""
+    return [(s.doc, s.transform, s.link_id) for s in link_sources()[0]]
+
+
+def source_by_key(key):
+    for source in link_sources()[0]:
+        if source.key == key:
+            return source
+    return None
+
+
+def source_by_link(link_id):
+    for source in link_sources()[0]:
+        if source.link_id == link_id:
+            return source
+    return None
+
+
+def models_lines():
+    """Righe del report: modelli letti (con il percorso), link non caricati, nomi doppi."""
+    loaded, unloaded, clashes, skipped = link_sources()
+    lines = ["Models read: {}.".format("; ".join(
+        "{} ({})".format(s.key or "this model", s.path or "not saved") for s in loaded))]
+    if skipped:
+        lines.append("Links not read (unticked in Place): {}.".format(", ".join(sorted(s.key for s in skipped))))
+    if unloaded:
+        lines.append("Links not loaded (their elements are not read): {}.".format(", ".join(sorted(unloaded))))
+    if clashes:
+        lines.append("Different linked files with the same name: {}. References use the file name, so they cannot "
+                     "tell them apart: rename one of the files.".format(", ".join(clashes)))
+    return lines
+
+
+class MepRef(object):
+    """Elemento MEP rettilineo dell'host o di un link, con curva e sezione in coordinate host. text e' il
+    riferimento scritto sul foro (ref_text); due MepRef sono uguali se hanno lo stesso text."""
+
+    def __init__(self, element, source):
+        self.element, self.source = element, source
+        self.doc, self.transform = source.doc, source.transform
+        self.text = ref_text(source.key, id_value(element.Id))
+        self._curve = None
+        self._section = None
+
+    def __eq__(self, other):
+        return isinstance(other, MepRef) and other.text == self.text
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.text)
+
+    @property
+    def is_host(self):
+        return self.source.link_id == 0
+
+    @property
+    def IsValidObject(self):
+        return self.element.IsValidObject
+
+    @property
+    def curve(self):
+        if self._curve is None:
+            curve = self.element.Location.Curve
+            self._curve = curve.CreateTransformed(self.transform) if self.transform is not None else curve
+        return self._curve
+
+    @property
+    def direction(self):
+        return self.curve.Direction
+
+    @property
+    def category_name(self):
+        return self.element.Category.Name if self.element.Category else "Element"
+
+    def box(self):
+        """Bounding box in coordinate host (allineato agli assi host), o None."""
+        box = self.element.get_BoundingBox(None)
+        if box is None or self.transform is None:
+            return box
+        corners = [self.transform.OfPoint(DB.XYZ(x, y, z)) for x in (box.Min.X, box.Max.X)
+                   for y in (box.Min.Y, box.Max.Y) for z in (box.Min.Z, box.Max.Z)]
+        result = DB.BoundingBoxXYZ()
+        result.Min = DB.XYZ(min(c.X for c in corners), min(c.Y for c in corners), min(c.Z for c in corners))
+        result.Max = DB.XYZ(max(c.X for c in corners), max(c.Y for c in corners), max(c.Z for c in corners))
+        return result
+
+    def select_ids(self):
+        """Id selezionabili nel modello aperto: solo gli elementi dell'host (quelli dei link non si selezionano per
+        Id)."""
+        return [id_value(self.element.Id)] if self.is_host else []
+
+
+def mep_ref(element, source):
+    """MepRef dell'elemento, uno solo per riferimento finche' non si rileggono i modelli (sezione calcolata una
+    volta)."""
+    text = ref_text(source.key, id_value(element.Id))
+    ref = ctx.mep_cache.get(text)
+    if ref is None:
+        ref = ctx.mep_cache[text] = MepRef(element, source)
+    return ref
+
+
+def host_source():
+    return link_sources()[0][0]
+
+
+def mep_by_ref(text):
+    """MepRef di un riferimento scritto su un foro, o None se l'elemento non c'e' (cancellato, non piu' MEP, link
+    non caricato: vedi link_not_loaded)."""
+    model, number = split_ref(text)
+    source = source_by_key(model)
+    if source is None:
+        return None
+    try:
+        element = source.doc.GetElement(DB.ElementId(int(number)))
+    except Exception:
+        return None
+    return mep_ref(element, source) if isinstance(element, MEP_CLASSES) else None
+
+
+def link_not_loaded(text):
+    """Il riferimento e' di un link non caricato, o non piu' inserito nel modello: l'elemento non si puo' leggere,
+    ma non e' detto che sia stato cancellato. Non si toglie dal foro."""
+    model, _ = split_ref(text)
+    return bool(model) and source_by_key(model) is None
+
+
 def mep_section(mep):
     """Sezione esterna, isolamento compreso, letta dalla geometria: (asse X, asse Y, semi-larghezza, semi-altezza,
     tonda). Gli assi sono quelli del connettore, perpendicolari al tratto; le misure vengono dai solidi di elemento
-    e isolamento, cosi' valgono anche per canali ruotati e passerelle di costa."""
-    conn = [c for c in mep.ConnectorManager.Connectors if c.ConnectorType == DB.ConnectorType.End][0]
+    e isolamento, cosi' valgono anche per canali ruotati e passerelle di costa. Misure lette nel documento
+    dell'elemento, assi riportati in coordinate host (il transform del link e' rigido). Calcolata una volta per
+    MepRef."""
+    if mep._section is not None:
+        return mep._section
+    element, source_doc = mep.element, mep.doc
+    conn = [c for c in element.ConnectorManager.Connectors if c.ConnectorType == DB.ConnectorType.End][0]
     bx, by = conn.CoordinateSystem.BasisX, conn.CoordinateSystem.BasisY
-    solids = solids_of(mep)
-    if isinstance(mep, (Pipe, Duct)):
-        for insulation_id in DB.InsulationLiningBase.GetInsulationIds(ctx.doc, mep.Id):
-            solids.extend(solids_of(ctx.doc.GetElement(insulation_id)))
-    origin = mep.Location.Curve.GetEndPoint(0)
+    solids = solids_of(element)
+    if isinstance(element, (Pipe, Duct)):
+        for insulation_id in DB.InsulationLiningBase.GetInsulationIds(source_doc, element.Id):
+            solids.extend(solids_of(source_doc.GetElement(insulation_id)))
+    origin = element.Location.Curve.GetEndPoint(0)
     points = solid_points(solids)
     if not points:
         raise ValueError("no geometry")
     xs = [p.Subtract(origin).DotProduct(bx) for p in points]
     ys = [p.Subtract(origin).DotProduct(by) for p in points]
-    return bx, by, (max(xs) - min(xs)) / 2.0, (max(ys) - min(ys)) / 2.0, conn.Shape == DB.ConnectorProfileType.Round
+    if mep.transform is not None:
+        bx, by = mep.transform.OfVector(bx), mep.transform.OfVector(by)
+    mep._section = (bx, by, (max(xs) - min(xs)) / 2.0, (max(ys) - min(ys)) / 2.0,
+                    conn.Shape == DB.ConnectorProfileType.Round)
+    return mep._section
 
 
 def section_points(center, section):
@@ -106,7 +311,7 @@ def sizes(items, frame):
 
 
 def crossing_item(mep, section, p0, p1, frame, kind):
-    direction = mep.Location.Curve.Direction
+    direction = mep.direction
     return {"mep": mep, "p0": p0, "p1": p1, "mid": p0.Add(p1).Divide(2.0), "frame": frame, "kind": kind,
             "points": section_points(p0, section) + section_points(p1, section), "discipline": discipline(mep),
             "round": section[4] and abs(direction.DotProduct(frame[2])) > ROUND_COS, "section": section}
@@ -179,7 +384,33 @@ def create_opening(data, frame, kind, symbols, meps, state, missing):
 
 
 def is_straight_mep(element):
+    """Tubo, canale, passerella o conduit rettilineo (elemento Revit o MepRef)."""
+    element = element_of(element)
     return isinstance(element, MEP_CLASSES) and isinstance(element.Location.Curve, DB.Line)
+
+
+def meps_in_outline(outline_of):
+    """MepRef degli elementi MEP rettilinei, dell'host e dei link caricati, che toccano l'outline. outline_of(transform
+    del modello o None) -> DB.Outline nelle coordinate di quel modello."""
+    categories = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](MEP_CATEGORIES))
+    found = []
+    for source in link_sources()[0]:
+        for element in DB.FilteredElementCollector(source.doc).WherePasses(categories)\
+                .WherePasses(DB.BoundingBoxIntersectsFilter(outline_of(source.transform)))\
+                .WhereElementIsNotElementType():
+            if is_straight_mep(element):
+                found.append(mep_ref(element, source))
+    return found
+
+
+def outline_in(low, high, transform):
+    """Outline (assi del modello) che contiene il box host low-high, portato nel modello con transform."""
+    corners = [DB.XYZ(x, y, z) for x in (low.X, high.X) for y in (low.Y, high.Y) for z in (low.Z, high.Z)]
+    if transform is not None:
+        inverse = transform.Inverse
+        corners = [inverse.OfPoint(c) for c in corners]
+    return DB.Outline(DB.XYZ(min(c.X for c in corners), min(c.Y for c in corners), min(c.Z for c in corners)),
+                      DB.XYZ(max(c.X for c in corners), max(c.Y for c in corners), max(c.Z for c in corners)))
 
 
 def hosts_from_meps(meps):
@@ -189,7 +420,7 @@ def hosts_from_meps(meps):
                                            DB.BuiltInCategory.OST_StructuralFraming,
                                            DB.BuiltInCategory.OST_StructuralColumns,
                                            DB.BuiltInCategory.OST_StructuralFoundation])
-    boxes = [m.get_BoundingBox(None) for m in meps]
+    boxes = [m.box() for m in meps]  # coordinate host
     boxes = [b for b in boxes if b is not None]
     hosts, seen = [], set()
     for source_doc, transform, link_id in model_sources():
@@ -302,10 +533,8 @@ def hosts_in_area(area):
 
 
 def meps_in_area(area):
-    """Elementi MEP rettilinei del modello host che toccano l'area (anche solo in parte)."""
-    categories = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](MEP_CATEGORIES))
-    return [e for e in DB.FilteredElementCollector(ctx.doc).WherePasses(categories).WhereElementIsNotElementType()
-            .WherePasses(DB.BoundingBoxIntersectsFilter(area_outline(area))) if is_straight_mep(e)]
+    """Elementi MEP rettilinei (MepRef) dell'host e dei link caricati che toccano l'area (anche solo in parte)."""
+    return meps_in_outline(lambda transform: area_outline(area, transform))
 
 
 def host_normal(element, transform, point):
@@ -330,14 +559,12 @@ def crossing_normal(element, transform, point, kind, direction):
 
 
 def mep_near(solids):
-    """Elementi MEP rettilinei del modello host vicini ai solidi (filtro sul bounding box)."""
+    """Elementi MEP rettilinei (MepRef) dell'host e dei link caricati vicini ai solidi (filtro sul bounding box;
+    solidi in coordinate host)."""
     points = solid_points(solids)
     low = DB.XYZ(min(p.X for p in points), min(p.Y for p in points), min(p.Z for p in points))
     high = DB.XYZ(max(p.X for p in points), max(p.Y for p in points), max(p.Z for p in points))
-    box_filter = DB.BoundingBoxIntersectsFilter(DB.Outline(low, high))
-    categories = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](MEP_CATEGORIES))
-    return [e for e in DB.FilteredElementCollector(ctx.doc).WherePasses(categories).WherePasses(box_filter)
-            .WhereElementIsNotElementType() if isinstance(e, MEP_CLASSES) and isinstance(e.Location.Curve, DB.Line)]
+    return meps_in_outline(lambda transform: outline_in(low, high, transform))
 
 
 def inside_existing(point, boxes):
@@ -351,16 +578,6 @@ def inside_existing(point, boxes):
 ADJACENT_SEARCH = 1000.0 / MM_PER_FT  # margine attorno all'elemento scelto in cui si cercano gli strati vicini
 MAX_LAYER = 1000.0 / MM_PER_FT  # strato attraversato per piu' di cosi': l'elemento MEP ci corre dentro, non conta
 PARALLEL_COS = 0.98             # strati di muro paralleli all'elemento scelto entro circa 11 gradi
-
-
-def model_sources():
-    """(documento, transform o None, id del link o 0) del modello host e dei link RVT caricati."""
-    sources = [(ctx.doc, None, 0)]
-    for link in DB.FilteredElementCollector(ctx.doc).OfClass(DB.RevitLinkInstance):
-        link_doc = link.GetLinkDocument()
-        if link_doc is not None:
-            sources.append((link_doc, link.GetTotalTransform(), id_value(link.Id)))
-    return sources
 
 
 def neighbours(solids, kind):
@@ -445,10 +662,10 @@ def extend_through(p0, p1, layers, options, kind, w):
 
 def find_crossings(hosts, stats, only=None, keep_existing=False, progress=None, area=None):
     """Attraversamenti degli elementi MEP con muri, solai e strutture, allungati attraverso gli strati a contatto
-    (muri o solai separati di una struttura composita). only: id degli elementi MEP da considerare (modalita'
-    inversa), None = tutti quelli vicini. Quelli che hanno gia' un foro si saltano (Place) o, con keep_existing (check),
-    restano con item["opening"] = il foro che li contiene. progress(i, n): avanzamento sugli elementi attraversati.
-    area: solo gli attraversamenti dentro l'area (crossing_in_area), gli altri contati in stats["outside_area"]."""
+    (muri o solai separati di una struttura composita). only: riferimenti (MepRef.text) degli elementi MEP da
+    considerare (modalita' inversa), None = tutti quelli vicini, dell'host e dei link. Quelli che hanno gia' un
+    foro si saltano (Place) o, con keep_existing (check), restano con item["opening"] = il foro che li contiene.
+    progress(i, n): avanzamento sugli elementi attraversati. area: solo gli attraversamenti dentro l'area (crossing_in_area), gli altri contati in stats["outside_area"]."""
     boxes = []
     for opening in existing_openings():
         box = opening.get_BoundingBox(None)
@@ -471,14 +688,13 @@ def find_crossings(hosts, stats, only=None, keep_existing=False, progress=None, 
         layers = neighbours(solids, host_kind) if host_kind != "auto" else []
         labels = dict((layer[0], layer[1]) for layer in layers)
         for mep in mep_near(solids):
-            if only is not None and id_value(mep.Id) not in only:
+            if only is not None and mep.text not in only:
                 continue
-            line = mep.Location.Curve
+            line = mep.curve
             try:
                 section = mep_section(mep)
             except Exception:
-                stats["problems"].append("{} {}: section not readable".format(mep.Category.Name,
-                                                                               id_value(mep.Id)))
+                stats["problems"].append("{} {}: section not readable".format(mep.category_name, mep.text))
                 continue
             for solid in solids:
                 result = solid.IntersectWithCurve(line, options)
@@ -533,10 +749,10 @@ def merge_overlapping(items):
     gap = max(ctx.settings["layer_gap_mm"], 5.0) / MM_PER_FT
     merged = []
     for item in items:
-        direction = item["mep"].Location.Curve.Direction
+        direction = item["mep"].direction
         target = None
         for other in merged:
-            if other["mep"].Id != item["mep"].Id or other["kind"] != item["kind"]:
+            if other["mep"] != item["mep"] or other["kind"] != item["kind"]:
                 continue
             if abs(other["frame"][2].DotProduct(item["frame"][2])) < PARALLEL_COS:
                 continue
@@ -619,7 +835,7 @@ def opening_kind(instance, meps):
         if ctx.settings[setting] == name:
             return key
     shape = "round" if read_length(instance, PARAM_DIAMETER) else "rect"
-    vertical = any(abs(m.Location.Curve.Direction.Z) > VERTICAL_SIN for m in meps)
+    vertical = any(abs(m.direction.Z) > VERTICAL_SIN for m in meps)
     return ("floor" if vertical else "wall"), shape
 
 
@@ -660,8 +876,8 @@ def half_sizes(data):
 def recross(mep, frame, data, limit_reach=True):
     """Attraversamento dell'elemento MEP con lo spessore del foro (il foro fa da muro: piano per il centro,
     perpendicolare a w, spessore = profondita'). None se non lo attraversa piu' o (limit_reach) se e' uscito dal foro
-    oltre la distanza di unione."""
-    line = mep.Location.Curve
+    oltre la distanza di unione. mep: MepRef (curva in coordinate host)."""
+    line = mep.curve
     if not isinstance(line, DB.Line):
         return None
     u, v, w = frame
@@ -739,7 +955,7 @@ def scanned_plane(meps, frame, old, scanned):
     tol = MOVE_TOL_MM / MM_PER_FT
     lows, highs = [], []
     for mep in meps:
-        for item in scanned.get(id_value(mep.Id), []):
+        for item in scanned.get(mep.text, []):
             if abs(item["frame"][2].DotProduct(w)) < 0.999:
                 continue
             a, b = sorted((item["p0"].Subtract(old["center"]).DotProduct(w),

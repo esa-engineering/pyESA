@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Openings Place" Width="540" Height="500" MinWidth="440" MinHeight="380"
+        Title="Openings Place&amp;Check" Width="540" Height="500" MinWidth="440" MinHeight="380"
         WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip">
     <Window.Resources>
         <Style x:Key="SectionHeader" TargetType="TextBlock">
@@ -112,7 +112,7 @@
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionHeader}" Foreground="Gray" Text="ℹ NOTE"/>
                         <TextBlock Style="{StaticResource HintText}"
-                                   Text="Openings are created in one transaction (one Undo). The report lists every opening with its crossed element, size and MEP elements."/>
+                                   Text="Openings are created in one transaction (one Undo). Then a window lists every new opening with its crossed element, size and MEP elements."/>
                     </StackPanel>
                 </Border>
             </StackPanel>

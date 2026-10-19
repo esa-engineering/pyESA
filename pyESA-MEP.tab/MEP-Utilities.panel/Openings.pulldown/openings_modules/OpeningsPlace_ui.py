@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Finestre di Openings Place: cosa selezionare (quando non c'e' selezione) e anteprima prima di creare i fori.
-Importato solo da place_main(); nessun documento o output a livello di modulo (Rocket mode)."""
+"""Finestre di Openings Place&Check: cosa selezionare e quali link leggere (quando non c'e' selezione), anteprima
+prima di creare i fori, esito (anche "nessun foro da aggiungere"). Nessun accesso a Revit. Importato solo da
+place_main(); nessun documento o output a livello di modulo (Rocket mode)."""
 import clr
 clr.AddReference("PresentationFramework")
 clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
 from System.IO import File
-from System.Windows import Visibility
+from System.Windows import FontWeights, GridLength, TextWrapping, Thickness, VerticalAlignment, Visibility
+from System.Windows.Controls import CheckBox, ColumnDefinition, Grid, TextBlock
 from System.Windows.Markup import XamlReader
 
 PICK_HOSTS, PICK_MEPS, PICK_AREA = "hosts", "meps", "area"
@@ -21,20 +23,105 @@ def _load(xaml_path):
 
 
 class PickWindow(object):
-    """Cosa selezionare: muri, solai e strutture, elementi MEP, oppure un'area. show() ritorna PICK_HOSTS,
-    PICK_MEPS, PICK_AREA o None se annullata."""
+    """Cosa selezionare (muri, solai e strutture, elementi MEP, oppure un'area) e quali link leggere. links: [(chiave,
+    percorso)] dei link caricati; skipped: chiavi da non spuntare. show() ritorna PICK_HOSTS, PICK_MEPS, PICK_AREA o
+    None se annullata; dopo, self.skipped = chiavi dei link non spuntati."""
 
-    def __init__(self, xaml_path, last_pick, settings_text):
+    def __init__(self, xaml_path, last_pick, settings_text, links=(), skipped=()):
         self.window = _load(xaml_path)
         find = self.window.FindName
         self.radios = {PICK_HOSTS: find("HostsRadio"), PICK_MEPS: find("MepsRadio"), PICK_AREA: find("AreaRadio")}
         self.radios.get(last_pick, self.radios[PICK_HOSTS]).IsChecked = True
         find("SettingsInfo").Text = settings_text
+        self.links = []  # CheckBox con la chiave del link in Tag
+        for key, path in links:
+            box = CheckBox()
+            label = TextBlock()
+            label.Text = u"{}  ({})".format(key, path or "path unknown")
+            label.TextWrapping = TextWrapping.Wrap
+            box.Content = label
+            box.Tag = key
+            box.IsChecked = key not in skipped
+            find("LinksList").Items.Add(box)
+            self.links.append(box)
+        if not self.links:
+            for name in ("LinksList", "LinksButtons"):
+                find(name).Visibility = Visibility.Collapsed
+            find("NoLinksText").Visibility = Visibility.Visible
+        find("SelectAllButton").Click += lambda sender, args: self._tick_all(True)
+        find("DeselectAllButton").Click += lambda sender, args: self._tick_all(False)
         find("OkButton").Click += self._on_ok
         self.result = None
+        self.skipped = set(skipped)
+
+    def _tick_all(self, value):
+        for box in self.links:
+            box.IsChecked = value
 
     def _on_ok(self, sender, args):
         self.result = [key for key, radio in self.radios.items() if radio.IsChecked][0]
+        self.skipped = set(box.Tag for box in self.links if not box.IsChecked)
+        self.window.DialogResult = True
+
+    def show(self):
+        self.window.ShowDialog()
+        return self.result
+
+
+def _value_row(label, value):
+    """Riga etichetta / valore (colonna fissa + colonna *), come le righe dei campi dello stile di casa."""
+    grid = Grid()
+    grid.Margin = Thickness(0, 3, 0, 3)
+    first = ColumnDefinition()
+    first.Width = GridLength(210)
+    grid.ColumnDefinitions.Add(first)
+    grid.ColumnDefinitions.Add(ColumnDefinition())
+    name = TextBlock()
+    name.Text = label
+    name.VerticalAlignment = VerticalAlignment.Center
+    text = TextBlock()
+    text.Text = u"{}".format(value)
+    text.FontWeight = FontWeights.Bold
+    text.TextWrapping = TextWrapping.Wrap
+    Grid.SetColumn(text, 1)
+    grid.Children.Add(name)
+    grid.Children.Add(text)
+    return grid
+
+
+class ResultWindow(object):
+    """Esito di Place&Check, al posto del pannello di output di pyRevit: titolo, messaggio, riepilogo [(etichetta,
+    valore)], avvisi, fori creati [testo] (ids: i loro Id), dettagli [testo]. show() ritorna True se si e' chiesto di
+    selezionare i fori creati (la selezione la fa chi chiama, dopo la chiusura)."""
+
+    def __init__(self, xaml_path, header, message, summary, openings=(), ids=(), warning="", details=()):
+        self.window = _load(xaml_path)
+        find = self.window.FindName
+        find("HeaderText").Text = header
+        find("MessageText").Text = message
+        for label, value in summary:
+            find("SummaryPanel").Children.Add(_value_row(label, value))
+        if warning:
+            find("WarningText").Text = warning
+        else:
+            find("WarningBorder").Visibility = Visibility.Collapsed
+        for line in openings:
+            row = TextBlock()
+            row.Text = line
+            row.TextWrapping = TextWrapping.Wrap
+            find("OpeningsList").Items.Add(row)
+        if not openings:
+            find("OpeningsBorder").Visibility = Visibility.Collapsed
+        find("DetailsText").Text = u"\n".join(details)
+        select = find("SelectButton")
+        if ids:
+            select.Click += self._on_select
+        else:
+            select.Visibility = Visibility.Collapsed
+        self.result = False
+
+    def _on_select(self, sender, args):
+        self.result = True
         self.window.DialogResult = True
 
     def show(self):

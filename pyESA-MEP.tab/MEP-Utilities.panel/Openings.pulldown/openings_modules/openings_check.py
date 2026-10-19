@@ -3,29 +3,46 @@
 scrittura degli stati e degli Id, scansione degli attraversamenti senza foro (Missing openings)."""
 from openings_pick import *  # noqa: F401,F403
 
+# foro con elementi di link non caricati: lo stato scritto resta quello che c'e' (stato interno corrispondente)
+KEEP_WRITTEN = {VALID: OK, TO_REFRESH: MISALIGNED, NOT_ASSOCIATED: CHANGED}
+
+
+def keep_status(result, instance):
+    """Foro che cita elementi di link non caricati: non si sa dove siano, quindi lo stato scritto non cambia e il foro
+    non si ricrea ne' si unisce ad altri (result["unloaded"] non vuoto). Gli altri controlli restano nelle note."""
+    if result["unloaded"]:
+        models = sorted(set(split_ref(t)[0] for t in result["unloaded"]))
+        result["state"] = KEEP_WRITTEN.get(get_text(instance, ctx.status_param) or VALID, OK)
+        result["notes"].insert(0, "Link not loaded: {}. Status kept as it is; load the link and run New Report "
+                                  "again.".format(", ".join(models)))
+    return result
+
 
 def check_opening(instance, extra=(), scanned=None):
     """Confronto di un foro con i suoi elementi MEP. Ritorna il dict del risultato; "elements" ha una riga per ogni
-    Id elencato nel foro, con il suo stato (ELEMENT_*). extra: elementi MEP che lo attraversano senza esservi
-    associati (scansione del check): se lo attraversano davvero entrano nel foro ("added"). scanned: {id elemento:
-    attraversamenti della scansione}, per ricalcolare la profondita' (scanned_plane)."""
+    riferimento elencato nel foro, con il suo stato (ELEMENT_*). extra: elementi MEP (MepRef) che lo attraversano
+    senza esservi associati (scansione del check): se lo attraversano davvero entrano nel foro ("added"). scanned:
+    {riferimento: attraversamenti della scansione}, per ricalcolare la profondita' (scanned_plane)."""
     listed = split_list(get_text(instance, ctx.id_param))
     found = []
     result = {"instance": instance, "code": code_of(instance), "keep": [], "notes": [], "state": OK, "new": None,
-              "elements": [], "stale": []}
+              "elements": [], "stale": [], "unloaded": []}
 
     def element_row(text, mep, state):
         result["elements"].append({"id": text, "element": mep, "name": mep_name(mep) if mep is not None else
                                    "Element", "state": state})
 
     for text in listed:
-        element = element_by_id(text)
-        if element is None or not isinstance(element, MEP_CLASSES):
+        mep = mep_by_ref(text)
+        if mep is not None:
+            found.append(mep)
+        elif link_not_loaded(text):
+            result["unloaded"].append(text)  # tenuto sul foro: l'elemento c'e' ancora, probabilmente
+            element_row(text, None, ELEMENT_LINK_NOT_LOADED)
+        else:
             result["notes"].append("{} no longer exists".format(text))
             result["stale"].append(text)  # Id vecchio: tolto dal foro alla scrittura
             element_row(text, None, ELEMENT_DELETED)
-        else:
-            found.append(element)
     kind, shape = opening_kind(instance, found)
     frame = opening_frame(instance, kind, shape)
     old = current_data(instance, kind, shape)
@@ -34,10 +51,10 @@ def check_opening(instance, extra=(), scanned=None):
     result["misplaced"] = []  # (elemento, attraversamento): fuori dal foro, il foro si puo' spostare su di lui
     listed_set = set(listed)
     # elementi che attraversano il foro senza esservi associati (trovati dalla scansione del check): si associano
-    extra = [m for m in extra if str(id_value(m.Id)) not in listed_set]
+    extra = [m for m in extra if m.text not in listed_set]
     result["added"] = []
     for mep in found + extra:
-        text = str(id_value(mep.Id))
+        text = mep.text
         if text not in listed_set:
             # non era associato: entra solo se attraversa davvero il foro
             try:
@@ -96,13 +113,13 @@ def check_opening(instance, extra=(), scanned=None):
     result["groups"] = [items]  # fori che ne prendono il posto, se ricreato (due se MEC ed ELE vanno separati)
     if not items:
         result["state"] = OBSOLETE
-        return result
+        return keep_status(result, instance)
     # piano e profondita': dalla scansione del check se c'e' (strati nuovi o tolti), altrimenti quelli attuali
     result["plane"] = scanned_plane(result["keep"], frame, old, scanned)
     new = rebuilt(items, frame, result["plane"][0], result["plane"][1])
     result["new"] = new
     # elementi elencati spariti, non piu' attraversanti o illeggibili (quelli aggiunti non contano)
-    lost = len([m for m in result["keep"] if str(id_value(m.Id)) in listed_set]) < len(listed)
+    lost = len([m for m in result["keep"] if m.text in listed_set]) < len(listed)
     diffs = differences(old, new)
     result["notes"].extend(diffs)
     if lost or not all_inside:
@@ -113,13 +130,14 @@ def check_opening(instance, extra=(), scanned=None):
         result["state"] = PARTIAL if kept and ctx.settings["misaligned"] else CHANGED
     elif diffs:
         result["state"] = MISALIGNED if ctx.settings["misaligned"] else CHANGED
-    return result
+    return keep_status(result, instance)
 
 
 def linked_openings(openings, sel_meps, sel_openings):
-    """Fori legati agli elementi scelti: i fori stessi, quelli elencati sui MEP e quelli che elencano i MEP."""
-    mep_ids = set(str(id_value(m.Id)) for m in sel_meps)
-    codes = set(c for m in sel_meps for c in split_list(get_text(m, ctx.id_param)))
+    """Fori legati agli elementi scelti (MepRef): i fori stessi, quelli elencati sui MEP del modello e quelli che
+    elencano i MEP."""
+    mep_ids = set(m.text for m in sel_meps)
+    codes = set(c for m in sel_meps if m.is_host for c in split_list(get_text(m.element, ctx.id_param)))
     wanted = set(id_value(o.Id) for o in sel_openings)
     return [o for o in openings if id_value(o.Id) in wanted or code_of(o) in codes or
             mep_ids & set(split_list(get_text(o, ctx.id_param)))]
@@ -140,9 +158,10 @@ class CheckScope(object):
         self.released = dict(released or {})
 
     def release(self, element, codes):
-        text = str(id_value(element.Id))
+        """element: MepRef."""
+        text = element.text
         self.released[text] = sorted(set(self.released.get(text, [])) | set(codes), key=int)
-        if all(m.Id != element.Id for m in self.meps):
+        if all(m != element for m in self.meps):
             self.meps.append(element)
 
     def add(self, codes):
@@ -172,7 +191,7 @@ def discipline_checks(results):
     I fori Changed e Partial (elementi tolti o usciti) non entrano nelle unioni: altrimenti un elemento spostato vicino a un
     foro in ordine lo renderebbe Not Associated. Ricreato il foro Changed, il check dopo propone l'unione. Cosi' i
     gruppi hanno solo fori To Be Refreshed e si ricreano tutti insieme o per niente."""
-    live = [r for r in results if r["state"] != OBSOLETE and r["items"]]
+    live = [r for r in results if r["state"] != OBSOLETE and r["items"] and not r["unloaded"]]
     if ctx.settings["separate"]:
         for r in live:
             split = [[i for i in r["items"] if i["discipline"] == d] for d in ("MEC", "ELE")]
@@ -237,7 +256,7 @@ def outside_meps(r):
     """Elementi del foro che esistono ancora ma non attraversano piu' il foro (nemmeno entro la portata): Recreate non
     li include nel foro nuovo e perdono l'associazione, ma restano nell'ambito (CheckScope.release): la scansione li
     mostra in Missing openings finche' un foro nuovo non li circonda."""
-    return [m for m in r["found_meps"] if all(m.Id != k.Id for k in r["keep"])]
+    return [m for m in r["found_meps"] if all(m != k for k in r["keep"])]
 
 
 def recreate_plan(r):
@@ -245,8 +264,8 @@ def recreate_plan(r):
     if not r["items"]:
         return "Recreate: not possible, no element crosses it any more."
     lost = len(outside_meps(r))
-    lost_text = "; {} element(s) outside it lose the association and stay listed in Missing openings where they " \
-                "cross a wall or floor".format(lost) if lost else ""
+    lost_text = "; {} element(s) outside it lose the association (Place&Check finds them a new opening if they " \
+                "cross a wall or floor)".format(lost) if lost else ""
     if r.get("merge_group"):
         others = [m["code"] for m in r["merge_group"] if m is not r]
         return "Recreate: joined with opening(s) {} into one opening{}.".format(", ".join(others), lost_text)
@@ -264,7 +283,7 @@ def recreate_openings(results, keys, symbols, missing):
     for r in results:
         if r["code"] not in keys:
             continue
-        if not r["items"]:
+        if not r["items"] or r["unloaded"]:
             skipped.append(r["code"])
             continue
         if r.get("merge_group"):
@@ -305,7 +324,8 @@ def recreate_openings(results, keys, symbols, missing):
 
 
 def mep_candidates(reverse):
-    """Elementi MEP da tenere allineati: con stato o Id compilati, o citati da un foro."""
+    """Elementi MEP del modello aperto (MepRef) da tenere allineati: con stato o Id compilati, o citati da un foro.
+    Solo i MEP del modello: quelli dei link non si scrivono."""
     categories = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](MEP_CATEGORIES))
     found = {}
     for element in DB.FilteredElementCollector(ctx.doc).WherePasses(categories).WhereElementIsNotElementType():
@@ -313,7 +333,7 @@ def mep_candidates(reverse):
             continue
         text = str(id_value(element.Id))
         if text in reverse or get_text(element, ctx.status_param) or get_text(element, ctx.id_param):
-            found[text] = element
+            found[text] = mep_ref(element, host_source())
     return found
 
 
@@ -330,7 +350,7 @@ def plan_writes(results, scope):
         code = code_of(opening)
         if code in checked:
             r = checked[code]
-            lists[code] = [str(id_value(m.Id)) for m in r["found_meps"]]
+            lists[code] = [m.text for m in r["found_meps"]] + r["unloaded"]
             statuses[code] = WRITTEN[r["state"]]
         else:
             lists[code] = split_list(get_text(opening, ctx.id_param))
@@ -339,11 +359,11 @@ def plan_writes(results, scope):
     for code, ids in lists.items():
         for text in ids:
             reverse.setdefault(text, []).append(code)
-    chosen = set(str(id_value(m.Id)) for m in scope.meps)
+    chosen = set(m.text for m in scope.meps)
     relevant = set(checked) | scope.removed
     meps, stale_meps, added, updated, orphaned = [], [], 0, 0, 0
     for text, mep in mep_candidates(reverse).items():
-        current = split_list(get_text(mep, ctx.id_param))
+        current = split_list(get_text(mep.element, ctx.id_param))
         codes = reverse.get(text, [])
         if scope.ids is not None and text not in chosen and not (set(codes) | set(current)) & relevant:
             continue
@@ -366,18 +386,18 @@ def plan_writes(results, scope):
 # ----------------------------------------------------------------------------------------------------------------
 def scan_meps(scope):
     """Elementi MEP del report: quelli elencati nei fori dell'ambito, piu' quelli scelti (selezione MEP) o nell'area
-    (ambito Area, riletti a ogni controllo)."""
+    (ambito Area, riletti a ogni controllo). MepRef riletti dal riferimento: un link ricaricato mentre la finestra del
+    report e' aperta ha elementi nuovi."""
     meps = {}
-    for mep in list(scope.meps) + (meps_in_area(scope.area) if scope.area is not None else []):
-        if not mep.IsValidObject:
-            continue
-        if is_straight_mep(mep):
-            meps[id_value(mep.Id)] = mep
+    chosen = [mep_by_ref(m.text) for m in scope.meps]
+    for mep in chosen + (meps_in_area(scope.area) if scope.area is not None else []):
+        if mep is not None and mep.IsValidObject and is_straight_mep(mep):
+            meps[mep.text] = mep
     for opening in scope.openings():
         for text in split_list(get_text(opening, ctx.id_param)):
-            element = element_by_id(text)
-            if element is not None and is_straight_mep(element):
-                meps[id_value(element.Id)] = element
+            mep = mep_by_ref(text)
+            if mep is not None and is_straight_mep(mep):
+                meps[mep.text] = mep
     return list(meps.values())
 
 
@@ -391,7 +411,7 @@ def scan_crossings(scope):
     meps = scan_meps(scope)
     if not meps:
         return [], stats
-    only = set(id_value(m.Id) for m in meps)
+    only = set(m.text for m in meps)
     hosts = hosts_in_area(scope.area) if scope.area is not None else hosts_from_meps(meps)
     if not hosts:
         return [], stats
@@ -408,8 +428,8 @@ def unlisted_crossings(items):
         opening = item.get("opening")
         if opening is None:
             continue
-        mep_id = id_value(item["mep"].Id)
-        if str(mep_id) not in split_list(get_text(opening, ctx.id_param)):
+        mep_id = item["mep"].text
+        if mep_id not in split_list(get_text(opening, ctx.id_param)):
             found.setdefault(code_of(opening), {})[mep_id] = item["mep"]
     return found
 
@@ -422,7 +442,7 @@ def handled_by_opening(item, results):
     mep = item["mep"]
     tol = MOVE_TOL_MM / MM_PER_FT
     for r in results:
-        if not any(m.Id == mep.Id for m in r["found_meps"]):
+        if not any(m == mep for m in r["found_meps"]):
             continue
         if recross(mep, r["frame"], r["old"]) is None:
             continue
@@ -457,7 +477,7 @@ def missing_openings(items, results):
         data = sizes(group, frame)
         stack, host, _ = group[0]["host"]
         meps = unique_meps(group)
-        mep_ids = sorted(id_value(m.Id) for m in meps)
+        mep_ids = sorted(m.text for m in meps)
         row = {"key": "new:{}:{}".format("+".join("{}_{}".format(a, b) for a, b in stack),
                                          "-".join(str(i) for i in mep_ids)),
                "group": group, "frame": frame, "kind": kind, "data": data, "meps": meps, "mep_ids": mep_ids,

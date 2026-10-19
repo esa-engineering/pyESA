@@ -30,14 +30,14 @@ from System.Collections.Generic import List
 from pyrevit import revit, script, DB, forms
 
 MODULE_DIR = op.dirname(op.abspath(__file__))  # anche le XAML stanno qui
-TITLES = {"place": "Openings Place", "new": "Openings New Report", "last": "Openings Last Report"}
+TITLES = {"place": "Openings Place&Check", "new": "Openings New Report", "last": "Openings Last Report"}
 
 
 class Context(object):
     """Stato del comando in corso. Un solo oggetto (ctx), mai riassegnato: start() e restore() ne cambiano i campi,
     cosi' chi l'ha importato con `from openings_core import *` vede sempre quelli attuali."""
     FIELDS = ("mode", "title", "doc", "uidoc", "output", "settings", "status_param", "id_param", "cat_param",
-              "min_cross_sin", "neighbour_cache")
+              "min_cross_sin", "neighbour_cache", "sources", "mep_cache", "skipped_links")
 
     def __init__(self):
         for name in self.FIELDS:
@@ -65,7 +65,18 @@ def start(mode):
                  # pavimento, montanti nel muro): nessun foro
                  "min_cross_sin": math.sin(math.radians(min(max(settings["min_angle_deg"], 0.0), 89.0))),
                  # (id del link o 0, id dell'elemento) -> solidi in coordinate host
-                 "neighbour_cache": {}})
+                 "neighbour_cache": {},
+                 # modelli letti (host e link caricati) e riferimenti MEP gia' risolti: vedi reset_models()
+                 "sources": None, "mep_cache": {},
+                 # chiavi dei link da non leggere (scelta di Place); New Report e Last Report li leggono tutti
+                 "skipped_links": frozenset()})
+
+
+def reset_models():
+    """Rilegge i link e i riferimenti agli elementi MEP alla prossima richiesta: a ogni controllo, perche' mentre la
+    finestra del report e' aperta un link puo' essere ricaricato (gli elementi letti prima non valgono piu')."""
+    ctx.sources = None
+    ctx.mep_cache = {}
 
 
 # =================================================================================================================
@@ -132,6 +143,7 @@ ELEMENT_DELETED = "deleted"
 ELEMENT_ADDED = "crossing it, now associated"
 ELEMENT_ADDED_OUT = "crossing it partly outside, now associated"
 ELEMENT_NO_OPENING = "no opening"  # attraversamento senza foro (Missing openings)
+ELEMENT_LINK_NOT_LOADED = "link not loaded"  # elemento di un link non caricato: Id tenuto, stato del foro invariato
 MISSING = "Missing openings"  # gruppo del report: attraversamenti senza foro
 MEP_CATEGORIES = (DB.BuiltInCategory.OST_PipeCurves, DB.BuiltInCategory.OST_DuctCurves,
                   DB.BuiltInCategory.OST_CableTray, DB.BuiltInCategory.OST_Conduit)
@@ -141,9 +153,10 @@ HOST_KINDS = {int(DB.BuiltInCategory.OST_Walls): "wall", int(DB.BuiltInCategory.
               int(DB.BuiltInCategory.OST_StructuralFoundation): "auto"}
 STATE_RANK = {OK: 0, NEW: 1, MISALIGNED: 2, REGROUP: 3, PARTIAL: 4, CHANGED: 5, OBSOLETE: 6}
 
-# finestre di Place (OpeningsPlace_ui.py, importato solo da place_main)
+# finestre di Place&Check (OpeningsPlace_ui.py, importato solo da place_main)
 PICK_XAML = "OpeningsPlace_pick.xaml"
 CONFIRM_XAML = "OpeningsPlace_confirm.xaml"
+RESULT_XAML = "OpeningsPlace_result.xaml"
 # finestre dei report (OpeningsCheck_ui.py e OpeningsReport_xlsx.py); moduli e XAML tutti in openings_modules
 SCOPE_XAML = "OpeningsCheck_scope.xaml"
 SUMMARY_XAML = "OpeningsCheck_summary.xaml"
@@ -214,8 +227,25 @@ def set_text(element, name, value, missing):
         param.Set(value)
 
 
+def element_of(mep):
+    """Elemento Revit di un MepRef (openings_geometry), o l'elemento stesso."""
+    return getattr(mep, "element", mep)
+
+
+def ref_text(model, number):
+    """Riferimento a un elemento MEP scritto sul foro: "123456" nel modello host (model vuoto), "PRJ_MEC:123456" in
+    un link. Gli Id di documenti diversi si sovrappongono: per i link serve il modello."""
+    return "{}:{}".format(model, number) if model else str(number)
+
+
+def split_ref(text):
+    """(modello, numero) di un riferimento; modello "" per l'host. I nomi dei file non contengono ":"."""
+    model, _, number = text.rpartition(":")
+    return model, number
+
+
 def discipline(mep):
-    return "MEC" if isinstance(mep, (Pipe, Duct)) else "ELE"
+    return "MEC" if isinstance(element_of(mep), (Pipe, Duct)) else "ELE"
 
 
 def disciplines_text(meps):
@@ -225,7 +255,7 @@ def disciplines_text(meps):
 
 def categories_text(meps):
     """Categorie degli elementi MEP del foro, nomi fissi in inglese: "Pipes, Ducts"."""
-    return ", ".join(label for cls, label in MEP_LABELS if any(isinstance(m, cls) for m in meps))
+    return ", ".join(label for cls, label in MEP_LABELS if any(isinstance(element_of(m), cls) for m in meps))
 
 
 def worst(statuses):
@@ -238,11 +268,13 @@ def code_of(opening):
     return str(id_value(opening.Id))
 
 
-def write_opening(instance, meps, state, missing):
-    """Stato, Id e categorie degli elementi MEP del foro."""
+def write_opening(instance, meps, state, missing, kept=()):
+    """Stato, riferimenti e categorie degli elementi MEP del foro (MepRef). kept: riferimenti da non perdere anche
+    se non leggibili ora (elementi di link non caricati); le loro categorie restano quelle gia' scritte."""
     set_text(instance, ctx.status_param, WRITTEN[state], missing)
-    set_text(instance, ctx.id_param, ",".join(str(id_value(m.Id)) for m in meps), missing)
-    set_text(instance, ctx.cat_param, categories_text(meps), missing)
+    set_text(instance, ctx.id_param, ",".join([m.text for m in meps] + list(kept)), missing)
+    if not kept:
+        set_text(instance, ctx.cat_param, categories_text(meps), missing)
 
 
 def split_list(text):
@@ -306,7 +338,7 @@ def family_line():
 
 def mep_name(mep):
     for cls, label in MEP_SINGULAR:
-        if isinstance(mep, cls):
+        if isinstance(element_of(mep), cls):
             return label
     return "Element"
 
@@ -330,7 +362,7 @@ def remember_scope_kind(kind):
 def unique_meps(items):
     meps = []
     for item in items:
-        if all(m.Id != item["mep"].Id for m in meps):
+        if all(m != item["mep"] for m in meps):
             meps.append(item["mep"])
     return meps
 

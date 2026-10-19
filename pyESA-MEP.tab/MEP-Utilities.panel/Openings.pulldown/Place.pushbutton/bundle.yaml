@@ -1,20 +1,22 @@
-title: Place
+title: Place&Check
 tooltip: >-
-  With elements already selected: openings and MEP elements already associated with an opening are checked (as
-  Check&Report does); the other pipes, ducts, cable trays and conduits get an opening at their crossings with every wall,
-  floor and structural element (beams, columns, foundations) of the host model and of the loaded RVT links; selected
-  walls, floors and structural elements of the host model get an opening for every MEP element crossing them. With
-  nothing selected: a window asks whether to select walls, floors and structure (also in links) or MEP elements.
+  Checks where new openings are needed and creates them. Pipes, ducts, cable trays and conduits of this model and of
+  the RVT links are checked against the walls, floors and structural elements (beams, columns, foundations) of this
+  model and of the links.
+
+  With nothing selected: a window asks what to select (walls, floors and structure; MEP elements; or an area) and
+  which linked models to read. With elements already selected: openings and MEP elements already associated with an
+  opening are checked as in New Report; the other MEP elements and the walls, floors and structural elements of this
+  model get openings, reading the links ticked last time.
 
   Each crossing gets an opening at its centre, with the families and sizes of Settings: outer section with insulation
   plus the clearance, rounded up; depth = whole stack of parallel walls (or floors), cavities included, plus the extra
   depth on each side; nearby crossings share one rectangular opening (MEC and ELE apart, if set). Structural
   elements: floor opening for vertical MEP elements, wall opening for the others. Elements running inside (under the
-  minimum angle) and crossings that already have an opening are skipped. A preview window comes first, then you
-  confirm.
+  minimum angle) and crossings that already have an opening are skipped. A preview comes first, then you confirm;
+  the result (also "no new openings needed") is shown in a window.
 
-  Opening: e_GEN_RelatedElement_ID = Ids of its MEP elements, e_GEN_RelatedElement_Cat = their categories (Pipes,
-  Ducts, Cable Trays, Conduits), e_GEN_Void_Status = Valid. MEP elements: e_GEN_RelatedElement_ID = Ids of their
-  openings, e_GEN_RelatedElement_Cat = Generic Models, e_GEN_Void_Status = Valid. Parameter names can be changed in
-  Settings. Comments and Mark are not touched.
+  Opening: e_GEN_RelatedElement_ID = its MEP elements (Id, or model:Id for linked models), e_GEN_RelatedElement_Cat
+  = their categories, e_GEN_Void_Status = Valid. MEP elements of this model get the Ids of their openings; linked
+  ones are not written. Parameter names can be changed in Settings. Comments and Mark are not touched.
 author: Matteo Maiorano

@@ -19,8 +19,10 @@ Piano di lavoro per il passaggio a un modello Openings separato, con MEP e ARC s
 | --- | --- |
 | Modello misto MEP + fori | **No**: modelli sempre separati. Nel modello Openings non ci sono MEP propri |
 | Parametri sui MEP | **Nessuno** (tolti `write_mep()`, `mep_candidates()` e la parte MEP di `plan_writes()`). Il legame sta sul foro e nel JSON |
-| MEP e ARC da quali link | **Tutti i link caricati**: ogni link puo' dare sia MEP sia muri, solai e strutture. Nessuna scelta nella finestra |
+| MEP e ARC da quali link | Ogni link puo' dare sia MEP sia muri, solai e strutture. **Place**: sezione "Linked models" nella finestra, spunta = leggi (MEP e ARC), ricordata per modello (`place_skipped_links`), link nuovi spuntati; con elementi gia' selezionati vale l'ultima scelta (decisione del 19.10.2026, prima era "tutti, nessuna scelta"). **New Report / Last Report**: nessuna scelta, si leggono tutti i link caricati e si controllano i fori dello scope |
 | JSON | Uno **di lavoro per utente** (`script.get_document_data_file`), aggiornato a ogni Place e New Report, mai salvato altrove. **Export** / import: la cartella si sceglie ogni volta (proposta l'ultima usata) |
+| Chi cerca i fori nuovi | **Place&Check** (rinominato da Place): verifica dove servono fori nuovi e li crea; esito sempre in una finestra XAML, anche "no new openings needed". **New Report** verifica solo lo stato dei fori presenti: niente *Missing openings* (19.10.2026) |
+| Pannello di output di pyRevit | Non si apre se non serve: Openings mostra tutto in finestre XAML |
 | Foro reale nei modelli ARC | **Non interessa**: i fori restano non ospitati e non tagliano i link; il foro vero si approva dopo |
 | Fori senza piu' elementi dentro | Si **tengono**: con un Id MEP associato ma nessun elemento al loro interno risultano *Not Associated* nel report |
 | Revit minimo | **2023** (niente 2022): `Selection.SetReferences` utilizzabile, da verificare sui link |
@@ -142,8 +144,12 @@ Last Report riconosce il caso: nessun foro gestito nel modello aperto, e il mode
 
 0. **Fatto (19.10.2026):** risolto il merge `79cb08f` committato con i marker di conflitto; tenuta ovunque la
    versione con Area (commit `152f181`).
-   **Fase 1 scritta (19.10.2026), da provare in Revit, non committata.** Moduli in `openings_modules/`, stato del
-   comando in `openings_core.ctx`. Verifiche fatte fuori da Revit: compilazione con l'IronPython 2.7 di pyRevit
+   **Fase 1 fatta e provata in Revit sul modello MEP + fori (commit `f545a96`).** Moduli in `openings_modules/`,
+   stato del comando in `openings_core.ctx`.
+   **Fase 3 scritta (19.10.2026), da provare in Revit:** `MepRef` in tutto il codice (Place, New Report, Last
+   Report), MEP cercati anche nei link, riferimenti `<modello>:<id>`, selezione MEP nei link, modelli e percorsi nel
+   report, link non caricato = riferimento tenuto e stato invariato. Fase 2 (fasi, workset, lettura unica) rinviata
+   a dopo questo test. Verifiche fatte fuori da Revit: compilazione con l'IronPython 2.7 di pyRevit
    (`bin\netfx\engines\IPY2712PR`), nessun nome globale indefinito nella catena di `import *`, nessun nome definito
    in due moduli, AST di 181 blocchi identico all'originale (con `ctx.x` riportato al nome globale); diversi solo
    `load_settings`, `bundle_path`, `revit_owner`, `family_line`, `place_main`, `ReportController` (voluti).
