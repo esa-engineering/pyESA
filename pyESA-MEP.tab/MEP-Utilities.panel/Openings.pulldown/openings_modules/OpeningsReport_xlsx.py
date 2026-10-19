@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """Export Excel del report di Openings: writer .xlsx minimale (zip + xml, niente Excel installato), ridotto da
 mepqto_xlsx.py (MEPQTO): solo testo inline, intestazione, grassetto, a capo, riquadro bloccato e filtro automatico.
-Nessun accesso a Revit: scrive i dati gia' pronti del report (vedi report_data() nello script).
-Copia identica nelle cartelle di Place, NewReport e LastReport (Rocket mode: stesso nome, stesso contenuto)."""
+Nessun accesso a Revit: scrive i dati gia' pronti del report (vedi report_data() in openings_report).
+Una sola copia, in openings_modules."""
 import re
 
 import clr

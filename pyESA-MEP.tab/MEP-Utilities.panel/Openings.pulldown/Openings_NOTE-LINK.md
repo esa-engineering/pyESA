@@ -141,7 +141,12 @@ Last Report riconosce il caso: nessun foro gestito nel modello aperto, e il mode
 ## Fasi
 
 0. **Fatto (19.10.2026):** risolto il merge `79cb08f` committato con i marker di conflitto; tenuta ovunque la
-   versione con Area. Da provare in Revit prima di andare avanti.
+   versione con Area (commit `152f181`).
+   **Fase 1 scritta (19.10.2026), da provare in Revit, non committata.** Moduli in `openings_modules/`, stato del
+   comando in `openings_core.ctx`. Verifiche fatte fuori da Revit: compilazione con l'IronPython 2.7 di pyRevit
+   (`bin\netfx\engines\IPY2712PR`), nessun nome globale indefinito nella catena di `import *`, nessun nome definito
+   in due moduli, AST di 181 blocchi identico all'originale (con `ctx.x` riportato al nome globale); diversi solo
+   `load_settings`, `bundle_path`, `revit_owner`, `family_line`, `place_main`, `ReportController` (voluti).
 1. **Divisione in moduli** come MEPQTO: un solo `openings_*.py` per tema (es. `openings_geometry.py`,
    `openings_check.py`, `openings_report.py`) in `Openings.pulldown/openings_modules/` (senza suffisso, pyRevit la
    ignora), aggiunta a `sys.path` dai tre `script.py`, che restano entry point con `MODE`. Ci finiscono anche

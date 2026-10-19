@@ -15,10 +15,27 @@ non toccato.
 
 - New Report e Last Report: cartelle `NewReport.pushbutton` e `LastReport.pushbutton` (prima un pulsante unico,
   chiamato Refresh e poi Check&Report).
-- I tre `script.py` di Place, New Report e Last Report sono **identici tranne `MODE`** e `__title__`: si modifica
-  quello di Place e si rigenerano gli altri due.
-- Il blocco "comune" (nome della configurazione, predefiniti, nomi dei parametri, stati scritti) e' ripetuto negli
-  script e in Settings. Una modifica va riportata ovunque.
+- **Tutto il codice sta in `openings_modules/`** (cartella senza suffisso: pyRevit non la carica come pulsante),
+  una copia sola. I `script.py` dei pulsanti aggiungono la cartella a `sys.path`, chiamano
+  `openings_core.start(MODE)` e lanciano il comando; quelli di Place, New Report e Last Report differiscono solo per
+  `MODE` e `__title__`. Settings legge da `openings_core` predefiniti, nomi dei parametri e `load_settings()`.
+
+  | Modulo | Contenuto |
+  | --- | --- |
+  | `openings_core.py` | costanti, impostazioni, stato del comando (`ctx`, `start()`), parametri `e_GEN` |
+  | `openings_geometry.py` | sezioni MEP, famiglie e inserimento, area, ricerca degli attraversamenti, lettura dei fori |
+  | `openings_pick.py` | selezioni nel modello e smistamento della selezione corrente |
+  | `openings_check.py` | controllo dei fori, ambito (`CheckScope`), unioni e divisioni, Recreate, scrittura, Missing openings |
+  | `openings_report.py` | file dell'ultimo report, righe e dati del report, `CheckSession`, `LastReport`, finestra del report, `check_main()`, `last_main()` |
+  | `openings_place.py` | `place_main()` |
+  | `OpeningsCheck_ui.py`, `OpeningsPlace_ui.py`, `OpeningsReport_xlsx.py`, XAML | finestre ed export Excel (non leggono Revit) |
+
+  Ogni modulo importa il precedente con `from ... import *` (core <- geometry <- pick <- check <- report <- place):
+  un modulo non usa funzioni di quelli che vengono dopo. **Rocket mode**: i moduli restano caricati tra un comando e
+  l'altro, quindi niente documento, output o impostazioni a livello di modulo. Stanno in `ctx` (`ctx.doc`,
+  `ctx.settings`, `ctx.status_param`...), riempito da `start()` a ogni comando; la finestra del report, non modale,
+  ne salva una copia e la ripristina prima di ogni azione (`ReportController`). Dopo una modifica ai moduli serve
+  pyRevit Reload.
 - Il vecchio pulsante Families (creava le famiglie PFV dal template) e' in `_old/`: le famiglie VD_Void Demand
   vengono dalla libreria aziendale.
 
@@ -95,7 +112,7 @@ separati (no); stato To Be Refreshed nel New Report (si'; spento, ogni spostamen
 
 ## New Report e Last Report
 
-Due pulsanti, stesso script (`MODE = "new"` / `"last"`):
+Due pulsanti, stessi moduli (`MODE = "new"` / `"last"`):
 
 - **New Report** (`check_main()`, classe `CheckSession`): finestra dell'ambito (`OpeningsCheck_scope.xaml`): tutto
   il modello; selezione MEP (fori associati agli elementi MEP o ai fori scelti, `linked_openings()`); selezione ARC
@@ -206,10 +223,8 @@ not readable, deleted.
 - Interactive Report: scegliendo un elemento sotto un foro, Show / Select selezionano anche i fori che lo elencano
   (`owners_of()`).
 
-`OpeningsCheck_ui.py`, `OpeningsReport_xlsx.py` e i quattro XAML `OpeningsCheck_*` sono **copie identiche** nelle
-cartelle di Place, NewReport e LastReport: Place lancia il check
-sugli elementi gia' associati. Il modulo non legge Revit: riceve testi e Id interi (`OpeningEntry`) e un oggetto
-`CheckActions` che lavora sul modello.
+`OpeningsCheck_ui.py` (usato anche da Place, che lancia il check sugli elementi gia' associati) non legge Revit:
+riceve testi e Id interi (`OpeningEntry`) e un oggetto actions (`ReportController`) che lavora sul modello.
 
 Il foro fa da muro (piano per il centro, perpendicolare all'asse di attraversamento, spessore = lunghezza del foro)
 per capire se gli elementi sono ancora dentro. **Profondita' e centro lungo l'asse** invece vengono dalla scansione
@@ -311,8 +326,7 @@ Gli elementi MEP che escono dall'area contano, ma solo per gli attraversamenti d
   MEP (ultima scelta ricordata in `ESA_Openings`, chiave `place_pick`).
 - Prima di creare, l'anteprima `OpeningsPlace_confirm.xaml` (conteggi e problemi di lettura); il report resta nel
   pannello di output.
-- `OpeningsPlace_ui.py` e i due XAML stanno solo nella cartella di Place: lo script li importa dentro `place_main()`,
-  cosi' New Report (stesso script) non ne ha bisogno.
+- `OpeningsPlace_ui.py` si importa dentro `place_main()`: New Report e Last Report non lo caricano.
 - **Strutture** (anche nella modalita' normale e nell'ambito del New Report): foro a solaio per elementi MEP verticali
   (oltre 45 gradi), a muro per gli altri, con asse perpendicolare alla trave o, per i pilastri, lungo l'elemento MEP;
   un attraversamento piu' lungo di 1 m e' scartato (l'elemento ci corre dentro). Niente allungamento per strati.

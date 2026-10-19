@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """Finestre dei report di Openings (pulsanti New Report e Last Report, e Place con elementi gia' associati):
 ambito (New Report), riepilogo con le due schede (Text Report, Interactive Report), Text Report con l'export Excel,
-Interactive Report. Nessun accesso a Revit: lo script passa testi e Id interi, e un oggetto actions (call:
+Interactive Report. Nessun accesso a Revit: openings_report passa testi e Id interi, e un oggetto actions (call:
 select, prepare_recreate, recreate, move, delete, refresh, report_data) che fa il lavoro sul modello.
-Copia identica in Place.pushbutton, NewReport.pushbutton e LastReport.pushbutton (Rocket mode: stesso nome, stesso
-contenuto)."""
+Una sola copia, in openings_modules."""
 import clr
 clr.AddReference("PresentationFramework")
 clr.AddReference("PresentationCore")

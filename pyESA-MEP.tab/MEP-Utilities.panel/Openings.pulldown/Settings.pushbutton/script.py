@@ -16,54 +16,22 @@ __author__ = "Matteo Maiorano"
 __context__ = "zero-doc"
 
 import os.path as op
+import sys
 
 from pyrevit import revit, script, DB
 
 import Settings_ui
 
+# nomi, parametri e impostazioni predefinite: una sola copia, in openings_modules/openings_core.py
+MODULES = op.join(op.dirname(op.dirname(op.abspath(__file__))), "openings_modules")
+if MODULES not in sys.path:
+    sys.path.insert(0, MODULES)
+from openings_core import CONFIG_NAME, DEFAULTS, PARAM_WIDTH, PARAM_HEIGHT, PARAM_DEPTH, PARAM_DIAMETER, VALID, \
+    TO_REFRESH, NOT_ASSOCIATED, load_settings  # noqa: E402
+
 XAML_FILE_NAME = "Settings_form.xaml"
 
-# =================================================================================================================
-# Blocco comune a Place, Check&Report e Settings (nomi, parametri, impostazioni predefinite): tenerlo allineato
-# =================================================================================================================
-CONFIG_NAME = "ESA_Openings"
-DEFAULTS = {"fam_wall_rect": "e_GM.PH.VD_Void Demand_Wall_Rect", "fam_wall_round": "e_GM.PH.VD_Void Demand_Wall_Circ",
-            "fam_floor_rect": "e_GM.PH.VD_Void Demand_Floor_Rect",
-            "fam_floor_round": "e_GM.PH.VD_Void Demand_Floor_Circ",
-            "status_param": "e_GEN_Void_Status", "related_id_param": "e_GEN_RelatedElement_ID",
-            "related_cat_param": "e_GEN_RelatedElement_Cat",
-            "clearance_mm": 25.0, "rounding_mm": 50.0, "merge_mm": 100.0, "extra_depth_mm": 0.0, "layer_gap_mm": 200.0,
-            "min_angle_deg": 15.0,
-            "separate": False, "misaligned": True}
-NUMBER_KEYS = ("clearance_mm", "rounding_mm", "merge_mm", "extra_depth_mm", "layer_gap_mm", "min_angle_deg")
-BOOL_KEYS = ("separate", "misaligned")
-TEXT_KEYS = ("status_param", "related_id_param", "related_cat_param")  # vuoti: tornano al predefinito
-PARAM_WIDTH = "e_DIM_Width_1"
-PARAM_HEIGHT = "e_DIM_Height_1"
-PARAM_DEPTH = "e_DIM_Depth_1"
-PARAM_DIAMETER = "e_DIM_Diameter_1"
-# stati scritti in e_GEN_Void_Status, dal migliore al peggiore
-VALID, TO_REFRESH, NOT_ASSOCIATED = "Valid", "To Be Refreshed", "Not Associated"
-# =================================================================================================================
-
 doc = revit.doc
-
-
-def load_settings(config):
-    settings = dict(DEFAULTS)
-    try:
-        for key in DEFAULTS:
-            value = config.get_option(key, DEFAULTS[key])
-            if key in NUMBER_KEYS:
-                value = float(value)
-            elif key in BOOL_KEYS and not isinstance(value, bool):
-                value = str(value).strip().lower() in ("true", "1", "yes")
-            elif key in TEXT_KEYS:
-                value = str(value or "").strip() or DEFAULTS[key]
-            settings[key] = value
-    except Exception:
-        pass
-    return settings
 
 
 def generic_model_families():
