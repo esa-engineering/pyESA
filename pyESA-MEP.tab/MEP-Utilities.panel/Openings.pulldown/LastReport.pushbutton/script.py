@@ -13,12 +13,8 @@ PLACE: with elements already selected, those already associated with an
 opening (openings, MEP elements listing an existing opening) are
 checked; the other MEP elements, walls, floors and structural elements
 get openings. With nothing selected, a window asks what to select: walls
-<<<<<<< HEAD
 and floors (host model or RVT links), MEP elements, or an area (rectangle
 dragged in a plan view, or the section box of a 3D view). Every straight pipe, duct, cable tray or conduit of the host
-=======
-and floors (host model or RVT links) or MEP elements. Every straight pipe, duct, cable tray or conduit of the host
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
 model that crosses them gets a Generic Model opening at the centre of
 the crossing, sized with the outer section (insulation included) plus
 the clearance, rounded up; the depth is the thickness plus the extra
@@ -34,11 +30,7 @@ Parameter names can be changed in Settings. Comments and Mark are not
 touched. Crossings that already have an opening are skipped.
 
 NEW REPORT: choose the scope (whole model, MEP selection, ARC
-<<<<<<< HEAD
 selection, area). Every opening is compared with its MEP elements: still
-=======
-selection). Every opening is compared with its MEP elements: still
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
 there, still crossing, in the same place and size? Statuses: Valid,
 To Be Refreshed (the elements moved but are still inside the opening;
 optional), Not Associated (elements removed or moved out, no element
@@ -72,11 +64,7 @@ from Autodesk.Revit.DB.Mechanical import Duct
 from Autodesk.Revit.DB.Electrical import CableTray, Conduit
 from Autodesk.Revit.DB.Structure import StructuralType
 from Autodesk.Revit.UI import ExternalEvent, IExternalEventHandler
-<<<<<<< HEAD
 from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter, PickBoxStyle
-=======
-from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
 from Autodesk.Revit.Exceptions import OperationCanceledException
 from System.Collections.Generic import List
 
@@ -571,7 +559,6 @@ def hosts_from_meps(meps):
     return hosts
 
 
-<<<<<<< HEAD
 # ----------------------------------------------------------------------------------------------------------------
 # Area: riquadro trascinato in pianta (quote dal view range, come Quick SectionBox) o section box della vista 3D
 # ----------------------------------------------------------------------------------------------------------------
@@ -731,8 +718,6 @@ def meps_in_area(area):
             .WherePasses(DB.BoundingBoxIntersectsFilter(area_outline(area))) if is_straight_mep(e)]
 
 
-=======
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
 def host_normal(element, transform, point):
     """Normale del muro (o della trave) nel punto, anche curvo, in coordinate host."""
     curve = element.Location.Curve
@@ -870,20 +855,12 @@ def extend_through(p0, p1, layers, options, kind, w):
 
 
 
-<<<<<<< HEAD
 def find_crossings(hosts, stats, only=None, keep_existing=False, progress=None, area=None):
     """Attraversamenti degli elementi MEP con muri, solai e strutture, allungati attraverso gli strati a contatto
     (muri o solai separati di una struttura composita). only: id degli elementi MEP da considerare (modalita'
     inversa), None = tutti quelli vicini. Quelli che hanno gia' un foro si saltano (Place) o, con keep_existing (check),
     restano con item["opening"] = il foro che li contiene. progress(i, n): avanzamento sugli elementi attraversati.
     area: solo gli attraversamenti dentro l'area (crossing_in_area), gli altri contati in stats["outside_area"]."""
-=======
-def find_crossings(hosts, stats, only=None, keep_existing=False, progress=None):
-    """Attraversamenti degli elementi MEP con muri, solai e strutture, allungati attraverso gli strati a contatto
-    (muri o solai separati di una struttura composita). only: id degli elementi MEP da considerare (modalita'
-    inversa), None = tutti quelli vicini. Quelli che hanno gia' un foro si saltano (Place) o, con keep_existing (check),
-    restano con item["opening"] = il foro che li contiene. progress(i, n): avanzamento sugli elementi attraversati."""
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
     boxes = []
     for opening in existing_openings():
         box = opening.get_BoundingBox(None)
@@ -937,12 +914,9 @@ def find_crossings(hosts, stats, only=None, keep_existing=False, progress=None):
                         stats["inside"] += 1  # corre dentro il muro o il solaio: nessun foro
                         continue
                     p0, p1, used = extend_through(p0, p1, layers, options, kind, w)
-<<<<<<< HEAD
                     if area is not None and not crossing_in_area(area, p0, p1):
                         stats["outside_area"] = stats.get("outside_area", 0) + 1
                         continue
-=======
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
                     mid = p0.Add(p1).Divide(2.0)
                     opening = inside_existing(mid, boxes)
                     if opening is not None:
@@ -1108,11 +1082,7 @@ def missing_families_exit(missing_families):
 def place_main():
     import OpeningsPlace_ui  # solo nella cartella di Place
     symbols, missing_families = family_symbols()
-<<<<<<< HEAD
     meps, hosts, ignored, area = [], [], 0, None
-=======
-    meps, hosts, ignored = [], [], 0
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
     if uidoc.Selection.GetElementIds().Count:
         # selezione: gli elementi gia' associati a un foro vanno al check, gli altri ai fori nuovi
         openings, linked, meps, hosts, ignored = split_selection()
@@ -1138,7 +1108,6 @@ def place_main():
         remember_pick(pick)
         if pick == OpeningsPlace_ui.PICK_MEPS:
             meps = pick_meps()
-<<<<<<< HEAD
         elif pick == OpeningsPlace_ui.PICK_AREA:
             area = pick_area()
         else:
@@ -1156,13 +1125,6 @@ def place_main():
                                             progress=lambda i, n: bar.update_progress(i + 1, n), area=area))
         modes.append("area: {}; MEP elements {}, walls, floors and structural elements {}".format(
             area_text(area), len(area_meps), len(area_hosts)))
-=======
-        else:
-            hosts = pick_hosts()
-
-    stats = {"inside": 0, "existing": 0, "extended": 0, "problems": []}
-    items, modes = [], []
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
     if hosts:
         items.extend(find_crossings(hosts, stats))
         modes.append("walls, floors and structural elements selected: {}".format(len(hosts)))
@@ -1181,12 +1143,9 @@ def place_main():
     output.print_md("Mode: **{}** | crossings: **{}** | openings to create: **{}** | already with an opening: **{}** | "
                     "MEP running inside (no opening): **{}** | extended through adjacent layers: **{}**".format(
                         mode_text, len(items), len(groups), stats["existing"], stats["inside"], stats["extended"]))
-<<<<<<< HEAD
     if stats["outside_area"]:
         output.print_md("Crossings of these MEP elements outside the area (skipped): **{}**".format(
             stats["outside_area"]))
-=======
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
     if ignored:
         output.print_md("Selected elements not used (not MEP, opening, wall, floor or structure, or not straight): "
                         "**{}**".format(ignored))
@@ -1552,19 +1511,12 @@ def linked_openings(openings, sel_meps, sel_openings):
 class CheckScope(object):
     """Fori del check: tutti (ids None) o un insieme di Id di fori, aggiornato dopo ricreazioni. meps: elementi MEP
     scelti, le cui liste si riscrivono anche se non hanno piu' fori. removed: fori cancellati dalle ricreazioni: i MEP
-<<<<<<< HEAD
     che li citano ancora si riscrivono anche se il foro non e' piu' nell'ambito. area (make_area): ambito Area, a
     ogni controllo entrano anche i fori e gli elementi MEP comparsi nell'area nel frattempo."""
 
     def __init__(self, kind, description, ids=None, meps=None, released=None, area=None):
         self.kind, self.description, self.ids, self.meps = kind, description, ids, list(meps or [])
         self.area = area
-=======
-    che li citano ancora si riscrivono anche se il foro non e' piu' nell'ambito."""
-
-    def __init__(self, kind, description, ids=None, meps=None, released=None):
-        self.kind, self.description, self.ids, self.meps = kind, description, ids, list(meps or [])
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
         self.removed = set()
         # {Id elemento (testo): [codici dei fori cancellati che lo elencavano]}: elementi rimasti senza foro dopo un
         # Delete, tenuti nell'ambito e nel report finche' un foro nuovo non li circonda
@@ -1583,13 +1535,9 @@ class CheckScope(object):
 
     def openings(self):
         found = existing_openings()
-<<<<<<< HEAD
         if self.ids is None:
             return found
         return [o for o in found if code_of(o) in self.ids or (self.area is not None and opening_in_area(self.area, o))]
-=======
-        return found if self.ids is None else [o for o in found if code_of(o) in self.ids]
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
 
     def replace(self, removed, created):
         self.removed |= set(removed)
@@ -1660,14 +1608,11 @@ def ask_check_scope(ui):
         chosen = openings_on_hosts(openings, hosts)
         description = "ARC selection ({} walls, floors and structural elements)".format(len(hosts))
         return CheckScope(kind, description, set(code_of(o) for o in chosen))
-<<<<<<< HEAD
     if kind == ui.SCOPE_AREA:
         area = pick_area()
         chosen = [o for o in openings if opening_in_area(area, o)]
         return CheckScope(kind, "Area: {}".format(area_text(area)), set(code_of(o) for o in chosen),
                           meps_in_area(area), area=area)
-=======
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
     return CheckScope(kind, "whole model")
 
 
@@ -1970,11 +1915,7 @@ def save_last_check(rows, removed, scope=None, missing_rows=None):
             "scope": {"kind": scope.kind, "description": scope.description,
                       "ids": sorted(scope.ids) if scope.ids is not None else None,
                       "meps": [id_value(m.Id) for m in scope.meps if m.IsValidObject],
-<<<<<<< HEAD
                       "released": scope.released, "area": scope.area},
-=======
-                      "released": scope.released},
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
             "missing": [dict((key, row[key]) for key in MISSING_SAVED) for row in (missing_rows or [])]}
     try:
         temp = path + ".tmp"
@@ -2187,18 +2128,12 @@ def report_data(report):
 # Scansione degli attraversamenti dell'ambito (New Report): elementi non associati e fori mancanti
 # ----------------------------------------------------------------------------------------------------------------
 def scan_meps(scope):
-<<<<<<< HEAD
     """Elementi MEP del report: quelli elencati nei fori dell'ambito, piu' quelli scelti (selezione MEP) o nell'area
     (ambito Area, riletti a ogni controllo)."""
     meps = {}
     for mep in list(scope.meps) + (meps_in_area(scope.area) if scope.area is not None else []):
         if not mep.IsValidObject:
             continue
-=======
-    """Elementi MEP del report: quelli elencati nei fori dell'ambito, piu' quelli scelti (selezione MEP)."""
-    meps = {}
-    for mep in scope.meps:
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
         if is_straight_mep(mep):
             meps[id_value(mep.Id)] = mep
     for opening in scope.openings():
@@ -2213,7 +2148,6 @@ def scan_crossings(scope):
     """Attraversamenti degli elementi MEP del report (scan_meps), come li trova Place: muri, solai e strutture del
     modello e dei link toccati da quegli elementi, con il foro che contiene ogni attraversamento (item["opening"]) o
     None. Solo questi elementi, qualunque sia l'ambito: non si cercano attraversamenti di altri elementi del modello.
-<<<<<<< HEAD
     Ambito Area: muri, solai e strutture dell'area (non uno per elemento MEP, che sarebbero migliaia di ricerche) e
     solo gli attraversamenti dentro l'area. Ritorna (attraversamenti, statistiche)."""
     stats = {"inside": 0, "existing": 0, "extended": 0, "outside_area": 0, "problems": []}
@@ -2222,23 +2156,11 @@ def scan_crossings(scope):
         return [], stats
     only = set(id_value(m.Id) for m in meps)
     hosts = hosts_in_area(scope.area) if scope.area is not None else hosts_from_meps(meps)
-=======
-    Ritorna (attraversamenti, statistiche)."""
-    stats = {"inside": 0, "existing": 0, "extended": 0, "problems": []}
-    meps = scan_meps(scope)
-    if not meps:
-        return [], stats
-    hosts, only = hosts_from_meps(meps), set(id_value(m.Id) for m in meps)
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
     if not hosts:
         return [], stats
     with forms.ProgressBar(title="Openings: looking for crossings ({value} of {max_value})") as bar:
         items = find_crossings(hosts, stats, only=only, keep_existing=True,
-<<<<<<< HEAD
                                progress=lambda i, n: bar.update_progress(i + 1, n), area=scope.area)
-=======
-                               progress=lambda i, n: bar.update_progress(i + 1, n))
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
     return items, stats
 
 
@@ -2392,11 +2314,8 @@ class CheckSession(object):
                 "an opening ({} elements not associated before, now added), {} running inside a wall or floor (no "
                 "opening).".format(sum(m["crossings"] for m in self.missing_rows), len(self.missing_rows),
                                    stats["existing"], self.added, stats["inside"])] + \
-<<<<<<< HEAD
                (["Crossings outside the area (not checked): {}.".format(stats["outside_area"])]
                 if stats.get("outside_area") else []) + \
-=======
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
                ["- {}".format(p) for p in stats["problems"]] + [
                 "Stale Ids removed: {} on openings (elements deleted), {} on {} MEP elements (openings deleted, or not "
                 "listing them). Ids added to MEP elements: {}.".format(
@@ -2498,12 +2417,8 @@ class LastReport(object):
         ids = scope.get("ids")
         meps = [m for m in (element_by_id(i) for i in scope.get("meps") or []) if m is not None]
         self.scope = CheckScope(scope.get("kind", "all"), scope.get("description", ""),
-<<<<<<< HEAD
                                 set(ids) if ids is not None else None, meps, scope.get("released"),
                                 scope.get("area"))
-=======
-                                set(ids) if ids is not None else None, meps, scope.get("released"))
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
         self.date = saved.get("date", "")
         self.log = []
         self.stale_meps = []

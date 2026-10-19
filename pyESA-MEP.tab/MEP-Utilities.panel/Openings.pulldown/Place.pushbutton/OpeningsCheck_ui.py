@@ -23,11 +23,7 @@ from System.Windows.Media import BrushConverter
 
 import OpeningsReport_xlsx
 
-<<<<<<< HEAD
 SCOPE_ALL, SCOPE_MEP, SCOPE_ARC, SCOPE_AREA = "all", "mep", "arc", "area"
-=======
-SCOPE_ALL, SCOPE_MEP, SCOPE_ARC = "all", "mep", "arc"
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
 SHOW_TEXT, SHOW_WINDOW = "text", "window"
 TITLE = "Openings Report"
 
@@ -78,23 +74,14 @@ def _set_owner(window, owner):
 
 
 class ScopeWindow(object):
-<<<<<<< HEAD
     """Ambito del New Report (tutto il modello, selezione MEP, selezione ARC, area). show() ritorna l'ambito o None
     se annullata."""
-=======
-    """Ambito del New Report (tutto il modello, selezione MEP, selezione ARC). show() ritorna l'ambito o None se
-    annullata."""
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
 
     def __init__(self, xaml_path, last_scope, selected_meps, selected_hosts):
         self.window = _load(xaml_path)
         find = self.window.FindName
-<<<<<<< HEAD
         self.radios = {SCOPE_ALL: find("AllRadio"), SCOPE_MEP: find("MepRadio"), SCOPE_ARC: find("ArcRadio"),
                        SCOPE_AREA: find("AreaRadio")}
-=======
-        self.radios = {SCOPE_ALL: find("AllRadio"), SCOPE_MEP: find("MepRadio"), SCOPE_ARC: find("ArcRadio")}
->>>>>>> 21b9cf6a0a03e5f0df727b4d43f9b7745f20f764
         if selected_meps:
             last_scope = SCOPE_MEP
         elif selected_hosts:

@@ -20,7 +20,12 @@ Piano di lavoro per il passaggio a un modello Openings separato, con MEP e ARC s
 | Modello misto MEP + fori | **No**: modelli sempre separati. Nel modello Openings non ci sono MEP propri |
 | Parametri sui MEP | **Nessuno** (tolti `write_mep()`, `mep_candidates()` e la parte MEP di `plan_writes()`). Il legame sta sul foro e nel JSON |
 | MEP e ARC da quali link | **Tutti i link caricati**: ogni link puo' dare sia MEP sia muri, solai e strutture. Nessuna scelta nella finestra |
-| JSON | Uno **di lavoro**, aggiornato a ogni Place e New Report, piu' l'**Export** in una cartella condivisa scelta dall'utente (ricordata) |
+| JSON | Uno **di lavoro per utente** (`script.get_document_data_file`), aggiornato a ogni Place e New Report, mai salvato altrove. **Export** / import: la cartella si sceglie ogni volta (proposta l'ultima usata) |
+| Foro reale nei modelli ARC | **Non interessa**: i fori restano non ospitati e non tagliano i link; il foro vero si approva dopo |
+| Fori senza piu' elementi dentro | Si **tengono**: con un Id MEP associato ma nessun elemento al loro interno risultano *Not Associated* nel report |
+| Revit minimo | **2023** (niente 2022): `Selection.SetReferences` utilizzabile, da verificare sui link |
+| Percorso dei modelli | Quando si selezionano elementi di un link, il report mostra modello e percorso del file |
+| Fasi e workset dei link | Come MEPQTO (vedi "Link: fasi e workset") |
 | Fori nei modelli MEP / ARC | Il modello Openings e' **linkato** li': Show zooma sul foro vero nel link. Senza link, ripiego sul bounding box salvato nel JSON |
 | Scrittura nei modelli MEP / ARC | Solo visualizzazione; *Write status* **opzionale** (pulsante a parte, scrive in un parametro se c'e') |
 
@@ -29,11 +34,30 @@ Piano di lavoro per il passaggio a un modello Openings separato, con MEP e ARC s
 Gli Id di documenti diversi si sovrappongono: ogni riferimento porta il modello.
 
 - **Chiave del modello** = titolo del file linkato (`link_doc.Title`, senza estensione). E' stabile tra sessioni ed e'
-  la stessa nei modelli MEP / ARC, che cercano se stessi nel JSON con `doc.Title`.
+  la stessa nei modelli MEP / ARC, che cercano se stessi nel JSON con `doc.Title`. Il percorso (`PathName`, o
+  quello del centrale) va nel JSON e nel report: due link con lo stesso titolo da cartelle diverse si segnalano.
 - **Sul foro**, `e_GEN_RelatedElement_ID` diventa `<modello>:<id>,<modello>:<id>` (es. `PRJ_MEC:123456`). Nel
   modello Openings i fori sono scrivibili, quindi i parametri restano sui fori. Un valore senza `:` (fori di prima)
-  viene letto come elemento dell'host e risulta *deleted* alla prima New Report: va deciso se migrarli (vedi Punti
-  aperti).
+  non trova il suo elemento: nessuna migrazione, vale la regola dei fori orfani qui sotto.
+
+### Fori orfani (decisione 19.10.2026)
+
+Un foro con Id associati che non trova piu' i suoi elementi (cancellati, Id senza modello, foro spostato) **non si
+cancella mai da solo**: resta, e' *Not Associated* nel report, l'utente sceglie se cancellarlo.
+
+- Se alla verifica dentro il foro ci sono **altri elementi MEP** (es. foro spostato a mano), resta comunque *Not
+  Associated*, con una nota che elenca gli elementi trovati dentro. Il legame **non** si aggiorna da solo.
+- **Recreate** su quel foro riscrive gli Id associati (`<modello>:<id>`) con gli elementi trovati dentro e
+  ricalcola dimensioni e stato. E' l'unico modo per riassociare, e vale anche come migrazione dei fori vecchi.
+
+**Differenza con il codice di oggi** (da cambiare in fase 4). `check_opening()` associa in automatico gli elementi
+non elencati che attraversano il foro (`ELEMENT_ADDED`, "crossing it, now associated"): un foro orfano spostato su
+altri tubi diventa *Partial* / *To Be Refreshed*, non *Not Associated*. `recreate_openings()` salta i fori senza
+`items` (`skipped`), quindi oggi Recreate non puo' riassociare un orfano. Da fare:
+
+- nessuno degli elementi elencati e' piu' presente: gli `extra` **non** si aggiungono, stato `OBSOLETE`, nota con
+  gli elementi trovati dentro (nuovo stato di riga, es. `ELEMENT_FOUND_INSIDE`, non scritto sul foro);
+- Recreate di un orfano usa quegli elementi trovati dentro invece di saltarlo; `recreate_plan()` lo dice.
 - **Nel JSON** anche l'`UniqueId`: se nel modello MEP un elemento viene cancellato e ricreato, l'Id cambia e lo si
   vede subito.
 - **Piu' istanze dello stesso link** (copie del link): la chiave del modello non basta, serve l'istanza. Proposta:
@@ -61,16 +85,18 @@ Gli Id di documenti diversi si sovrappongono: ogni riferimento porta il modello.
 
 ## Report JSON
 
-File di lavoro: dove sta oggi (`script.get_document_data_file`, per utente) **piu'** una copia accanto al centrale
-del modello Openings, cosi' il New Report di un collega riparte dallo stesso stato. Export: `<Openings>_Openings.json`
-sovrascritto nella cartella scelta (quello che leggono i modelli MEP / ARC) piu' una copia datata
+File di lavoro: solo dove sta oggi (`script.get_document_data_file`, per utente), nessuna copia condivisa. Lo stato
+che conta tra colleghi e' quello scritto sui fori (parametri), che il New Report rilegge. Export: cartella scelta
+ogni volta, `<Openings>_Openings.json` sovrascritto (quello che leggono i modelli MEP / ARC) piu' una copia datata
 `<Openings>_Openings_AAAAMMGG-HHMM.json` come storico. Scrittura via `.tmp` come in MEPQTO.
 
 ```json
 {
   "format": "ESA_Openings_Report", "version": 1,
   "openings_model": "PRJ_OPN", "date": "16.10.2026 15:30", "user": "...", "settings": {"clearance_mm": 25},
-  "models": {"PRJ_MEC": {"path": "...", "kind_seen": ["MEP"]}, "PRJ_ARC": {"path": "...", "kind_seen": ["ARC"]}},
+  "models": {"PRJ_MEC": {"path": "...", "kind_seen": ["MEP"], "phase": "New Construction",
+                         "transform": [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]]},
+             "PRJ_ARC": {"path": "...", "kind_seen": ["ARC"], "phase": "...", "transform": "..."}},
   "openings": [{
     "code": "123456", "unique_id": "...", "status": "Valid", "notes": [],
     "kind": "wall", "shape": "rect", "size": "300 x 200 x 250",
@@ -83,8 +109,19 @@ sovrascritto nella cartella scelta (quello che leggono i modelli MEP / ARC) piu'
 ```
 
 - `box` e' in coordinate interne del **modello Openings**. Nel modello MEP / ARC si porta in coordinate locali con
-  il transform del link Openings. Senza link Openings: con l'inverso del transform con cui il modello MEP / ARC e'
-  linkato nel modello Openings, salvato in `models` (da aggiungere: `transform`).
+  il transform del link Openings. Senza link Openings: con l'inverso di `models.<modello>.transform` (BasisX, BasisY,
+  BasisZ, Origin del link nel modello Openings, in piedi), gia' nella versione 1 dello schema.
+
+## Link: fasi e workset (come MEPQTO)
+
+- **Fase.** Un elemento del link ha le fasi del *suo* documento, che non sono quelle del modello Openings. Per ogni
+  link si cerca la fase con lo **stesso nome** di quella scelta nell'host; si leggono solo gli elementi esistenti in
+  quella fase (creati prima o in quella fase, non demoliti). Se il link non ha una fase con quel nome, il link si
+  salta e il report lo dice (non si indovina).
+- **Workset.** Si escludono per **nome**, non per Id: gli Id dei workset cambiano da documento a documento, i nomi
+  no. Nella finestra di New Report l'elenco dei nomi dei workset di tutti i link, spunta = leggi. I nomi mai visti
+  prima compaiono spuntati e segnalati, cosi' un workset nuovo (es. "MEP_Provvisorio") non sparisce in silenzio.
+  Config `ESA_Openings`: `last_included_worksets`, `last_known_worksets`.
 - Le chiavi sono in inglese, gli stati sono i testi scritti (`Valid`, `To Be Refreshed`, `Not Associated`).
 
 ## Last Report nei modelli MEP / ARC
@@ -101,24 +138,39 @@ Last Report riconosce il caso: nessun foro gestito nel modello aperto, e il mode
 - **Write status** (opzionale, pulsante a parte o nella finestra): scrive lo stato del MEP in un parametro di testo
   (nome in Settings), una transazione. Elementi del JSON non piu' presenti: elenco nel report.
 
-## Fasi proposte
+## Fasi
 
-1. `MepRef` + ricerca MEP nei link + Place (Area, MEP selection, ARC selection) nel modello Openings. Verifica:
-   fori identici a quelli fatti oggi con i MEP nell'host.
-2. New Report e Interactive Report con i MEP linkati; niente scrittura sui MEP; stato *Link not loaded*.
-3. JSON di lavoro + Export.
-4. Last Report nei modelli MEP / ARC (lettura, Select / Show).
-5. Write status (opzionale).
+0. **Fatto (19.10.2026):** risolto il merge `79cb08f` committato con i marker di conflitto; tenuta ovunque la
+   versione con Area. Da provare in Revit prima di andare avanti.
+1. **Divisione in moduli** come MEPQTO: un solo `openings_*.py` per tema (es. `openings_geometry.py`,
+   `openings_check.py`, `openings_report.py`) in `Openings.pulldown/openings_modules/` (senza suffisso, pyRevit la
+   ignora), aggiunta a `sys.path` dai tre `script.py`, che restano entry point con `MODE`. Ci finiscono anche
+   `OpeningsCheck_ui`, `OpeningsReport_xlsx` e le XAML oggi copiati tre volte. Nessun modulo fuori da Openings la
+   importa; eccezione documentata in CLAUDE.md, la regola "no shared library" resta. Refactor puro, nessun cambio di
+   comportamento: si prova che fa esattamente quello di oggi, e che Reload ricarica i moduli della cartella.
+2. **Lettura dei link una volta sola**: record Python (curva, sezione, categoria, chiave) per MEP e host di tutti i
+   link, con fase e workset come sopra; poi i calcoli girano sui record. Misurare i tempi su un progetto vero.
+3. **`MepRef`** + Place (Area, MEP selection, ARC selection) nel modello Openings. Verifica: fori identici a quelli
+   fatti oggi con i MEP nell'host.
+4. **New Report** e Interactive Report con i MEP linkati; niente scrittura sui MEP; stati *Link not loaded* e *Not
+   Associated* (fori orfani, mantenuti, con nota se dentro ci sono altri elementi; Recreate li riassocia).
+5. **JSON** di lavoro + Export (schema v1 con `path`, `phase`, `transform`).
+6. **Last Report** nei modelli MEP / ARC (import, Select / Show con `SetReferences`, ripiego zoom + box).
+7. Write status (opzionale).
 
-Ogni fase si chiude su un branch e si prova in Revit prima della successiva. Dato il volume, valutare in fase 1 la
-divisione di `script.py` (oltre 2.500 righe) in moduli come MEPQTO (`openings_geometry.py`, `openings_check.py`,
-`openings_report.py`). Si toglierebbe anche la regola delle tre copie dello script.
+Ogni fase si chiude e si prova in Revit prima della successiva.
 
 ## Punti aperti
 
-- **Fori gia' posati** con Id senza modello: migrazione una tantum (pulsante o prima New Report che chiede il
-  modello sorgente) oppure si ripartono i progetti da zero?
-- **Revit minimo** per `Selection.SetReferences` sui link: se serve anche Revit 2022, resta il ripiego zoom + box.
+- **`SetReferences` sui link** (Revit 2023+): da verificare che selezioni davvero gli elementi del link.
+
+## Decisi il 19.10.2026
+
+- **Moduli condivisi tra i tre pulsanti**: cartella interna `openings_modules/` + `sys.path` (fase 1). Scartate una
+  `lib/` di estensione (cambierebbe la regola "no shared library") e le copie identiche (tre modifiche per ogni
+  cambio, divergenze silenziose con Rocket mode).
+- **Caso misto** (foro con alcuni elementi originali + uno nuovo che lo attraversa): resta l'associazione automatica
+  di oggi, *To Be Refreshed*.
 - **Export concorrente** dalla stessa cartella da due modelli Openings diversi: nomi distinti per modello, nessun
   conflitto; dallo stesso modello: last writer wins (lo storico datato copre).
 - Se un link e' sia MEP sia ARC (es. modello unico di disciplina), non cambia nulla: "tutti i link" lo copre.
