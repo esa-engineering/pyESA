@@ -167,7 +167,8 @@ stessi assi e gli stessi nomi di parametro.
 ## Settings (per utente)
 
 Famiglie dei quattro casi; nomi dei tre parametri `e_GEN` (vuoto = predefinito); franco per lato (25 mm),
-arrotondamento per eccesso (50 mm), accorpamento entro (100 mm), sporgenza oltre ogni faccia (0 mm); MEC ed ELE
+arrotondamento per eccesso (50 mm; una misura entro 0,5 mm sopra un multiplo resta su quel multiplo, `ROUND_TOL_MM`:
+il rumore numerico faceva saltare un passo in modo diverso tra Place e New Report), accorpamento entro (100 mm), sporgenza oltre ogni faccia (0 mm); MEC ed ELE
 separati (no); stato To Be Refreshed nel New Report (si'; spento, ogni spostamento rende il foro Not Associated).
 
 ## Place
@@ -217,10 +218,22 @@ of* con la data, nel Last Report) e due schede grandi:
 - **Interactive Report** (`OpeningsCheck_report.xaml`): albero stato -> foro -> elementi, ricerca, dettaglio del
   nodo scelto. *Show in model* / *Select and close* sul nodo scelto (un foro con i suoi elementi, un gruppo intero);
   *Create / Recreate*, *Move onto their elements* e *Delete (Not Associated)* sui fori spuntati (Delete solo sui Not
-  Associated: conferma con l'elenco, una transazione, poi New Report dell'ambito; gli Id dei fori cancellati si
-  tolgono dai MEP tramite `CheckScope.removed`). Dopo ogni azione i fori si ricontrollano, si riscrive e l'albero si
-  aggiorna (i fori ricreati entrano nell'ambito al posto dei vecchi). *Text report* apre il Text Report dello stato
-  attuale. Da un Last Report la prima azione fa prima il New Report dell'ambito (`ReportController.check_again()`).
+  Associated: conferma con l'elenco, una transazione, le righe dei fori cancellati spariscono). Prima e dopo ogni
+  azione si ricontrollano **solo i fori toccati** (`CheckSession.run_partial()`), si riscrive e l'albero si aggiorna
+  (i fori ricreati entrano nell'ambito al posto dei vecchi). *Text report* apre il Text Report dello stato attuale.
+  Il `TreeView` ha un solo nodo selezionato: la scelta multipla passa dalle spunte. **Shift + clic** su una casella
+  da' il suo stato a tutti i fori visibili (gruppi aperti, ricerca applicata) tra l'ultima casella cliccata e questa
+  (`_on_box_click()`).
+
+  **Ricontrollo parziale** (`run_partial()`, `related()`): i fori spuntati (o creati, o spostati), tutto il loro
+  gruppo di unione, i fori dell'ambito il cui box dista al massimo unione + 2 franchi (le unioni li riguardano) e
+  quelli dell'ambito mai visti nella sessione (es. tornati con un Undo). La scansione (`scan_openings()`) si limita a
+  muri, solai e strutture che toccano quei fori e agli elementi MEP del report che li toccano. Gli altri fori restano
+  come all'ultimo controllo; le unioni (`discipline_checks()`) si ricalcolano su tutti, e se cambiano lo stato di un
+  foro non ricontrollato se ne riscrive solo lo stato. Delete non ricontrolla niente: un foro Not Associated non entra
+  nelle unioni. *Refresh* fa il New Report di tutto l'ambito (`run()`). Da un Last Report la prima azione crea la
+  sessione senza controllo (`CheckSession(scope, last=...)`): i fori non toccati restano righe del Last Report
+  (`stored`) finche' un'azione o Refresh non li ricontrolla.
 
 **Finestre non modali** (Text Report e Interactive Report, `Window.Show()`, owner = finestra di Revit):
 
@@ -230,8 +243,8 @@ of* con la data, nel Last Report) e due schede grandi:
   pulsanti delle azioni sono spenti;
 - lo script dichiara `__persistentengine__ = True`: il comando finisce, ma il motore IronPython resta vivo per
   le finestre;
-- il modello puo' cambiare mentre la finestra e' aperta: *Refresh* rifa' il New Report dell'ambito; Create /
-  Recreate, Move e Delete lo rifanno sempre prima di agire (Recreate poi mostra l'anteprima);
+- il modello puo' cambiare mentre la finestra e' aperta: *Refresh* rifa' il New Report dell'ambito; Recreate e Move
+  ricontrollano prima i fori spuntati (Recreate poi mostra l'anteprima);
 - le azioni girano solo se il modello attivo e' quello del report, altrimenti un messaggio chiede di tornarci;
 - niente piu' pannello di output: le azioni fatte finiscono nella finestra (*Last action*) e nei dettagli del Text
   Report.
@@ -339,8 +352,10 @@ attraversanti. Un foro ricreato e' Valid e ha un nuovo Id.
   - separati: un foro misto e' To Be Refreshed (Regroup) e, ricreato, diventa due fori (uno per disciplina);
   - insieme: un foro MEC e uno ELE sullo stesso piano, a distanza <= accorpamento, sono To Be Refreshed e,
     ricreati, diventano un foro solo.
-- **Fori avvicinati:** due o piu' fori sullo stesso piano i cui fori ricalcolati (franco compreso) distano al
-  massimo la distanza di unione sono To Be Refreshed e, ricreati, diventano uno solo (Valid). Con MEC ed ELE
+- **Fori avvicinati:** due o piu' fori sullo stesso piano le cui sezioni, con il franco dei due fori, distano al
+  massimo la distanza di unione sono To Be Refreshed e, ricreati, diventano uno solo (Valid). E' lo stesso criterio
+  di Place (`clusters()`): l'arrotondamento non conta, altrimenti fori appena posati separati risulterebbero da
+  unire. Con MEC ed ELE
   separati si uniscono solo fori della stessa disciplina. I fori Not Associated (Changed: elementi tolti o usciti)
   **non entrano nelle unioni**: un elemento spostato vicino a un foro in ordine non deve renderlo Not Associated.
   Ricreato il foro Not Associated sulla nuova posizione, il check dopo propone l'unione dei due (To Be Refreshed). I

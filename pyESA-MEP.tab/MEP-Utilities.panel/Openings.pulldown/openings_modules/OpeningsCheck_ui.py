@@ -21,6 +21,7 @@ from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 from System.Windows.Media import BrushConverter
 from System.Windows.Forms import FolderBrowserDialog, DialogResult as FormsResult
+from System.Windows.Input import Keyboard, ModifierKeys
 
 import OpeningsReport_xlsx
 
@@ -374,6 +375,8 @@ class ReportWindow(object):
         self.status = find("StatusText")
         self.buttons = [find(name) for name in self.BUTTONS]
         self.checked = set()
+        self.boxes = {}  # chiave del foro -> casella nell'albero attuale
+        self.anchor = None  # chiave dell'ultima casella cliccata: Shift + clic spunta da li' a quella cliccata
         self.expanded = set(self.EXPANDED)
         self.search.TextChanged += self._on_search
         self.tree.SelectedItemChanged += self._on_selected
@@ -408,6 +411,7 @@ class ReportWindow(object):
             else:
                 self.expanded.discard(title)
         self.tree.Items.Clear()
+        self.boxes = {}
         for title, entries in self._visible():
             group = TreeViewItem()
             header = TextBlock()
@@ -433,6 +437,8 @@ class ReportWindow(object):
             box.VerticalAlignment = VerticalAlignment.Center
             box.Checked += self._on_check
             box.Unchecked += self._on_uncheck
+            box.Click += self._on_box_click
+            self.boxes[entry.key] = box
             row.Children.Add(box)
         label = TextBlock()
         label.Text = entry.label
@@ -452,6 +458,28 @@ class ReportWindow(object):
 
     def _on_uncheck(self, sender, args):
         self.checked.discard(sender.Tag.key)
+
+    def _shown_keys(self):
+        """Chiavi dei fori con la casella, nell'ordine in cui si vedono: solo i gruppi aperti (e la ricerca)."""
+        keys = []
+        for group in self.tree.Items:
+            if group.IsExpanded:
+                keys.extend(item.Tag[2].key for item in group.Items if item.Tag[2].key in self.boxes)
+        return keys
+
+    def _on_box_click(self, sender, args):
+        """Shift + clic: tutti i fori visibili tra l'ultima casella cliccata e questa prendono lo stato di questa (come
+        in Esplora risorse). Click arriva dopo che la casella ha cambiato stato."""
+        key = sender.Tag.key
+        if (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift and self.anchor is not None:
+            shown = self._shown_keys()
+            if self.anchor in shown and key in shown:
+                first, last = sorted((shown.index(self.anchor), shown.index(key)))
+                state = bool(sender.IsChecked)
+                for other in shown[first:last + 1]:
+                    self.boxes[other].IsChecked = state  # Checked / Unchecked aggiornano self.checked
+                self.status.Text = u"{} {} openings.".format("Ticked" if state else "Unticked", last - first + 1)
+        self.anchor = key
 
     def _on_search(self, sender, args):
         self._fill()
@@ -544,9 +572,9 @@ class ReportWindow(object):
                             "Refreshed openings with elements still crossing them.", TITLE)
             return
         keys = [e.key for e in entries]
-        # prima si ricontrolla l'ambito (il modello puo' essere cambiato), poi anteprima e conferma
+        # prima si ricontrollano i fori spuntati (il modello puo' essere cambiato), poi anteprima e conferma
         self._call("prepare_recreate", (keys,), lambda result: self._confirm_recreate(keys, result),
-                   "Checking the scope again first...")
+                   "Checking the ticked openings again first...")
 
     def _confirm_recreate(self, keys, result):
         preview, groups = result
@@ -555,7 +583,7 @@ class ReportWindow(object):
         message = (u"Recreate {} openings?\n\n{}\n\nEvery new opening gets a new Id and status Valid; the Ids on the "
                    u"MEP elements are updated.".format(len(keys), preview or u"(nothing to recreate)"))
         if MessageBox.Show(message, TITLE, MessageBoxButton.YesNo) != MessageBoxResult.Yes:
-            self.status.Text = "Cancelled; the list was checked again."
+            self.status.Text = "Cancelled; the ticked openings were checked again."
             return
         self._call("recreate", (keys,), self._show_groups, "Creating / recreating...")
 
@@ -564,7 +592,7 @@ class ReportWindow(object):
         if not entries:
             MessageBox.Show("Tick the openings to move: openings with elements partly or fully outside them.", TITLE)
             return
-        message = (u"Move {} openings onto their elements? The scope is checked again first; sizes and associations "
+        message = (u"Move {} openings onto their elements? They are checked again first; sizes and associations "
                    u"do not change.".format(len(entries)))
         if MessageBox.Show(message, TITLE, MessageBoxButton.YesNo) != MessageBoxResult.Yes:
             return
@@ -577,8 +605,8 @@ class ReportWindow(object):
             return
         keys = [e.key for e in entries]
         others = len([key for key in self.checked if key not in keys])
-        message = (u"Delete {} Not Associated openings?\n\n{}\n\nTheir Ids are removed from the MEP elements, and the "
-                   u"scope is checked again. Undo in Revit brings them back.".format(len(keys), u", ".join(keys)))
+        message = (u"Delete {} Not Associated openings?\n\n{}\n\nTheir elements stay in the report. Undo in Revit "
+                   u"brings them back.".format(len(keys), u", ".join(keys)))
         if others:
             message += u"\n\n{} other ticked items are not Not Associated openings and are left as they are.".format(
                 others)

@@ -67,6 +67,8 @@
                     <StackPanel x:Name="TickButtons" Grid.Row="3" Orientation="Horizontal" Margin="0,5,0,0">
                         <Button x:Name="SelectAllButton" Content="Select All" Width="90" Height="26" Margin="0,0,5,0"/>
                         <Button x:Name="DeselectAllButton" Content="Deselect All" Width="90" Height="26"/>
+                        <TextBlock Style="{StaticResource HintText}" VerticalAlignment="Center" Margin="10,0,0,0"
+                                   Text="Shift + click on a box: ticks (or unticks) every opening from the last box clicked"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -97,7 +99,7 @@
                             <Button x:Name="MoveButton" Content="Move onto their elements" Height="28" Margin="0,0,0,5"/>
                             <Button x:Name="DeleteButton" Content="Delete (Not Associated)" Height="28" Margin="0,0,0,5"/>
                             <TextBlock Style="{StaticResource HintText}"
-                                       Text="Recreate: the ticked openings are recreated on their elements. A preview says, opening by opening, what happens (recreated, split in two, joined with nearby openings, elements losing the association), then new openings with new Ids, status Valid, and the Ids on the MEP elements updated. Move: same size, centred on elements that moved out. Delete: only Not Associated openings; their Ids are removed from the MEP elements. After each action the openings are checked again and the list is updated. From a Last Report the first action runs New Report on the scope."/>
+                                       Text="Recreate: the ticked openings are recreated on their elements. A preview says, opening by opening, what happens (recreated, split in two, joined with nearby openings, elements losing the association), then new openings with new Ids, status Valid, and the Ids on the MEP elements updated. Move: same size, centred on elements that moved out. Delete: only Not Associated openings; their Ids are removed from the MEP elements. Each action checks again only the ticked openings and the ones next to them, before and after; the others stay as they are. Refresh checks the whole scope."/>
                         </StackPanel>
                     </Border>
                     <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1" CornerRadius="5"

@@ -197,11 +197,17 @@ def mm(value_ft):
     return value_ft * MM_PER_FT
 
 
+# una misura che supera un multiplo di meno di cosi' resta su quel multiplo. Con il franco di 25 mm le misure cadono
+# spesso su un multiplo esatto (canale 600 + 2 x 25 = 650): il rumore numerico di proiezioni, rotazione del foro e
+# transform dei link faceva saltare un passo (700), in modo diverso tra Place e New Report (foro To Be Refreshed)
+ROUND_TOL_MM = 0.5
+
+
 def round_up(value_mm):
     step = ctx.settings["rounding_mm"]
     if step <= 0:
         return value_mm
-    return math.ceil(value_mm / step - 1e-9) * step
+    return max(math.ceil((value_mm - ROUND_TOL_MM) / step), 1) * step
 
 
 def level_elevation(level):

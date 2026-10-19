@@ -228,7 +228,10 @@ def discipline_checks(results):
                 r["groups"] = split
                 r["state"] = max(r["state"], REGROUP, key=STATE_RANK.get)
                 r["notes"].append("MEC and ELE must be separate (Settings): it becomes two openings")
-    merge = ctx.settings["merge_mm"] / MM_PER_FT
+    # stessa distanza di Place (clusters): tra le sezioni degli elementi, con il franco dei due fori. Non tra i fori
+    # ricalcolati: con l'arrotondamento crescono fino a meta' passo per lato, e fori appena posati da Place come
+    # separati risultavano da unire (To Be Refreshed)
+    merge = (ctx.settings["merge_mm"] + 2.0 * ctx.settings["clearance_mm"]) / MM_PER_FT
     candidates = [r for r in live if len(r["groups"]) == 1 and r["state"] not in (CHANGED, PARTIAL)]
     parent = dict((id(r), id(r)) for r in candidates)
 
@@ -240,20 +243,50 @@ def discipline_checks(results):
     def disciplines(r):
         return set(i["discipline"] for i in r["items"])
 
-    for i in range(len(candidates)):
-        for j in range(i + 1, len(candidates)):
-            a, b = candidates[i], candidates[j]
+    def sphere(r):
+        """Sfera (centro, raggio) in numeri Python che contiene il rettangolo del foro nel suo piano, per scartare
+        senza chiamate .NET le coppie lontane: il box dei punti, ruotato negli assi del foro, sta entro raggio x
+        radice di 3."""
+        xs, ys, zs = [], [], []
+        for item in r["items"]:
+            for p in item["points"]:
+                xs.append(p.X)
+                ys.append(p.Y)
+                zs.append(p.Z)
+        center = ((max(xs) + min(xs)) / 2.0, (max(ys) + min(ys)) / 2.0, (max(zs) + min(zs)) / 2.0)
+        half = math.sqrt(((max(xs) - min(xs)) / 2.0) ** 2 + ((max(ys) - min(ys)) / 2.0) ** 2 +
+                         ((max(zs) - min(zs)) / 2.0) ** 2)
+        return center, half * math.sqrt(3.0)
+
+    def rect(r, frame):
+        u, v, _ = frame
+        pu = [p.DotProduct(u) for item in r["items"] for p in item["points"]]
+        pv = [p.DotProduct(v) for item in r["items"] for p in item["points"]]
+        return min(pu), max(pu), min(pv), max(pv)
+
+    spheres = dict((id(r), sphere(r)) for r in candidates)
+    widest = max([s[1] for s in spheres.values()] or [0.0])
+    # rettangoli a distanza <= merge nel piano: centri entro i due raggi + merge x radice di 2 (1.5 per margine)
+    reach = 1.5 * merge
+    order = sorted(candidates, key=lambda r: spheres[id(r)][0][0])
+    for i, a in enumerate(order):
+        (ax, ay, az), ra = spheres[id(a)]
+        for b in order[i + 1:]:
+            (bx, by, bz), rb = spheres[id(b)]
+            if bx - ax > ra + widest + reach:
+                break  # ordinati per X: i successivi sono ancora piu' lontani
+            if math.sqrt((bx - ax) ** 2 + (by - ay) ** 2 + (bz - az) ** 2) > ra + rb + reach:
+                continue
             if ctx.settings["separate"] and (len(disciplines(a)) > 1 or disciplines(a) != disciplines(b)):
                 continue
-            u, v, w = a["frame"]
+            w = a["frame"][2]
             if abs(w.DotProduct(b["frame"][2])) < 0.999:
                 continue
             if mm(abs(b["old"]["center"].Subtract(a["old"]["center"]).DotProduct(w))) > MOVE_TOL_MM:
                 continue  # non sullo stesso piano: muri o solai diversi
-            # fori come andrebbero ricalcolati (misure con il franco): si uniscono se distano <= unione
-            d = b["new"]["center"].Subtract(a["new"]["center"])
-            ha, hb = [[h / MM_PER_FT for h in half_sizes(r["new"])] for r in (a, b)]
-            gap = max(abs(d.DotProduct(u)) - ha[0] - hb[0], abs(d.DotProduct(v)) - ha[1] - hb[1])
+            ra_rect, rb_rect = rect(a, a["frame"]), rect(b, a["frame"])
+            gap = max(rb_rect[0] - ra_rect[1], ra_rect[0] - rb_rect[1], rb_rect[2] - ra_rect[3],
+                      ra_rect[2] - rb_rect[3])
             if gap <= merge:
                 parent[root(id(b))] = root(id(a))
     groups = {}
@@ -393,6 +426,42 @@ def scan_crossings(scope):
         items = find_crossings(hosts, stats, only=only, keep_existing=True,
                                progress=lambda i, n: bar.update_progress(i + 1, n), area=scope.area)
     return items, stats
+
+
+def scan_openings(scope, openings, scope_openings):
+    """Scansione ridotta a pochi fori (azioni dell'Interactive Report): degli attraversamenti di scan_crossings, solo
+    quelli che servono al check di questi fori. Elementi MEP del report (come scan_meps: elencati nei fori
+    dell'ambito, scelti, nell'area) che toccano i fori; muri, solai e strutture che toccano i fori (gli strati vicini
+    li aggiunge find_crossings). Un elemento piu' lontano della distanza di unione non entra comunque nel check del
+    foro. scope_openings: scope.openings(), gia' letto dal chiamante. Ritorna (attraversamenti, statistiche)."""
+    stats = {"inside": 0, "existing": 0, "extended": 0, "outside_area": 0, "problems": []}
+    margin = (ctx.settings["merge_mm"] + MOVE_TOL_MM) / MM_PER_FT
+    boxes = [b for b in (grown_box(o.get_BoundingBox(None), margin) for o in openings) if b is not None]
+    if not boxes:
+        return [], stats
+    report = set(m.text for m in scope.meps)
+    for opening in scope_openings:
+        report.update(parse_refs(get_text(opening, ctx.id_param)))
+    if scope.area is not None:
+        report.update(m.text for m in meps_in_area(scope.area))
+    only = set()
+    for box in boxes:
+        only.update(m.text for m in meps_in_outline(lambda transform, b=box: outline_in(b.Min, b.Max, transform))
+                    if m.text in report)
+    if not only:
+        return [], stats
+    hosts = hosts_in_boxes(boxes)
+    if not hosts:
+        return [], stats
+    return find_crossings(hosts, stats, only=only, keep_existing=True, area=scope.area), stats
+
+
+def scanned_by_ref(items):
+    """{riferimento: attraversamenti della scansione}: profondita' dei fori (strati aggiunti o tolti)."""
+    scanned = {}
+    for item in items:
+        scanned.setdefault(item["mep"].text, []).append(item)
+    return scanned
 
 
 def unlisted_crossings(items):

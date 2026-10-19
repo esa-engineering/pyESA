@@ -359,12 +359,21 @@ def mep_section(mep):
     points = solid_points(solids)
     if not points:
         raise ValueError("no geometry")
-    xs = [p.Subtract(origin).DotProduct(bx) for p in points]
-    ys = [p.Subtract(origin).DotProduct(by) for p in points]
+    round_shape = conn.Shape == DB.ConnectorProfileType.Round
+    if round_shape:
+        # tondo: raggio = distanza massima dall'asse. Gli estremi degli archi possono stare a un angolo qualsiasi, e
+        # proiettati su X e Y sottostimerebbero il diametro; la distanza dall'asse e' il raggio per ogni punto
+        axis = element.Location.Curve.Direction
+        radius = max(p.Subtract(origin).Subtract(axis.Multiply(p.Subtract(origin).DotProduct(axis))).GetLength()
+                     for p in points)
+        half_x = half_y = radius
+    else:
+        xs = [p.Subtract(origin).DotProduct(bx) for p in points]
+        ys = [p.Subtract(origin).DotProduct(by) for p in points]
+        half_x, half_y = (max(xs) - min(xs)) / 2.0, (max(ys) - min(ys)) / 2.0
     if mep.transform is not None:
         bx, by = mep.transform.OfVector(bx), mep.transform.OfVector(by)
-    mep._section = (bx, by, (max(xs) - min(xs)) / 2.0, (max(ys) - min(ys)) / 2.0,
-                    conn.Shape == DB.ConnectorProfileType.Round)
+    mep._section = (bx, by, half_x, half_y, round_shape)
     return mep._section
 
 
@@ -520,14 +529,35 @@ def outline_in(low, high, transform):
                       DB.XYZ(max(c.X for c in corners), max(c.Y for c in corners), max(c.Z for c in corners)))
 
 
+def grown_box(box, margin):
+    """Copia del BoundingBoxXYZ allargata di margin (piedi) su ogni lato; None resta None."""
+    if box is None:
+        return None
+    result = DB.BoundingBoxXYZ()
+    result.Min = box.Min.Subtract(DB.XYZ(margin, margin, margin))
+    result.Max = box.Max.Add(DB.XYZ(margin, margin, margin))
+    return result
+
+
+def boxes_touch(a, b, gap=0.0):
+    """I due BoundingBoxXYZ distano al massimo gap (piedi) lungo ogni asse."""
+    return a.Min.X <= b.Max.X + gap and b.Min.X <= a.Max.X + gap and a.Min.Y <= b.Max.Y + gap and \
+        b.Min.Y <= a.Max.Y + gap and a.Min.Z <= b.Max.Z + gap and b.Min.Z <= a.Max.Z + gap
+
+
 def hosts_from_meps(meps):
     """Modalita' inversa: muri, solai e strutture del modello host e dei link caricati che toccano il bounding box
     di almeno un elemento MEP scelto. Stesso formato di pick_hosts."""
+    return hosts_in_boxes([m.box() for m in meps])
+
+
+def hosts_in_boxes(boxes):
+    """Muri, solai e strutture del modello host e dei link letti che toccano almeno uno dei box (BoundingBoxXYZ in
+    coordinate host, None ignorati). Stesso formato di pick_hosts."""
     categories = List[DB.BuiltInCategory]([DB.BuiltInCategory.OST_Walls, DB.BuiltInCategory.OST_Floors,
                                            DB.BuiltInCategory.OST_StructuralFraming,
                                            DB.BuiltInCategory.OST_StructuralColumns,
                                            DB.BuiltInCategory.OST_StructuralFoundation])
-    boxes = [m.box() for m in meps]  # coordinate host
     boxes = [b for b in boxes if b is not None]
     hosts, seen = [], set()
     for source in searched_sources():

@@ -322,49 +322,135 @@ def missing_entry(ui, row, owners, released):
 # ----------------------------------------------------------------------------------------------------------------
 class CheckSession(object):
     """New Report di un ambito: controlla i fori, scrive stati e Id (Id vecchi tolti), salva il dettaglio per il
-    Last Report; ricrea e sposta i fori dalla finestra del report."""
+    Last Report; ricrea, sposta e cancella i fori dalla finestra del report.
+    run() controlla tutto l'ambito (New Report, Refresh); run_partial() solo i fori su cui agisce un'azione
+    dell'Interactive Report, con il loro gruppo di unione e i vicini: gli altri restano come all'ultimo controllo.
+    last: LastReport da cui nasce la sessione alla prima azione, senza controllo; i suoi fori restano righe del Last
+    Report (stored) finche' un'azione o Refresh non li ricontrolla."""
     title = "New Report"
 
-    def __init__(self, scope):
+    def __init__(self, scope, last=None):
         self.scope = scope
         self.symbols, self.missing_families = family_symbols()
         self.missing = set()
         self.log = []  # azioni fatte dalla finestra del report, per il report testuale
         self.origins = {}  # codice di un foro ricreato -> da dove viene (recreated / split / joined from ...)
-        self.run([])
+        self.checked = {}  # codice -> risultato di check_opening, prima delle unioni (discipline_checks)
+        self.stored = {}  # codice -> riga del Last Report, foro non ancora ricontrollato in questa sessione
+        self.results = []  # risultati di self.checked dopo le unioni, ordinati per codice
+        self.scan_stats = None  # statistiche della scansione dell'ultimo controllo completo
+        self.missing_rows = None  # i fori mancanti li cerca Place&Check: qui solo lo stato dei fori presenti
+        self.since = ""
+        if last is None:
+            self.run([])
+            return
+        self.stored = dict((row["code"], row) for row in last.rows)
+        self.origins = dict((row["code"], row["origin"]) for row in last.rows if row["origin"])
+        self.since = last.date
+        self.rows = sorted(self.stored.values(), key=lambda row: int(row["code"]))
+        self.added = self.stale = 0
+        self.timing = "no check yet (Last Report of {})".format(last.date)
+        self.date = last.date
 
     def run(self, removed):
+        """Controllo completo dell'ambito."""
         reset_models()  # link ricaricati mentre la finestra del report era aperta
         started = time.time()
         # prima gli attraversamenti degli elementi dell'ambito: elementi dentro un foro senza esservi associati
-        # (entrano nel suo check, e il foro nell'ambito) e attraversamenti senza foro (Missing openings)
+        # (entrano nel suo check, e il foro nell'ambito)
         items, self.scan_stats = scan_crossings(self.scope)
         unlisted = unlisted_crossings(items)
         self.scope.add(unlisted.keys())
-        scanned = {}  # riferimento -> attraversamenti: profondita' dei fori (strati aggiunti o tolti)
-        for item in items:
-            scanned.setdefault(item["mep"].text, []).append(item)
-        self.results = sorted([check_opening(o, list(unlisted.get(code_of(o), {}).values()), scanned)
-                               for o in self.scope.openings()], key=lambda r: int(r["code"]))
+        scanned = scanned_by_ref(items)
+        self.checked = dict((code_of(o), check_opening(o, list(unlisted.get(code_of(o), {}).values()), scanned))
+                            for o in self.scope.openings())
+        self.stored = {}
+        self.finish(set(removed), None, started)
+
+    def run_partial(self, codes, removed=()):
+        """Ricontrollo dei soli fori codes, con i fori del loro gruppo di unione, quelli vicini (le unioni li
+        riguardano) e quelli dell'ambito mai visti in questa sessione (es. tornati con un Undo). La scansione si
+        limita a loro (scan_openings). Gli altri fori restano come all'ultimo controllo: Refresh rifa' tutto."""
+        reset_models()
+        started = time.time()
+        removed = set(removed)
+        for code in removed:
+            self.checked.pop(code, None)
+            self.stored.pop(code, None)
+        in_scope = self.scope.openings()
+        targets = self.related(codes, in_scope)
+        items, _ = scan_openings(self.scope, targets, in_scope)
+        unlisted = unlisted_crossings(items)
+        scanned = scanned_by_ref(items)
+        for opening in targets:
+            code = code_of(opening)
+            self.checked[code] = check_opening(opening, list(unlisted.get(code, {}).values()), scanned)
+            self.stored.pop(code, None)
+        self.finish(removed, set(code_of(o) for o in targets), started)
+
+    def related(self, codes, in_scope):
+        """Fori dell'ambito da ricontrollare per un'azione su codes (vedi run_partial)."""
+        wanted = set(codes)
+        for r in self.results:
+            if r["code"] in wanted and r.get("merge_group"):
+                wanted.update(m["code"] for m in r["merge_group"])
+        # vicini: le unioni guardano le sezioni entro unione + 2 franchi, e il box di un foro contiene le sue
+        reach = (ctx.settings["merge_mm"] + 2.0 * ctx.settings["clearance_mm"] + MOVE_TOL_MM) / MM_PER_FT
+        boxes = [o.get_BoundingBox(None) for o in in_scope if code_of(o) in wanted]
+        boxes = [b for b in boxes if b is not None]
+        targets = []
+        for opening in in_scope:
+            code = code_of(opening)
+            if code in wanted or (code not in self.checked and code not in self.stored):
+                targets.append(opening)
+                continue
+            box = opening.get_BoundingBox(None)
+            if box is not None and any(boxes_touch(box, b, reach) for b in boxes):
+                targets.append(opening)
+        return targets
+
+    def finish(self, removed, targets, started):
+        """Unioni e divisioni su tutti i fori controllati, scrittura, righe del report, file del Last Report.
+        targets: codici controllati ora (None: tutti). Degli altri si riscrive solo lo stato, e solo se le unioni lo
+        cambiano: i loro riferimenti vengono da un controllo precedente."""
+        for table in (self.checked, self.stored):
+            for code in list(table):
+                if code in removed or not table[code]["instance"].IsValidObject:
+                    del table[code]  # cancellato, anche a mano o con un Undo mentre la finestra era aperta
+        self.results = []
+        for r in self.checked.values():
+            copy = dict(r)  # discipline_checks cambia stato, gruppi e note: il risultato del check resta com'e'
+            copy["notes"] = list(r["notes"])
+            self.results.append(copy)
+        self.results.sort(key=lambda r: int(r["code"]))
         discipline_checks(self.results)
-        self.missing_rows = None  # i fori mancanti li cerca Place&Check: qui solo lo stato dei fori presenti
         self.added = sum(len(r["added"]) for r in self.results)
         self.stale = sum(len(r["stale"]) for r in self.results)  # Id di elementi cancellati, tolti dai fori
         # si scrivono solo i fori (stato, riferimenti, categorie): sui MEP niente
+        written = set()
         transaction = DB.Transaction(ctx.doc, "Openings: check")
         transaction.Start()
         try:
             for r in self.results:
-                write_opening(r["instance"], r["found_meps"], r["state"], self.missing, r["unloaded"])
+                if targets is None or r["code"] in targets:
+                    write_opening(r["instance"], r["found_meps"], r["state"], self.missing, r["unloaded"])
+                    written.add(r["code"])
+                elif get_text(r["instance"], ctx.status_param) != WRITTEN[r["state"]]:
+                    set_text(r["instance"], ctx.status_param, WRITTEN[r["state"]], self.missing)
+                    written.add(r["code"])
             transaction.Commit()
         except Exception:
             if transaction.GetStatus() == DB.TransactionStatus.Started:
                 transaction.RollBack()
             raise
-        self.rows = [check_row(r, self.origins) for r in self.results]
-        self.elapsed = time.time() - started
+        rows = [check_row(r, self.origins) for r in self.results]
+        self.rows = sorted(rows + list(self.stored.values()), key=lambda row: int(row["code"]))
+        elapsed = time.time() - started
+        self.timing = "{:.1f} s, {}".format(elapsed, "whole scope ({} openings)".format(len(self.results))
+                                            if targets is None else "{} openings (the ones acted on and their "
+                                                                    "neighbours)".format(len(targets)))
         self.date = datetime.now().strftime("%d.%m.%Y %H:%M")
-        save_last_check(self.rows, removed, self.scope, self.missing_rows)
+        save_last_check([row for row in rows if row["code"] in written], removed, self.scope, self.missing_rows)
 
     def totals(self):
         return status_totals(self)
@@ -372,17 +458,22 @@ class CheckSession(object):
     def details(self):
         """Righe in piu' del report testuale."""
         stats = self.scan_stats
-        return models_lines() + ["Statuses and element Ids written on the openings, in one transaction (one Undo). "
-                                 "MEP elements are not written.",
-                "Only the openings already in the model are checked; new openings: Place&Check.",
-                "Crossings of the MEP elements in this report: {} inside an opening ({} elements not associated "
-                "before, now added), {} running inside a wall or floor (no opening).".format(
-                    stats["existing"], self.added, stats["inside"])] + \
-               (["Crossings outside the area (not checked): {}.".format(stats["outside_area"])]
-                if stats.get("outside_area") else []) + \
-               ["- {}".format(p) for p in stats["problems"]] + [
-                "Ids of deleted elements removed from the openings: {}.".format(self.stale),
-                "Time: last check {:.1f} s.".format(self.elapsed)]
+        lines = models_lines() + ["Statuses and element Ids written on the openings, in one transaction (one Undo). "
+                                  "MEP elements are not written.",
+                                  "Only the openings already in the model are checked; new openings: Place&Check."]
+        if stats is not None:
+            lines.append("Crossings of the MEP elements in this report (last full check): {} inside an opening ({} "
+                         "elements not associated before, now added), {} running inside a wall or floor (no "
+                         "opening).".format(stats["existing"], self.added, stats["inside"]))
+            if stats.get("outside_area"):
+                lines.append("Crossings outside the area (not checked): {}.".format(stats["outside_area"]))
+            lines.extend("- {}".format(p) for p in stats["problems"])
+        if self.stored:
+            lines.append("{} openings not checked again in this window: as in the Last Report of {}. Refresh checks "
+                         "the whole scope.".format(len(self.stored), self.since))
+        lines += ["Ids of deleted elements removed from the openings: {}.".format(self.stale),
+                  "Time: last check {}.".format(self.timing)]
+        return lines
 
     def warning(self):
         """Avviso del riepilogo, solo se qualcosa non si e' potuto scrivere."""
@@ -437,7 +528,7 @@ class CheckSession(object):
             self.origins.pop(code, None)
         self.origins.update(origins)
         self.scope.replace(removed, created)
-        self.run(removed)  # ricontrollo e scrittura degli stati
+        self.run_partial(created, removed)  # ricontrollo dei fori nuovi e dei vicini, scrittura degli stati
         lines = list(events) or ["Nothing recreated"]
         if skipped:
             lines.append("Skipped (no element crossing, or link not loaded): {}.".format(", ".join(skipped)))
@@ -460,7 +551,7 @@ class CheckSession(object):
             if transaction.GetStatus() == DB.TransactionStatus.Started:
                 transaction.RollBack()
             raise
-        self.run([])
+        self.run_partial([r["code"] for r, _ in moves])
         message = "Moved onto their elements: {} ({}).".format(
             len(moves), ", ".join("{} by {:.0f} mm".format(r["code"], v.GetLength() * MM_PER_FT) for r, v in moves))
         self.log.append(message)
@@ -697,8 +788,9 @@ class ReportRunner(IExternalEventHandler):
 
 class ReportController(object):
     """Azioni della finestra del report (OpeningsCheck_ui.ReportWindow), chiamate con call(nome, argomenti, fatto)
-    e messe in coda su un ExternalEvent. Il modello puo' cambiare mentre la finestra e' aperta: Create / Recreate,
-    Move e Delete rifanno prima il New Report dell'ambito (da un Last Report e' il primo controllo vero)."""
+    e messe in coda su un ExternalEvent. Il modello puo' cambiare mentre la finestra e' aperta: Recreate e Move
+    ricontrollano prima i fori spuntati (con gruppo di unione e vicini), e dopo l'azione solo i fori toccati
+    (CheckSession.run_partial). Refresh rifa' il New Report di tutto l'ambito."""
 
     def __init__(self, report, ui):
         self.report, self.ui = report, ui
@@ -737,6 +829,13 @@ class ReportController(object):
             self.report = CheckSession(self.report.scope)
             self.report.log.append("New Report run on the scope from the Interactive Report.")
 
+    def session(self):
+        """Sessione di controllo per le azioni. Da un Last Report si crea senza controllare niente: ogni azione
+        ricontrolla solo i fori su cui agisce."""
+        if not isinstance(self.report, CheckSession):
+            self.report = CheckSession(self.report.scope, last=self.report)
+        return self.report
+
     def groups(self):
         return report_groups(self.ui, self.report)
 
@@ -755,19 +854,19 @@ class ReportController(object):
                                                  if missing else "")
 
     def prepare_recreate(self, keys):
-        self.check_again()
+        self.session().run_partial(keys)
         return self.report.recreate_preview(keys), self.groups()
 
     def recreate(self, keys):
-        return self.report.recreate(keys), self.groups()
+        return self.session().recreate(keys), self.groups()
 
     def move(self, keys):
-        self.check_again()
+        self.session().run_partial(keys)
         return self.report.move(keys), self.groups()
 
     def delete(self, keys):
-        """Cancella i fori spuntati (la finestra offre solo i Not Associated), poi New Report dell'ambito: gli Id dei
-        fori cancellati si tolgono dagli elementi MEP (CheckScope.removed)."""
+        """Cancella i fori spuntati (la finestra offre solo i Not Associated). Niente ricontrollo: un foro Not
+        Associated non entra nelle unioni, quindi gli altri fori non cambiano; si tolgono le sue righe."""
         managed = dict((code_of(o), o) for o in existing_openings())
         codes = [k for k in keys if k in managed]
         if not codes:
@@ -788,10 +887,7 @@ class ReportController(object):
                 transaction.RollBack()
             raise
         self.report.scope.replace(codes, [])
-        if isinstance(self.report, CheckSession):
-            self.report.run(codes)
-        else:
-            self.report = CheckSession(self.report.scope)
+        self.session().run_partial([], codes)
         message = "Deleted {} openings ({}).".format(len(codes), ", ".join(codes))
         self.report.log.append(message)
         return message, self.groups()
