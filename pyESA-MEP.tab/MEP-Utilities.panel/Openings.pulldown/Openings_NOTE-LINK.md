@@ -27,7 +27,7 @@ Piano di lavoro per il passaggio a un modello Openings separato, con MEP e ARC s
 | Fori senza piu' elementi dentro | Si **tengono**: con un Id MEP associato ma nessun elemento al loro interno risultano *Not Associated* nel report |
 | Revit minimo | **2023** (niente 2022): `Selection.SetReferences` utilizzabile, da verificare sui link |
 | Percorso dei modelli | Quando si selezionano elementi di un link, il report mostra modello e percorso del file |
-| Fasi e workset dei link | Come MEPQTO (vedi "Link: fasi e workset") |
+| Fasi e workset dei link | Fase come MEPQTO (vedi "Link: fasi e workset"); **workset: nessun filtro** (19.10.2026) |
 | Fori nei modelli MEP / ARC | Il modello Openings e' **linkato** li': Show zooma sul foro vero nel link. Senza link, ripiego sul bounding box salvato nel JSON |
 | Scrittura nei modelli MEP / ARC | Solo visualizzazione; *Write status* **opzionale** (pulsante a parte, scrive in un parametro se c'e') |
 
@@ -115,16 +115,15 @@ ogni volta, `<Openings>_Openings.json` sovrascritto (quello che leggono i modell
   il transform del link Openings. Senza link Openings: con l'inverso di `models.<modello>.transform` (BasisX, BasisY,
   BasisZ, Origin del link nel modello Openings, in piedi), gia' nella versione 1 dello schema.
 
-## Link: fasi e workset (come MEPQTO)
+## Link: fasi e workset
 
-- **Fase.** Un elemento del link ha le fasi del *suo* documento, che non sono quelle del modello Openings. Per ogni
-  link si cerca la fase con lo **stesso nome** di quella scelta nell'host; si leggono solo gli elementi esistenti in
-  quella fase (creati prima o in quella fase, non demoliti). Se il link non ha una fase con quel nome, il link si
-  salta e il report lo dice (non si indovina).
-- **Workset.** Si escludono per **nome**, non per Id: gli Id dei workset cambiano da documento a documento, i nomi
-  no. Nella finestra di New Report l'elenco dei nomi dei workset di tutti i link, spunta = leggi. I nomi mai visti
-  prima compaiono spuntati e segnalati, cosi' un workset nuovo (es. "MEP_Provvisorio") non sparisce in silenzio.
-  Config `ESA_Openings`: `last_included_worksets`, `last_known_worksets`.
+- **Fase** (come MEPQTO). Un elemento del link ha le fasi del *suo* documento, che non sono quelle del modello
+  Openings. La fase letta e' quella della vista attiva (o l'ultima del progetto); per ogni modello si cerca la fase
+  con lo **stesso nome**; si cercano solo gli elementi esistenti in quella fase (creati prima o in quella fase, non
+  demoliti). Un link senza una fase con quel nome non si cerca e il report lo dice (non si indovina); i riferimenti
+  gia' scritti sui fori si leggono lo stesso.
+- **Workset: nessun filtro** (19.10.2026). Un workset da ignorare del tutto e' raro; semmai quegli elementi vanno in
+  un modello a parte, che in Place&Check non si spunta. Un filtro per workset toglierebbe fori senza segnale.
 - Le chiavi sono in inglese, gli stati sono i testi scritti (`Valid`, `To Be Refreshed`, `Not Associated`).
 
 ## Last Report nei modelli MEP / ARC
@@ -143,38 +142,26 @@ Last Report riconosce il caso: nessun foro gestito nel modello aperto, e il mode
 
 ## Fasi
 
-0. **Fatto (19.10.2026):** risolto il merge `79cb08f` committato con i marker di conflitto; tenuta ovunque la
-   versione con Area (commit `152f181`).
-   **Fase 1 fatta e provata in Revit sul modello MEP + fori (commit `f545a96`).** Moduli in `openings_modules/`,
-   stato del comando in `openings_core.ctx`.
-   **Fase 3 scritta (19.10.2026), da provare in Revit:** `MepRef` in tutto il codice (Place, New Report, Last
-   Report), MEP cercati anche nei link, riferimenti `<modello>:<id>`, selezione MEP nei link, modelli e percorsi nel
-   report, link non caricato = riferimento tenuto e stato invariato. Provata in Revit, commit `adeb102` (con la
-   scelta dei link in Place&Check e la finestra dell'esito). Fase 2 (fasi, workset, lettura unica) ancora da fare.
-   **Fase 4 scritta (19.10.2026), da provare in Revit:** formato dei riferimenti
-   `111,222; PRJ_MEC: 333,444` (`parse_refs` / `format_refs`, legge anche i formati vecchi), niente scrittura sui MEP
-   (tolti `write_mep`, `mep_candidates`, `plan_writes` e le righe "Stale Ids" del report), fori orfani come deciso
-   sotto (ricerca nel bounding box, Recreate sugli elementi trovati dentro). Verifiche fatte fuori da Revit: compilazione con l'IronPython 2.7 di pyRevit
-   (`bin\netfx\engines\IPY2712PR`), nessun nome globale indefinito nella catena di `import *`, nessun nome definito
-   in due moduli, AST di 181 blocchi identico all'originale (con `ctx.x` riportato al nome globale); diversi solo
-   `load_settings`, `bundle_path`, `revit_owner`, `family_line`, `place_main`, `ReportController` (voluti).
-1. **Divisione in moduli** come MEPQTO: un solo `openings_*.py` per tema (es. `openings_geometry.py`,
-   `openings_check.py`, `openings_report.py`) in `Openings.pulldown/openings_modules/` (senza suffisso, pyRevit la
-   ignora), aggiunta a `sys.path` dai tre `script.py`, che restano entry point con `MODE`. Ci finiscono anche
-   `OpeningsCheck_ui`, `OpeningsReport_xlsx` e le XAML oggi copiati tre volte. Nessun modulo fuori da Openings la
-   importa; eccezione documentata in CLAUDE.md, la regola "no shared library" resta. Refactor puro, nessun cambio di
-   comportamento: si prova che fa esattamente quello di oggi, e che Reload ricarica i moduli della cartella.
-2. **Lettura dei link una volta sola**: record Python (curva, sezione, categoria, chiave) per MEP e host di tutti i
-   link, con fase e workset come sopra; poi i calcoli girano sui record. Misurare i tempi su un progetto vero.
-3. **`MepRef`** + Place (Area, MEP selection, ARC selection) nel modello Openings. Verifica: fori identici a quelli
-   fatti oggi con i MEP nell'host.
-4. **New Report** e Interactive Report con i MEP linkati; niente scrittura sui MEP; stati *Link not loaded* e *Not
-   Associated* (fori orfani, mantenuti, con nota se dentro ci sono altri elementi; Recreate li riassocia).
-5. **JSON** di lavoro + Export (schema v1 con `path`, `phase`, `transform`).
-6. **Last Report** nei modelli MEP / ARC (import, Select / Show con `SetReferences`, ripiego zoom + box).
-7. Write status (opzionale).
+| Fase | Contenuto | Stato |
+| --- | --- | --- |
+| 0 | Merge `79cb08f` committato con i marker di conflitto: tenuta ovunque la versione con Area | Fatto (`152f181`) |
+| 1 | Divisione in moduli in `openings_modules/` (cartella senza suffisso, aggiunta a `sys.path` dai pulsanti), stato del comando in `openings_core.ctx`. Refactor puro: AST di 181 blocchi identico all'originale | Fatto, provato (`f545a96`) |
+| 3 | `MepRef` in tutto il codice, MEP cercati anche nei link, selezione MEP nei link, modelli e percorsi nel report, link non caricato = riferimento tenuto e stato invariato; scelta dei link in Place&Check; Place rinominato Place&Check, esito in finestra; New Report solo sui fori presenti | Fatto, provato (`adeb102`) |
+| 4 | Riferimenti `111,222; PRJ_MEC: 333,444` (`parse_refs` / `format_refs`, legge anche i formati vecchi); niente scrittura sui MEP; fori orfani (ricerca nel bounding box, Recreate sugli elementi trovati dentro) | Fatto, provato (commit dell'utente) |
+| 2 | Fase della vista attiva, ogni modello nella fase con lo stesso nome (senza: non cercato, riferimenti letti); tempi nell'esito e nel New Report. Workset: nessun filtro (scritto e tolto il 19.10.2026). Lettura unica dei link solo se i tempi sui progetti veri lo richiedono | Scritto, da provare |
+| 5 | JSON di lavoro + Export (schema v1 con `path`, `phase`, `transform`) | Da fare |
+| 6 | Last Report nei modelli MEP / ARC (import, Select / Show con `SetReferences`, ripiego zoom + box) | Da fare |
+| 7 | Write status (opzionale) | Da fare |
 
-Ogni fase si chiude e si prova in Revit prima della successiva.
+Ogni fase si chiude e si prova in Revit prima della successiva. Verifiche fuori da Revit, a ogni fase: compilazione
+con l'IronPython 2.7 di pyRevit (`bin\netfx\engines\IPY2712PR`), nessun nome globale indefinito nella catena di
+`import *`, nessun nome definito in due moduli.
+
+## Richieste per dopo
+
+- **Settings: categorie da leggere**, due liste affiancate: categorie MEP (oggi fisse: tubi, canali, passerelle,
+  conduit) e categorie ARC/STR (oggi fisse: muri, solai, travi, pilastri, fondazioni). Chiesto il 19.10.2026, da
+  fare dopo le fasi in corso. Tocca `MEP_CATEGORIES`, `HOST_CATEGORIES`, `HOST_KINDS` e i filtri di selezione.
 
 ## Punti aperti
 

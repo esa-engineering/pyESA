@@ -1,43 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Openings: comando Place (fori nuovi sugli attraversamenti scelti; gli elementi gia' associati vanno al check)."""
+"""Openings: comando Place&Check (fori nuovi sugli attraversamenti scelti; gli elementi gia' associati vanno al
+check)."""
 from openings_report import *  # noqa: F401,F403
 
 
-SKIPPED_LINKS_OPTION = "place_skipped_links"  # ["<modello>::<chiave>|<chiave>"], link non spuntati per modello
-SKIPPED_LINKS_MAX = 50
-
-
-def model_key():
-    """Chiave del modello aperto nella configurazione: percorso del centrale o del file, altrimenti il titolo."""
-    return doc_path(ctx.doc) or ctx.doc.Title
-
-
-def load_skipped_links():
-    try:
-        entries = script.get_config(CONFIG_NAME).get_option(SKIPPED_LINKS_OPTION, []) or []
-    except Exception:
-        return set()
-    prefix = model_key() + "::"
-    for entry in entries:
-        if entry.startswith(prefix):
-            return set(k for k in entry[len(prefix):].split("|") if k)
-    return set()
-
-
-def save_skipped_links(skipped):
-    """Ricorda i link non spuntati di questo modello (i link nuovi compaiono spuntati). Errori silenziosi."""
-    try:
-        config = script.get_config(CONFIG_NAME)
-        prefix = model_key() + "::"
-        entries = [e for e in (config.get_option(SKIPPED_LINKS_OPTION, []) or []) if not e.startswith(prefix)]
-        setattr(config, SKIPPED_LINKS_OPTION, ([prefix + "|".join(sorted(skipped))] + entries)[:SKIPPED_LINKS_MAX])
-        script.save_config()
-    except Exception:
-        pass
-
-
 def skip_links(skipped):
-    """Da qui in poi Place non legge questi link (MEP, muri, solai e strutture)."""
+    """Da qui in poi Place&Check non legge questi link (MEP, muri, solai e strutture)."""
     ctx.skipped_links = frozenset(skipped)
     reset_models()
 
@@ -75,19 +43,21 @@ def place_main():
             return
         if missing_families:
             missing_families_exit(missing_families)
-        skip_links(load_skipped_links())  # senza finestra: i link scelti l'ultima volta (il check sopra li legge tutti)
+        # senza finestra: i link scelti l'ultima volta (il check sopra li legge tutti)
+        skip_links(load_model_list(SKIPPED_LINKS_OPTION))
     else:
         if missing_families:
             missing_families_exit(missing_families)
-        links, remembered = loaded_links(), load_skipped_links()
+        links, remembered = loaded_links(), load_model_list(SKIPPED_LINKS_OPTION)
         window = OpeningsPlace_ui.PickWindow(bundle_path(PICK_XAML), last_pick(),
-                                             "{}\n{}".format(settings_line(), family_line()), links, remembered)
+                                             "{}\n{}".format(settings_line(), family_line()), links, remembered,
+                                             phase_name())
         pick = window.show()
         if pick is None:
             script.exit()
         remember_pick(pick)
         # i link tolti che ora non sono caricati restano tolti quando tornano
-        save_skipped_links(window.skipped | (remembered - set(key for key, _ in links)))
+        save_model_list(SKIPPED_LINKS_OPTION, window.skipped | (remembered - set(key for key, _ in links)))
         skip_links(window.skipped)
         if pick == OpeningsPlace_ui.PICK_MEPS:
             meps = pick_meps()
@@ -96,6 +66,7 @@ def place_main():
         else:
             hosts = pick_hosts()
 
+    started = time.time()  # tempi nell'esito: per capire se la lettura dei link va ottimizzata
     stats = {"inside": 0, "existing": 0, "extended": 0, "outside_area": 0, "problems": []}
     items, modes = [], []
     if area is not None:
@@ -121,6 +92,7 @@ def place_main():
     mode_text = "; ".join(modes)
     items = merge_overlapping(items)
     groups = clusters(items)
+    searched = time.time() - started
     # righe comuni dell'esito: conteggi della ricerca e dettagli (impostazioni, modelli letti, problemi)
     summary = [("Mode", mode_text), ("Crossings found", len(items)),
                ("Already with an opening", stats["existing"]), ("Running inside (no opening)", stats["inside"]),
@@ -130,7 +102,8 @@ def place_main():
     if ignored:
         summary.append(("Selected elements not used", "{} (not MEP, opening, wall, floor or structure, or not "
                                                        "straight)".format(ignored)))
-    details = ["Settings: {}.".format(settings_line()), family_line()] + models_lines()
+    details = ["Settings: {}.".format(settings_line()), family_line()] + models_lines() + [
+        "Time: crossings searched in {:.1f} s.".format(searched)]
     problems = "\n".join(stats["problems"])
     if not groups:
         show_result("NO NEW OPENINGS NEEDED", "Every crossing found already has an opening, or none was found.",
@@ -142,6 +115,7 @@ def place_main():
         script.exit()
 
     missing = set()
+    started = time.time()
     rows, ids = [], []
     transaction = DB.Transaction(ctx.doc, ctx.title)
     transaction.Start()
@@ -169,4 +143,4 @@ def place_main():
         (["Not read:\n" + problems] if problems else [])
     show_result("OPENINGS CREATED", "{} new openings, in one transaction (one Undo).".format(len(groups)),
                 [("Openings created", len(groups))] + summary, rows, ids, "\n\n".join(warnings),
-                [written] + details)
+                [written, "Time: openings created in {:.1f} s.".format(time.time() - started)] + details)

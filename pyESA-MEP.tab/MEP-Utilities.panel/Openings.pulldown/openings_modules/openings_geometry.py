@@ -40,12 +40,30 @@ def unit(vector):
 # ----------------------------------------------------------------------------------------------------------------
 # Modelli letti (host e link RVT caricati) e riferimenti agli elementi MEP (MepRef)
 # ----------------------------------------------------------------------------------------------------------------
+# elementi che esistono nella fase letta: costruiti prima o in quella fase, non demoliti
+PHASE_STATUSES = List[DB.ElementOnPhaseStatus]([DB.ElementOnPhaseStatus.Existing, DB.ElementOnPhaseStatus.New])
+
+
 class Source(object):
     """Modello da cui si leggono elementi: l'host (link_id 0, transform None, key "") o un'istanza di link caricata.
-    key: nome del modello nei riferimenti ("PRJ_MEC"; "PRJ_MEC#2" se il link e' inserito piu' volte)."""
+    key: nome del modello nei riferimenti ("PRJ_MEC"; "PRJ_MEC#2" se il link e' inserito piu' volte).
+    phase_id: fase con lo stesso nome di quella letta (phase_name), None se il modello non ce l'ha: allora i suoi
+    elementi non si cercano (searchable False), ma i riferimenti gia' scritti sui fori si risolvono lo stesso.
+    Nessun filtro per workset (deciso il 19.10.2026): elementi da ignorare stanno in un modello a parte, non letto."""
 
     def __init__(self, doc, transform, link_id, key, path):
         self.doc, self.transform, self.link_id, self.key, self.path = doc, transform, link_id, key, path
+        self.phase_id = phase_by_name(doc, phase_name())
+
+    @property
+    def searchable(self):
+        return self.phase_id is not None
+
+    def collector(self):
+        """Collector del modello per cercare elementi: solo quelli che esistono nella fase letta. Per risolvere i
+        riferimenti scritti sui fori non si usa (mep_by_ref)."""
+        return DB.FilteredElementCollector(self.doc).WherePasses(
+            DB.ElementPhaseStatusFilter(self.phase_id, PHASE_STATUSES))
 
 
 def doc_path(document):
@@ -67,6 +85,72 @@ def element_name(element):
         return DB.Element.Name.GetValue(element)
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# Configurazione per modello (ESA_Openings): liste "<percorso del modello>::<valore>|<valore>", al massimo 50
+# ----------------------------------------------------------------------------------------------------------------
+MODEL_LIST_MAX = 50
+SKIPPED_LINKS_OPTION = "place_skipped_links"        # link non spuntati in Place&Check
+
+
+def model_key():
+    """Chiave del modello aperto nella configurazione: percorso del centrale o del file, altrimenti il titolo."""
+    return doc_path(ctx.doc) or ctx.doc.Title
+
+
+def load_model_list(option):
+    try:
+        entries = script.get_config(CONFIG_NAME).get_option(option, []) or []
+    except Exception:
+        return set()
+    prefix = model_key() + "::"
+    for entry in entries:
+        if entry.startswith(prefix):
+            return set(v for v in entry[len(prefix):].split("|") if v)
+    return set()
+
+
+def save_model_list(option, values):
+    """Errori silenziosi. I nomi dei link non contengono "|"."""
+    try:
+        config = script.get_config(CONFIG_NAME)
+        prefix = model_key() + "::"
+        entries = [e for e in (config.get_option(option, []) or []) if not e.startswith(prefix)]
+        setattr(config, option, ([prefix + "|".join(sorted(values))] + entries)[:MODEL_LIST_MAX])
+        script.save_config()
+    except Exception:
+        pass
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Fase letta
+# ----------------------------------------------------------------------------------------------------------------
+def phase_name():
+    """Fase letta: quella della vista attiva; se la vista non ne ha (fogli, abachi), l'ultima del progetto. Ogni link
+    si legge nella fase con lo stesso nome (le fasi di documenti diversi hanno Id diversi)."""
+    if ctx.phase_name is None:
+        name = ""
+        try:
+            phase = ctx.doc.GetElement(ctx.doc.ActiveView.get_Parameter(DB.BuiltInParameter.VIEW_PHASE).AsElementId())
+            name = phase.Name if isinstance(phase, DB.Phase) else ""
+        except Exception:
+            pass
+        if not name:
+            phases = list(ctx.doc.Phases)
+            name = phases[-1].Name if phases else ""
+        ctx.phase_name = name
+    return ctx.phase_name
+
+
+def phase_by_name(document, name):
+    for phase in document.Phases:
+        if phase.Name == name:
+            return phase.Id
+    return None
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Modelli letti
+# ----------------------------------------------------------------------------------------------------------------
 def link_sources():
     """(modelli letti [Source], host per primo; {nome: [istanze]} dei link non caricati; titoli di link diversi
     con lo stesso nome; link caricati ma non letti [Source], tolti in Place: ctx.skipped_links). Letti una volta per
@@ -97,15 +181,15 @@ def link_sources():
     return ctx.sources
 
 
+def searched_sources():
+    """Modelli in cui si cercano elementi: letti e con la fase letta."""
+    return [s for s in link_sources()[0] if s.searchable]
+
+
 def loaded_links():
     """[(chiave, percorso)] di tutti i link caricati, anche quelli tolti in Place (per la finestra di Place)."""
     loaded, _, _, skipped = link_sources()
     return sorted((s.key, s.path) for s in loaded[1:] + skipped)
-
-
-def model_sources():
-    """(documento, transform o None, id del link o 0) del modello host e dei link RVT caricati."""
-    return [(s.doc, s.transform, s.link_id) for s in link_sources()[0]]
 
 
 def source_by_key(key):
@@ -123,12 +207,19 @@ def source_by_link(link_id):
 
 
 def models_lines():
-    """Righe del report: modelli letti (con il percorso), link non caricati, nomi doppi."""
+    """Righe del report: fase, modelli letti (con il percorso), link senza la fase, link non
+    caricati, nomi doppi."""
     loaded, unloaded, clashes, skipped = link_sources()
-    lines = ["Models read: {}.".format("; ".join(
-        "{} ({})".format(s.key or "this model", s.path or "not saved") for s in loaded))]
+    lines = ["Phase read: {} (phase of the active view; links in the phase with the same name).".format(
+        phase_name() or "none"),
+        "Models read: {}.".format("; ".join(
+            "{} ({})".format(s.key or "this model", s.path or "not saved") for s in loaded if s.searchable))]
+    no_phase = [s.key or "this model" for s in loaded if not s.searchable]
+    if no_phase:
+        lines.append("Without a phase named '{}' (their elements are not searched; references already on the "
+                     "openings are still read): {}.".format(phase_name(), ", ".join(no_phase)))
     if skipped:
-        lines.append("Links not read (unticked in Place): {}.".format(", ".join(sorted(s.key for s in skipped))))
+        lines.append("Links not read (unticked in Place&Check): {}.".format(", ".join(sorted(s.key for s in skipped))))
     if unloaded:
         lines.append("Links not loaded (their elements are not read): {}.".format(", ".join(sorted(unloaded))))
     if clashes:
@@ -390,12 +481,12 @@ def is_straight_mep(element):
 
 
 def meps_in_outline(outline_of):
-    """MepRef degli elementi MEP rettilinei, dell'host e dei link caricati, che toccano l'outline. outline_of(transform
-    del modello o None) -> DB.Outline nelle coordinate di quel modello."""
+    """MepRef degli elementi MEP rettilinei, dell'host e dei link letti (fase: Source.collector), che
+    toccano l'outline. outline_of(transform del modello o None) -> DB.Outline nelle coordinate di quel modello."""
     categories = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](MEP_CATEGORIES))
     found = []
-    for source in link_sources()[0]:
-        for element in DB.FilteredElementCollector(source.doc).WherePasses(categories)\
+    for source in searched_sources():
+        for element in source.collector().WherePasses(categories)\
                 .WherePasses(DB.BoundingBoxIntersectsFilter(outline_of(source.transform)))\
                 .WhereElementIsNotElementType():
             if is_straight_mep(element):
@@ -423,19 +514,12 @@ def hosts_from_meps(meps):
     boxes = [m.box() for m in meps]  # coordinate host
     boxes = [b for b in boxes if b is not None]
     hosts, seen = [], set()
-    for source_doc, transform, link_id in model_sources():
-        inverse = transform.Inverse if transform is not None else None
-        model = source_doc.Title if link_id else "Host model"
+    for source in searched_sources():
+        transform, link_id = source.transform, source.link_id
+        model = source.doc.Title if link_id else "Host model"
         for box in boxes:
-            corners = [DB.XYZ(x, y, z) for x in (box.Min.X, box.Max.X) for y in (box.Min.Y, box.Max.Y)
-                       for z in (box.Min.Z, box.Max.Z)]
-            if inverse is not None:
-                corners = [inverse.OfPoint(c) for c in corners]
-            outline = DB.Outline(DB.XYZ(min(c.X for c in corners), min(c.Y for c in corners),
-                                        min(c.Z for c in corners)),
-                                 DB.XYZ(max(c.X for c in corners), max(c.Y for c in corners),
-                                        max(c.Z for c in corners)))
-            for element in DB.FilteredElementCollector(source_doc).WherePasses(
+            outline = outline_in(box.Min, box.Max, transform)
+            for element in source.collector().WherePasses(
                     DB.ElementMulticategoryFilter(categories)).WhereElementIsNotElementType()\
                     .WherePasses(DB.BoundingBoxIntersectsFilter(outline)):
                 key = (link_id, id_value(element.Id))
@@ -520,13 +604,14 @@ def area_text(area):
 
 
 def hosts_in_area(area):
-    """Muri, solai e strutture del modello host e dei link caricati che toccano l'area. Stesso formato di
+    """Muri, solai e strutture del modello host e dei link letti che toccano l'area. Stesso formato di
     pick_hosts."""
     categories = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](HOST_CATEGORIES))
     hosts = []
-    for source_doc, transform, link_id in model_sources():
-        model = source_doc.Title if link_id else "Host model"
-        for element in DB.FilteredElementCollector(source_doc).WherePasses(categories).WhereElementIsNotElementType()\
+    for source in searched_sources():
+        transform, link_id = source.transform, source.link_id
+        model = source.doc.Title if link_id else "Host model"
+        for element in source.collector().WherePasses(categories).WhereElementIsNotElementType()\
                 .WherePasses(DB.BoundingBoxIntersectsFilter(area_outline(area, transform))):
             hosts.append(((link_id, id_value(element.Id)), element, transform, model))
     return hosts
@@ -591,14 +676,10 @@ def neighbours(solids, kind):
                   max(p.Z for p in points) + ADJACENT_SEARCH)
     category = DB.BuiltInCategory.OST_Walls if kind == "wall" else DB.BuiltInCategory.OST_Floors
     found = []
-    for source_doc, transform, link_id in model_sources():
-        corners = [DB.XYZ(x, y, z) for x in (low.X, high.X) for y in (low.Y, high.Y) for z in (low.Z, high.Z)]
-        if transform is not None:
-            inverse = transform.Inverse
-            corners = [inverse.OfPoint(c) for c in corners]
-        outline = DB.Outline(DB.XYZ(min(c.X for c in corners), min(c.Y for c in corners), min(c.Z for c in corners)),
-                             DB.XYZ(max(c.X for c in corners), max(c.Y for c in corners), max(c.Z for c in corners)))
-        for element in DB.FilteredElementCollector(source_doc).OfCategory(category).WhereElementIsNotElementType()\
+    for source in searched_sources():
+        source_doc, transform, link_id = source.doc, source.transform, source.link_id
+        outline = outline_in(low, high, transform)
+        for element in source.collector().OfCategory(category).WhereElementIsNotElementType()\
                 .WherePasses(DB.BoundingBoxIntersectsFilter(outline)):
             key = (link_id, id_value(element.Id))
             if key not in ctx.neighbour_cache:
@@ -665,7 +746,8 @@ def find_crossings(hosts, stats, only=None, keep_existing=False, progress=None, 
     (muri o solai separati di una struttura composita). only: riferimenti (MepRef.text) degli elementi MEP da
     considerare (modalita' inversa), None = tutti quelli vicini, dell'host e dei link. Quelli che hanno gia' un
     foro si saltano (Place) o, con keep_existing (check), restano con item["opening"] = il foro che li contiene.
-    progress(i, n): avanzamento sugli elementi attraversati. area: solo gli attraversamenti dentro l'area (crossing_in_area), gli altri contati in stats["outside_area"]."""
+    progress(i, n): avanzamento sugli elementi attraversati. area: solo gli attraversamenti dentro l'area
+    (crossing_in_area), gli altri contati in stats["outside_area"]."""
     boxes = []
     for opening in existing_openings():
         box = opening.get_BoundingBox(None)

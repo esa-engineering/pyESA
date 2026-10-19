@@ -247,7 +247,8 @@ def link(element, fallback):
 
 def report_data(report):
     """Dati del Text Report e dell'export Excel (solo testo: la finestra e l'Excel non leggono Revit). Sezioni per
-    stato: Not Associated, To Be Refreshed, Valid (compatti). Ogni voce: codice, titolo, descrizione, note, righe (elemento, categoria, stato dell'elemento)."""
+    stato: Not Associated, To Be Refreshed, Valid (compatti). Ogni voce: codice, titolo, descrizione, note, righe
+    (elemento, categoria, stato dell'elemento)."""
     sections = []
     owners = owners_of(report)
     if report.missing_rows is not None:
@@ -322,6 +323,7 @@ class CheckSession(object):
 
     def run(self, removed):
         reset_models()  # link ricaricati mentre la finestra del report era aperta
+        started = time.time()
         # prima gli attraversamenti degli elementi dell'ambito: elementi dentro un foro senza esservi associati
         # (entrano nel suo check, e il foro nell'ambito) e attraversamenti senza foro (Missing openings)
         items, self.scan_stats = scan_crossings(self.scope)
@@ -348,6 +350,7 @@ class CheckSession(object):
                 transaction.RollBack()
             raise
         self.rows = [check_row(r, self.origins) for r in self.results]
+        self.elapsed = time.time() - started
         self.date = datetime.now().strftime("%d.%m.%Y %H:%M")
         save_last_check(self.rows, removed, self.scope, self.missing_rows)
 
@@ -366,7 +369,8 @@ class CheckSession(object):
                (["Crossings outside the area (not checked): {}.".format(stats["outside_area"])]
                 if stats.get("outside_area") else []) + \
                ["- {}".format(p) for p in stats["problems"]] + [
-                "Ids of deleted elements removed from the openings: {}.".format(self.stale)]
+                "Ids of deleted elements removed from the openings: {}.".format(self.stale),
+                "Time: last check {:.1f} s.".format(self.elapsed)]
 
     def warning(self):
         """Avviso del riepilogo, solo se qualcosa non si e' potuto scrivere."""

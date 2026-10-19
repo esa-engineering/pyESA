@@ -55,10 +55,24 @@ fori (come prima) e il modello Openings con MEP e ARC linkati (piano in `Opening
   elemento e' `MepRef.text` = `"333"` o `"PRJ_MEC:333"`, risolto da `mep_by_ref()`.
 - **Link letti da Place**: sezione *Linked models* della finestra di Place (spunta = leggi, per MEP e per muri,
   solai e strutture; il modello aperto si legge sempre). Ricordata per modello in `ESA_Openings`
-  (`place_skipped_links`: `"<percorso del modello>::<chiave>|<chiave>"`, al massimo 50); i link nuovi compaiono
+  (`place_skipped_links`: `"<percorso del modello>::<chiave>|<chiave>"`, al massimo 50; `load_model_list()` /
+  `save_model_list()` in `openings_geometry`); i link nuovi compaiono
   spuntati, quelli tolti e ora non caricati restano tolti. Con elementi gia' selezionati la finestra non c'e' e vale
   l'ultima scelta. `ctx.skipped_links` toglie quei link da `link_sources()`; anche le selezioni nel modello li
   rifiutano. New Report e Last Report leggono sempre tutti i link.
+- **Fase** (`phase_name()`): quella della vista attiva; se la vista non ne ha (fogli, abachi), l'ultima del progetto.
+  Ogni modello, aperto compreso, si legge nella fase con lo **stesso nome** (`Source.phase_id`): si cercano solo gli
+  elementi che esistono in quella fase (`ElementPhaseStatusFilter`, Existing + New: niente demoliti ne' futuri). Un
+  link senza una fase con quel nome non si cerca (`Source.searchable`), ma i riferimenti gia' scritti sui fori si
+  risolvono lo stesso (`mep_by_ref` non filtra): niente "link not loaded" per questo.
+- **Workset**: nessun filtro (deciso il 19.10.2026: un workset da ignorare del tutto e' raro, e semmai quegli
+  elementi vanno in un modello a parte, non spuntato in Place&Check). Un filtro per workset escluderebbe fori senza
+  segnale.
+- Tutte le ricerche (`meps_in_outline()`, `hosts_from_meps()`, `hosts_in_area()`, `neighbours()`) passano da
+  `searched_sources()` e `Source.collector()`, che applica la fase. `models_lines()` riporta la fase e i link senza
+  quella fase.
+- **Tempi** nell'esito di Place&Check (ricerca, creazione) e nei dettagli del New Report: servono a decidere se la
+  lettura dei link va ottimizzata (lettura unica in record Python, fase 2 del piano).
 - **Selezione MEP**: Revit non seleziona insieme elementi del modello e dei link. Se il modello aperto ha MEP propri si
   scelgono quelli, altrimenti quelli dei link (`pick_meps()`).
 - **Sui MEP non si scrive niente**, ne' nei link ne' nel modello aperto (decisione del 19.10.2026): il legame sta

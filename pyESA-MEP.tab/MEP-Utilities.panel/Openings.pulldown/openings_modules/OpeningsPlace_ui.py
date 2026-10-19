@@ -22,40 +22,56 @@ def _load(xaml_path):
     return XamlReader.Parse(File.ReadAllText(xaml_path))
 
 
-class PickWindow(object):
-    """Cosa selezionare (muri, solai e strutture, elementi MEP, oppure un'area) e quali link leggere. links: [(chiave,
-    percorso)] dei link caricati; skipped: chiavi da non spuntare. show() ritorna PICK_HOSTS, PICK_MEPS, PICK_AREA o
-    None se annullata; dopo, self.skipped = chiavi dei link non spuntati."""
+def _checkbox(tag, text, checked):
+    """CheckBox con testo a capo e il valore in Tag (liste multi-selezione dello stile di casa)."""
+    box = CheckBox()
+    label = TextBlock()
+    label.Text = text
+    label.TextWrapping = TextWrapping.Wrap
+    box.Content = label
+    box.Tag = tag
+    box.IsChecked = checked
+    return box
 
-    def __init__(self, xaml_path, last_pick, settings_text, links=(), skipped=()):
+
+class PickWindow(object):
+    """Cosa selezionare (muri, solai e strutture, elementi MEP, oppure un'area) e quali link leggere. links:
+    [(chiave, percorso)] dei link caricati; skipped: chiavi da non spuntare; phase: fase letta (solo testo). show()
+    ritorna PICK_HOSTS, PICK_MEPS, PICK_AREA o None se annullata; dopo, self.skipped = link non spuntati."""
+
+    def __init__(self, xaml_path, last_pick, settings_text, links=(), skipped=(), phase=""):
         self.window = _load(xaml_path)
         find = self.window.FindName
         self.radios = {PICK_HOSTS: find("HostsRadio"), PICK_MEPS: find("MepsRadio"), PICK_AREA: find("AreaRadio")}
         self.radios.get(last_pick, self.radios[PICK_HOSTS]).IsChecked = True
         find("SettingsInfo").Text = settings_text
-        self.links = []  # CheckBox con la chiave del link in Tag
-        for key, path in links:
-            box = CheckBox()
-            label = TextBlock()
-            label.Text = u"{}  ({})".format(key, path or "path unknown")
-            label.TextWrapping = TextWrapping.Wrap
-            box.Content = label
-            box.Tag = key
-            box.IsChecked = key not in skipped
-            find("LinksList").Items.Add(box)
-            self.links.append(box)
-        if not self.links:
-            for name in ("LinksList", "LinksButtons"):
-                find(name).Visibility = Visibility.Collapsed
-            find("NoLinksText").Visibility = Visibility.Visible
-        find("SelectAllButton").Click += lambda sender, args: self._tick_all(True)
-        find("DeselectAllButton").Click += lambda sender, args: self._tick_all(False)
+        find("PhaseText").Text = u"Phase read: {} (phase of the active view; each link in the phase with the same " \
+                                 u"name).".format(phase or "none")
+        self.links = self._fill(find, "Links", [(key, u"{}  ({})".format(key, path or "path unknown"),
+                                                 key not in skipped) for key, path in links])
+        find("SelectAllButton").Click += lambda sender, args: self._tick_all(self.links, True)
+        find("DeselectAllButton").Click += lambda sender, args: self._tick_all(self.links, False)
         find("OkButton").Click += self._on_ok
         self.result = None
         self.skipped = set(skipped)
 
-    def _tick_all(self, value):
-        for box in self.links:
+    @staticmethod
+    def _fill(find, name, rows):
+        """Riempie la lista <name>List con [(tag, testo, spuntato)]; senza righe mostra No<name>Text."""
+        boxes = []
+        for tag, text, checked in rows:
+            box = _checkbox(tag, text, checked)
+            find(name + "List").Items.Add(box)
+            boxes.append(box)
+        if not boxes:
+            for control in (name + "List", name + "Buttons"):
+                find(control).Visibility = Visibility.Collapsed
+            find("No{}Text".format(name)).Visibility = Visibility.Visible
+        return boxes
+
+    @staticmethod
+    def _tick_all(boxes, value):
+        for box in boxes:
             box.IsChecked = value
 
     def _on_ok(self, sender, args):

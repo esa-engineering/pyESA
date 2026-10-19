@@ -13,6 +13,7 @@ import json
 import math
 import os
 import os.path as op
+import time
 from datetime import datetime
 
 import clr
@@ -37,7 +38,7 @@ class Context(object):
     """Stato del comando in corso. Un solo oggetto (ctx), mai riassegnato: start() e restore() ne cambiano i campi,
     cosi' chi l'ha importato con `from openings_core import *` vede sempre quelli attuali."""
     FIELDS = ("mode", "title", "doc", "uidoc", "output", "settings", "status_param", "id_param", "cat_param",
-              "min_cross_sin", "neighbour_cache", "sources", "mep_cache", "skipped_links")
+              "min_cross_sin", "neighbour_cache", "sources", "mep_cache", "skipped_links", "phase_name")
 
     def __init__(self):
         for name in self.FIELDS:
@@ -69,7 +70,9 @@ def start(mode):
                  # modelli letti (host e link caricati) e riferimenti MEP gia' risolti: vedi reset_models()
                  "sources": None, "mep_cache": {},
                  # chiavi dei link da non leggere (scelta di Place); New Report e Last Report li leggono tutti
-                 "skipped_links": frozenset()})
+                 "skipped_links": frozenset(),
+                 # fase letta: calcolata alla prima richiesta (phase_name in geometry)
+                 "phase_name": None})
 
 
 def reset_models():
