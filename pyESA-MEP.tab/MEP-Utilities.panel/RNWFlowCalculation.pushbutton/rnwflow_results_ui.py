@@ -2,7 +2,13 @@
 """
 rnwflow_results_ui.py - finestra dei risultati di RNWFlowCalculation.
 
-Due schede.
+Tre schede (la finestra si apre su Sections).
+
+General: riepilogo dai terminali (general_summary, Python puro): superficie
+coperta = somma delle superfici di raccolta, portata raccolta = somma delle
+portate, indice pluviometrico ricavato da ogni terminale come Q / (A x C1 x C2)
+(lo calcola la famiglia, lo script non lo conosce), e l'elenco dei sistemi con
+superficie e portata. Valori letti dal modello all'apertura.
 
 Sections: una riga per parte di tratto (SectionResult di rnwflow_check) e una
 per terminale (FixtureItem: bocchettone con la sua portata), nell'ordine della
@@ -20,8 +26,9 @@ La colonna Sim. slope simula sulle righe orizzontali una pendenza delle tabelle 
 la riga si verifica a quella pendenza, diventa gialla (Simulated) e non cambia il
 modello, perche' cambiare la pendenza dei tubi romperebbe i collegamenti.
 
-Fixtures: i terminali collegati ai tratti calcolati, con famiglia e tipo e i
-parametri FIXTURE_PARAMS, tutti modificabili. I dati arrivano dallo script gia'
+Fixtures: i terminali collegati ai tratti calcolati, con livello e offset
+(FixtureRecord.level, dallo script), famiglia e tipo e i parametri
+FIXTURE_PARAMS, tutti modificabili. I dati arrivano dallo script gia'
 ridotti a testo (FixtureData: valori di istanza per terminale, valori di tipo per
 tipo); un parametro di istanza cambia solo la sua riga, uno di tipo tutte le
 righe dello stesso tipo, come in Revit (pending_type). Cambiare tipo ricarica i
@@ -106,8 +113,16 @@ KIND_APPLY = "apply"
 KIND_SHOW = "show"
 KIND_RECALC = "recalc"
 
-TAB_SECTIONS = 0
-TAB_FIXTURES = 1
+# Ordine delle schede nella XAML; la finestra si apre su Sections.
+TAB_GENERAL = 0
+TAB_SECTIONS = 1
+TAB_FIXTURES = 2
+
+# Indice pluviometrico ricavato dai terminali: valori entro questa tolleranza
+# relativa contano come un valore solo (arrotondamenti dei parametri).
+INTENSITY_TOLERANCE = 0.005
+# l/(s m2) -> mm/h
+INTENSITY_TO_MMH = 3600.0
 
 # Tendina della pendenza simulata: prima voce = pendenza del modello (nessuna
 # simulazione), poi le pendenze di rnwflow_check.SIMULATED_SLOPES [cm/m = %].
@@ -283,15 +298,19 @@ MISSING = ParamValue("", WHERE_MISSING, VALUE_TEXT, False)
 
 
 class FixtureRecord(object):
-    """Un terminale: i suoi valori di istanza ({parametro: ParamValue}) e il tipo."""
+    """Un terminale: i suoi valori di istanza ({parametro: ParamValue}) e il tipo.
+    level = "Livello, +offset [mm]", level_sort = quota assoluta [mm] (ordinamento)."""
 
-    def __init__(self, element_id, system, flow, type_id, instance_values, notes=None):
+    def __init__(self, element_id, system, flow, type_id, instance_values, notes=None,
+                 level="", level_sort=None):
         self.id = str(element_id)
         self.system = system
         self.flow = flow
         self.type_id = str(type_id)
         self.instance_values = dict(instance_values)
         self.notes = list(notes or [])
+        self.level = level or ""
+        self.level_sort = level_sort
 
 
 class FixtureData(object):
@@ -315,6 +334,108 @@ class FixtureEdits(object):
     @property
     def count(self):
         return len(self.types) + len(self.type_params) + len(self.instance)
+
+
+# =============================================================================
+# SCHEDA GENERAL (Python puro)
+# =============================================================================
+
+class SystemSummary(object):
+    """Un sistema calcolato: terminali, superficie [m2] e portata [l/s] raccolte."""
+
+    def __init__(self, name):
+        self.name = name
+        self.fixtures = 0
+        self.area = None
+        self.flow = None
+
+
+class GeneralSummary(object):
+    """Dati della scheda General. Valori letti dal modello all'apertura della
+    finestra: le modifiche ai terminali non ancora scritte non contano, come la
+    portata Q della scheda Fixtures."""
+
+    def __init__(self):
+        self.systems = []           # SystemSummary, per nome
+        self.fixtures = 0
+        self.area = None
+        self.flow = None
+        self.no_area = 0            # terminali senza superficie
+        self.no_flow = 0            # terminali senza portata leggibile
+        self.intensities = []       # l/(s m2), una per terminale con Q, A, C1, C2 > 0
+
+
+def _model_number(record, type_values, name):
+    """Valore numerico del parametro letto dal modello (istanza, poi tipo); None se
+    manca, e' vuoto o e' un testo."""
+    value = record.instance_values.get(name)
+    if value is None:
+        value = type_values.get(record.type_id, {}).get(name)
+    if value is None or value.kind == VALUE_TEXT:
+        return None
+    return parse_decimal(value.text)
+
+
+def general_summary(sections, fixture_data):
+    """Superficie e portata per sistema e totali, dai terminali (FixtureData).
+
+    L'indice pluviometrico non e' un dato dello script (lo calcola la famiglia):
+    si ricava da ogni terminale come Q / (A x C1 x C2), cioe' supponendo che la
+    famiglia calcoli Q = i x A x C1 x C2.
+    """
+    summary = GeneralSummary()
+    by_name = {}
+
+    def system(name):
+        item = by_name.get(name)
+        if item is None:
+            item = by_name[name] = SystemSummary(name)
+        return item
+
+    # Anche i sistemi senza terminali compaiono nell'elenco
+    for entry in sections:
+        system(entry.system)
+    for record in fixture_data.records:
+        item = system(record.system)
+        item.fixtures += 1
+        summary.fixtures += 1
+        area = _model_number(record, fixture_data.type_values, PARAM_AREA)
+        if area is None:
+            summary.no_area += 1
+        else:
+            item.area = (item.area or 0.0) + area
+            summary.area = (summary.area or 0.0) + area
+        flow = record.flow
+        if flow is None:
+            summary.no_flow += 1
+        else:
+            item.flow = (item.flow or 0.0) + flow
+            summary.flow = (summary.flow or 0.0) + flow
+        c1 = _model_number(record, fixture_data.type_values, PARAM_C1)
+        c2 = _model_number(record, fixture_data.type_values, PARAM_C2)
+        if flow and area and c1 and c2 and flow > 0 and area > 0 and c1 > 0 and c2 > 0:
+            summary.intensities.append(flow / (area * c1 * c2))
+    summary.systems = sorted(by_name.values(), key=lambda s: (s.name or "").lower())
+    return summary
+
+
+def intensity_texts(values):
+    """(testo in l/(s m2), testo in mm/h, True se i terminali danno valori diversi)."""
+    if not values:
+        return "-", "-", False
+    low = min(values)
+    high = max(values)
+    if high - low <= INTENSITY_TOLERANCE * high:
+        mean = sum(values) / len(values)
+        return ("{0:.4f}".format(mean), "{0:.1f}".format(mean * INTENSITY_TO_MMH), False)
+    return ("{0:.4f} - {1:.4f}".format(low, high),
+            "{0:.1f} - {1:.1f}".format(low * INTENSITY_TO_MMH, high * INTENSITY_TO_MMH), True)
+
+
+def number_or_dash(value, digits):
+    if value is None:
+        return "-"
+    return "{0:.{1}f}".format(float(value), digits)
 
 
 # Colonne del foglio Calculation: solo il risultato del calcolo (la misura nuova),
@@ -393,6 +514,7 @@ class ResultsForm(Window):
 
         self._load_xaml()
         self.txt_settings.Text = settings_text
+        self._build_general(data)
         if self.state.table is None:
             self._build_table()
             self._build_fixture_table()
@@ -449,7 +571,9 @@ class ResultsForm(Window):
 
         for name in ('txt_settings', 'tabs', 'txt_search', 'btn_clear_search',
                      'chk_only_action', 'txt_count', 'dg_sections', 'txt_fixture_count',
-                     'dg_fixtures', 'btn_export', 'btn_recalc', 'btn_ok', 'btn_cancel'):
+                     'dg_fixtures', 'txt_total_area', 'txt_intensity', 'txt_intensity_mmh',
+                     'txt_total_flow', 'txt_general_notes', 'dg_systems',
+                     'btn_export', 'btn_recalc', 'btn_ok', 'btn_cancel'):
             setattr(self, name, root.FindName(name))
 
         self.txt_search.TextChanged += self.OnFilterChanged
@@ -474,7 +598,8 @@ class ResultsForm(Window):
     def OnWindowLoaded(self, sender, args):
         """Riporta la scheda e la riga da cui si era partiti per navigare."""
         try:
-            self.tabs.SelectedIndex = self.state.tab or TAB_SECTIONS
+            self.tabs.SelectedIndex = self.state.tab if self.state.tab is not None \
+                else TAB_SECTIONS
         except Exception:
             pass
         key = self.state.last_key
@@ -518,6 +643,54 @@ class ResultsForm(Window):
             self.state.tab = self.tabs.SelectedIndex
         except Exception:
             pass
+
+    # ------------------------------------------------------- scheda General
+
+    def _build_general(self, fixture_data):
+        """Riepilogo: superficie, indice pluviometrico, portata e sistemi. Si
+        ricostruisce a ogni apertura: dipende solo dai dati letti dallo script."""
+        summary = general_summary(self.sections, fixture_data)
+        self.txt_total_area.Text = number_or_dash(summary.area, 2)
+        self.txt_total_flow.Text = number_or_dash(summary.flow, 2)
+        per_m2, per_hour, varies = intensity_texts(summary.intensities)
+        self.txt_intensity.Text = per_m2
+        self.txt_intensity_mmh.Text = per_hour
+
+        notes = ["{0} system(s), {1} fixture(s).".format(len(summary.systems),
+                                                          summary.fixtures)]
+        if summary.no_area:
+            notes.append("{0} fixture(s) without a collection area ({1}) are not in the "
+                         "covered area.".format(summary.no_area, PARAM_AREA))
+        if summary.no_flow:
+            notes.append("{0} fixture(s) without a readable flow are not in the collected "
+                         "flow.".format(summary.no_flow))
+        used = len(summary.intensities)
+        if used:
+            notes.append("Rainfall intensity derived from {0} fixture(s).".format(used))
+            if used < summary.fixtures:
+                notes.append("{0} fixture(s) with no flow, collection area, C1 or C2 are "
+                             "not used for it.".format(summary.fixtures - used))
+            if varies:
+                notes.append("The fixtures give different values: check the rainfall "
+                             "intensity in the fixture families.")
+        elif summary.fixtures:
+            notes.append("The rainfall intensity cannot be derived: no fixture has flow, "
+                         "collection area, C1 and C2 all above zero.")
+        self.txt_general_notes.Text = " ".join(notes)
+
+        table = DataTable("Systems")
+        for name, kind in (("System", System.String), ("Fixtures", System.Int32),
+                           ("Area", System.Double), ("Flow", System.Double)):
+            table.Columns.Add(name, kind)
+        for item in summary.systems:
+            row = table.NewRow()
+            row["System"] = item.name
+            row["Fixtures"] = item.fixtures
+            row["Area"] = _value(item.area)
+            row["Flow"] = _value(item.flow)
+            table.Rows.Add(row)
+        table.AcceptChanges()
+        self.dg_systems.ItemsSource = table.DefaultView
 
     # ------------------------------------------------------- tabella Sections
 
@@ -717,6 +890,7 @@ class ResultsForm(Window):
         table = DataTable("Fixtures")
         columns = [
             ("Key", System.String), ("Order", System.Int32), ("System", System.String),
+            ("Level", System.String), ("LevelSort", System.Double),
             ("FixtureId", System.String), ("TypeId", System.String),
             ("TypeLabel", System.String), ("TypeOptions", System.Object),
             ("Flow", System.Double), ("Notes", System.String), ("Dirty", System.Boolean),
@@ -741,6 +915,8 @@ class ResultsForm(Window):
             row["Key"] = "F" + record.id
             row["Order"] = order_of.get(record.id, 0)
             row["System"] = record.system
+            row["Level"] = record.level or "-"
+            row["LevelSort"] = _value(record.level_sort)
             row["FixtureId"] = record.id
             row["TypeId"] = record.type_id
             row["TypeLabel"] = self._type_label.get(record.type_id, "")

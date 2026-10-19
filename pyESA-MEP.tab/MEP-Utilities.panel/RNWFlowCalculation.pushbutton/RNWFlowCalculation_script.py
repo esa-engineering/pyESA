@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "RNW Flow\nCalculation"
-__doc__ = """Version = 4.0
-Date    = 16.10.2026
+__doc__ = """Version = 4.1
+Date    = 19.10.2026
 _____________________________________________________________________
 Description:
 Rainwater network sizing. The rainwater fixtures write their design flow
@@ -738,6 +738,69 @@ def fixture_types(fixtures):
     return symbols
 
 
+def _level_elevation_mm(level):
+    """Quota del livello [mm] nelle coordinate interne (vedi CLAUDE.md: Elevation
+    puo' riferirsi al Survey Point, la geometria no)."""
+    try:
+        return level.ProjectElevation * FT_TO_MM
+    except Exception:
+        pass
+    try:
+        return level.Elevation * FT_TO_MM
+    except Exception:
+        return None
+
+
+def fixture_level(fixture):
+    """Colonna Level della scheda Fixtures: ("Livello, +150", quota assoluta [mm]
+    per ordinare). L'offset e' quello impostato (Elevation from Level, poi Offset
+    from Host); se manca, la distanza del punto di inserimento dal livello."""
+    level = None
+    try:
+        if get_element_id_value(fixture.LevelId) > 0:
+            level = doc.GetElement(fixture.LevelId)
+    except Exception:
+        pass
+    if level is None:
+        for name in ("INSTANCE_SCHEDULE_ONLY_LEVEL_PARAM", "FAMILY_LEVEL_PARAM"):
+            bip = getattr(BIP, name, None)
+            param = fixture.get_Parameter(bip) if bip is not None else None
+            if param is None or not param.HasValue:
+                continue
+            try:
+                level_id = param.AsElementId()
+                if get_element_id_value(level_id) > 0:
+                    level = doc.GetElement(level_id)
+                    break
+            except Exception:
+                continue
+    if level is None:
+        return "-", None
+    level_mm = _level_elevation_mm(level)
+
+    offset_mm = None
+    for name in ("INSTANCE_ELEVATION_PARAM", "INSTANCE_FREE_HOST_OFFSET_PARAM"):
+        bip = getattr(BIP, name, None)
+        param = fixture.get_Parameter(bip) if bip is not None else None
+        if param is not None and param.HasValue and param.StorageType == DB.StorageType.Double:
+            offset_mm = param.AsDouble() * FT_TO_MM
+            break
+    if offset_mm is None and level_mm is not None:
+        try:
+            offset_mm = fixture.Location.Point.Z * FT_TO_MM - level_mm
+        except Exception:
+            offset_mm = None
+
+    text = element_name(level)
+    if offset_mm is not None:
+        rounded = int(round(offset_mm))
+        text += ", {0}{1}".format("+" if rounded >= 0 else "-", abs(rounded))
+    sort = None
+    if level_mm is not None:
+        sort = level_mm + (offset_mm or 0.0)
+    return text, sort
+
+
 def read_fixture_data(entries, fixtures, symbols):
     """Dati della scheda Fixtures: terminali in ordine di rete, valori di istanza
     per terminale e valori di tipo per tipo (rres.FixtureData)."""
@@ -771,8 +834,9 @@ def read_fixture_data(entries, fixtures, symbols):
                    if name not in instance and name not in type_values.get(type_key, {})]
         if missing:
             notes.append("Parameter(s) not found: " + ", ".join(missing))
+        level, level_sort = fixture_level(fixture)
         records.append(rres.FixtureRecord(entry.id, entry.system, entry.flow, type_key,
-                                          instance, notes))
+                                          instance, notes, level, level_sort))
     return rres.FixtureData(records, types, type_values)
 
 

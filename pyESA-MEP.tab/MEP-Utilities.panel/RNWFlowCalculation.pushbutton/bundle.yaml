@@ -38,7 +38,11 @@ tooltip: >
   report opens only at the end, and only if a section could not be resized or a fixture
   value could not be written.
 
-  The Fixtures tab lists the connected fixtures with family and type, collection area
+  The General tab sums up the total covered area, the rainfall intensity (derived from the
+  fixtures as Q / (A x C1 x C2)), the total collected flow and the area and flow of every
+  system. The Sections tab has a colour legend.
+
+  The Fixtures tab lists the connected fixtures with level and offset, family and type, collection area
   (u_PLU_Area_1), C1, C2 and element code (e_MEC_ElementCode_1), instance or type
   parameters, all editable; a type value changes every fixture of that type. Apply and
   Recalculate writes them, lets Revit update the flows and recalculates the network,

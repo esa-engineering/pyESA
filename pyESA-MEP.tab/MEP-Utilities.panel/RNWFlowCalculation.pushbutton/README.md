@@ -164,8 +164,31 @@ danno il punto di partenza dei rami. Cliccando un'intestazione la griglia si rio
 quella colonna; cliccando `#` si torna all'ordine della rete.
 
 
-`rnwflow_results_ui.py` + `RNWFlowCalculation_results.xaml`: due schede, **Sections** e
-**Fixtures**, griglie legate a `DataTable` come in MEPQTO.
+`rnwflow_results_ui.py` + `RNWFlowCalculation_results.xaml`: tre schede, **General**,
+**Sections** e **Fixtures**, griglie legate a `DataTable` come in MEPQTO. La finestra si
+apre su Sections; dopo la navigazione o il ricalcolo torna sulla scheda da cui si era
+partiti.
+
+### Scheda General
+
+Riepilogo del calcolo (`general_summary()`, Python puro, ricostruito a ogni apertura):
+
+- **Total covered area** [m²]: somma delle superfici di raccolta (`u_PLU_Area_1`, istanza
+  poi tipo) dei terminali collegati;
+- **Rainfall intensity**, in l/(s·m²) e in mm/h (× 3600). L'indice pluviometrico lo usa la
+  famiglia del bocchettone e lo script non lo legge: lo **ricava** da ogni terminale come
+  Q / (A × C1 × C2), cioè supponendo che la famiglia calcoli Q = i × A × C1 × C2. Si usano
+  i terminali con Q, A, C1 e C2 tutti maggiori di zero; se i valori differiscono di più
+  dello 0,5 % (`INTENSITY_TOLERANCE`) si mostra l'intervallo e una nota invita a
+  controllare le famiglie;
+- **Total collected flow** [l/s]: somma delle portate dei terminali (Fixture Units del
+  connettore);
+- tabella dei **sistemi** calcolati (anche quelli senza terminali), con numero di
+  terminali, superficie e portata.
+
+Le note sotto i valori contano i terminali senza superficie o senza portata leggibile,
+esclusi dai totali. Tutti i valori sono quelli del modello all'apertura della finestra:
+le modifiche ai terminali non ancora scritte contano solo dopo Apply and Recalculate.
 
 ### Scheda Sections
 
@@ -174,6 +197,14 @@ Una riga per parte di Section (colonna *Run*: Horizontal / Vertical). Prima colo
 poi tipo; valori diversi uniti da "/"), Section, Pipes, **Pipe Type** (Type Mark del tipo
 di tubazione, `ALL_MODEL_TYPE_MARK`; più tipi nella stessa riga uniti da " - ", un tipo senza
 Type Mark compare come "(no type mark)") e le altre. Pipe Type entra anche nella ricerca.
+**Status** (stato attuale) sta subito prima di **New size**.
+
+Le celle sono **su una riga sola**: le colonne di testo (System, Element code, Pipe Type,
+Fed by, Status, Check new, Notes) hanno larghezza automatica e la griglia scorre in
+orizzontale; le colonne numeriche restano strette, con l'intestazione su più righe. Con la
+virtualizzazione delle righe una colonna automatica può allargarsi scorrendo verso righe
+con testi più lunghi. Sotto la griglia, una **legenda** spiega i colori di righe, celle
+della misura nuova e celle Status / Check new.
 
 - Colonne del modello: DN, De, portata ammissibile, utilizzo, velocità e riempimento alla
   portata di progetto, De suggerito.
@@ -220,7 +251,16 @@ Type Mark compare come "(no type mark)") e le altre. Pipe Type entra anche nella
 ### Scheda Fixtures
 
 I terminali collegati ai tratti calcolati, nell'ordine della rete, con 🔍, portata e i
-valori modificabili (celle gialle):
+valori modificabili (celle gialle).
+
+Prima dell'Id, la colonna **Level, offset [mm]** riporta il livello e l'offset impostato
+nel formato `Livello, +150` (`fixture_level()` nello script): livello da `LevelId`, poi
+dai parametri del livello di abaco / di famiglia; offset da *Elevation from Level*
+(`INSTANCE_ELEVATION_PARAM`), poi *Offset from Host* (`INSTANCE_FREE_HOST_OFFSET_PARAM`,
+per le famiglie ospitate è quindi la distanza dalla faccia ospite), altrimenti la distanza
+del punto di inserimento dalla quota del livello (`ProjectElevation`). La colonna si ordina
+per quota assoluta. Come Notes e System, ha larghezza automatica: la griglia scorre in
+orizzontale invece di stringere le altre colonne.
 
 | Colonna | Parametro |
 | --- | --- |

@@ -187,13 +187,88 @@
         </Border>
 
         <TabControl x:Name="tabs" Grid.Row="2">
+            <!-- ============================================================ GENERAL -->
+            <TabItem Header="📋 General">
+                <Grid Margin="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- SECTION: Project -->
+                    <Border Grid.Row="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,5,0,10">
+                        <StackPanel>
+                            <TextBlock Text="🌧️ PROJECT" Style="{StaticResource SectionHeader}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="220"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Total covered area" Style="{StaticResource FieldLabel}" Margin="0,5,10,5"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="txt_total_area" FontWeight="SemiBold"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center" Text="-"/>
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="m²" Style="{StaticResource UnitLabel}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Rainfall intensity" Style="{StaticResource FieldLabel}" Margin="0,5,10,5"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="txt_intensity" FontWeight="SemiBold"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center" Text="-"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="l/(s·m²)" Style="{StaticResource UnitLabel}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="txt_intensity_mmh" FontWeight="SemiBold"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,5" Text="-"/>
+                                <TextBlock Grid.Row="2" Grid.Column="2" Text="mm/h" Style="{StaticResource UnitLabel}" Margin="5,0,15,5"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Total collected flow" Style="{StaticResource FieldLabel}" Margin="0,5,10,5"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="txt_total_flow" FontWeight="SemiBold"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center" Text="-"/>
+                                <TextBlock Grid.Row="3" Grid.Column="2" Text="l/s" Style="{StaticResource UnitLabel}"/>
+                            </Grid>
+                            <TextBlock x:Name="txt_general_notes" Style="{StaticResource HintText}" Margin="0,8,0,5" Text=""/>
+                            <TextBlock Style="{StaticResource HintText}"
+                                       Text="Covered area = sum of the collection areas (u_PLU_Area_1) of the connected fixtures; collected flow = sum of the flows of the fixtures (Fixture Units of their connector). The rainfall intensity is calculated by the fixture families, so the tool derives it from every fixture as Q / (A × C1 × C2): it is right if the families calculate Q = i × A × C1 × C2. All values are those of the model when the window opened: fixture changes not written yet count only after Apply and Recalculate."/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- SECTION: Systems -->
+                    <Border Grid.Row="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="🏗️ SYSTEMS" Style="{StaticResource SectionHeader}"/>
+                            <DataGrid x:Name="dg_systems" Grid.Row="1" Style="{StaticResource GridStyle}"
+                                      IsReadOnly="True" HorizontalAlignment="Left">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="System" Binding="{Binding System}" Width="Auto" MinWidth="160"/>
+                                    <DataGridTextColumn Header="Fixtures" Binding="{Binding Fixtures}" Width="70"
+                                                        ElementStyle="{StaticResource NumberCell}"/>
+                                    <DataGridTextColumn Header="Covered area [m²]" Binding="{Binding Area, StringFormat=0.00}" Width="130"
+                                                        ElementStyle="{StaticResource NumberCell}"/>
+                                    <DataGridTextColumn Header="Q [l/s]" Binding="{Binding Flow, StringFormat=0.00}" Width="100"
+                                                        ElementStyle="{StaticResource NumberCell}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
             <!-- ============================================================ SECTIONS -->
-            <TabItem Header="📏 Sections">
+            <TabItem Header="📏 Sections" IsSelected="True">
                 <Grid Margin="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <StackPanel Grid.Row="0">
                         <TextBlock Style="{StaticResource HintText}"
@@ -224,7 +299,8 @@
                     </Grid>
 
                     <DataGrid x:Name="dg_sections" Grid.Row="2" Style="{StaticResource GridStyle}"
-                              ColumnHeaderStyle="{StaticResource WrapHeader}">
+                              ColumnHeaderStyle="{StaticResource WrapHeader}"
+                              HorizontalScrollBarVisibility="Auto">
                         <DataGrid.RowStyle>
                             <Style TargetType="DataGridRow">
                                 <Style.Triggers>
@@ -257,18 +333,15 @@
                             </DataGridTemplateColumn>
                             <DataGridTextColumn Header="#" Binding="{Binding Order}" Width="34" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}"/>
-                            <DataGridTextColumn Header="System" Binding="{Binding System}" Width="95" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Element code" Binding="{Binding Code}" Width="95" IsReadOnly="True"
-                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="System" Binding="{Binding System}" Width="Auto" MinWidth="95" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Element code" Binding="{Binding Code}" Width="Auto" MinWidth="95" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Section" Binding="{Binding Section}" Width="55" IsReadOnly="True"
                                                 SortMemberPath="SectionSort" ElementStyle="{StaticResource NumberCell}"/>
                             <DataGridTextColumn Header="Pipes" Binding="{Binding Pipes}" Width="46" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}"/>
-                            <DataGridTextColumn Header="Pipe Type" Binding="{Binding PipeType}" Width="80" IsReadOnly="True"
-                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Pipe Type" Binding="{Binding PipeType}" Width="Auto" MinWidth="80" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Run" Binding="{Binding Run}" Width="70" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Fed by" Binding="{Binding FedBy}" Width="110" IsReadOnly="True"
-                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Fed by" Binding="{Binding FedBy}" Width="Auto" MinWidth="70" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Min slope [cm/m]" Binding="{Binding Slope, StringFormat=0.00}" Width="55" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}"/>
                             <DataGridTextColumn Header="Q [l/s]" Binding="{Binding Flow, StringFormat=0.00}" Width="50" IsReadOnly="True"
@@ -287,6 +360,8 @@
                                                 ElementStyle="{StaticResource NumberCell}"/>
                             <DataGridTextColumn Header="Suggested De [mm]" Binding="{Binding Suggested}" Width="72" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="Auto" MinWidth="90" IsReadOnly="True"
+                                                CellStyle="{StaticResource StatusCell}"/>
                             <DataGridTemplateColumn Header="New size" Width="135" SortMemberPath="NewDeSort"
                                                     CellStyle="{StaticResource NewCell}">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -334,14 +409,62 @@
                                                 ElementStyle="{StaticResource NumberCell}" CellStyle="{StaticResource NewCell}"/>
                             <DataGridTextColumn Header="Fill new [%]" Binding="{Binding FillNew, StringFormat=0}" Width="45" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}" CellStyle="{StaticResource NewCell}"/>
-                            <DataGridTextColumn Header="Check new" Binding="{Binding CheckNew}" Width="140" IsReadOnly="True"
+                            <DataGridTextColumn Header="Check new" Binding="{Binding CheckNew}" Width="Auto" MinWidth="90" IsReadOnly="True"
                                                 CellStyle="{StaticResource CheckNewCell}"/>
-                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="140" IsReadOnly="True"
-                                                CellStyle="{StaticResource StatusCell}"/>
-                            <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*" MinWidth="110" IsReadOnly="True"
-                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <!-- Celle su una riga: le colonne di testo si allargano e la griglia scorre in orizzontale -->
+                            <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="Auto" MinWidth="110" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>
+
+                    <!-- Legenda dei colori della griglia -->
+                    <Border Grid.Row="3" BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
+                            CornerRadius="5" Padding="8,4" Margin="0,8,0,0">
+                        <WrapPanel>
+                            <WrapPanel.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                                    <Setter Property="BorderThickness" Value="1"/>
+                                    <Setter Property="Padding" Value="6,1"/>
+                                    <Setter Property="Margin" Value="0,2,6,2"/>
+                                </Style>
+                            </WrapPanel.Resources>
+                            <TextBlock Text="Rows:" FontWeight="Bold" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <Border Background="#DDEBF7">
+                                <TextBlock Text="New size differs from the model: resized by Apply Changes" FontWeight="SemiBold"/>
+                            </Border>
+                            <Border Background="#FFF2CC">
+                                <TextBlock Text="Simulated slope: checked only, never changed" FontWeight="SemiBold"/>
+                            </Border>
+                            <Border Background="#EAF4EA">
+                                <TextBlock Text="Fixture" FontStyle="Italic"/>
+                            </Border>
+                            <Border Background="White">
+                                <TextBlock Text="No flow" Foreground="Gray"/>
+                            </Border>
+
+                            <TextBlock Text="New size cells:" FontWeight="Bold" Foreground="Gray" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                            <Border Background="#EEF4FB">
+                                <TextBlock Text="Same size as the model"/>
+                            </Border>
+                            <Border Background="#BDD7EE">
+                                <TextBlock Text="Size changes"/>
+                            </Border>
+                            <Border Background="#FFE699">
+                                <TextBlock Text="Simulated slope"/>
+                            </Border>
+
+                            <TextBlock Text="Status / Check new:" FontWeight="Bold" Foreground="Gray" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                            <Border Background="#FFC7CE">
+                                <TextBlock Text="UNDERSIZED, FLOW BEYOND TABLE" Foreground="#9C0006"/>
+                            </Border>
+                            <Border Background="#FFEB9C">
+                                <TextBlock Text="DE NOT IN TABLE, SLOPE UNDER 0.5 cm/m, HIGH / LOW VELOCITY" Foreground="#7A5B00"/>
+                            </Border>
+                            <Border Background="White">
+                                <TextBlock Text="OVERSIZED" Foreground="#2D5A8A"/>
+                            </Border>
+                        </WrapPanel>
+                    </Border>
                 </Grid>
             </TabItem>
 
@@ -354,14 +477,15 @@
                     </Grid.RowDefinitions>
                     <StackPanel Grid.Row="0">
                         <TextBlock Style="{StaticResource HintText}"
-                                   Text="The plumbing fixtures connected to the calculated sections. Edit the family and type, the collection area (u_PLU_Area_1), the runoff coefficient C1, the risk coefficient C2 and the element code (e_MEC_ElementCode_1) in the yellow cells; 'from' tells whether the value is an instance or a type parameter. A type value changes every fixture of that type in the model, so all the rows of the type change together. Grey cells are missing or read-only parameters (for example driven by a formula). Rows with changes to write are blue."/>
+                                   Text="The plumbing fixtures connected to the calculated sections. Edit the family and type, the collection area (u_PLU_Area_1), the runoff coefficient C1, the risk coefficient C2 and the element code (e_MEC_ElementCode_1) in the yellow cells; 'from' tells whether the value is an instance or a type parameter. A type value changes every fixture of that type in the model, so all the rows of the type change together. Grey cells are missing or read-only parameters (for example driven by a formula). Rows with changes to write are blue. 'Level, offset' is the level of the fixture and its offset in mm (Elevation from Level, or Offset from Host for hosted families); the column sorts by absolute elevation."/>
                         <TextBlock Style="{StaticResource HintText}"
                                    Text="Apply and Recalculate writes the changes, lets Revit update the flows of the network and opens this window again with the new results; the sizes you chose by hand are kept. Apply Changes also writes the pending fixture changes, but the sizes stay those calculated with the current flows. Q is the flow read before the changes."/>
                         <TextBlock x:Name="txt_fixture_count" Style="{StaticResource HintText}" Text=""/>
                     </StackPanel>
 
                     <DataGrid x:Name="dg_fixtures" Grid.Row="1" Style="{StaticResource GridStyle}"
-                              ColumnHeaderStyle="{StaticResource WrapHeader}">
+                              ColumnHeaderStyle="{StaticResource WrapHeader}"
+                              HorizontalScrollBarVisibility="Auto">
                         <DataGrid.RowStyle>
                             <Style TargetType="DataGridRow">
                                 <Style.Triggers>
@@ -383,7 +507,9 @@
                             </DataGridTemplateColumn>
                             <DataGridTextColumn Header="#" Binding="{Binding Order}" Width="34" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}"/>
-                            <DataGridTextColumn Header="System" Binding="{Binding System}" Width="95" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="System" Binding="{Binding System}" Width="Auto" MinWidth="95" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Level, offset [mm]" Binding="{Binding Level}" Width="Auto" MinWidth="90" IsReadOnly="True"
+                                                SortMemberPath="LevelSort"/>
                             <DataGridTextColumn Header="Id" Binding="{Binding FixtureId}" Width="70" IsReadOnly="True"
                                                 ElementStyle="{StaticResource NumberCell}"/>
                             <DataGridTemplateColumn Header="Family and type" Width="300" SortMemberPath="TypeLabel">
@@ -414,8 +540,7 @@
                                                 CellStyle="{StaticResource EditCodeCell}"/>
                             <DataGridTextColumn Header="from" Binding="{Binding CodeFrom}" Width="88" IsReadOnly="True"
                                                 ElementStyle="{StaticResource GrayCell}"/>
-                            <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*" MinWidth="180" IsReadOnly="True"
-                                                ElementStyle="{StaticResource WrapCell}"/>
+                            <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="Auto" MinWidth="180" IsReadOnly="True"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
