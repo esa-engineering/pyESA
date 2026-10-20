@@ -960,46 +960,24 @@ class ClashReportForm(Window):
     # ------------------------------------------------------------------ refresh
 
     def _refresh_api(self, uiapp):
-        """Rifa' i test del report sul modello di adesso e mostra cosa e' cambiato
-        rispetto al report di partenza. Il file in cartella non viene toccato."""
+        """Ricontrolla le coppie del report e mostra quelle non piu' presenti."""
         if self._uidoc_api(uiapp) is None:
             return
-        problem = ce.phase_problem(self.doc.ActiveView)
-        if problem:
-            _warn(problem)
-            return
-        tests = [r.test for r in self.result.tests]
-        uses_selection = any(test[key]["source"] == cr.SOURCE_SELECTION
-                             for test in tests for key in ("set_a", "set_b"))
-        notes = []
-        selection = []
-        if self.result.selection_ids:
-            for value in self.result.selection_ids:
-                element_id = ce.make_element_id(value)
-                if self.doc.GetElement(element_id) is not None:
-                    selection.append(element_id)
-            gone = len(self.result.selection_ids) - len(selection)
-            if uses_selection and gone:
-                notes.append(u"{} of the run selection no longer in the model.".format(
-                    _plural(gone, u"element")))
-        elif uses_selection:
-            selection = list(uiapp.ActiveUIDocument.Selection.GetElementIds())
-            notes.append(u"The report does not record its selection: the current Revit "
-                         u"selection was used ({}).".format(_plural(len(selection), u"element")))
-
-        with forms.ProgressBar(title="Clash Report refresh: {value} of {max_value} elements",
+        test_results = list(self.result.tests)
+        total = sum(len(test_result.clashes) for test_result in test_results)
+        with forms.ProgressBar(title="Clash Report refresh: {value} of {max_value} clashes",
                                cancellable=True) as progress_bar:
             def progress(done, total):
                 if done == total or done % 20 == 0:
                     progress_bar.update_progress(done, total)
                 return progress_bar.cancelled
 
-            fresh = ce.run_tests(self.doc, tests, selection, self.doc.ActiveView,
-                                 ce.list_links(self.doc), progress)
+            fresh = ce.recheck_report_clashes(self.doc, test_results, progress)
         if fresh.cancelled:
             self.txt_result_hint.Text = u"Refresh stopped: the report was not changed."
             return
-        self._apply_refresh(fresh, notes)
+        fresh.phase_text = self.result.phase_text
+        self._apply_refresh(fresh, [])
 
     def _apply_refresh(self, fresh, notes):
         """Nuove = non nel report di partenza; risolte = del report di partenza ma non

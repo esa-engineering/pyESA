@@ -698,8 +698,7 @@ class RunResult(object):
         # Percorsi in cui il report e' stato salvato e nota per l'intestazione.
         self.report_paths = []
         self.save_note = u""
-        # Id della selezione di Revit usata dal run (sorgente "Current selection"):
-        # il Refresh del report rifa' il test sugli stessi elementi.
+        # Id della selezione di Revit usata dal run (sorgente "Current selection").
         self.selection_ids = []
         # Fase e filtro di fase della vista usata ("Phase X, phase filter Y.").
         self.phase_text = u""
@@ -1273,6 +1272,92 @@ def pair_key(clash):
     """Identita' di un'interferenza fra due run: (istanza di link, id) dei due elementi."""
     return (clash.a.link_uid or u"", int(clash.a.id_value),
             clash.b.link_uid or u"", int(clash.b.id_value))
+
+
+def recheck_report_clashes(doc, test_results, progress=None):
+    """Ricontrolla solo le coppie gia' presenti nel report, senza risolvere gli insiemi."""
+    started = time.time()
+    links = list_links(doc)
+    sources = dict((source.key, source) for source in links)
+    scope = (scope_of(test_results[0].test, links) if test_results else
+             RunScope(SOURCE_NONE, SOURCE_NONE))
+    result = RunResult(scope, links)
+    total = sum(len(test_result.clashes) for test_result in test_results)
+    done = 0
+
+    for original in test_results:
+        refreshed = TestResult(original.test)
+        for field in TEST_RESULT_FIELDS:
+            setattr(refreshed, field, getattr(original, field))
+        refreshed.clashes = []
+        result.tests.append(refreshed)
+
+        for clash in original.clashes:
+            done += 1
+            if progress is not None and progress(done, total):
+                result.cancelled = True
+                result.seconds = time.time() - started
+                return result
+
+            def resolve(info):
+                if info.is_link:
+                    source = sources.get(info.link_uid)
+                    if source is None:
+                        return None
+                    element = source.doc.GetElement(make_element_id(info.id_value))
+                else:
+                    source = ModelSource(0, doc)
+                    element = doc.GetElement(make_element_id(info.id_value))
+                return Item(source, element) if element is not None else None
+
+            item_a = resolve(clash.a)
+            item_b = resolve(clash.b)
+            if item_a is None or item_b is None:
+                continue
+            box_a = item_a.box()
+            box_b = item_b.box()
+            if box_a is None or box_b is None or not boxes_overlap(box_a, box_b):
+                continue
+
+            if item_a.is_link and item_b.is_link:
+                solids_a = item_a.solids()
+                solids_b = item_b.solids()
+                intersects = bool(solids_a and solids_b and
+                                  solids_intersect(solids_a, solids_b, refreshed))
+            elif item_a.is_link:
+                solids_a = item_a.solids()
+                intersects = bool(solids_a and
+                                  host_element_hits_solids(doc, item_b.element, solids_a,
+                                                           refreshed))
+            elif item_b.is_link:
+                solids_b = item_b.solids()
+                intersects = bool(solids_b and
+                                  host_element_hits_solids(doc, item_a.element, solids_b,
+                                                           refreshed))
+            else:
+                intersects = bool(
+                    intersect_supported(item_a.element) and
+                    host_hits_by_element(doc, item_a.element, box_a,
+                                         _ids_list([item_b.element.Id])))
+
+            if not intersects:
+                continue
+
+            test = original.test
+            same_source = item_a.source.index == item_b.source.index
+            if test.get("ignore_connected") and same_source and \
+                    item_b.value in connected_ids(item_a.element):
+                continue
+            if test.get("ignore_hosted") and same_source:
+                a_host = host_id_value(item_a.element) or -1
+                if a_host == item_b.value or host_id_value(item_b.element) == item_a.value:
+                    continue
+            refreshed.clashes.append(
+                Clash(original.name, ElementInfo(item_a), ElementInfo(item_b)))
+
+    result.seconds = time.time() - started
+    result.phase_text = u""
+    return result
 
 
 def latest_report(folder):

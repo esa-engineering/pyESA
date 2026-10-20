@@ -180,22 +180,20 @@ report intero, riapribile con Last Report; vedi sotto).
 
 ### Refresh
 
-*Refresh* rifa' i test del report sul modello com'e' adesso (`ce.run_tests`, via bridge, con
-la vista attiva per la sorgente *Active view*) e confronta con il **report di partenza**
-(quello aperto, non l'ultimo refresh: `self.baseline`). Un'interferenza e' la coppia
-(istanza di link o host, id) dei due elementi (`ce.pair_key`):
+*Refresh* ricontrolla le coppie A/B gia' presenti nel report sul modello com'e' adesso,
+senza rilanciare i test e senza usare la vista attiva o la selezione corrente. Confronta
+con il **report di partenza** (quello aperto, non l'ultimo refresh: `self.baseline`).
+Un'interferenza e' la coppia (istanza di link o host, id) dei due elementi
+(`ce.pair_key`):
 
 - quelle ancora presenti tengono il loro numero;
-- le nuove sono marcate **NEW** (arancio) e proseguono la numerazione;
 - quelle non piu' trovate finiscono nel gruppo grigio *✔ Resolved since the report*, con il
   loro numero, ancora navigabili.
 
-La sorgente *Current selection* usa la selezione del run, salvata nel report
-(`selection_ids`): gli elementi cancellati nel frattempo sono segnalati. Un report senza
-`selection_ids` (scritto prima di questa versione) usa la selezione corrente, con una nota.
+Il refresh controlla solo clash gia' contenute nel report: non scopre nuove coppie.
 Il refresh **non scrive** il file: Export JSON salva le interferenze di adesso (il file
 precedente va in `_old`, perche' non e' piu' lo stesso report). Export CSV ha la colonna
-*Status* (`new` / `resolved`) e le risolte in coda.
+*Status* (`resolved`) e le risolte in coda.
 
 ## Cartella dei report e Last Report
 
