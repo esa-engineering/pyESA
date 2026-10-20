@@ -1,59 +1,18 @@
 title: "RNW Flow\nCalculation"
 tooltip: >
-  Rainwater network sizing. The rainwater fixtures write their design flow [l/s] in the
-  Fixture Units of their connector and Revit sums it along the network: the Fixture Units
-  value of every pipe is read as its design flow in l/s. Choose the piping system type of
-  the rainwater drainage and tick the systems to calculate (one or more); the whole systems
-  are checked. Start the tool with elements selected (pipes, fittings, fixtures) to have
-  their systems ticked. The pipe series is
-  read from the model: the column of Table 6.2 comes from the material of the pipe segment,
-  and the suggested diameters are the sizes of the pipe type.
+  Rainwater network sizing. The design flow [l/s] of each fixture is written in the Fixture
+  Units of its connector, and Revit sums it along the network. Choose the piping system type
+  and the systems to check (elements selected at start are pre-ticked).
 
-  Sloped horizontal pipes are checked against Table 6.3, 6.4 or 6.5 (fill degree 0.5, 0.6
-  or 0.7, chosen in the dialog), using the table row with the next lower slope; 45 degree
-  runs count as horizontal. Pipes steeper than 60 degrees are checked as vertical stacks
-  against Table 6.2 (fill degree 0.33), in the column of their pipe series (PE, PP,
-  Triplus, Silere; the most conservative one if not recognized). Sloped pipes are also checked for
-  velocity (minimum and maximum set in the dialog) and fill degree at the design flow.
+  Horizontal pipes are checked against Table 6.3 / 6.4 / 6.5 (fill degree 0.5 / 0.6 / 0.7),
+  pipes steeper than 60 degrees as stacks against Table 6.2, in the column of their pipe
+  material. Velocity and fill degree are checked too.
 
-  CLICK: the results open in a window that follows the network from upstream to
-  downstream: every branch starts at its fixture (with the flow of each fixture) and comes
-  before the section it drains into. One row per section part, horizontal and
-  vertical (System + Section parameter of the pipes): flow, nominal and outer diameter in the model, capacity,
-  velocity, fill degree, suggested diameter and status. Pick the new size from a dropdown
-  with the sizes of the pipe type (from the segments of its routing preferences): capacity,
-  velocity, fill and check of the new size update at once. The rows whose new size differs
-  from the model are coloured; the new size starts at the suggested one only for the
-  sections that must change (undersized, not tabulated, high velocity). A horizontal row
-  can be checked at a simulated slope (0.5 to 10 cm/m, the slopes of the tables) when the flow is not in the table at
-  the slope of the model: the row turns yellow and is never changed. Apply Changes sets
-  the size on all the pipes of the coloured rows, after confirmation, one section at a
-  time. Pipes always keep the
-  calculated size. The fittings connected to them take the new size, as with the Diameter field
-  of the options bar (connector size, or the family parameter tied to it, for example NR);
-  where a resized fitting still meets a pipe that keeps its size, or a fitting cannot take the
-  new size, a transition from the routing preferences of the pipe type is added, as Revit
-  does. No fitting is deleted and no pipe is moved. A section that cannot be resized is rolled
-  back and the others are kept. The
-  report opens only at the end, and only if a section could not be resized or a fixture
-  value could not be written.
+  CLICK: results window, upstream to downstream, one row per section. Pick a new size from
+  the sizes of the pipe type, or simulate a slope; Apply Changes resizes pipes and connected
+  fittings (with transitions where needed), one section at a time. Fixture areas and
+  coefficients are editable in the Fixtures tab. Export to Excel.
 
-  The General tab sums up the total covered area, the rainfall intensity (derived from the
-  fixtures as Q / (A x C1 x C2)), the total collected flow and the area and flow of every
-  system. The Sections tab has a colour legend.
-
-  The Fixtures tab lists the connected fixtures with level and offset, family and type, collection area
-  (u_PLU_Area_1), C1, C2 and element code (e_MEC_ElementCode_1), instance or type
-  parameters, all editable; a type value changes every fixture of that type. Apply and
-  Recalculate writes them, lets Revit update the flows and recalculates the network,
-  keeping the sizes chosen by hand.
-
-  The search button of a row selects its elements and lets you navigate the active view;
-  Finish or Esc returns to the window as it was. Export Excel writes the calculation (every
-  row in network order with element code, calculation size and its results, not the
-  current state of the model) and the settings to an .xlsx file.
-
-  SHIFT + CLICK: fitting test. Pick a fitting, a connector and a DN: the tool tries the connector
-  size and the family parameter in a transaction that is rolled back, and reports what is
-  connected to every connector after each attempt. The model is not changed.
+  SHIFT + CLICK: fitting test. Tries a DN on a fitting connector in a rolled-back
+  transaction and reports the result. The model is not changed.
 author: ESA Engineering

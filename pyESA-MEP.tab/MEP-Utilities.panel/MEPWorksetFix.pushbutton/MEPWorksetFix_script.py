@@ -1,22 +1,30 @@
 # -*- coding: utf-8 -*-
 __title__ = "MEP\nWorkset Fix"
 
-__doc__ = """Version = 1.1
+__doc__ = """Version = 1.4
 Date    = 20.10.2026
 _____________________________________________________________________
 Moves MEP elements to the workset of their discipline, chosen in a
 dialog for four sections: mechanical, plumbing, fire protection and
 electrical.
 
-  Cable Trays, Cable Tray Fittings      -> electrical, always
+  Cable Trays, Cable Tray Fittings,
+  Conduits, Conduit Fittings,
+  Data / Fire Alarm / Lighting /
+  Nurse Call / Security / Telephone
+  Devices, Electrical Equipment,
+  Electrical Fixtures                   -> electrical, always
   Air Terminals, Ducts, Duct Fittings,
-  Duct Accessories (System Type)        -> DS.FF fire protection
+  Duct Accessories, Flex Ducts
+  (System Type)                         -> DS.FF fire protection
                                            DS.HV mechanical
                                            DS.OT mechanical
-  Pipes, Pipe Fittings (System Type)    -> PS.FF fire protection
+  Pipes, Pipe Fittings, Flex Pipes
+  (System Type)                         -> PS.FF fire protection
                                            PS.PD mechanical
                                            PS.SS plumbing
                                            PS.GA plumbing
+  Sprinklers                            -> fire protection, always
 
 "Contains" match on the System Type name, case-insensitive. Elements
 matching no rule, or rules of two different sections, are left where
@@ -112,18 +120,36 @@ def _pipe_rule(bic, label):
                         domain=DB.Domain.DomainPiping, rules=PIPE_RULES)
 
 
+def _electrical_rule(bic, label):
+    return CategoryRule(bic, label, fixed_section=ELECTRICAL)
+
+
 CATEGORY_RULES = (
     _duct_rule(BIC.OST_DuctTerminal, "Air Terminals"),
     _duct_rule(BIC.OST_DuctCurves, "Ducts"),
     _duct_rule(BIC.OST_DuctFitting, "Duct Fittings"),
     _duct_rule(BIC.OST_DuctAccessory, "Duct Accessories"),
+    _duct_rule(BIC.OST_FlexDuctCurves, "Flex Ducts"),
     _pipe_rule(BIC.OST_PipeCurves, "Pipes"),
     _pipe_rule(BIC.OST_PipeFitting, "Pipe Fittings"),
-    CategoryRule(BIC.OST_CableTray, "Cable Trays", fixed_section=ELECTRICAL),
-    CategoryRule(BIC.OST_CableTrayFitting, "Cable Tray Fittings", fixed_section=ELECTRICAL),
+    _pipe_rule(BIC.OST_FlexPipeCurves, "Flex Pipes"),
+    CategoryRule(BIC.OST_Sprinklers, "Sprinklers", fixed_section=FIRE),
+    _electrical_rule(BIC.OST_CableTray, "Cable Trays"),
+    _electrical_rule(BIC.OST_CableTrayFitting, "Cable Tray Fittings"),
+    _electrical_rule(BIC.OST_Conduit, "Conduits"),
+    _electrical_rule(BIC.OST_ConduitFitting, "Conduit Fittings"),
+    _electrical_rule(BIC.OST_DataDevices, "Data Devices"),
+    _electrical_rule(BIC.OST_ElectricalEquipment, "Electrical Equipment"),
+    # Electrical Fixtures e Fire Alarm Devices sono spesso famiglie annidate
+    # condivise: quelle istanze si saltano (NESTED), il workset segue l'host.
+    _electrical_rule(BIC.OST_ElectricalFixtures, "Electrical Fixtures"),
+    _electrical_rule(BIC.OST_FireAlarmDevices, "Fire Alarm Devices"),
+    _electrical_rule(BIC.OST_LightingDevices, "Lighting Devices"),
+    _electrical_rule(BIC.OST_NurseCallDevices, "Nurse Call Devices"),
+    _electrical_rule(BIC.OST_SecurityDevices, "Security Devices"),
+    _electrical_rule(BIC.OST_TelephoneDevices, "Telephone Devices"),
 )
 RULE_BY_CATEGORY = dict((int(rule.bic), rule) for rule in CATEGORY_RULES)
-CABLE_TRAY_IDS = (int(BIC.OST_CableTray), int(BIC.OST_CableTrayFitting))
 
 # Esiti. TO_MOVE e' solo il marcatore interno prima della scrittura; gli altri
 # finiscono nel report e sono in inglese.
@@ -336,10 +362,13 @@ def group_of(element):
     return doc.GetElement(group_id)
 
 
-def insulation_and_lining_ids(element):
-    """Isolamenti e rivestimenti dell'elemento (le passerelle non ne hanno)."""
-    if element.Category is not None and \
-            int(get_element_id_value(element.Category.Id)) in CABLE_TRAY_IDS:
+def insulation_and_lining_ids(element, rule):
+    """Isolamenti e rivestimenti dell'elemento.
+
+    Solo canali e tubi ne hanno: le categorie a sezione fissa (elettriche,
+    sprinkler) no.
+    """
+    if rule.fixed_section:
         return []
     ids = []
     try:
@@ -411,8 +440,14 @@ def plan_item(element, config, worksets):
     if group is not None:
         item.status, item.note = IN_GROUP, element_name(group)
         return item
-    if getattr(element, "SuperComponent", None) is not None:
+    # Istanze annidate condivise (es. Electrical Fixtures / Fire Alarm Devices
+    # dentro un'altra famiglia): il workset segue la famiglia ospite e non si
+    # puo' cambiare. La nota dice quale famiglia le contiene.
+    host = getattr(element, "SuperComponent", None)
+    if host is not None:
         item.status = NESTED
+        item.note = "inside {} ({})".format(element_name(host),
+                                            get_element_id_value(host.Id))
         return item
     param = element.get_Parameter(BIP.ELEM_PARTITION_PARAM)
     if param is None or param.IsReadOnly:
@@ -427,7 +462,7 @@ def plan_item(element, config, worksets):
         item.status, item.note = TARGET_OWNED, owner
         return item
 
-    item.linked_ids = insulation_and_lining_ids(element)
+    item.linked_ids = insulation_and_lining_ids(element, rule)
     for linked_id in item.linked_ids:
         linked = doc.GetElement(linked_id)
         linked_group = group_of(linked) if linked is not None else None

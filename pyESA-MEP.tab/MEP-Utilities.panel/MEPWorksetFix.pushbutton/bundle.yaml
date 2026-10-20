@@ -6,10 +6,12 @@ tooltip: >
   elements: "+ Add workset" adds another one), and whether to process the whole model, the
   active view or the current selection.
 
-  Cable Trays and Cable Tray Fittings always go to electrical. Air Terminals, Ducts, Duct
-  Fittings and Duct Accessories follow their System Type: DS.FF to fire protection, DS.HV
-  and DS.OT to mechanical. Pipes and Pipe Fittings: PS.FF to fire protection, PS.PD to
-  mechanical, PS.SS and PS.GA to plumbing. Insulation and lining follow their host.
+  Cable Trays, Cable Tray Fittings, Conduits, Conduit Fittings, Electrical Equipment,
+  Electrical Fixtures and Data, Fire Alarm, Lighting, Nurse Call, Security and Telephone
+  Devices always go to electrical; instances nested inside another family are skipped. Air Terminals, Ducts, Duct
+  Fittings, Duct Accessories and Flex Ducts follow their System Type: DS.FF to fire protection, DS.HV
+  and DS.OT to mechanical. Pipes, Pipe Fittings and Flex Pipes: PS.FF to fire protection, PS.PD to
+  mechanical, PS.SS and PS.GA to plumbing. Sprinklers always go to fire protection. Insulation and lining follow their host.
 
   A summary is shown before anything is written; answering No prints the report as a
   preview. Model groups are never changed: elements inside a model group are skipped. Elements

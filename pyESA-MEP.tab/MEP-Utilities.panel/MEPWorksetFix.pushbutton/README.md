@@ -23,9 +23,12 @@ avviso spiega perché e il comando termina.
 **Workset delle quattro sezioni.** Ogni tendina elenca i workset utente del modello
 (`WorksetKind.UserWorkset`, in ordine alfabetico), preceduti da **(do not change)**: una
 sezione lasciata così non sposta nessuno dei suoi elementi, che compaiono nel report come
-`SECTION SET TO DO NOT CHANGE`. Serve almeno una sezione impostata. Sotto ogni tendina un
-testo grigio dice quali categorie e quali System Type finiscono in quella sezione; il testo
-è generato dalle regole dello script, quindi resta allineato al codice.
+`SECTION SET TO DO NOT CHANGE`. Serve almeno una sezione impostata. Le quattro sezioni
+stanno in un'unica tabella *Target worksets*, una riga ciascuna: nome della sezione,
+tendina e, a destra, un testo grigio che dice quali categorie e quali System Type
+finiscono in quella sezione. Il testo è generato dalle regole dello script, quindi resta
+allineato al codice. In testa alla finestra il riquadro *How it works* riassume il
+funzionamento.
 
 Alla prima apertura, se non c'è una scelta salvata, la finestra propone il primo workset il
 cui nome contiene una parola chiave della sezione (`MECH`, `MECC`, `HVAC`; `PLUMB`, `IDRA`,
@@ -59,14 +62,15 @@ spostare il report esce subito, senza domanda.
 
 | Categorie | System Type contiene | Sezione |
 | --- | --- | --- |
-| Cable Trays, Cable Tray Fittings | (non si legge) | elettrici, sempre |
-| Air Terminals, Ducts, Duct Fittings, Duct Accessories | `DS.FF` | antincendio |
+| Cable Trays, Cable Tray Fittings, Conduits, Conduit Fittings, Data Devices, Electrical Equipment, Electrical Fixtures, Fire Alarm Devices, Lighting Devices, Nurse Call Devices, Security Devices, Telephone Devices | (non si legge) | elettrici, sempre |
+| Air Terminals, Ducts, Duct Fittings, Duct Accessories, Flex Ducts | `DS.FF` | antincendio |
 | | `DS.HV` | meccanici |
 | | `DS.OT` | meccanici |
-| Pipes, Pipe Fittings | `PS.FF` | antincendio |
+| Pipes, Pipe Fittings, Flex Pipes | `PS.FF` | antincendio |
 | | `PS.PD` | meccanici |
 | | `PS.SS` | idraulici |
 | | `PS.GA` | idraulici |
+| Sprinklers | (non si legge) | antincendio, sempre |
 
 Il confronto è "contiene" e non distingue maiuscole e minuscole (`ds.hv` vale come
 `DS.HV`). Le regole sono in testa allo script (`DUCT_RULES`, `PIPE_RULES`,
@@ -99,7 +103,7 @@ nel workset giusto (`ALREADY CORRECT`) e a quelli senza regola, restano invariat
 | `IN A WORKSET LEFT UNTOUCHED` | l'elemento è in uno dei workset da non toccare scelti nella finestra |
 | `SECTION SET TO DO NOT CHANGE` | la sezione dell'elemento è impostata su (do not change) |
 | `IN A GROUP` | l'elemento, o un suo isolamento / rivestimento, è membro di un gruppo di modello (nota: nome del gruppo) |
-| `NESTED IN A FAMILY` | famiglia annidata condivisa (`SuperComponent`): segue l'host |
+| `NESTED IN A FAMILY` | istanza di famiglia annidata condivisa (`SuperComponent`), tipicamente Electrical Fixtures o Fire Alarm Devices dentro un'altra famiglia: il workset segue la famiglia ospite e non si può cambiare (nota: nome e id della famiglia ospite) |
 | `WORKSET READ-ONLY` | il parametro `ELEM_PARTITION_PARAM` manca o è in sola lettura |
 | `OWNED BY ANOTHER USER` | l'elemento, o un suo isolamento / rivestimento, è preso da un altro utente (nota: nome dell'utente) |
 | `NOT UPDATED FROM CENTRAL` | l'elemento è cambiato o è stato cancellato nel centrale: serve *Reload Latest* |
@@ -176,9 +180,11 @@ in 2026, `IntegerValue` prima; `WorksetId.IntegerValue` esiste in tutte le versi
 
 ## Limiti e punti da verificare
 
-- Le categorie gestite sono solo le otto della tabella. Restano fuori, fra le altre, Pipe
-  Accessories, Flex Ducts, Flex Pipes, Sprinklers, Mechanical Equipment, Plumbing Fixtures
-  e Conduits: vanno aggiunte in `CATEGORY_RULES` se servono.
+- Le categorie gestite sono solo quelle della tabella. Communication Devices, Generic
+  Models, Lighting Fixtures, Mechanical Equipment, Pipe Accessories, Plumbing Fixtures e
+  Specialty Equipment restano fuori per scelta: il loro workset si assegna con un abaco
+  multicategoria (Multi-Category Schedule), e la finestra lo ricorda nel riquadro *How it
+  works*.
 - Si lavora solo sul modello aperto, non sui collegamenti.
 - Non è verificato in Revit se isolamenti e rivestimenti seguano l'host da soli quando
   cambia il workset: lo script gestisce entrambi i casi.

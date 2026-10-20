@@ -34,6 +34,10 @@ CONFIG_SECTION = 'ESA_MEPWorksetFix'
 NOT_SET_LABEL = '(do not change)'
 # Voce vuota delle tendine dei workset da non toccare.
 NO_WORKSET_LABEL = '(none)'
+# Colonne delle righe create da codice: le stesse della tabella dei workset di
+# destinazione nel XAML, cosi' le tendine stanno in colonna.
+LABEL_COLUMN_WIDTH = 190
+COMBO_COLUMN_WIDTH = 280
 REMOVE_GLYPH = u'\u2715'
 
 SECTION_KEYS = ('mechanical', 'plumbing', 'fire', 'electrical')
@@ -215,7 +219,8 @@ class MEPWorksetFixForm(Window):
         """Aggiunge una riga etichetta + tendina + pulsante di rimozione."""
         row = Grid()
         row.Margin = Thickness(0, 5, 0, 0)
-        for width in (GridLength(80), GridLength(1, GridUnitType.Star), GridLength.Auto):
+        for width in (GridLength(LABEL_COLUMN_WIDTH), GridLength(COMBO_COLUMN_WIDTH),
+                      GridLength.Auto, GridLength(1, GridUnitType.Star)):
             column = ColumnDefinition()
             column.Width = width
             row.ColumnDefinitions.Add(column)
