@@ -212,6 +212,18 @@ Both are current; pick whichever the file already uses.
 Resolve the XAML path with `script.get_bundle_file(XAML_FILE_NAME)`, falling back to
 `op.join(op.dirname(__file__), XAML_FILE_NAME)`.
 
+**Modeless windows** (the user keeps working in Revit while the window is open) exist only in
+`ClashFinder.pulldown` (`pyESA-MEP.tab/MEP-Utilities.panel`: Clash Setup, Quick Clash and
+Last Report). Its buttons share their modules and XAML through `ClashFinder.pulldown/lib`, which pyRevit
+puts on the search path of every button in the pulldown (any container's `lib/` is): the one place where code is shared between bundles, still
+private to that tool. From a modeless window's WPF events there is no
+valid API context, so every model read, selection change or transaction goes through
+`clashfinder_bridge.RevitBridge`: a queue of callables run by one `ExternalEvent`, created in
+the script (API context) and disposed in the window's `Closed`. The script sets
+`__persistentengine__ = True` so the engine outlives the command, and helpers resolve their XAML
+from `os.path.dirname(__file__)` first, because `script.get_bundle_file` needs the running
+command. Copy that bridge (renamed after the tool) for any new modeless window.
+
 For simple prompts prefer the pyRevit built-ins already used everywhere:
 `forms.alert`, `forms.SelectFromList`, `forms.ProgressBar`, `forms.WarningBar`,
 `forms.CommandSwitchWindow`, `forms.pick_file` / `save_file`.
