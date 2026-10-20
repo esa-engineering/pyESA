@@ -47,7 +47,9 @@ toccare: la finestra lo segnala e resta aperta.
 
 **Elementi da elaborare.**
 
-- *All elements in the model*: tutto il modello.
+- *All elements in the model*: tutto il modello. È l'unico ambito in cui si elaborano
+  anche i **Duct Systems** e i **Piping Systems**: con vista attiva o selezione vengono
+  ignorati e il report lo dice in testa.
 - *Only elements visible in the active view*: disabilitata se la vista attiva non è una
   vista grafica del modello (tavole, abachi, modelli di vista).
 - *Only the current selection*: disabilitata se non c'è nulla di selezionato. Se al lancio
@@ -63,10 +65,10 @@ spostare il report esce subito, senza domanda.
 | Categorie | System Type contiene | Sezione |
 | --- | --- | --- |
 | Cable Trays, Cable Tray Fittings, Conduits, Conduit Fittings, Data Devices, Electrical Equipment, Electrical Fixtures, Fire Alarm Devices, Lighting Devices, Nurse Call Devices, Security Devices, Telephone Devices | (non si legge) | elettrici, sempre |
-| Air Terminals, Ducts, Duct Fittings, Duct Accessories, Flex Ducts | `DS.FF` | antincendio |
+| Air Terminals, Ducts, Duct Fittings, Duct Accessories, Flex Ducts, Duct Systems (solo intero modello) | `DS.FF` | antincendio |
 | | `DS.HV` | meccanici |
 | | `DS.OT` | meccanici |
-| Pipes, Pipe Fittings, Flex Pipes | `PS.FF` | antincendio |
+| Pipes, Pipe Fittings, Flex Pipes, Piping Systems (solo intero modello) | `PS.FF` | antincendio |
 | | `PS.PD` | meccanici |
 | | `PS.SS` | idraulici |
 | | `PS.GA` | idraulici |
@@ -87,6 +89,14 @@ aggiungere una categoria una riga in `CATEGORY_RULES` con la regola dei canali o
 2. Se il parametro è vuoto (tipicamente un raccordo non collegato) si guardano i sistemi
    dei connettori del dominio giusto (`DomainHvac` / `DomainPiping`) e si prendono i nomi
    dei loro tipi.
+
+I **Duct Systems** (`OST_DuctSystem`, regole dei canali) e i **Piping Systems**
+(`OST_PipingSystem`, regole dei tubi) sono essi stessi sistemi: il System Type è il
+loro tipo (`GetTypeId()`), letto direttamente senza parametro né connettori
+(`from_element_type` in `CategoryRule`). Non hanno isolamenti. La regola è marcata
+`model_only`: `active_rules()` la esclude quando l'ambito è la vista attiva o la
+selezione, perché i sistemi non sono elementi visibili in una vista e di rado si
+selezionano.
 
 Se nessun nome corrisponde a una regola l'elemento resta dov'è (`NO MATCHING SYSTEM TYPE`).
 Se i nomi corrispondono a regole di **due sezioni diverse** (per esempio un raccordo fra un

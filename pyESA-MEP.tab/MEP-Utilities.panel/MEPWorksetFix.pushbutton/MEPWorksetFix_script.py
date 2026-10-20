@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "MEP\nWorkset Fix"
 
-__doc__ = """Version = 1.4
+__doc__ = """Version = 1.6
 Date    = 20.10.2026
 _____________________________________________________________________
 Moves MEP elements to the workset of their discipline, chosen in a
@@ -19,11 +19,15 @@ electrical.
   (System Type)                         -> DS.FF fire protection
                                            DS.HV mechanical
                                            DS.OT mechanical
+  Duct Systems (type name, whole
+  model scope only)                     -> same rules as ducts
   Pipes, Pipe Fittings, Flex Pipes
   (System Type)                         -> PS.FF fire protection
                                            PS.PD mechanical
                                            PS.SS plumbing
                                            PS.GA plumbing
+  Piping Systems (type name, whole
+  model scope only)                     -> same rules as pipes
   Sprinklers                            -> fire protection, always
 
 "Contains" match on the System Type name, case-insensitive. Elements
@@ -98,16 +102,22 @@ class CategoryRule(object):
     fixed_section valorizzata: la categoria va sempre li', senza leggere il sistema.
     Altrimenti system_param e domain dicono dove leggere il System Type e rules
     lo traducono in sezione.
+    from_element_type: l'elemento e' esso stesso un sistema MEP, il System Type
+    e' il suo tipo (GetTypeId), non un parametro.
+    model_only: la categoria si elabora solo con l'ambito "intero modello".
     """
 
     def __init__(self, bic, label, fixed_section=None,
-                 system_param=None, domain=None, rules=()):
+                 system_param=None, domain=None, rules=(),
+                 from_element_type=False, model_only=False):
         self.bic = bic
         self.label = label
         self.fixed_section = fixed_section
         self.system_param = system_param
         self.domain = domain
         self.rules = rules
+        self.from_element_type = from_element_type
+        self.model_only = model_only
 
 
 def _duct_rule(bic, label):
@@ -130,9 +140,16 @@ CATEGORY_RULES = (
     _duct_rule(BIC.OST_DuctFitting, "Duct Fittings"),
     _duct_rule(BIC.OST_DuctAccessory, "Duct Accessories"),
     _duct_rule(BIC.OST_FlexDuctCurves, "Flex Ducts"),
+    # Sistemi: solo sull'intero modello (vedi Piping Systems sotto).
+    CategoryRule(BIC.OST_DuctSystem, "Duct Systems", domain=DB.Domain.DomainHvac,
+                 rules=DUCT_RULES, from_element_type=True, model_only=True),
     _pipe_rule(BIC.OST_PipeCurves, "Pipes"),
     _pipe_rule(BIC.OST_PipeFitting, "Pipe Fittings"),
     _pipe_rule(BIC.OST_FlexPipeCurves, "Flex Pipes"),
+    # I sistemi non stanno nelle viste e quasi mai in una selezione: si
+    # elaborano solo sull'intero modello.
+    CategoryRule(BIC.OST_PipingSystem, "Piping Systems", domain=DB.Domain.DomainPiping,
+                 rules=PIPE_RULES, from_element_type=True, model_only=True),
     CategoryRule(BIC.OST_Sprinklers, "Sprinklers", fixed_section=FIRE),
     _electrical_rule(BIC.OST_CableTray, "Cable Trays"),
     _electrical_rule(BIC.OST_CableTrayFitting, "Cable Tray Fittings"),
@@ -273,7 +290,11 @@ def system_type_names(element, rule):
 
     I raccordi non collegati hanno il parametro vuoto: in quel caso si guarda ai
     sistemi dei connettori, che di solito sono vuoti anch'essi.
+    Per un sistema MEP (Piping Systems) il System Type e' il tipo dell'elemento.
     """
+    if rule.from_element_type:
+        system_type = doc.GetElement(element.GetTypeId())
+        return [element_name(system_type)] if system_type is not None else []
     names = []
     param = element.get_Parameter(rule.system_param)
     if param is not None and param.HasValue:
@@ -333,8 +354,14 @@ class PlanItem(object):
         self.linked_ids = []
 
 
+def active_rules(config):
+    """Regole valide per l'ambito scelto: le model_only solo sull'intero modello."""
+    return [rule for rule in CATEGORY_RULES
+            if config.scope == ui.SCOPE_MODEL or not rule.model_only]
+
+
 def collect_elements(config):
-    bics = List[BIC]([rule.bic for rule in CATEGORY_RULES])
+    bics = List[BIC]([rule.bic for rule in active_rules(config)])
     category_filter = DB.ElementMulticategoryFilter(bics)
     if config.scope == ui.SCOPE_SELECTION:
         ids = uidoc.Selection.GetElementIds()
@@ -366,9 +393,9 @@ def insulation_and_lining_ids(element, rule):
     """Isolamenti e rivestimenti dell'elemento.
 
     Solo canali e tubi ne hanno: le categorie a sezione fissa (elettriche,
-    sprinkler) no.
+    sprinkler) e i sistemi no.
     """
-    if rule.fixed_section:
+    if rule.fixed_section or rule.from_element_type:
         return []
     ids = []
     try:
@@ -579,6 +606,10 @@ def print_header(config, preview):
     if config.excluded_names:
         output.print_md("Worksets left untouched: **{}**".format(
             "**, **".join(config.excluded_names)))
+    skipped_rules = [rule.label for rule in CATEGORY_RULES if rule not in active_rules(config)]
+    if skipped_rules:
+        output.print_md("Not processed with this scope (whole model only): {}.".format(
+            ", ".join(skipped_rules)))
 
 
 def print_report(plan, config, worksets, preview, linked_counts=None):
@@ -588,14 +619,14 @@ def print_report(plan, config, worksets, preview, linked_counts=None):
     if not plan:
         output.print_md(
             "No element of the handled categories was found in the chosen scope "
-            "({}).".format(", ".join(rule.label for rule in CATEGORY_RULES)))
+            "({}).".format(", ".join(rule.label for rule in active_rules(config))))
         return
 
     moved_status = TO_MOVE if preview else MOVED
     moved_label = "To move" if preview else "Moved"
 
     # Riepilogo per categoria.
-    summary = OrderedDict((rule.label, [0, 0, 0, 0, 0]) for rule in CATEGORY_RULES)
+    summary = OrderedDict((rule.label, [0, 0, 0, 0, 0]) for rule in active_rules(config))
     for item in plan:
         counts = summary.setdefault(item.category, [0, 0, 0, 0, 0])
         counts[0] += 1
@@ -686,10 +717,13 @@ def section_hints():
     fixed = OrderedDict((key, []) for key in SECTION_LABELS)
     by_rules = OrderedDict()
     for rule in CATEGORY_RULES:
+        label = rule.label
+        if rule.model_only:
+            label += " (whole model only)"
         if rule.fixed_section:
-            fixed[rule.fixed_section].append(rule.label)
+            fixed[rule.fixed_section].append(label)
         else:
-            by_rules.setdefault(rule.rules, []).append(rule.label)
+            by_rules.setdefault(rule.rules, []).append(label)
     for key in SECTION_LABELS:
         if fixed[key]:
             hints[key].append("{}: always.".format(", ".join(fixed[key])))
