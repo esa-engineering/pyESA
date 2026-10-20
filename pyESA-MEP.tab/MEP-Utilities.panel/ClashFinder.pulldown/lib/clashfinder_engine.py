@@ -1219,34 +1219,6 @@ def set_report_folder(doc, folder):
     _set_model_value(doc, REPORT_FOLDERS_KEY, folder)
 
 
-# Workset delle copie dei linkati nei modelli condivisi, per modello: quello attivo
-# (default) o un workset esistente, per nome.
-PREVIEW_WORKSETS_KEY = "preview_worksets"
-WORKSET_ACTIVE = u"<active>"
-
-
-def preview_workset_choice(doc):
-    # Vuoto: la voce del vecchio workset dedicato, ora tolto; vale come workset attivo.
-    return _model_value(doc, PREVIEW_WORKSETS_KEY) or WORKSET_ACTIVE
-
-
-def set_preview_workset_choice(doc, value):
-    _set_model_value(doc, PREVIEW_WORKSETS_KEY, value)
-
-
-def user_worksets(doc):
-    """Nomi dei workset utente del modello (vuoto se non condiviso)."""
-    if not doc.IsWorkshared:
-        return []
-    names = []
-    try:
-        for workset in DB.FilteredWorksetCollector(doc).OfKind(DB.WorksetKind.UserWorkset):
-            names.append(workset.Name)
-    except Exception:
-        return []
-    return sorted(names, key=lambda n: n.lower())
-
-
 def report_file_name(test_name):
     """<nome del test>.json, senza i caratteri vietati da Windows."""
     name = re.sub(u'[<>:"/\\\\|?*\\x00-\\x1f]+', u"_", cr.text(test_name)).strip(u" .")

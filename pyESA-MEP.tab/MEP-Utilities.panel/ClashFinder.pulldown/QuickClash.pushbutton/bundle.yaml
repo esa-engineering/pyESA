@@ -3,12 +3,12 @@ title:
 
   Clash
 tooltip: >
-  Compact version of Clash Finder: click a saved test, check or change where Set A
+  Compact version of Clash Setup: click a saved test, check or change where Set A
   and Set B come from (current Revit selection, active view, whole model or
   nothing, plus loaded links) for this run, then run. The report is the same as
-  Clash Finder's.
+  Clash Setup's.
 
   The current selection is read again at every Refresh and when the run starts.
-  Tests and settings are shared with Clash Finder, where the tests are created and
+  Tests and settings are shared with Clash Setup, where the tests are created and
   edited.
 author: Claude + Matteo Maiorano

@@ -79,7 +79,7 @@
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Text="🧪 CLASH TESTS" Style="{StaticResource SectionHeader}"/>
                     <TextBlock Grid.Row="1" Style="{StaticResource HintText}"
-                               Text="Click the test to run. Its sources and links can be changed here for this run; tests are created and edited in Clash Finder."/>
+                               Text="Click the test to run. Its sources and links can be changed here for this run; tests are created and edited in Clash Setup."/>
                     <ListBox x:Name="lst_tests" Grid.Row="2" MinHeight="120"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>

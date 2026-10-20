@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__title__ = "Clash\nFinder"
+__title__ = "Clash\nSetup"
 
 __doc__ = """Version = 2.0
 Date    = 20.10.2026
@@ -49,12 +49,12 @@ if doc is None:
 if doc.IsFamilyDocument:
     forms.alert("This command is not available in a family document.", exitscript=True)
 if int(doc.Application.VersionNumber) < 2022:
-    forms.alert("Clash Finder needs Revit 2022 or later.", exitscript=True)
+    forms.alert("Clash Setup needs Revit 2022 or later.", exitscript=True)
 
 from clashfinder_bridge import RevitBridge
 import clashfinder_ui
 
-bridge = RevitBridge("Clash Finder")
+bridge = RevitBridge("Clash Setup")
 try:
     clashfinder_ui.show_main_window(doc, bridge, __revit__.MainWindowHandle)  # noqa: F821
 except Exception:

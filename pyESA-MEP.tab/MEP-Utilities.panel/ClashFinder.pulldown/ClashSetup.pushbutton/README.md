@@ -3,12 +3,19 @@
 Clash detection a test salvati, sul modello di Navisworks. Sostituisce l'uso diretto
 dell'Interference Check di Revit con test riutilizzabili e un report navigabile.
 
+Pulldown **Clash Finder** (`ClashFinder.pulldown`, pannello MEP-Utilities) con tre comandi:
+**Clash Setup** (finestra principale: crea, modifica ed esegue i test), **Quick Clash**
+(esegue un test salvato) e **Last Report** (riapre l'ultimo report).
+
 ## Concetti
 
-- **Test**: confronta **Set A** con **Set B**. Ha un nome e due opzioni:
-  - *Ignore elements connected to each other*: scarta le coppie collegate da connettori MEP
-    (un canale e il suo raccordo si toccano sempre);
-  - *Ignore an element and its host*: scarta le coppie elemento / host (porta e muro).
+- **Test**: confronta **Set A** con **Set B** e ha un nome. Sempre, senza spunte (tolte:
+  `normalize_test` forza `ignore_connected` / `ignore_hosted` a true anche nei file che li
+  hanno a false):
+  - le coppie collegate da connettori MEP non sono clash (un canale e il suo raccordo si
+    toccano sempre);
+  - le coppie elemento / host non sono clash (porta e muro). Un elemento ospitato che sfonda
+    davvero il suo host non viene quindi segnalato.
 - **Set**: sorgenti, categorie, filtri di vista e regole, tutto salvato nel test.
   - *From this model*: *Current selection*, vista attiva, intero modello o nulla. La
     selezione corrente di Revit e' riletta a ogni aggiornamento del riepilogo e all'avvio del
@@ -50,12 +57,12 @@ Una sola pagina:
 - a sinistra la libreria: un clic carica il test nell'editor (sotto il nome, in grigio,
   le sorgenti di A e B: `describe_scope()`); *New* (chiede il nome nella finestra di
   salvataggio e aggiunge subito alla libreria un test vuoto: nessuna categoria, link o filtro,
-  A e B dalla selezione corrente; le opzioni restano attive), *▲* / *▼* (sposta il test
+  A e B dalla selezione corrente), *▲* / *▼* (sposta il test
   selezionato; l'ordine si salva subito nella libreria e vale anche per Quick Clash), *Delete*, *Import JSON*, *Export JSON* (tutta la libreria);
 - a destra l'editor (il nome del test caricato sta nel titolo della finestra, con `*` se
   modificato): le colonne **Set A** e **Set B** con la sorgente nel modello aperto sulla riga del titolo, i link, le
   categorie (conteggio in una colonna a destra), i filtri di vista (con ricerca per nome) e
-  le regole, poi le opzioni del test. Negli elenchi di categorie e filtri SHIFT + clic porta
+  le regole. Negli elenchi di categorie e filtri SHIFT + clic porta
   allo stato della casella cliccata tutte quelle visibili fra lei e l'ultima cliccata
   (`_shift_range`). Un insieme vuoto e' segnalato in rosso nella riga di stato;
 - in fondo la riga di stato ("Unsaved changes", elementi selezionati in Revit, note), *Refresh*, *Save*,
@@ -133,36 +140,34 @@ principale, che ne esegue uno) c'e' un livello in piu' per test.
 Un clic su una riga (gruppo, interferenza o elemento), via bridge e in una sola transazione
 "Clash Finder view":
 
-- **copie dei linkati**: Revit non ha override sul singolo elemento di un link, quindi per
-  ogni elemento linkato della riga si crea nel modello aperto un `DirectShape` (Generic
-  Model) con i solidi del link gia' trasformati (`ce.element_solids`), marcato con
-  `ApplicationId = cr.PREVIEW_APP_ID` (`"ESA_ClashFinder_Preview"`). A ogni clic e alla
-  chiusura si cancellano **tutti** i DirectShape con quel marchio, anche quelli orfani di una
-  chiusura anomala di Revit; la clash detection li ignora (`cr.is_model_element`). Un
-  elemento che non si riesce a copiare (nessun solido valido) e' segnalato e, con
-  l'isolamento, si isola l'istanza del link intera. Le copie seguono la visibilita' di
-  Generic Models nella vista. In un modello condiviso il workset delle copie si sceglie in
-  fondo alla finestra di Clash Finder (sezione OPTIONS, *Workset for the copies of linked
-  elements*), per modello e non nel test (config `ESA_ClashFinder` / `preview_worksets`,
-  voci `"<model_key>::<scelta>"`; `ce.preview_workset_choice`):
-  - **Active workset** (default): dove Revit mette i nuovi elementi. Nessun workset viene
-    creato dallo strumento; una vecchia scelta del workset dedicato (voce vuota) vale come
-    workset attivo;
-  - **un workset esistente**, per nome: la sua visibilita' non viene toccata (cambierebbe
-    anche gli elementi veri); se e' nascosto nella vista attiva c'e' una nota, se non esiste
-    piu' le copie restano nel workset attivo. *Hide overlay* / *Show overlay* (`overlay_on`, attivo
-  all'apertura) spegne colori e copie insieme: i colori tornano all'originale, le copie
-  vengono cancellate, la navigazione resta (section box, isolamento del link intero, zoom
-  sul box di tutti gli elementi della riga);
-- **colori**: override di elemento nella vista attiva, Set A verde (0,170,0), Set B rosso
-  (220,0,0), linee e retino pieno di superficie e di taglio, sugli elementi host e sulle
-  copie. Gli host colorati prima, in quella vista, tornano all'override originale (salvato
-  prima di toccarli);
+- **elementi linkati disegnati**: Revit non ha override ne' "nascondi" via API sul singolo
+  elemento di un link (`View.HideElements` non accetta elementi dei link), quindi i solidi
+  dei linkati della riga, gia' trasformati (`ce.element_solids`), vengono **disegnati** con
+  DirectContext3D (`pyrevit.revit.dc3dserver`: `Mesh.from_solid`, verde A / rosso B). Non
+  si crea nessun elemento nel modello: niente workset, abachi o sincronizzazione. Il server
+  (`_make_drawing_server`) disegna solo nella vista attiva al momento del clic
+  (`CanExecute` sull'id della vista), viene creato al primo uso e rimosso alla chiusura. Un
+  linkato senza mesh (nessun solido), o pyRevit senza `dc3dserver`, ricade sull'istanza del
+  link intera. Le DirectShape `ESA_ClashFinder_Preview` delle versioni precedenti vengono
+  ancora cancellate a ogni clic e alla chiusura;
+- **colori**: override di elemento nella vista attiva sugli host, Set A verde (0,170,0), Set B
+  rosso (220,0,0), linee e retino pieno di superficie e di taglio. Gli host colorati prima, in
+  quella vista, tornano all'override originale (salvato prima di toccarli);
+- **contenitore trasparente**: quando la riga e' una singola clash, dei due elementi quello
+  con il bounding box piu' grande (`container_key`) e' reso trasparente
+  (`CONTAINER_TRANSPARENCY`, 0-100 come in Revit, ora 40): override di trasparenza della
+  superficie se host, canale alfa (0-255) della mesh DirectContext3D se linkato;
 - **section box**: solo se la vista attiva e' 3D, attorno agli elementi con 10 cm di margine;
-- **isolamento**: con il pulsante *Isolate selected* attivo, `IsolateElementsTemporary` sugli
-  elementi host e sulle copie della riga. Spegnendo il pulsante l'isolamento viene tolto;
-- **zoom**: `ShowElements` su host e copie (`UIView.ZoomAndCenterRectangle` sul box
-  memorizzato se nessuno dei due e' disponibile).
+- **isolamento** (*Isolate selected*, **attivo all'apertura**): `IsolateElementsTemporary`
+  sugli host della riga, cosi' link e resto spariscono e restano gli host e i linkati
+  disegnati: **si vedono solo i due elementi**. Una riga di soli linkati nasconde
+  temporaneamente tutto il resto della vista (`HideElementsTemporary`). Spegnendo il
+  pulsante l'isolamento viene tolto (i linkati disegnati si sovrappongono allora al link);
+- **zoom**: `ShowElements` sugli host se la riga non ha linkati, altrimenti
+  `UIView.ZoomAndCenterRectangle` sul box memorizzato.
+
+*Hide overlay* / *Show overlay* (`overlay_on`, attivo all'apertura) spegne colori e linkati
+disegnati insieme; la navigazione resta (section box, isolamento con il link intero, zoom).
 
 Ogni clic e' una transazione "Clash Finder view" (compare nell'annulla).
 
@@ -208,7 +213,7 @@ salvataggio automatico, o di un report riaperto da quel file) viene solo riscrit
 rinuncia a scegliere la cartella o la scrittura fallisce, il report si apre comunque con
 una nota nell'intestazione.
 
-Last Report e' il terzo pulsante dello stack (`LastReport.pushbutton`): CLICK apre il
+Last Report e' il terzo comando del pulldown (`LastReport.pushbutton`): CLICK apre il
 report piu' recente della cartella del modello (`ce.latest_report`, per data del file,
 escluso `_old`); se non ce n'e' chiede un file. SHIFT + CLICK importa un file qualsiasi,
 partendo dalla cartella del modello (anche da `_old`). Il report riaperto ha la stessa
@@ -235,12 +240,13 @@ coppia piu' vicina della diagnostica non viene salvata.
 | Test | Set A | Set B | Sorgente (A e B) |
 | --- | --- | --- | --- |
 | All vs All | tutte le categorie | tutte le categorie | Current selection |
-| Pipes vs Ducts | tubi, raccordi, accessori, tubi flessibili | canali, raccordi, accessori, canali flessibili | Current selection |
-| Mec vs Generic Models | distribuzione meccanica + terminali aria, apparecchiature meccaniche, apparecchi sanitari, sprinkler | Generic Models | Whole model |
+| Pipes vs Ducts | tubi, raccordi, tubi flessibili (senza accessori) | canali, raccordi, canali flessibili (senza accessori) | Current selection |
 | Mec vs Ele | distribuzione meccanica (canali e tubi con raccordi, accessori, flessibili) | passerelle, tubi protettivi e loro raccordi | Current selection |
+| Ele vs Structures | passerelle, tubi protettivi e loro raccordi | muri, solai, tetti, pilastri, travi, fondazioni | Whole model |
+| Openings vs Structures | Generic Models con *[Family] contains "Void Demand"* **oppure** *[Type] contains "VoidDemand"* (famiglie `e_GM.PH.VD_Void Demand_*`, tipo `PLH_VoidDemand` di `e_GM.MT_Placeholder`; `OPENING_RULES`) | travi, pilastri, solai | Whole model |
 | Equipments vs Distribution | apparecchiature meccaniche ed elettriche | distribuzione meccanica ed elettrica | Whole model |
 
-Tutti con *Ignore connected* e *Ignore an element and its host* attivi. In una libreria gia'
+In una libreria gia'
 esistente i predefiniti mancanti (per nome) si aggiungono una volta sola per
 `DEFAULTS_VERSION` (config `ESA_ClashFinder` / `defaults_version`, `cr.pending_defaults`):
 un test con lo stesso nome non viene toccato e un predefinito cancellato non torna, finche'
@@ -248,11 +254,11 @@ la versione non sale.
 
 ## Quick Clash
 
-Secondo pulsante dello stack (`QuickClash.pushbutton`), per eseguire in fretta. A sinistra
+Secondo comando del pulldown (`QuickClash.pushbutton`), per eseguire in fretta. A sinistra
 l'elenco dei test (un clic sceglie quello da eseguire), a destra sorgente nel modello aperto
 e link di Set A e Set B: vengono dal test e si possono cambiare per l'esecuzione, senza
 salvarli. Categorie, filtri e regole restano quelli del test. Nessuna tabella: una riga di
-stato riporta conteggi e note. Libreria e `last_test` condivisi con Clash Finder; il report
+stato riporta conteggi e note. Libreria e `last_test` condivisi con Clash Setup; il report
 e' lo stesso.
 
 `QuickClashForm` (`clashfinder_quick_ui.py`) eredita da `ClashFinderForm` e cambia
@@ -261,14 +267,14 @@ della libreria con sorgenti e link a schermo) e `_show_summary`; `_mark_dirty` n
 
 ## Moduli
 
-Pulsanti e moduli stanno in `Clash.stack`. I moduli e gli XAML sono in `Clash.stack/lib`:
-pyRevit mette la cartella `lib` di uno stack nel percorso di ricerca di tutti i suoi
-pulsanti, cosi' i due comandi usano lo stesso codice senza copie. Gli XAML si risolvono da
+Pulsanti e moduli stanno in `ClashFinder.pulldown`. I moduli e gli XAML sono in `ClashFinder.pulldown/lib`:
+pyRevit mette la cartella `lib` di qualsiasi contenitore (qui il pulldown) nel percorso di
+ricerca di tutti i suoi pulsanti, cosi' i tre comandi usano lo stesso codice senza copie. Gli XAML si risolvono da
 `os.path.dirname(__file__)`, cioe' da `lib`.
 
 | Modulo | Ruolo |
 | --- | --- |
-| `ClashFinder.pushbutton/ClashFinder_script.py` | controlli sul documento, crea il bridge e apre la finestra completa; `__persistentengine__ = True` |
+| `ClashSetup.pushbutton/ClashSetup_script.py` | controlli sul documento, crea il bridge e apre la finestra completa; `__persistentengine__ = True` |
 | `QuickClash.pushbutton/QuickClash_script.py` | idem per la finestra rapida |
 | `LastReport.pushbutton/LastReport_script.py` | riapre l'ultimo report del modello o ne importa uno (`ce.load_report`) |
 | `lib/clashfinder_rules.py` | modello dati dei test, JSON, valutazione di categorie e regole sugli elementi |

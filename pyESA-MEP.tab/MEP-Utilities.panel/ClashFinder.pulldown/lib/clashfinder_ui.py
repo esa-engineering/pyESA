@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-clashfinder_ui.py - finestra principale di Clash Finder (non modale), pagina unica.
+clashfinder_ui.py - finestra principale di Clash Setup (non modale), pagina unica.
 
 A sinistra la libreria dei test: un clic carica il test nell'editor. A destra
 l'editor del test caricato, con due colonne Set A e Set B, ciascuna con:
@@ -48,7 +48,7 @@ import clashfinder_report_ui as report_ui
 XAML_FILE_NAME = 'ClashFinder_form.xaml'
 SAVE_XAML_FILE = 'ClashFinder_save.xaml'
 CONFIG_SECTION = 'ESA_ClashFinder'
-TITLE = "Clash Finder"
+TITLE = "Clash Setup"
 NEW_TEST_NAME = u"New test"
 
 SIDES = ("a", "b")
@@ -217,7 +217,6 @@ class ClashFinderForm(Window):
         names = ("lst_tests", "btn_up", "btn_down", "btn_new", "btn_delete", "btn_import",
                  "btn_export",
                  "txt_library_path", "pnl_editor", "txt_editor_state",
-                 "chk_ignore_connected", "chk_ignore_hosted", "cbo_preview_workset",
                  "txt_summary_state", "txt_links_hint",
                  "btn_refresh", "btn_save", "btn_save_as", "btn_close", "btn_run")
         for name in names:
@@ -254,9 +253,6 @@ class ClashFinderForm(Window):
         self.btn_delete.Click += self.OnDeleteTest
         self.btn_import.Click += self.OnImport
         self.btn_export.Click += self.OnExport
-        self.chk_ignore_connected.Click += lambda s, e: self._mark_dirty()
-        self.chk_ignore_hosted.Click += lambda s, e: self._mark_dirty()
-        self._fill_preview_worksets()
 
         self.btn_refresh.Click += lambda s, e: self._request_summary()
         self.btn_save.Click += lambda s, e: self._save()
@@ -265,30 +261,6 @@ class ClashFinderForm(Window):
         self.btn_run.Click += self.OnRun
         self.Closing += self.OnWindowClosing
         self.Closed += self.OnWindowClosed
-
-    def _fill_preview_worksets(self):
-        """Workset delle copie dei linkati nel report: impostazione del modello."""
-        combo = self.cbo_preview_workset
-        self._workset_choices = []
-        if not self.doc.IsWorkshared:
-            combo.Items.Add(u"Model not workshared")
-            combo.SelectedIndex = 0
-            combo.IsEnabled = False
-            return
-        self._workset_choices = [(ce.WORKSET_ACTIVE, u"Active workset")]
-        self._workset_choices += [(name, name) for name in ce.user_worksets(self.doc)]
-        current = ce.preview_workset_choice(self.doc)
-        if current not in [value for value, _ in self._workset_choices]:
-            self._workset_choices.append((current, u"{} (not found)".format(current)))
-        for _, label in self._workset_choices:
-            combo.Items.Add(label)
-        combo.SelectedIndex = [value for value, _ in self._workset_choices].index(current)
-        combo.SelectionChanged += self.OnPreviewWorksetChanged
-
-    def OnPreviewWorksetChanged(self, sender, args):
-        index = self.cbo_preview_workset.SelectedIndex
-        if 0 <= index < len(self._workset_choices):
-            ce.set_preview_workset_choice(self.doc, self._workset_choices[index][0])
 
     def _wire_side(self, side):
         search = getattr(self, "txt_search_" + side)
@@ -342,9 +314,9 @@ class ClashFinderForm(Window):
                 return uidoc
         except Exception:
             pass
-        _warn(u"Clash Finder works on the model it was opened on. "
-              u"Activate that model and try again, or close this window and run "
-              u"Clash Finder again from the other model.")
+        _warn(u"This window works on the model it was opened on. "
+              u"Activate that model and try again, or close this window and open "
+              u"it again from the other model.")
         return None
 
     def _read_selection(self, uidoc):
@@ -650,8 +622,6 @@ class ClashFinderForm(Window):
         try:
             self.edit_test = test
             self.edit_name = name
-            self.chk_ignore_connected.IsChecked = test["ignore_connected"]
-            self.chk_ignore_hosted.IsChecked = test["ignore_hosted"]
             for side in SIDES:
                 set_data = test[SET_KEYS[side]]
                 getattr(self, "cbo_source_" + side).SelectedIndex = \
@@ -680,8 +650,7 @@ class ClashFinderForm(Window):
     def _read_editor_raw(self):
         """Test a schermo, cosi' come e' (regole incomplete comprese)."""
         test = {"name": self.edit_name or NEW_TEST_NAME,
-                "ignore_connected": bool(self.chk_ignore_connected.IsChecked),
-                "ignore_hosted": bool(self.chk_ignore_hosted.IsChecked)}
+                "ignore_connected": True, "ignore_hosted": True}
         for side in SIDES:
             rules = [row.read() for row in self.rule_rows[side]]
             rules = [r for r in rules if r["parameter"] or r["value"]]

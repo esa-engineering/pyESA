@@ -57,12 +57,21 @@ from pyrevit import DB, script, forms
 
 import clashfinder_rules as cr
 import clashfinder_engine as ce
+
+# DirectContext3D di pyRevit: grafica temporanea nella vista, senza elementi nel modello.
+try:
+    from pyrevit.revit import dc3dserver
+except Exception:
+    dc3dserver = None
 from clashfinder_bridge import RevitBridge
 
 XAML_FILE_NAME = 'ClashFinder_report.xaml'
 TITLE = "Clash Report"
 
 SECTION_BOX_MARGIN_FT = 10.0 / 30.48     # 10 cm
+# Trasparenza (0-100, come in Revit) dell'elemento "contenitore" di una clash: dei due,
+# quello con il bounding box piu' grande, perche' quello interno resti leggibile.
+CONTAINER_TRANSPARENCY = 40
 ZOOM_PAD_FT = 1.0                        # ~30 cm attorno allo zoom su box
 
 # Colori dei due insiemi: in Revit (override) e nell'elenco (quadratino accanto all'elemento).
@@ -138,6 +147,27 @@ def union_box(boxes):
     return low, high
 
 
+def box_volume(box):
+    if box is None:
+        return 0.0
+    low, high = box
+    return abs((high[0] - low[0]) * (high[1] - low[1]) * (high[2] - low[2]))
+
+
+def container_key(pairs):
+    """Chiave dell'elemento contenitore di una singola clash (il box piu' grande), o
+    None per righe con piu' elementi o box uguali."""
+    if len(pairs) != 2:
+        return None
+    (first, _), (second, _) = pairs
+    if first.box is None or second.box is None:
+        return None
+    first_volume, second_volume = box_volume(first.box), box_volume(second.box)
+    if first_volume == second_volume:
+        return None
+    return first.key if first_volume > second_volume else second.key
+
+
 def group_key(clash):
     return (clash.a.category or u"", clash.b.category or u"")
 
@@ -149,14 +179,19 @@ class ClashReportForm(Window):
         self.result = result
         self.display_names = display_names
         self.bridge = RevitBridge(TITLE)
+        # Contenitore della clash selezionata, reso trasparente (vedi _show_api).
+        self._transparent_host = set()
+        self._transparent_linked = set()
         # Override originali degli elementi colorati: {id vista: {id elemento:
         # (ElementId, OverrideGraphicSettings)}}. Servono per il ripristino.
         self._colored = {}
         self._isolated_views = set()
         self._solid_fill = False
         self._group_borders = []
-        # Overlay (colori e copie DirectShape dei linkati) attivo: Hide / Show overlay.
+        # Overlay (colori degli host, linkati disegnati) attivo: Hide / Show overlay.
         self.overlay_on = True
+        # Server DirectContext3D dei linkati, creato al primo uso in contesto API.
+        self._drawing = None
 
         # Refresh: stato rispetto al report di partenza ({id(clash): "new" / "resolved"}),
         # interferenze risolte per test e ora dell'ultimo refresh.
@@ -515,16 +550,15 @@ class ClashReportForm(Window):
             self.bridge.run(self._end_isolation_api)
 
     def OnOverlayToggled(self, sender, args):
-        """Hide: colori tolti e copie cancellate, la navigazione resta (zoom, section
-        box, isolamento). Show: la riga selezionata viene rimostrata con l'overlay."""
+        """Hide: colori tolti e linkati non piu' disegnati (con l'isolamento si isola il
+        link intero). Show: la riga selezionata viene rimostrata con l'overlay."""
         self.overlay_on = not self.overlay_on
         self.btn_overlay.Content = OVERLAY_LABELS[self.overlay_on]
         if not self.overlay_on:
             def hide(uiapp):
                 self._restore_colors_api(uiapp)
-                self._delete_previews_api(uiapp)
+                self._clear_drawing_api(uiapp)
             self.bridge.run(hide)
-            return
         item = self.tree.SelectedItem
         if item is not None and item.Tag:
             pairs = list(item.Tag)
@@ -546,17 +580,26 @@ class ClashReportForm(Window):
         host = []        # (elemento, lato)
         linked = []      # (istanza di link, elemento, lato)
         boxes = []
+        # Elemento contenitore (trasparente): id host o (UniqueId del link, id) linkato.
+        container = container_key(pairs)
+        self._transparent_host = set()
+        self._transparent_linked = set()
         for info, side in pairs:
             if info.is_link:
                 pair = self._linked_element(info)
                 if pair is None:
                     continue
                 linked.append((pair[0], pair[1], side))
+                if info.key == container:
+                    self._transparent_linked.add(
+                        (pair[0].UniqueId, cr.get_element_id_value(pair[1].Id)))
             else:
                 element = self.doc.GetElement(info.id)
                 if element is None:
                     continue
                 host.append((element, side))
+                if info.key == container:
+                    self._transparent_host.add(cr.get_element_id_value(element.Id))
             boxes.append(info.box)
         if not host and not linked:
             self.txt_result_hint.Text = (u"The elements of this row no longer exist "
@@ -564,9 +607,9 @@ class ClashReportForm(Window):
             return
         box = union_box(boxes)
         view = self.doc.ActiveView
-        shown = self._update_view(view, host, linked, box, isolate)
-        # Senza copie ShowElements inquadrerebbe solo gli host: zoom sul box di tutti.
-        if shown and (self.overlay_on or not linked):
+        shown = self._update_view(uidoc, view, host, linked, box, isolate)
+        # Con elementi linkati ShowElements inquadrerebbe solo gli host: zoom sul box.
+        if shown and not linked:
             ids = List[DB.ElementId]()
             for element_id in shown:
                 ids.Add(element_id)
@@ -608,136 +651,113 @@ class ClashReportForm(Window):
 
     # ------------------------------------------------------------- vista attiva
 
-    def _update_view(self, view, host, linked, box, isolate):
-        """Copie dei linkati, colori, section box (viste 3D) e isolamento in una sola
-        transazione. Restituisce gli id da inquadrare (host e copie), o [] se nulla."""
+    def _update_view(self, uidoc, view, host, linked, box, isolate):
+        """Colori, section box (viste 3D) e isolamento in una sola transazione, poi i
+        linkati disegnati con DirectContext3D. Restituisce gli id degli host."""
         if view is None or view.IsTemplate or isinstance(view, DB.ViewSheet):
             self.txt_result_hint.Text = u"The active view is not a model view."
             return []
         notes = []
         shown = []
+        meshes, failed = [], list(linked)
+        if self.overlay_on and linked:
+            if dc3dserver is None:
+                notes.append(u"Linked elements cannot be drawn alone (pyRevit "
+                             u"DirectContext3D not available): the whole link is shown.")
+            else:
+                meshes, failed = self._linked_meshes(linked)
         transaction = DB.Transaction(self.doc, "Clash Finder view")
         try:
             transaction.Start()
+            # Copie DirectShape lasciate dalle versioni precedenti del report.
             self._delete_previews()
-            if self.overlay_on:
-                previews, failed, workset_note = self._create_previews(linked, view)
-                notes.append(workset_note)
-            else:
-                previews, failed = [], list(linked)
             # Overlay spento: nessun colore (quelli messi prima tornano all'originale).
             notes.append(self._apply_colors(view, host if self.overlay_on else []))
-            notes.append(self._color_previews(view, previews))
             if isinstance(view, DB.View3D) and box is not None:
                 notes.append(self._fit_section_box(view, box))
-            # Un linkato senza copia: si isola l'istanza del link intera.
+            # Un linkato non disegnato: si isola l'istanza del link intera.
             fallback = [instance for instance, element, side in failed]
             if isolate:
-                notes.append(self._isolate(view, [e for e, _ in host] +
-                                           [d for d, _ in previews] + fallback))
+                notes.append(self._isolate(view, [e for e, _ in host] + fallback))
             transaction.Commit()
-            shown = [e.Id for e, _ in host] + [d.Id for d, _ in previews]
-            if failed and self.overlay_on:
-                notes.append(u"{} could not be copied for display.".format(
-                    _plural(len(failed), u"linked element")))
+            shown = [e.Id for e, _ in host]
         except Exception as error:
             if transaction.HasStarted() and not transaction.HasEnded():
                 transaction.RollBack()
             notes.append(u"View not updated: {}".format(error))
+        notes.append(self._draw(uidoc, view, meshes))
+        if failed and self.overlay_on and dc3dserver is not None:
+            notes.append(u"{} could not be drawn: the whole link is shown.".format(
+                _plural(len(failed), u"linked element")))
         self.txt_result_hint.Text = u" ".join(n for n in notes if n)
         return shown
 
-    # Copie DirectShape degli elementi linkati ------------------------------------
+    # Elementi linkati disegnati con DirectContext3D --------------------------------
 
-    def _find_workset(self, name):
-        for candidate in DB.FilteredWorksetCollector(self.doc).OfKind(
-                DB.WorksetKind.UserWorkset):
-            if candidate.Name == name:
-                return candidate
+    def _linked_meshes(self, linked):
+        """Mesh colorate dei solidi dei linkati (gia' nelle coordinate del modello
+        aperto). ([mesh], [linkati senza mesh])."""
+        meshes = []
+        failed = []
+        for instance, element, side in linked:
+            rgb = SET_COLORS[side]
+            alpha = 0
+            if (instance.UniqueId, cr.get_element_id_value(element.Id)) in \
+                    self._transparent_linked:
+                # 0-255 in DirectContext3D; > 0 va nel passaggio trasparente.
+                alpha = max(1, int(round(CONTAINER_TRANSPARENCY * 255 / 100.0)))
+            color = DB.ColorWithTransparency(rgb[0], rgb[1], rgb[2], alpha)
+            made = []
+            for solid in ce.element_solids(element, instance.GetTotalTransform()):
+                try:
+                    mesh = dc3dserver.Mesh.from_solid(self.doc, solid, color=color)
+                except Exception:
+                    mesh = None
+                if mesh is not None and mesh.triangles:
+                    made.append(mesh)
+            if made:
+                meshes.extend(made)
+            else:
+                failed.append((instance, element, side))
+        return meshes, failed
+
+    def _draw(self, uidoc, view, meshes):
+        """Disegna le mesh nella sola vista attiva (anche [] per cancellare)."""
+        if self._drawing is None and not meshes:
+            return None
+        try:
+            if self._drawing is None:
+                self._drawing = _make_drawing_server(uidoc)
+            self._drawing.view_value = cr.get_element_id_value(view.Id)
+            self._drawing.meshes = meshes
+            uidoc.RefreshActiveView()
+        except Exception as error:
+            return u"Linked elements not drawn: {}".format(error)
         return None
 
-    def _preview_workset(self, view):
-        """Workset delle copie in un modello condiviso: (WorksetId o None, nota).
-
-        Scelto in fondo alla finestra di Clash Finder (ce.preview_workset_choice): il
-        workset attivo (None: le copie restano dove Revit le mette) o un workset esistente,
-        la cui visibilita' non si tocca (cambierebbe anche gli elementi veri che
-        contiene); se e' nascosto nella vista, una nota.
-        """
-        if not self.doc.IsWorkshared:
-            return None, None
-        choice = ce.preview_workset_choice(self.doc)
-        if choice == ce.WORKSET_ACTIVE:
-            return None, None
+    def _clear_drawing_api(self, uiapp=None):
+        if self._drawing is None:
+            return
         try:
-            workset = self._find_workset(choice)
-        except Exception:
-            workset = None
-        if workset is None:
-            return None, (u"Workset {} not found: copies left in the active "
-                          u"workset.".format(choice))
-        try:
-            if not view.IsWorksetVisible(workset.Id):
-                return workset.Id, (u"The copies are hidden: the workset {} is not "
-                                    u"visible in this view.".format(choice))
+            self._drawing.meshes = []
+            if uiapp is not None and uiapp.ActiveUIDocument is not None:
+                uiapp.ActiveUIDocument.RefreshActiveView()
         except Exception:
             pass
-        return workset.Id, None
 
-    def _create_previews(self, linked, view):
-        """Copia DirectShape di ogni elemento linkato, nel workset delle copie se il
-        modello e' condiviso. ([(copia, lato)], [linkati falliti], nota)."""
-        created = []
-        failed = []
-        if not linked:
-            return created, failed, None
-        workset_id, note = self._preview_workset(view)
-        category_id = DB.ElementId(DB.BuiltInCategory.OST_GenericModel)
-        for instance, element, side in linked:
-            solids = ce.element_solids(element, instance.GetTotalTransform())
-            shape = None
-            try:
-                shape = DB.DirectShape.CreateElement(self.doc, category_id)
-                shape.ApplicationId = cr.PREVIEW_APP_ID
-                shape.ApplicationDataId = u"{}:{}".format(
-                    instance.UniqueId, cr.get_element_id_value(element.Id))
-                geometry = List[DB.GeometryObject]()
-                for solid in solids:
-                    geometry.Add(solid)
-                if not geometry.Count:
-                    raise ValueError("no solid")
-                try:
-                    shape.SetShape(geometry)
-                except Exception:
-                    # Qualche solido non accettato: si tengono quelli validi uno per uno.
-                    valid = List[DB.GeometryObject]()
-                    for solid in solids:
-                        single = List[DB.GeometryObject]()
-                        single.Add(solid)
-                        if shape.IsValidShape(single):
-                            valid.Add(solid)
-                    if not valid.Count:
-                        raise ValueError("no valid solid")
-                    shape.SetShape(valid)
-                try:
-                    shape.SetName(u"Clash Finder preview")
-                except Exception:
-                    pass
-                if workset_id is not None:
-                    try:
-                        shape.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM).Set(
-                            workset_id.IntegerValue)
-                    except Exception:
-                        note = u"Some copies stayed in the active workset."
-                created.append((shape, side))
-            except Exception:
-                if shape is not None:
-                    try:
-                        self.doc.Delete(shape.Id)
-                    except Exception:
-                        pass
-                failed.append((instance, element, side))
-        return created, failed, note
+    def _remove_drawing_api(self, uiapp=None):
+        if self._drawing is None:
+            return
+        try:
+            self._drawing.meshes = []
+            self._drawing.remove_server()
+            if uiapp is not None and uiapp.ActiveUIDocument is not None:
+                uiapp.ActiveUIDocument.RefreshActiveView()
+        except Exception:
+            pass
+        self._drawing = None
+
+    # Copie DirectShape delle versioni precedenti ------------------------------------
 
     def _delete_previews(self):
         """Cancella tutte le copie del report nel modello, anche quelle orfane."""
@@ -752,15 +772,6 @@ class ClashReportForm(Window):
         if ids.Count:
             self.doc.Delete(ids)
         return ids.Count
-
-    def _color_previews(self, view, previews):
-        try:
-            overrides = {"a": self._color_override("a"), "b": self._color_override("b")}
-            for shape, side in previews:
-                view.SetElementOverrides(shape.Id, overrides[side])
-        except Exception as error:
-            return u"Copies not coloured: {}".format(error)
-        return None
 
     def _delete_previews_api(self, uiapp=None):
         if not self.doc.IsValidObject or self.doc.IsReadOnly:
@@ -796,7 +807,7 @@ class ClashReportForm(Window):
                 collector.Dispose()
         return self._solid_fill
 
-    def _color_override(self, side):
+    def _color_override(self, side, transparent=False):
         rgb = SET_COLORS[side]
         color = DB.Color(rgb[0], rgb[1], rgb[2])
         override = DB.OverrideGraphicSettings()
@@ -808,6 +819,8 @@ class ClashReportForm(Window):
             override.SetSurfaceForegroundPatternColor(color)
             override.SetCutForegroundPatternId(solid)
             override.SetCutForegroundPatternColor(color)
+        if transparent:
+            override.SetSurfaceTransparency(CONTAINER_TRANSPARENCY)
         return override
 
     def _apply_colors(self, view, host):
@@ -823,7 +836,10 @@ class ClashReportForm(Window):
             for value, (element, side) in wanted.items():
                 if value not in saved:
                     saved[value] = (element.Id, view.GetElementOverrides(element.Id))
-                view.SetElementOverrides(element.Id, overrides[side])
+                override = overrides[side]
+                if value in self._transparent_host:
+                    override = self._color_override(side, transparent=True)
+                view.SetElementOverrides(element.Id, override)
         except Exception as error:
             if cr.get_element_id_value(view.ViewTemplateId) > 0:
                 return (u"Colours not set: the view template of the active view controls "
@@ -847,7 +863,8 @@ class ClashReportForm(Window):
         return None
 
     def _isolate(self, view, elements):
-        """Isolamento temporaneo degli elementi (host, copie, istanze di link)."""
+        """Isolamento temporaneo degli elementi (host, istanze di link). Senza elementi
+        (riga di soli linkati disegnati) si nasconde temporaneamente tutto il resto."""
         ids = List[DB.ElementId]()
         seen = set()
         for element in elements:
@@ -858,11 +875,28 @@ class ClashReportForm(Window):
         try:
             if view.IsInTemporaryViewMode(DB.TemporaryViewMode.TemporaryHideIsolate):
                 view.DisableTemporaryViewMode(DB.TemporaryViewMode.TemporaryHideIsolate)
-            view.IsolateElementsTemporary(ids)
+            if ids.Count:
+                view.IsolateElementsTemporary(ids)
+            else:
+                view.HideElementsTemporary(self._hideable_in(view))
             self._isolated_views.add(cr.get_element_id_value(view.Id))
         except Exception as error:
             return u"Elements not isolated: {}".format(error)
         return None
+
+    def _hideable_in(self, view):
+        ids = List[DB.ElementId]()
+        collector = DB.FilteredElementCollector(self.doc, view.Id).WhereElementIsNotElementType()
+        try:
+            for element in collector:
+                try:
+                    if element.CanBeHidden(view):
+                        ids.Add(element.Id)
+                except Exception:
+                    continue
+        finally:
+            collector.Dispose()
+        return ids
 
     def _end_isolation_api(self, uiapp=None):
         """Toglie l'isolamento temporaneo dalle viste in cui e' stato messo."""
@@ -1063,6 +1097,7 @@ class ClashReportForm(Window):
         def restore(uiapp):
             self._restore_colors_api(uiapp)
             self._end_isolation_api(uiapp)
+            self._remove_drawing_api(uiapp)
             self._delete_previews_api(uiapp)
         self.bridge.run(restore)
 
@@ -1097,6 +1132,24 @@ def save_run_reports(doc, result):
         result.save_note = u"Saved in {}.".format(folder)
     except Exception as error:
         result.save_note = u"Not saved in {}: {}".format(folder, error)
+
+
+def _make_drawing_server(uidoc):
+    """Server DirectContext3D che disegna solo nella vista indicata da view_value."""
+    class _ClashDrawing(dc3dserver.Server):
+        view_value = None
+
+        def CanExecute(self, view):
+            try:
+                return (self.view_value is not None
+                        and view.Document.Equals(self.uidoc.Document)
+                        and cr.get_element_id_value(view.Id) == self.view_value)
+            except Exception:
+                return False
+
+    return _ClashDrawing(uidoc=uidoc, name="Clash Finder",
+                         description="Linked elements of the selected clash",
+                         vendor_id="ESA")
 
 
 def show_report(doc, result, display_names, owner_handle=None):

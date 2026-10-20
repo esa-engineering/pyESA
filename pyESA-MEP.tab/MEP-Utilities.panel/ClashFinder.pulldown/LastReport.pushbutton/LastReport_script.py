@@ -7,7 +7,7 @@ _____________________________________________________________________
 Opens again the last Clash Finder report made on this model, with the
 same navigation (colours, section box, isolation, export).
 
-Every run of Clash Finder or Quick Clash saves its report in the
+Every run of Clash Setup or Quick Clash saves its report in the
 report folder of the model (asked the first time, changed with Export
 JSON): one file per clash test, earlier ones moved to _old.
 
@@ -51,7 +51,7 @@ def _error(text):
 # Con il motore persistente un errore puo' non arrivare al report di pyRevit:
 # ogni passo mostra il proprio errore in una MessageBox.
 try:
-    # Moduli condivisi con Clash Finder in Clash.stack/lib.
+    # Moduli condivisi con Clash Setup in ClashFinder.pulldown/lib.
     import clashfinder_engine as ce
     import clashfinder_rules as cr
     import clashfinder_report_ui as report_ui

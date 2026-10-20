@@ -84,7 +84,7 @@
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Text="💥 CLASHES" Style="{StaticResource SectionHeader}"/>
                     <TextBlock Grid.Row="1" Style="{StaticResource HintText}"
-                               Text="Click a row to zoom to its elements: Set A elements turn green, Set B elements red (linked elements are shown by a temporary copy, removed when this window closes). In a 3D view the section box is fitted around them."/>
+                               Text="Click a row to zoom to its elements: Set A elements turn green, Set B elements red (linked elements are drawn on screen in the active view only; nothing is added to the model). In a 3D view the section box is fitted around them."/>
                     <Grid Grid.Row="2" Margin="0,0,0,5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -118,7 +118,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <ToggleButton x:Name="btn_isolate" Content="🔍 Isolate selected" Width="150" Height="30"
+                <ToggleButton x:Name="btn_isolate" Content="🔍 Isolate selected" Width="150" Height="30" IsChecked="True"
                               ToolTip="While on, the elements of the selected row are temporarily isolated in the active view. Turn it off to end the isolation."/>
                 <Button x:Name="btn_overlay" Content="🎨 Hide overlay" Width="130" Height="30" Margin="10,0,0,0"
                         ToolTip="Hide or show the overlay: Set A green / Set B red colours and the temporary copies of linked elements. Zoom, section box and isolation keep working without it."/>

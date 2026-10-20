@@ -205,9 +205,9 @@ Resolve the XAML path with `script.get_bundle_file(XAML_FILE_NAME)`, falling bac
 `op.join(op.dirname(__file__), XAML_FILE_NAME)`.
 
 **Modeless windows** (the user keeps working in Revit while the window is open) exist only in
-`Clash.stack` (`pyESA-MEP.tab/MEP-Utilities.panel`: Clash Finder, Quick Clash and Last
-Report). Its buttons share their modules and XAML through `Clash.stack/lib`, which pyRevit puts on the search
-path of every button in the stack: the one place where code is shared between bundles, still
+`ClashFinder.pulldown` (`pyESA-MEP.tab/MEP-Utilities.panel`: Clash Setup, Quick Clash and
+Last Report). Its buttons share their modules and XAML through `ClashFinder.pulldown/lib`, which pyRevit
+puts on the search path of every button in the pulldown (any container's `lib/` is): the one place where code is shared between bundles, still
 private to that tool. From a modeless window's WPF events there is no
 valid API context, so every model read, selection change or transaction goes through
 `clashfinder_bridge.RevitBridge`: a queue of callables run by one `ExternalEvent`, created in

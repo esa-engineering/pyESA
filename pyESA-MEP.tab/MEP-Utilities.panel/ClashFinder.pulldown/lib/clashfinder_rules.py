@@ -81,31 +81,46 @@ NUMBER_PATTERN = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 
 # Test predefiniti: la libreria iniziale e, una volta per DEFAULTS_VERSION, quelli che
 # mancano (per nome) in una libreria gia' esistente (pending_defaults).
-DEFAULTS_VERSION = 2
+DEFAULTS_VERSION = 4
 CONFIG_SECTION = "ESA_ClashFinder"
 
 DUCTS = ["OST_DuctCurves", "OST_DuctFitting", "OST_DuctAccessory", "OST_FlexDuctCurves"]
 PIPES = ["OST_PipeCurves", "OST_PipeFitting", "OST_PipeAccessory", "OST_FlexPipeCurves"]
 MEC_DISTRIBUTION = DUCTS + PIPES
-MEC_ALL = MEC_DISTRIBUTION + ["OST_DuctTerminal", "OST_MechanicalEquipment",
-                              "OST_PlumbingFixtures", "OST_Sprinklers"]
+# Pipes vs Ducts: senza accessori.
+PIPES_NO_ACCESSORIES = [c for c in PIPES if c != "OST_PipeAccessory"]
+DUCTS_NO_ACCESSORIES = [c for c in DUCTS if c != "OST_DuctAccessory"]
 ELE_DISTRIBUTION = ["OST_CableTray", "OST_CableTrayFitting", "OST_Conduit",
                     "OST_ConduitFitting"]
 EQUIPMENT = ["OST_MechanicalEquipment", "OST_ElectricalEquipment"]
+STRUCTURE = ["OST_Walls", "OST_Floors", "OST_Roofs", "OST_StructuralColumns",
+             "OST_StructuralFraming", "OST_StructuralFoundation"]
 
 
-def _default(name, cats_a, cats_b, source):
+def _default(name, cats_a, cats_b, source, rules_a=(), match_a=MATCH_ALL):
     return {"name": name,
-            "set_a": {"source": source, "categories": cats_a, "match": MATCH_ALL, "rules": []},
+            "set_a": {"source": source, "categories": cats_a, "match": match_a,
+                      "rules": list(rules_a)},
             "set_b": {"source": source, "categories": cats_b, "match": MATCH_ALL, "rules": []},
             "ignore_connected": True, "ignore_hosted": True}
 
 
+# Aperture (Void Demand): famiglie e_GM.PH.VD_Void Demand_* e il tipo PLH_VoidDemand della
+# famiglia e_GM.MT_Placeholder, che puo' avere anche tipi che non sono aperture.
+OPENING_RULES = [
+    {"parameter": FIELD_FAMILY, "operator": "contains", "value": "Void Demand"},
+    {"parameter": FIELD_TYPE, "operator": "contains", "value": "VoidDemand"},
+]
+OPENING_HOSTS = ["OST_StructuralFraming", "OST_StructuralColumns", "OST_Floors"]
+
+
 DEFAULT_TESTS = [
     _default("All vs All", [], [], SOURCE_SELECTION),
-    _default("Pipes vs Ducts", PIPES, DUCTS, SOURCE_SELECTION),
-    _default("Mec vs Generic Models", MEC_ALL, ["OST_GenericModel"], SOURCE_MODEL),
+    _default("Pipes vs Ducts", PIPES_NO_ACCESSORIES, DUCTS_NO_ACCESSORIES, SOURCE_SELECTION),
     _default("Mec vs Ele", MEC_DISTRIBUTION, ELE_DISTRIBUTION, SOURCE_SELECTION),
+    _default("Ele vs Structures", ELE_DISTRIBUTION, STRUCTURE, SOURCE_MODEL),
+    _default("Openings vs Structures", ["OST_GenericModel"], OPENING_HOSTS, SOURCE_MODEL,
+             rules_a=OPENING_RULES, match_a=MATCH_ANY),
     _default("Equipments vs Distribution", EQUIPMENT, MEC_DISTRIBUTION + ELE_DISTRIBUTION,
              SOURCE_MODEL),
 ]
@@ -251,8 +266,9 @@ def normalize_test(data):
         "name": name,
         "set_a": normalize_set(data.get("set_a"), DEFAULT_SOURCES["set_a"]),
         "set_b": normalize_set(data.get("set_b"), DEFAULT_SOURCES["set_b"]),
-        "ignore_connected": bool(data.get("ignore_connected", True)),
-        "ignore_hosted": bool(data.get("ignore_hosted", True)),
+        # Sempre attivi (le spunte sono state tolte): anche un file che li ha a false.
+        "ignore_connected": True,
+        "ignore_hosted": True,
     }
 
 

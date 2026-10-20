@@ -4,17 +4,17 @@ __title__ = "Quick\nClash"
 __doc__ = """Version = 1.0
 Date    = 20.10.2026
 _____________________________________________________________________
-Compact version of Clash Finder: only the Run part.
+Compact version of Clash Setup: only the Run part.
 
 Click a saved test, check or change where Set A and Set B come from
 (current Revit selection, active view, whole model or nothing, plus
 loaded links) for this run, then run. The report is the same as Clash
-Finder's.
+Setup's.
 
 The current selection is read again at every Refresh and when the run
 starts, so you can change it in Revit with the window open.
 
-Tests and settings are shared with Clash Finder, where the tests are
+Tests and settings are shared with Clash Setup, where the tests are
 created and edited.
 _____________________________________________________________________
 Author(s): Claude + Matteo Maiorano
@@ -37,7 +37,7 @@ if doc.IsFamilyDocument:
 if int(doc.Application.VersionNumber) < 2022:
     forms.alert("Quick Clash needs Revit 2022 or later.", exitscript=True)
 
-# Moduli condivisi con Clash Finder in Clash.stack/lib (nel percorso di ricerca
+# Moduli condivisi con Clash Setup in ClashFinder.pulldown/lib (nel percorso di ricerca
 # di tutti i pulsanti dello stack).
 from clashfinder_bridge import RevitBridge
 import clashfinder_quick_ui

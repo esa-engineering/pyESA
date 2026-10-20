@@ -1,4 +1,17 @@
+title:
+  Clash
+
+  Finder
+tooltip: >
+  Clash detection driven by saved tests, as in Navisworks.
+
+  Clash Setup - create, edit and run the clash tests.
+
+  Quick Clash - run a saved test on the current selection or model.
+
+  Last Report - open again the last clash report of this model.
+author: Claude + Matteo Maiorano
 layout:
-  - ClashFinder
+  - ClashSetup
   - QuickClash
   - LastReport

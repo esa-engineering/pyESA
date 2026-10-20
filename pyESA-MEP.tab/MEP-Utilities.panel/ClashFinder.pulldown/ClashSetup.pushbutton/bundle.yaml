@@ -1,7 +1,7 @@
 title:
   Clash
 
-  Finder
+  Setup
 tooltip: >
   Clash detection driven by saved tests, as in Navisworks. A test compares Set A
   with Set B; each set has its sources (current Revit selection, active view,
