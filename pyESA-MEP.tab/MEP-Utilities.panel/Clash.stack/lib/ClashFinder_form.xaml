@@ -1,0 +1,332 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Clash Finder"
+        Height="900" Width="1120"
+        MinHeight="620" MinWidth="900"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="True">
+
+    <Window.Resources>
+        <!-- Common Styles -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,10,0,5"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,15,0"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+        <!-- Sub-sections inside a set -->
+        <Style x:Key="SubHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,12,0,4"/>
+        </Style>
+        <Style x:Key="ToolButton" TargetType="Button">
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="Margin" Value="0,0,5,5"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0"
+                   Text="💥 Clash Finder"
+                   FontSize="16" FontWeight="Bold"
+                   Margin="0,0,0,10"
+                   HorizontalAlignment="Center"/>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="270"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- SECTION: Saved tests -->
+            <Border Grid.Column="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,10,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="🧪 CLASH TESTS" Style="{StaticResource SectionHeader}"/>
+                    <TextBlock Grid.Row="1" Style="{StaticResource HintText}"
+                               Text="Click a test to load it. Edit it on the right, run it, or save it with a name."/>
+                    <ListBox x:Name="lst_tests" Grid.Row="2" MinHeight="120"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+                    <WrapPanel Grid.Row="3" Margin="0,8,0,0">
+                        <Button x:Name="btn_new" Content="➕ New" Style="{StaticResource ToolButton}"
+                                ToolTip="Start an empty test (it is added to the list when you save it)"/>
+                        <Button x:Name="btn_delete" Content="Delete" Style="{StaticResource ToolButton}"
+                                ToolTip="Delete the selected test from the library"/>
+                        <Button x:Name="btn_import" Content="Import JSON..." Style="{StaticResource ToolButton}"
+                                ToolTip="Add the tests of a JSON file to the library"/>
+                        <Button x:Name="btn_export" Content="Export JSON..." Style="{StaticResource ToolButton}"
+                                ToolTip="Save all the tests of the library to a JSON file"/>
+                    </WrapPanel>
+                    <TextBlock x:Name="txt_library_path" Grid.Row="4" Style="{StaticResource HintText}" Margin="0,5,0,0"/>
+                </Grid>
+            </Border>
+
+            <!-- Editor -->
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="0,0,5,0">
+                <StackPanel x:Name="pnl_editor" Margin="0,0,10,0">
+
+                    <!-- SECTION: Test -->
+                    <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="🏷️ TEST" Style="{StaticResource SectionHeader}"/>
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Loaded test:" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock x:Name="txt_editing" Grid.Column="1" FontWeight="Bold" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="txt_editor_state" Grid.Column="2" Foreground="Firebrick" FontSize="11"
+                                           VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                            <!-- SECTION: Set A -->
+                            <Border Grid.Column="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="🅰️ SET A" Style="{StaticResource SectionHeader}"/>
+
+                                    <TextBlock Text="Sources" Style="{StaticResource SubHeader}"/>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="110"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="From this model:" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbo_source_a" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                                  ToolTip="Elements of the open model that can enter Set A"/>
+                                    </Grid>
+                                    <TextBlock Text="Plus elements of these links:" FontSize="11" Margin="0,6,0,2"/>
+                                    <ListBox x:Name="lst_links_a" Height="60" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ToolTip="Links are saved by file name: the test works in any project that loads the same links"/>
+                                    <TextBlock x:Name="txt_total_a" FontWeight="Bold" Margin="0,8,0,0" TextWrapping="Wrap"/>
+
+                                    <TextBlock Text="Categories" Style="{StaticResource SubHeader}"/>
+                                    <Grid Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                        <TextBox x:Name="txt_search_a" Grid.Column="1" Padding="5,3" ToolTip="Filter categories by name"/>
+                                        <Button x:Name="btn_clear_search_a" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0" ToolTip="Clear search"/>
+                                    </Grid>
+                                    <ListBox x:Name="lst_cats_a" MinHeight="100" Height="200"
+                                             HorizontalContentAlignment="Stretch"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    <Thumb x:Name="thumb_a" Height="8" Cursor="SizeNS" HorizontalAlignment="Stretch"
+                                           Background="#CCCCCC" Opacity="0.5" ToolTip="Drag to resize list"/>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <CheckBox x:Name="chk_used_a" Content="Only categories with elements"
+                                                      ToolTip="In the open model or in a loaded link"/>
+                                            <CheckBox x:Name="chk_ticked_a" Margin="0,4,0,0" Content="Only ticked categories"/>
+                                        </StackPanel>
+                                        <Button x:Name="btn_none_a" Grid.Column="1" Content="Deselect All" Padding="10,3" VerticalAlignment="Top"/>
+                                    </Grid>
+                                    <TextBlock x:Name="txt_cats_a" Style="{StaticResource HintText}" Margin="0,6,0,0"/>
+
+                                    <TextBlock Text="Model filters" Style="{StaticResource SubHeader}"/>
+                                    <TextBlock Style="{StaticResource HintText}"
+                                               Text="View filters of this model. With filters ticked, an element must pass at least one of them, as well as the ticked categories."/>
+                                    <ListBox x:Name="lst_filters_a" Height="80" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                                    <TextBlock Text="Custom rules" Style="{StaticResource SubHeader}"/>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Element must match:" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbo_match_a" Grid.Column="1" Style="{StaticResource ComboStyle}"/>
+                                    </Grid>
+                                    <StackPanel x:Name="pnl_rules_a"/>
+                                    <Button x:Name="btn_add_rule_a" Content="➕ Add rule" Padding="10,3" Margin="0,5,0,0" HorizontalAlignment="Left"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- SECTION: Set B -->
+                            <Border Grid.Column="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="🅱️ SET B" Style="{StaticResource SectionHeader}"/>
+
+                                    <TextBlock Text="Sources" Style="{StaticResource SubHeader}"/>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="110"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="From this model:" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbo_source_b" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                                  ToolTip="Elements of the open model that can enter Set B"/>
+                                    </Grid>
+                                    <TextBlock Text="Plus elements of these links:" FontSize="11" Margin="0,6,0,2"/>
+                                    <ListBox x:Name="lst_links_b" Height="60" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ToolTip="Links are saved by file name: the test works in any project that loads the same links"/>
+                                    <TextBlock x:Name="txt_total_b" FontWeight="Bold" Margin="0,8,0,0" TextWrapping="Wrap"/>
+
+                                    <TextBlock Text="Categories" Style="{StaticResource SubHeader}"/>
+                                    <Grid Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                        <TextBox x:Name="txt_search_b" Grid.Column="1" Padding="5,3" ToolTip="Filter categories by name"/>
+                                        <Button x:Name="btn_clear_search_b" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0" ToolTip="Clear search"/>
+                                    </Grid>
+                                    <ListBox x:Name="lst_cats_b" MinHeight="100" Height="200"
+                                             HorizontalContentAlignment="Stretch"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    <Thumb x:Name="thumb_b" Height="8" Cursor="SizeNS" HorizontalAlignment="Stretch"
+                                           Background="#CCCCCC" Opacity="0.5" ToolTip="Drag to resize list"/>
+                                    <Grid Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <CheckBox x:Name="chk_used_b" Content="Only categories with elements"
+                                                      ToolTip="In the open model or in a loaded link"/>
+                                            <CheckBox x:Name="chk_ticked_b" Margin="0,4,0,0" Content="Only ticked categories"/>
+                                        </StackPanel>
+                                        <Button x:Name="btn_none_b" Grid.Column="1" Content="Deselect All" Padding="10,3" VerticalAlignment="Top"/>
+                                    </Grid>
+                                    <TextBlock x:Name="txt_cats_b" Style="{StaticResource HintText}" Margin="0,6,0,0"/>
+
+                                    <TextBlock Text="Model filters" Style="{StaticResource SubHeader}"/>
+                                    <TextBlock Style="{StaticResource HintText}"
+                                               Text="View filters of this model. With filters ticked, an element must pass at least one of them, as well as the ticked categories."/>
+                                    <ListBox x:Name="lst_filters_b" Height="80" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                                    <TextBlock Text="Custom rules" Style="{StaticResource SubHeader}"/>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Element must match:" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox x:Name="cbo_match_b" Grid.Column="1" Style="{StaticResource ComboStyle}"/>
+                                    </Grid>
+                                    <StackPanel x:Name="pnl_rules_b"/>
+                                    <Button x:Name="btn_add_rule_b" Content="➕ Add rule" Padding="10,3" Margin="0,5,0,0" HorizontalAlignment="Left"/>
+                                </StackPanel>
+                            </Border>
+                    </Grid>
+
+                    <!-- SECTION: Options -->
+                    <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="⚙️ OPTIONS" Style="{StaticResource SectionHeader}"/>
+                            <StackPanel Margin="20,5,0,0">
+                                <CheckBox x:Name="chk_ignore_connected"
+                                          Content="Ignore elements connected to each other (MEP connectors)"/>
+                                <CheckBox x:Name="chk_ignore_hosted" Margin="0,4,0,0"
+                                          Content="Ignore an element and its host (e.g. a door and its wall)"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- INFO -->
+                    <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
+                            CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="ℹ️ HOW SETS ARE BUILT" Style="{StaticResource SectionHeader}" Foreground="Gray"/>
+                            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                                <Run Text="An element enters a set when it comes from one of its sources, its category is ticked (no category ticked = any model category), it passes one of the ticked model filters (if any) and it matches the custom rules."/>
+                                <LineBreak/>
+                                <Run Text="Custom rules read the instance parameter first, then the type parameter, as text shown by Revit, ignoring case. Greater / less compare the first number in the value (e.g. '300 mm' = 300). [Family], [Type] and [Workset] work in any Revit language."/>
+                                <LineBreak/>
+                                <Run Text="On linked elements, model filters work with Revit's own parameters; filters on project or shared parameters do not match linked elements."/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Status and buttons -->
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                <TextBlock x:Name="txt_summary_state" Style="{StaticResource HintText}" Text=""/>
+                <TextBlock x:Name="txt_links_hint" Style="{StaticResource HintText}" Foreground="Firebrick" Text=""/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+                <Button x:Name="btn_refresh" Content="🔄 Refresh" Width="100" Height="30" Margin="0,0,10,0"
+                        ToolTip="Read the Revit selection and count the sets again"/>
+                <Button x:Name="btn_save" Content="💾 Save" Width="90" Height="30" Margin="0,0,10,0"
+                        ToolTip="Overwrite the loaded test with the settings on screen"/>
+                <Button x:Name="btn_save_as" Content="Save as..." Width="100" Height="30" Margin="0,0,10,0"
+                        ToolTip="Save the test on screen with a name (an existing name is overwritten after a confirmation)"/>
+                <Button x:Name="btn_close" Content="Close" Width="100" Height="30" Margin="0,0,10,0"/>
+                <Button x:Name="btn_run" Content="▶ Run clash detection" Width="160" Height="30"
+                        Background="#2D5A8A" Foreground="White"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
