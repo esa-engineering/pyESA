@@ -68,6 +68,10 @@ ZOOM_PAD_FT = 1.0                        # ~30 cm attorno allo zoom su box
 # Colori dei due insiemi: in Revit (override) e nell'elenco (quadratino accanto all'elemento).
 SET_COLORS = {"a": (0, 170, 0), "b": (220, 0, 0)}
 SIDE_LABELS = {"a": u"A", "b": u"B"}
+# Primo livello dell'elenco: categoria dell'elemento di Set A o di Set B.
+GROUP_LABELS = (u"Group by Set A", u"Group by Set B")
+# Testo del pulsante dell'overlay: {overlay attivo: azione proposta}.
+OVERLAY_LABELS = {True: u"\U0001f3a8 Hide overlay", False: u"\U0001f3a8 Show overlay"}
 
 
 def _brush(rgb):
@@ -151,6 +155,8 @@ class ClashReportForm(Window):
         self._isolated_views = set()
         self._solid_fill = False
         self._group_borders = []
+        # Overlay (colori e copie DirectShape dei linkati) attivo: Hide / Show overlay.
+        self.overlay_on = True
 
         # Refresh: stato rispetto al report di partenza ({id(clash): "new" / "resolved"}),
         # interferenze risolte per test e ora dell'ultimo refresh.
@@ -194,7 +200,8 @@ class ClashReportForm(Window):
 
         for name in ("txt_result", "txt_result_hint", "txt_search", "btn_clear_search",
                      "tree", "btn_copy_id", "btn_expand", "btn_collapse", "btn_isolate",
-                     "btn_refresh", "btn_export", "btn_export_json", "btn_close"):
+                     "btn_refresh", "btn_export", "btn_export_json", "btn_close",
+                     "cbo_group", "btn_overlay"):
             setattr(self, name, root.FindName(name))
 
         self.txt_search.TextChanged += lambda s, e: self._fill_tree()
@@ -205,6 +212,11 @@ class ClashReportForm(Window):
         self.tree.SelectedItemChanged += self.OnTreeSelection
         self.tree.SizeChanged += lambda s, e: self._fit_group_borders()
         self.btn_isolate.Click += self.OnIsolateToggled
+        self.btn_overlay.Click += self.OnOverlayToggled
+        for label in GROUP_LABELS:
+            self.cbo_group.Items.Add(label)
+        self.cbo_group.SelectedIndex = 0
+        self.cbo_group.SelectionChanged += lambda s, e: self._fill_tree()
         self.btn_refresh.Click += lambda s, e: self.bridge.run(self._refresh_api)
         self.btn_export.Click += self.OnExport
         self.btn_export_json.Click += self.OnExportJson
@@ -311,19 +323,33 @@ class ClashReportForm(Window):
                 add(self._text_item(u"No clashes.", [], gray=True))
             elif not clashes:
                 add(self._text_item(u"No clash matches the search.", [], gray=True))
-            groups = OrderedDict()
-            for clash in clashes:
-                groups.setdefault(group_key(clash), []).append(clash)
-            for (cat_a, cat_b), members in groups.items():
-                add(self._group_item(u"{}  ×  {}".format(cat_a or u"?", cat_b or u"?"),
-                                     members))
+            for item in self._category_groups(clashes):
+                add(item)
             if resolved:
                 add(self._group_item(u"✔ Resolved since the report", resolved,
-                                     RESOLVED_BRUSH))
+                                     RESOLVED_BRUSH, other=lambda c: u"{}  ×  {}".format(
+                                         *group_key(c))))
         self._fit_group_borders()
 
-    def _group_item(self, title, members, brush=GROUP_BRUSH):
-        """Gruppo (di categorie, o delle risolte): linea spessa sopra, nome e numero."""
+    def _category_groups(self, clashes):
+        """Un gruppo per categoria dell'insieme scelto (linea spessa); in ogni riga la
+        categoria dell'altro elemento prima del numero. Ordine: altra categoria, numero."""
+        by_b = self.cbo_group.SelectedIndex == 1
+
+        def categories(clash):
+            cat_a, cat_b = group_key(clash)
+            return (cat_b, cat_a) if by_b else (cat_a, cat_b)
+
+        groups = OrderedDict()
+        for clash in sorted(clashes, key=lambda c: (
+                categories(c)[0].lower(), categories(c)[1].lower(), self.numbers[id(c)])):
+            groups.setdefault(categories(clash)[0], []).append(clash)
+        return [self._group_item(first or u"?", members, other=lambda c: categories(c)[1])
+                for first, members in groups.items()]
+
+    def _group_item(self, title, members, brush=GROUP_BRUSH, other=None):
+        """Gruppo (di categorie, o delle risolte): linea spessa sopra, nome e numero.
+        Sotto, le righe delle interferenze; other(clash) da' il testo davanti al numero."""
         text = TextBlock()
         text.Text = u"{}   ({})".format(title, len(members))
         text.FontWeight = FontWeights.Bold
@@ -340,19 +366,24 @@ class ClashReportForm(Window):
         item.Header = border
         item.Tag = self._pairs(members)
         for clash in members:
-            item.Items.Add(self._clash_item(clash))
+            item.Items.Add(self._clash_item(clash, other(clash) if other else None))
         return item
 
-    def _clash_item(self, clash):
-        """Riga "Clash #n" (NEW / resolved dopo un refresh); espandendola, i due
-        elementi."""
+    def _clash_item(self, clash, prefix=None):
+        """Riga "<categoria>   Clash #n" (NEW / resolved dopo un refresh); espandendola,
+        i due elementi."""
         status = self.status.get(id(clash))
         text = u"Clash #{}".format(self.numbers[id(clash)])
+        if prefix is not None:
+            text = u"{}   {}".format(prefix or u"?", text)
         if status:
             text += u"   NEW" if status == "new" else u"   resolved"
         item = self._text_item(text, [(clash.a, "a"), (clash.b, "b")], bold=True)
         if status:
             item.Foreground = NEW_BRUSH if status == "new" else RESOLVED_BRUSH
+        else:
+            # Non eredita il colore del gruppo.
+            item.Foreground = TEXT_BRUSH
         item.Items.Add(self._element_item(clash.a, "a"))
         item.Items.Add(self._element_item(clash.b, "b"))
         return item
@@ -481,6 +512,23 @@ class ClashReportForm(Window):
         else:
             self.bridge.run(self._end_isolation_api)
 
+    def OnOverlayToggled(self, sender, args):
+        """Hide: colori tolti e copie cancellate, la navigazione resta (zoom, section
+        box, isolamento). Show: la riga selezionata viene rimostrata con l'overlay."""
+        self.overlay_on = not self.overlay_on
+        self.btn_overlay.Content = OVERLAY_LABELS[self.overlay_on]
+        if not self.overlay_on:
+            def hide(uiapp):
+                self._restore_colors_api(uiapp)
+                self._delete_previews_api(uiapp)
+            self.bridge.run(hide)
+            return
+        item = self.tree.SelectedItem
+        if item is not None and item.Tag:
+            pairs = list(item.Tag)
+            isolate = bool(self.btn_isolate.IsChecked)
+            self.bridge.run(lambda uiapp: self._show_api(uiapp, pairs, isolate))
+
     def _uidoc_api(self, uiapp):
         uidoc = uiapp.ActiveUIDocument
         if uidoc is None or not self.doc.IsValidObject or not uidoc.Document.Equals(self.doc):
@@ -515,7 +563,8 @@ class ClashReportForm(Window):
         box = union_box(boxes)
         view = self.doc.ActiveView
         shown = self._update_view(view, host, linked, box, isolate)
-        if shown:
+        # Senza copie ShowElements inquadrerebbe solo gli host: zoom sul box di tutti.
+        if shown and (self.overlay_on or not linked):
             ids = List[DB.ElementId]()
             for element_id in shown:
                 ids.Add(element_id)
@@ -569,8 +618,12 @@ class ClashReportForm(Window):
         try:
             transaction.Start()
             self._delete_previews()
-            previews, failed = self._create_previews(linked)
-            notes.append(self._apply_colors(view, host))
+            if self.overlay_on:
+                previews, failed = self._create_previews(linked)
+            else:
+                previews, failed = [], list(linked)
+            # Overlay spento: nessun colore (quelli messi prima tornano all'originale).
+            notes.append(self._apply_colors(view, host if self.overlay_on else []))
             notes.append(self._color_previews(view, previews))
             if isinstance(view, DB.View3D) and box is not None:
                 notes.append(self._fit_section_box(view, box))
@@ -581,7 +634,7 @@ class ClashReportForm(Window):
                                            [d for d, _ in previews] + fallback))
             transaction.Commit()
             shown = [e.Id for e, _ in host] + [d.Id for d, _ in previews]
-            if failed:
+            if failed and self.overlay_on:
                 notes.append(u"{} could not be copied for display.".format(
                     _plural(len(failed), u"linked element")))
         except Exception as error:

@@ -108,8 +108,11 @@ solidi linkati possono fallire su geometrie difficili: la coppia viene allora sc
 
 ## Report (non modale)
 
-Elenco espandibile diviso per **coppia di categorie** ("Duct Fittings × Walls"), con una linea
-spessa sopra ogni gruppo. Sotto il gruppo una riga per interferenza ("Clash #12");
+Elenco espandibile con un gruppo per categoria dell'elemento di Set A ("Duct Fittings",
+linea spessa sopra; `_category_groups`) e una riga per interferenza con davanti la categoria
+dell'altro elemento ("Walls   Clash #12"), in ordine di altra categoria e numero. Il menu
+accanto alla ricerca (*Group by Set A* / *Group by Set B*) sceglie l'insieme dei gruppi; i
+numeri non cambiano. Nel gruppo delle risolte la riga riporta le due categorie;
 espandendola, i due elementi con livello, categoria, famiglia : tipo e id, preceduti da un
 quadratino del colore del loro insieme (A verde, B rosso) e dal nome del link se linkati. I
 numeri seguono l'ordine dell'elenco e sono gli stessi dell'export CSV. Ricerca per modello,
@@ -127,7 +130,10 @@ Un clic su una riga (gruppo, interferenza o elemento), via bridge e in una sola 
   chiusura anomala di Revit; la clash detection li ignora (`cr.is_model_element`). Un
   elemento che non si riesce a copiare (nessun solido valido) e' segnalato e, con
   l'isolamento, si isola l'istanza del link intera. Le copie seguono la visibilita' di
-  Generic Models nella vista;
+  Generic Models nella vista. *Hide overlay* / *Show overlay* (`overlay_on`, attivo
+  all'apertura) spegne colori e copie insieme: i colori tornano all'originale, le copie
+  vengono cancellate, la navigazione resta (section box, isolamento del link intero, zoom
+  sul box di tutti gli elementi della riga);
 - **colori**: override di elemento nella vista attiva, Set A verde (0,170,0), Set B rosso
   (220,0,0), linee e retino pieno di superficie e di taglio, sugli elementi host e sulle
   copie. Gli host colorati prima, in quella vista, tornano all'override originale (salvato

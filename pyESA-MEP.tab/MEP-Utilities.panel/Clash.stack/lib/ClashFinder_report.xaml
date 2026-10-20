@@ -1,8 +1,8 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Clash Report"
-        Height="760" Width="760"
-        MinHeight="480" MinWidth="560"
+        Height="760" Width="880"
+        MinHeight="480" MinWidth="840"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="True">
@@ -90,11 +90,14 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <TextBox x:Name="txt_search" Grid.Column="1" Padding="5,3"
                                  ToolTip="Show only the clashes whose elements contain this text (category, family, type, level or id)"/>
                         <Button x:Name="btn_clear_search" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0" ToolTip="Clear search"/>
+                        <ComboBox x:Name="cbo_group" Grid.Column="3" Width="150" Margin="10,0,0,0" Padding="5,3"
+                                  ToolTip="First level of the list: the category of the Set A element or of the Set B element"/>
                     </Grid>
                     <TreeView x:Name="tree" Grid.Row="3" MinHeight="200"/>
                     <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
@@ -117,6 +120,8 @@
             <StackPanel Grid.Column="0" Orientation="Horizontal">
                 <ToggleButton x:Name="btn_isolate" Content="🔍 Isolate selected" Width="150" Height="30"
                               ToolTip="While on, the elements of the selected row are temporarily isolated in the active view. Turn it off to end the isolation."/>
+                <Button x:Name="btn_overlay" Content="🎨 Hide overlay" Width="130" Height="30" Margin="10,0,0,0"
+                        ToolTip="Hide or show the overlay: Set A green / Set B red colours and the temporary copies of linked elements. Zoom, section box and isolation keep working without it."/>
                 <Button x:Name="btn_refresh" Content="🔄 Refresh" Width="100" Height="30" Margin="10,0,0,0"
                         ToolTip="Run the tests of this report again on the model as it is now: new clashes are marked NEW, the ones no longer found are listed as resolved. The saved report file is not changed."/>
             </StackPanel>
