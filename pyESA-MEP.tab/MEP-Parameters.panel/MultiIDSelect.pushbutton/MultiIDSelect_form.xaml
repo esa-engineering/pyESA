@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Multi ID Select"
+        Title="Multi ID Read/Select"
         Width="1050" Height="720"
         MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterScreen"
@@ -43,7 +43,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="🔎 MULTI ID SELECT" FontSize="16" FontWeight="Bold"
+        <TextBlock Grid.Row="0" Text="🔎 MULTI ID READ/SELECT" FontSize="16" FontWeight="Bold"
                    HorizontalAlignment="Center" Margin="0,0,0,10"/>
 
         <Border Grid.Row="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"

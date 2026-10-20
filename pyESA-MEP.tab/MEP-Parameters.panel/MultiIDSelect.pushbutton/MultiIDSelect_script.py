@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__title__ = "Multi ID\nSelect"
+__title__ = "Multi ID\nRead/Select"
 __doc__ = """Version = 0.2
 Date    = 20.10.2026
 ________________________________________________________________
@@ -34,7 +34,7 @@ import MultiIDSelect_ui
 
 XAML_FILE_NAME = "MultiIDSelect_form.xaml"
 CONFIG_NAME = "ESA_MultiIDSelect"
-TITLE = "Multi ID Select"
+TITLE = "Multi ID Read/Select"
 
 
 def get_element_id_value(eid):

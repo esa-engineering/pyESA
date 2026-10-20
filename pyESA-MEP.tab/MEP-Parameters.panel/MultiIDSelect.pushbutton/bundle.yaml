@@ -1,4 +1,4 @@
-title: "Multi ID\nSelect"
+title: "Multi ID\nRead/Select"
 tooltip: >
   Select elements by Element Id, also in linked models, and read the Ids of the current selection.
 

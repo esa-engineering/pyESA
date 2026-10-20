@@ -16,7 +16,7 @@ from System.Windows.Markup import XamlReader
 
 from pyrevit import script
 
-TITLE = "Multi ID Select"
+TITLE = "Multi ID Read/Select"
 
 # colonne fisse della tabella: (intestazione, chiave nella riga)
 FIXED_COLUMNS = [("Model", "model"), ("Id", "id"), ("Category", "category"),
