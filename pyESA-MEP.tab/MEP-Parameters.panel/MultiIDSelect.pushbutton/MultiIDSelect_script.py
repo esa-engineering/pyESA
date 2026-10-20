@@ -108,11 +108,15 @@ def make_row(model, edoc, element):
 
 
 def host_label(doc):
-    return "This model: {}".format(doc.Title)
+    return doc.Title
 
 
 def link_label(instance):
-    return "Link: {}".format(element_name(instance))
+    """Solo il nome del file linkato, come per il modello aperto (senza istanza e posizione)."""
+    try:
+        return instance.GetLinkDocument().Title
+    except Exception:
+        return element_name(instance).split(" : ")[0]
 
 
 def collect_sources(doc):
