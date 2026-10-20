@@ -61,7 +61,6 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- SECTION: Result -->
@@ -74,91 +73,55 @@
             </Border>
 
             <!-- SECTION: Clashes -->
-            <Border Grid.Row="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+            <Border Grid.Row="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10">
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Text="💥 CLASHES" Style="{StaticResource SectionHeader}"/>
-                    <Grid Grid.Row="1" Margin="0,0,0,5">
+                    <TextBlock Grid.Row="1" Style="{StaticResource HintText}"
+                               Text="Click a row to zoom to its elements: Set A elements turn green, Set B elements red (elements of linked models cannot be coloured). In a 3D view the section box is fitted around them."/>
+                    <Grid Grid.Row="2" Margin="0,0,0,5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="170"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
                         <TextBox x:Name="txt_search" Grid.Column="1" Padding="5,3"
                                  ToolTip="Show only the clashes whose elements contain this text (category, family, type, level or id)"/>
-                        <Button x:Name="btn_clear_search" Grid.Column="2" Content="✕" Width="25" Margin="5,0,15,0" ToolTip="Clear search"/>
-                        <TextBlock Grid.Column="3" Text="Group by:" Style="{StaticResource FieldLabel}"/>
-                        <ComboBox x:Name="cbo_group" Grid.Column="4" Style="{StaticResource ComboStyle}"/>
+                        <Button x:Name="btn_clear_search" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0" ToolTip="Clear search"/>
                     </Grid>
-                    <TreeView x:Name="tree" Grid.Row="2" MinHeight="200"
-                              VirtualizingStackPanel.IsVirtualizing="True"
-                              VirtualizingStackPanel.VirtualizationMode="Recycling"/>
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                    <TreeView x:Name="tree" Grid.Row="3" MinHeight="200"/>
+                    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                        <Button x:Name="btn_copy_id" Content="📋 Copy ID" Padding="10,3" Margin="0,0,5,0"
+                                ToolTip="Copy the element ids of the selected row to the clipboard"/>
                         <Button x:Name="btn_expand" Content="Expand All" Padding="10,3" Margin="0,0,5,0"/>
                         <Button x:Name="btn_collapse" Content="Collapse All" Padding="10,3"/>
                     </StackPanel>
                 </Grid>
             </Border>
-
-            <!-- SECTION: Navigation -->
-            <Border Grid.Row="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,0">
-                <StackPanel>
-                    <TextBlock Text="🧭 NAVIGATION" Style="{StaticResource SectionHeader}"/>
-                    <TextBlock Style="{StaticResource HintText}"
-                               Text="Click a row to select its elements in Revit: a clash selects its two elements, a group or a test selects all the elements under it."/>
-                    <StackPanel Margin="20,5,0,0">
-                        <CheckBox x:Name="chk_zoom" Content="Zoom to the selected elements"/>
-                        <CheckBox x:Name="chk_section_box" Margin="0,4,0,0"
-                                  Content="Fit the section box of the active 3D view around them"/>
-                    </StackPanel>
-                    <Grid Margin="20,5,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="130"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Section box margin:" Style="{StaticResource FieldLabel}"/>
-                        <TextBox x:Name="txt_margin" Grid.Column="1" Style="{StaticResource InputField}" Text="50"/>
-                        <TextBlock Grid.Column="2" Text="cm" Style="{StaticResource UnitLabel}"/>
-                    </Grid>
-                    <StackPanel Margin="20,8,0,0">
-                        <CheckBox x:Name="chk_transparent"
-                                  Content="Make the other categories transparent in the active view"/>
-                    </StackPanel>
-                    <Grid Margin="40,5,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="110"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Transparency:" Style="{StaticResource FieldLabel}"/>
-                        <TextBox x:Name="txt_transparency" Grid.Column="1" Style="{StaticResource InputField}" Text="80"/>
-                        <TextBlock Grid.Column="2" Text="%" Style="{StaticResource UnitLabel}"/>
-                        <Button x:Name="btn_restore_view" Grid.Column="3" Content="Restore view graphics" Padding="10,3"
-                                HorizontalAlignment="Left"
-                                ToolTip="Put back the category overrides that Clash Finder changed"/>
-                    </Grid>
-                    <TextBlock Style="{StaticResource HintText}" Margin="40,5,0,0"
-                               Text="Category overrides of the active view: the categories of the selected row keep their look. The original overrides come back with the button, when the option is turned off, or when this window closes."/>
-                </StackPanel>
-            </Border>
         </Grid>
 
         <!-- Buttons -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-            <Button x:Name="btn_export" Content="Export CSV..." Width="100" Height="30"
-                    Margin="0,0,10,0"/>
-            <Button x:Name="btn_close" Content="Close" Width="100" Height="30"
-                    Background="#2D5A8A" Foreground="White"/>
-        </StackPanel>
+        <Grid Grid.Row="2" Margin="0,15,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <ToggleButton x:Name="btn_isolate" Grid.Column="0" Content="🔍 Isolate selected" Width="150" Height="30"
+                          ToolTip="While on, the elements of the selected row are temporarily isolated in the active view. Turn it off to end the isolation."/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button x:Name="btn_export" Content="Export CSV..." Width="100" Height="30"
+                        Margin="0,0,10,0"/>
+                <Button x:Name="btn_close" Content="Close" Width="100" Height="30"
+                        Background="#2D5A8A" Foreground="White"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

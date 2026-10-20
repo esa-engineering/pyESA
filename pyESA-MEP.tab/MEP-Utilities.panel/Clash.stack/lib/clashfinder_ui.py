@@ -197,7 +197,7 @@ class ClashFinderForm(Window):
 
     def _find_controls(self):
         names = ("lst_tests", "btn_new", "btn_delete", "btn_import", "btn_export",
-                 "txt_library_path", "pnl_editor", "txt_editing", "txt_editor_state",
+                 "txt_library_path", "pnl_editor", "txt_editor_state",
                  "chk_ignore_connected", "chk_ignore_hosted",
                  "txt_summary_state", "txt_links_hint",
                  "btn_refresh", "btn_save", "btn_save_as", "btn_close", "btn_run")
@@ -551,7 +551,9 @@ class ClashFinderForm(Window):
         self._request_summary()
 
     def _update_editor_state(self):
-        self.txt_editing.Text = self.edit_name or u"(not saved)"
+        """Nome del test caricato nel titolo della finestra, modifiche nella riga di stato."""
+        self.Title = u"{} - {}{}".format(TITLE, self.edit_name or u"new test (not saved)",
+                                         u" *" if self.dirty else u"")
         self.txt_editor_state.Text = u"Unsaved changes" if self.dirty else u""
 
     def _load_editor(self, test, name):

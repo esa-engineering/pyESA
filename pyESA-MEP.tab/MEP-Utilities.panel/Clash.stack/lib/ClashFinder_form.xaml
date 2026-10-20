@@ -107,24 +107,6 @@
             <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="0,0,5,0">
                 <StackPanel x:Name="pnl_editor" Margin="0,0,10,0">
 
-                    <!-- SECTION: Test -->
-                    <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
-                        <StackPanel>
-                            <TextBlock Text="🏷️ TEST" Style="{StaticResource SectionHeader}"/>
-                            <Grid Margin="0,2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Loaded test:" Style="{StaticResource FieldLabel}"/>
-                                <TextBlock x:Name="txt_editing" Grid.Column="1" FontWeight="Bold" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txt_editor_state" Grid.Column="2" Foreground="Firebrick" FontSize="11"
-                                           VerticalAlignment="Center" Margin="10,0,0,0"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -313,6 +295,8 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                <TextBlock x:Name="txt_editor_state" Foreground="Firebrick" FontSize="11" FontWeight="Bold"
+                           Margin="0,0,0,3" Text=""/>
                 <TextBlock x:Name="txt_summary_state" Style="{StaticResource HintText}" Text=""/>
                 <TextBlock x:Name="txt_links_hint" Style="{StaticResource HintText}" Foreground="Firebrick" Text=""/>
             </StackPanel>

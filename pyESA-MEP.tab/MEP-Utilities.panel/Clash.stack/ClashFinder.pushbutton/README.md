@@ -50,10 +50,10 @@ Una sola pagina:
 - a sinistra la libreria: un clic carica il test nell'editor (sotto il nome, in grigio,
   le sorgenti di A e B: `describe_scope()`); *New* (test vuoto, entra in libreria solo al
   salvataggio), *Delete*, *Import JSON*, *Export JSON* (tutta la libreria);
-- a destra l'editor: nome del test caricato e stato ("Unsaved changes"), le colonne
-  **Set A** e **Set B** con sorgenti, totale, categorie (conteggio in una colonna a destra),
+- a destra l'editor (il nome del test caricato sta nel titolo della finestra, con `*` se
+  modificato): le colonne **Set A** e **Set B** con sorgenti, totale, categorie (conteggio in una colonna a destra),
   filtri e regole, poi le opzioni del test;
-- in fondo la riga di stato (elementi selezionati in Revit, note), *Refresh*, *Save*,
+- in fondo la riga di stato ("Unsaved changes", elementi selezionati in Revit, note), *Refresh*, *Save*,
   *Save as...*, *Close*, *Run*.
 
 *Run* esegue il test a schermo, anche con modifiche non salvate. *Save* sovrascrive il test
@@ -104,29 +104,33 @@ solidi linkati possono fallire su geometrie difficili: la coppia viene allora sc
 
 ## Report (non modale)
 
-Elenco espandibile test -> gruppo -> interferenza, raggruppato per elemento di Set A, di
-Set B o senza gruppi; ricerca per categoria, famiglia, tipo, livello o id. Un clic seleziona
-gli elementi della riga (una interferenza: i due elementi; un gruppo o un test: tutti) con
-zoom e, a richiesta, section box della vista 3D attiva (margine in cm). La section box e'
-l'unica modifica al progetto, in una transazione propria. Export CSV (`;`, UTF-8 con BOM,
-con il modello di ciascun elemento).
+Elenco espandibile diviso per **coppia di categorie** ("Duct Fittings × Walls"), con una linea
+spessa sopra ogni gruppo. Sotto il gruppo una riga per interferenza ("Clash #12");
+espandendola, i due elementi con livello, categoria, famiglia : tipo e id, preceduti da un
+quadratino del colore del loro insieme (A verde, B rosso) e dal nome del link se linkati. I
+numeri seguono l'ordine dell'elenco e sono gli stessi dell'export CSV. Ricerca per modello,
+categoria, famiglia, tipo, livello o id. Con piu' test (non piu' possibile dalla finestra
+principale, che ne esegue uno) c'e' un livello in piu' per test.
 
-*Make the other categories transparent in the active view*: a ogni clic tutte le categorie
-di modello della vista attiva (`IsCategoryOverridable`) ricevono un override di categoria
-con trasparenza delle superfici (default 80 %), tranne le categorie degli elementi della
-riga. Prima di toccare una categoria se ne salva l'override originale (per vista); le
-categorie della riga tornano subito all'originale. Il ripristino completo avviene con
-*Restore view graphics*, togliendo la spunta o chiudendo il report. Section box e
-trasparenza stanno in una sola transazione ("Clash Finder view"). Con un view template
-che controlla Visibility/Graphics la trasparenza non si applica (nota nel report). Gli
-override di categoria valgono anche per i link mostrati *By Host View*; l'effetto e' per
-categoria, non per elemento: gli altri elementi delle stesse categorie restano opachi.
+Un clic su una riga (gruppo, interferenza o elemento), via bridge e in una sola transazione
+"Clash Finder view":
 
-Gli elementi linkati sono indicati con `[nome link]` davanti. Si selezionano con
-`Selection.SetReferences` e `Reference.CreateLinkReference` (Revit 2023+; prima resta la sola
-selezione degli elementi host, con una nota); lo zoom usa
-`UIView.ZoomAndCenterRectangle` sul bounding box memorizzato, perche' `ShowElements` non
-accetta elementi linkati.
+- **colori**: override di elemento nella vista attiva, Set A verde (0,170,0), Set B rosso
+  (220,0,0), linee e retino pieno di superficie e di taglio. Gli elementi colorati prima, in
+  quella vista, tornano all'override originale (salvato prima di toccarli). Gli elementi
+  linkati non si colorano: Revit non ha override sul singolo elemento di un link;
+- **section box**: solo se la vista attiva e' 3D, attorno agli elementi con 10 cm di margine;
+- **isolamento**: con il pulsante *Isolate selected* attivo, `IsolateElementsTemporary` sugli
+  elementi della riga (per un elemento linkato l'istanza del link intera). Spegnendo il
+  pulsante l'isolamento viene tolto;
+- **zoom**: `ShowElements` sugli elementi host, `UIView.ZoomAndCenterRectangle` sul box
+  memorizzato se c'e' un elemento linkato.
+
+La selezione di Revit non viene toccata: l'evidenziazione blu coprirebbe i colori. *Copy ID*
+copia negli appunti gli id della riga selezionata (separati da virgola; per un elemento
+linkato l'id nel link). Alla chiusura colori e isolamento vengono tolti. Con un view
+template che controlla Visibility/Graphics i colori non si applicano (nota nel report).
+Export CSV (`;`, UTF-8 con BOM, con il modello di ciascun elemento).
 
 ## Dati
 
@@ -134,7 +138,7 @@ accetta elementi linkati.
 | --- | --- |
 | Libreria test | `pyRevit_ESA_ClashFinder_tests.json` nella cartella dati di pyRevit (`%APPDATA%\pyRevit`), creata al primo salvataggio; alla prima apertura propone tre test di esempio |
 | Import / export | stesso formato: `{"format": "ESA_ClashFinder_Tests", "version": 1, "tests": [...]}`; si accettano anche una lista di test o un test singolo |
-| Impostazioni utente | `script.get_config('ESA_ClashFinder')`: `last_test` (test caricato alla riapertura) e opzioni del report. Sorgenti e link stanno nei test |
+| Impostazioni utente | `script.get_config('ESA_ClashFinder')`: `last_test` (test caricato alla riapertura). Sorgenti e link stanno nei test; il report non ha opzioni |
 
 ## Quick Clash
 
