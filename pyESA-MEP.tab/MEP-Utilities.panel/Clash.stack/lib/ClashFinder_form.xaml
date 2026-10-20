@@ -117,22 +117,24 @@
                             <!-- SECTION: Set A -->
                             <Border Grid.Column="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
                                 <StackPanel>
-                                    <TextBlock Text="🅰️ SET A" Style="{StaticResource SectionHeader}"/>
-
-                                    <TextBlock Text="Sources" Style="{StaticResource SubHeader}"/>
-                                    <Grid Margin="0,2">
+                                    <!-- Titolo e sorgente nel modello aperto sulla stessa riga -->
+                                    <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="110"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="170"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="From this model:" Style="{StaticResource FieldLabel}"/>
-                                        <ComboBox x:Name="cbo_source_a" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                        <TextBlock Text="🅰️ SET A" Style="{StaticResource SectionHeader}" Margin="0,0,10,0"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="From this model:" Style="{StaticResource UnitLabel}"
+                                                   Margin="0,0,6,0"/>
+                                        <ComboBox x:Name="cbo_source_a" Grid.Column="3" Style="{StaticResource ComboStyle}"
                                                   ToolTip="Elements of the open model that can enter Set A"/>
                                     </Grid>
-                                    <TextBlock Text="Plus elements of these links:" FontSize="11" Margin="0,6,0,2"/>
+                                    <TextBlock Text="Plus elements of these links:" FontSize="11" Margin="0,8,0,2"/>
                                     <ListBox x:Name="lst_links_a" Height="60" ScrollViewer.VerticalScrollBarVisibility="Auto"
                                              ToolTip="Links are saved by file name: the test works in any project that loads the same links"/>
-                                    <TextBlock x:Name="txt_total_a" FontWeight="Bold" Margin="0,8,0,0" TextWrapping="Wrap"/>
 
                                     <TextBlock Text="Categories" Style="{StaticResource SubHeader}"/>
                                     <Grid Margin="0,0,0,5">
@@ -146,6 +148,7 @@
                                         <Button x:Name="btn_clear_search_a" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0" ToolTip="Clear search"/>
                                     </Grid>
                                     <ListBox x:Name="lst_cats_a" MinHeight="100" Height="200"
+                                             ToolTip="SHIFT + click a box to tick or untick every category between it and the last one clicked"
                                              HorizontalContentAlignment="Stretch"
                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                              ScrollViewer.VerticalScrollBarVisibility="Auto"/>
@@ -163,12 +166,20 @@
                                         </StackPanel>
                                         <Button x:Name="btn_none_a" Grid.Column="1" Content="Deselect All" Padding="10,3" VerticalAlignment="Top"/>
                                     </Grid>
-                                    <TextBlock x:Name="txt_cats_a" Style="{StaticResource HintText}" Margin="0,6,0,0"/>
 
                                     <TextBlock Text="Model filters" Style="{StaticResource SubHeader}"/>
-                                    <TextBlock Style="{StaticResource HintText}"
-                                               Text="View filters of this model. With filters ticked, an element must pass at least one of them, as well as the ticked categories."/>
-                                    <ListBox x:Name="lst_filters_a" Height="80" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    <Grid Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                        <TextBox x:Name="txt_filter_search_a" Grid.Column="1" Padding="5,3" ToolTip="Filter the view filters by name"/>
+                                        <Button x:Name="btn_clear_filter_search_a" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0" ToolTip="Clear search"/>
+                                    </Grid>
+                                    <ListBox x:Name="lst_filters_a" Height="100" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ToolTip="View filters of this model. With filters ticked, an element must pass at least one of them, as well as the ticked categories. SHIFT + click ticks or unticks a range."/>
 
                                     <TextBlock Text="Custom rules" Style="{StaticResource SubHeader}"/>
                                     <Grid Margin="0,2">
@@ -188,22 +199,24 @@
                             <!-- SECTION: Set B -->
                             <Border Grid.Column="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
                                 <StackPanel>
-                                    <TextBlock Text="🅱️ SET B" Style="{StaticResource SectionHeader}"/>
-
-                                    <TextBlock Text="Sources" Style="{StaticResource SubHeader}"/>
-                                    <Grid Margin="0,2">
+                                    <!-- Titolo e sorgente nel modello aperto sulla stessa riga -->
+                                    <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="110"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="170"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="From this model:" Style="{StaticResource FieldLabel}"/>
-                                        <ComboBox x:Name="cbo_source_b" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                        <TextBlock Text="🅱️ SET B" Style="{StaticResource SectionHeader}" Margin="0,0,10,0"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="From this model:" Style="{StaticResource UnitLabel}"
+                                                   Margin="0,0,6,0"/>
+                                        <ComboBox x:Name="cbo_source_b" Grid.Column="3" Style="{StaticResource ComboStyle}"
                                                   ToolTip="Elements of the open model that can enter Set B"/>
                                     </Grid>
-                                    <TextBlock Text="Plus elements of these links:" FontSize="11" Margin="0,6,0,2"/>
+                                    <TextBlock Text="Plus elements of these links:" FontSize="11" Margin="0,8,0,2"/>
                                     <ListBox x:Name="lst_links_b" Height="60" ScrollViewer.VerticalScrollBarVisibility="Auto"
                                              ToolTip="Links are saved by file name: the test works in any project that loads the same links"/>
-                                    <TextBlock x:Name="txt_total_b" FontWeight="Bold" Margin="0,8,0,0" TextWrapping="Wrap"/>
 
                                     <TextBlock Text="Categories" Style="{StaticResource SubHeader}"/>
                                     <Grid Margin="0,0,0,5">
@@ -217,6 +230,7 @@
                                         <Button x:Name="btn_clear_search_b" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0" ToolTip="Clear search"/>
                                     </Grid>
                                     <ListBox x:Name="lst_cats_b" MinHeight="100" Height="200"
+                                             ToolTip="SHIFT + click a box to tick or untick every category between it and the last one clicked"
                                              HorizontalContentAlignment="Stretch"
                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                              ScrollViewer.VerticalScrollBarVisibility="Auto"/>
@@ -234,12 +248,20 @@
                                         </StackPanel>
                                         <Button x:Name="btn_none_b" Grid.Column="1" Content="Deselect All" Padding="10,3" VerticalAlignment="Top"/>
                                     </Grid>
-                                    <TextBlock x:Name="txt_cats_b" Style="{StaticResource HintText}" Margin="0,6,0,0"/>
 
                                     <TextBlock Text="Model filters" Style="{StaticResource SubHeader}"/>
-                                    <TextBlock Style="{StaticResource HintText}"
-                                               Text="View filters of this model. With filters ticked, an element must pass at least one of them, as well as the ticked categories."/>
-                                    <ListBox x:Name="lst_filters_b" Height="80" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    <Grid Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                        <TextBox x:Name="txt_filter_search_b" Grid.Column="1" Padding="5,3" ToolTip="Filter the view filters by name"/>
+                                        <Button x:Name="btn_clear_filter_search_b" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0" ToolTip="Clear search"/>
+                                    </Grid>
+                                    <ListBox x:Name="lst_filters_b" Height="100" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ToolTip="View filters of this model. With filters ticked, an element must pass at least one of them, as well as the ticked categories. SHIFT + click ticks or unticks a range."/>
 
                                     <TextBlock Text="Custom rules" Style="{StaticResource SubHeader}"/>
                                     <Grid Margin="0,2">

@@ -23,6 +23,10 @@ Gli id di documenti diversi si sovrappongono: chiavi e cache usano (indice della
 sorgente, id). Nessuna transazione: il modello non viene modificato.
 """
 
+import io
+import json
+import os
+import re
 import time
 
 from System.Collections.Generic import List
@@ -449,7 +453,7 @@ class ElementInfo(object):
     """
 
     __slots__ = ("id", "id_value", "key", "category", "category_value", "family_type",
-                 "level", "model", "link_id", "box")
+                 "level", "model", "link_id", "link_uid", "box")
 
     def __init__(self, item):
         element = item.element
@@ -467,6 +471,7 @@ class ElementInfo(object):
         self.level = element_level(element, doc)
         self.model = item.source.label
         self.link_id = item.source.instance.Id if item.is_link else None
+        self.link_uid = item.source.instance.UniqueId if item.is_link else None
         self.box = item.box()
 
     @property
@@ -478,6 +483,45 @@ class ElementInfo(object):
         if self.is_link:
             text = u"[{}] {}".format(self.model, text)
         return text
+
+    def to_dict(self):
+        # int(): da Revit 2024 gli id sono System.Int64, che json non sa scrivere.
+        category_value = self.category_value
+        return {"id": int(self.id_value), "source": int(self.key[0]),
+                "category": self.category,
+                "category_value": int(category_value) if category_value is not None else None,
+                "family_type": self.family_type, "level": self.level, "model": self.model,
+                "link_id": int(cr.get_element_id_value(self.link_id)) if self.link_id else None,
+                "link_uid": self.link_uid,
+                "box": ([[float(v) for v in self.box[0]], [float(v) for v in self.box[1]]]
+                        if self.box else None)}
+
+    @classmethod
+    def from_dict(cls, data):
+        info = cls.__new__(cls)
+        info.id_value = int(data["id"])
+        info.id = make_element_id(info.id_value)
+        info.key = (int(data.get("source") or 0), info.id_value)
+        info.category = data.get("category") or u""
+        info.category_value = data.get("category_value")
+        info.family_type = data.get("family_type") or u""
+        info.level = data.get("level") or u""
+        info.model = data.get("model") or u""
+        link_id = data.get("link_id")
+        info.link_id = make_element_id(int(link_id)) if link_id is not None else None
+        info.link_uid = data.get("link_uid")
+        box = data.get("box")
+        info.box = (tuple(box[0]), tuple(box[1])) if box else None
+        return info
+
+
+def make_element_id(value):
+    """ElementId da un intero: Int64 da Revit 2024, int prima."""
+    try:
+        import System
+        return DB.ElementId(System.Int64(value))
+    except Exception:
+        return DB.ElementId(int(value))
 
 
 class Clash(object):
@@ -523,13 +567,32 @@ class TestResult(object):
             self.first_error = u"{}: {}".format(type(error).__name__, error)
 
 
+TEST_RESULT_FIELDS = ("count_a", "count_b", "linked_a", "linked_b", "unsupported",
+                      "ignored_connected", "ignored_hosted", "note", "link_pairs_tested",
+                      "link_box_hits", "link_without_box", "geometry_errors", "first_error")
+SCOPE_FIELDS = ("source_a", "source_b", "links_a", "links_b", "missing_a", "missing_b")
+
+
 class RunResult(object):
+    """Esito di un run. model / model_key / created / saved_path servono al report
+    salvato su file (Last Report); created e' l'ora del run."""
+
     def __init__(self, scope, links):
         self.tests = []
         self.seconds = 0.0
         self.cancelled = False
         self.scope = scope
         self.link_labels = dict((source.key, source.label) for source in links)
+        self.model = u""
+        self.model_key = u""
+        self.created = time.strftime("%Y-%m-%d %H:%M")
+        self.saved_path = None
+        # Percorsi in cui il report e' stato salvato e nota per l'intestazione.
+        self.report_paths = []
+        self.save_note = u""
+        # Id della selezione di Revit usata dal run (sorgente "Current selection"):
+        # il Refresh del report rifa' il test sugli stessi elementi.
+        self.selection_ids = []
 
     @property
     def clash_count(self):
@@ -969,3 +1032,197 @@ def _run_one(doc, test_result, items_a, b_host, b_link, infos, done, total, prog
                 Clash(test_result.name, _info(infos, item_a), _info(infos, item_b)))
 
     test_result.unsupported = len(unsupported)
+
+
+# =============================================================================
+# REPORT SU FILE (Last Report, Export / Import JSON)
+# =============================================================================
+
+REPORT_FORMAT = "ESA_ClashFinder_Report"
+REPORT_VERSION = 1
+CONFIG_SECTION = "ESA_ClashFinder"
+# Cartella dei report per modello, come "<model_key>::<cartella>" (al massimo 50).
+REPORT_FOLDERS_KEY = "report_folders"
+MAX_REPORT_FOLDERS = 50
+OLD_FOLDER = "_old"
+
+
+def model_key(doc):
+    """Identita' del modello: percorso del centrale, poi del file, poi il titolo."""
+    try:
+        if doc.IsWorkshared:
+            central = doc.GetWorksharingCentralModelPath()
+            if central is not None:
+                return DB.ModelPathUtils.ConvertModelPathToUserVisiblePath(central)
+    except Exception:
+        pass
+    return doc.PathName or doc.Title
+
+
+def _folder_entries():
+    from pyrevit import script
+    try:
+        raw = script.get_config(CONFIG_SECTION).get_option(REPORT_FOLDERS_KEY, []) or []
+    except Exception:
+        return []
+    return [cr.text(entry) for entry in raw if u"::" in cr.text(entry)]
+
+
+def report_folder(doc):
+    """Cartella dei report scelta per il modello, o None."""
+    key = model_key(doc)
+    for entry in _folder_entries():
+        entry_key, _, folder = entry.partition(u"::")
+        if entry_key == key and folder:
+            return folder
+    return None
+
+
+def set_report_folder(doc, folder):
+    from pyrevit import script
+    key = model_key(doc)
+    entries = [e for e in _folder_entries() if e.partition(u"::")[0] != key]
+    entries.insert(0, u"{}::{}".format(key, folder))
+    try:
+        cfg = script.get_config(CONFIG_SECTION)
+        cfg.set_option(REPORT_FOLDERS_KEY, entries[:MAX_REPORT_FOLDERS])
+        script.save_config()
+    except Exception:
+        pass
+
+
+def report_file_name(test_name):
+    """<nome del test>.json, senza i caratteri vietati da Windows."""
+    name = re.sub(u'[<>:"/\\\\|?*\\x00-\\x1f]+', u"_", cr.text(test_name)).strip(u" .")
+    return (name or u"Clash test")[:80] + u".json"
+
+
+def _same_file(first, second):
+    return os.path.normcase(os.path.abspath(first)) == os.path.normcase(os.path.abspath(second))
+
+
+def _archive(path):
+    """Sposta il report gia' presente in _old, con data e ora del file nel nome."""
+    folder = os.path.join(os.path.dirname(path), OLD_FOLDER)
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
+    stem = os.path.splitext(os.path.basename(path))[0]
+    stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime(os.path.getmtime(path)))
+    target = os.path.join(folder, u"{}_{}.json".format(stem, stamp))
+    number = 2
+    while os.path.exists(target):
+        target = os.path.join(folder, u"{}_{}_{}.json".format(stem, stamp, number))
+        number += 1
+    os.rename(path, target)
+
+
+def save_reports(folder, result, doc):
+    """Un file per test nella cartella, <test>.json; quello che c'era va in _old.
+    Un file gia' scritto per questo stesso report viene solo riscritto. Restituisce
+    i percorsi scritti. Solleva IOError / OSError."""
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
+    own = [p for p in [result.saved_path] + list(result.report_paths) if p]
+    paths = []
+    for test_result in result.tests:
+        single = RunResult(result.scope, [])
+        single.link_labels = result.link_labels
+        single.seconds = result.seconds
+        single.cancelled = result.cancelled
+        single.created = result.created
+        single.selection_ids = result.selection_ids
+        single.tests = [test_result]
+        path = os.path.join(folder, report_file_name(test_result.name))
+        if os.path.exists(path) and not any(_same_file(path, p) for p in own):
+            _archive(path)
+        save_report(path, single, doc)
+        paths.append(path)
+    return paths
+
+
+def pair_key(clash):
+    """Identita' di un'interferenza fra due run: (istanza di link, id) dei due elementi."""
+    return (clash.a.link_uid or u"", int(clash.a.id_value),
+            clash.b.link_uid or u"", int(clash.b.id_value))
+
+
+def latest_report(folder):
+    """Il report piu' recente della cartella (non in _old), o None."""
+    best = None
+    best_time = None
+    try:
+        names = os.listdir(folder)
+    except Exception:
+        return None
+    for name in names:
+        path = os.path.join(folder, name)
+        if not name.lower().endswith(".json") or not os.path.isfile(path):
+            continue
+        modified = os.path.getmtime(path)
+        if best_time is None or modified > best_time:
+            best, best_time = path, modified
+    return best
+
+
+def save_report(path, result, doc):
+    """Scrive il report su file. Gli elementi sono scritti una volta sola e le
+    interferenze li richiamano per indice. Solleva IOError / OSError."""
+    elements = []
+    index_of = {}
+
+    def index(info):
+        if info.key not in index_of:
+            index_of[info.key] = len(elements)
+            elements.append(info.to_dict())
+        return index_of[info.key]
+
+    tests = []
+    for test_result in result.tests:
+        data = {"name": test_result.name, "test": test_result.test,
+                "clashes": [[index(c.a), index(c.b)] for c in test_result.clashes]}
+        for field in TEST_RESULT_FIELDS:
+            data[field] = getattr(test_result, field)
+        tests.append(data)
+    payload = {
+        "format": REPORT_FORMAT, "version": REPORT_VERSION,
+        "model": doc.Title, "model_key": model_key(doc), "created": result.created,
+        "seconds": result.seconds, "cancelled": result.cancelled,
+        "scope": dict((f, getattr(result.scope, f)) for f in SCOPE_FIELDS),
+        "link_labels": result.link_labels,
+        "selection_ids": [int(value) for value in result.selection_ids],
+        "elements": elements, "tests": tests}
+    cr.write_json_file(path, payload)
+
+
+def load_report(path):
+    """RunResult letto da file. Solleva IOError / ValueError."""
+    with io.open(path, "r", encoding="utf-8-sig") as handle:
+        data = json.loads(handle.read())
+    if not isinstance(data, dict) or data.get("format") != REPORT_FORMAT:
+        raise ValueError("The file is not a Clash Finder report.")
+    infos = [ElementInfo.from_dict(item) for item in data.get("elements") or []]
+    scope_data = data.get("scope") or {}
+    scope = RunScope(scope_data.get("source_a", SOURCE_NONE),
+                     scope_data.get("source_b", SOURCE_NONE),
+                     scope_data.get("links_a") or [], scope_data.get("links_b") or [],
+                     scope_data.get("missing_a") or [], scope_data.get("missing_b") or [])
+    result = RunResult(scope, [])
+    result.link_labels = data.get("link_labels") or {}
+    result.seconds = float(data.get("seconds") or 0.0)
+    result.cancelled = bool(data.get("cancelled"))
+    result.model = data.get("model") or u""
+    result.model_key = data.get("model_key") or u""
+    result.created = data.get("created") or u""
+    result.saved_path = path
+    result.selection_ids = [int(value) for value in data.get("selection_ids") or []]
+    for test_data in data.get("tests") or []:
+        test = cr.normalize_test(test_data.get("test")) or cr.new_test(
+            test_data.get("name") or u"Test")
+        test_result = TestResult(test)
+        for field in TEST_RESULT_FIELDS:
+            if field in test_data:
+                setattr(test_result, field, test_data[field])
+        for a_index, b_index in test_data.get("clashes") or []:
+            test_result.clashes.append(Clash(test_result.name, infos[a_index], infos[b_index]))
+        result.tests.append(test_result)
+    return result

@@ -27,6 +27,7 @@ clr.AddReference('PresentationFramework')
 clr.AddReference('PresentationCore')
 clr.AddReference('WindowsBase')
 
+from System import Object
 from System.IO import FileStream, FileMode
 from System.Windows import (Window, MessageBox, MessageBoxButton, MessageBoxImage,
                             MessageBoxResult, Thickness, GridLength, GridUnitType,
@@ -34,6 +35,7 @@ from System.Windows import (Window, MessageBox, MessageBoxButton, MessageBoxImag
                             VerticalAlignment)
 from System.Windows.Controls import (CheckBox, ComboBox, TextBox, TextBlock, Button, Grid,
                                      ColumnDefinition, ListBoxItem, StackPanel)
+from System.Windows.Input import Keyboard, ModifierKeys
 from System.Windows.Markup import XamlReader
 from System.Windows.Media import SolidColorBrush, Colors
 
@@ -117,7 +119,7 @@ class RuleRow(object):
 class SaveDialog(Window):
     """Nome con cui salvare il test (modale sulla finestra principale)."""
 
-    def __init__(self, owner, name, scope_text):
+    def __init__(self, owner, name, scope_text, title=None, ok_text=None):
         Window.__init__(self)
         root = _load_window(self, SAVE_XAML_FILE)
         self.Owner = owner
@@ -125,7 +127,13 @@ class SaveDialog(Window):
         self.txt_name = root.FindName("txt_name")
         self.txt_name.Text = name
         root.FindName("txt_scope").Text = scope_text
-        root.FindName("btn_ok").Click += self.OnOK
+        button = root.FindName("btn_ok")
+        if title:
+            self.Title = title
+            root.FindName("txt_title").Text = title
+        if ok_text:
+            button.Content = ok_text
+        button.Click += self.OnOK
         root.FindName("btn_cancel").Click += lambda s, e: self.Close()
         self.Loaded += lambda s, e: (self.txt_name.Focus(), self.txt_name.SelectAll())
 
@@ -175,6 +183,8 @@ class ClashFinderForm(Window):
         self._param_cache = {}
         self._param_pending = {"a": False, "b": False}
         self._summary_pending = False
+        # Ultima casella cliccata per elenco, per lo SHIFT + clic su un intervallo.
+        self._last_clicked = {}
 
         Window.__init__(self)
         self._root = _load_window(self, self.XAML_FILE)
@@ -204,9 +214,10 @@ class ClashFinderForm(Window):
         for name in names:
             setattr(self, name, self._root.FindName(name))
         for side in SIDES:
-            for name in ("cbo_source_{}", "lst_links_{}", "txt_total_{}",
+            for name in ("cbo_source_{}", "lst_links_{}",
                          "txt_search_{}", "btn_clear_search_{}", "lst_cats_{}", "thumb_{}",
-                         "chk_used_{}", "chk_ticked_{}", "btn_none_{}", "txt_cats_{}",
+                         "chk_used_{}", "chk_ticked_{}", "btn_none_{}",
+                         "txt_filter_search_{}", "btn_clear_filter_search_{}",
                          "lst_filters_{}", "cbo_match_{}", "pnl_rules_{}", "btn_add_rule_{}"):
                 setattr(self, name.format(side), self._root.FindName(name.format(side)))
 
@@ -251,6 +262,10 @@ class ClashFinderForm(Window):
         getattr(self, "chk_used_" + side).Click += lambda s, e: self._fill_categories(side)
         getattr(self, "chk_ticked_" + side).Click += lambda s, e: self._fill_categories(side)
         getattr(self, "btn_none_" + side).Click += lambda s, e: self._clear_categories(side)
+        filter_search = getattr(self, "txt_filter_search_" + side)
+        filter_search.TextChanged += lambda s, e: self._fill_filters(side)
+        getattr(self, "btn_clear_filter_search_" + side).Click += \
+            lambda s, e: setattr(filter_search, "Text", u"")
         getattr(self, "thumb_" + side).DragDelta += \
             lambda s, e: self._resize_list(getattr(self, "lst_cats_" + side), e)
         getattr(self, "cbo_match_" + side).SelectionChanged += lambda s, e: self._changed()
@@ -399,10 +414,31 @@ class ClashFinderForm(Window):
         return True
 
     def OnNewTest(self, sender, args):
+        """Chiede il nome e aggiunge subito alla libreria un test vuoto: nessuna
+        categoria, link o filtro, entrambi gli insiemi dalla selezione corrente."""
         if not self._resolve_dirty():
             return
-        self._select_in_list(None)
-        self._load_editor(cr.new_test(NEW_TEST_NAME), None)
+        names = [t["name"] for t in self.library]
+        test = cr.new_test(cr.unique_name(NEW_TEST_NAME, names))
+        for key in SET_KEYS.values():
+            test[key]["source"] = cr.SOURCE_SELECTION
+        dialog = SaveDialog(self, test["name"], cr.describe_scope(test),
+                            title=u"➕ New Test", ok_text=u"Create")
+        dialog.ShowDialog()
+        name = dialog.result
+        if not name:
+            return
+        if self._library_test(name) is not None:
+            _warn(u"A test called '{}' already exists: choose another name.".format(name))
+            return
+        test["name"] = name
+        self.library.append(test)
+        if not self._save_library():
+            self.library.pop()
+            return
+        self._fill_tests()
+        self._select_in_list(name)
+        self._load_editor(cr.copy_test(test), name)
 
     def OnDeleteTest(self, sender, args):
         item = self.lst_tests.SelectedItem
@@ -736,7 +772,6 @@ class ClashFinderForm(Window):
             if only_ticked and key not in ticked:
                 continue
             listbox.Items.Add(self._category_row(side, key, name))
-        self._update_category_count(side)
 
     def _refresh_category_labels(self, side):
         """Aggiorna i conteggi accanto alle categorie senza ricostruire l'elenco."""
@@ -745,15 +780,37 @@ class ClashFinderForm(Window):
             count.Text = self._count_text(side, key)
 
     def _category_clicked(self, side, checkbox):
-        key, count = checkbox.Tag
-        if checkbox.IsChecked:
-            self.edit_cats[side].add(key)
-        else:
-            self.edit_cats[side].discard(key)
-        count.Text = self._count_text(side, key)
-        self._update_category_count(side)
+        for box in self._shift_range("lst_cats_" + side, checkbox):
+            key, count = box.Tag
+            if box.IsChecked:
+                self.edit_cats[side].add(key)
+            else:
+                self.edit_cats[side].discard(key)
+            count.Text = self._count_text(side, key)
         self._changed()
         self._request_param_names(side)
+
+    def _shift_range(self, list_name, checkbox):
+        """Caselle da aggiornare dopo il clic su checkbox: con SHIFT tutte quelle
+        dell'elenco (cosi' come e' filtrato) fra l'ultima cliccata e questa, portate
+        allo stato di questa; altrimenti solo questa."""
+        last = self._last_clicked.get(list_name)
+        self._last_clicked[list_name] = checkbox
+        if last is None or not (Keyboard.Modifiers & ModifierKeys.Shift):
+            return [checkbox]
+        boxes = []
+        for item in getattr(self, list_name).Items:
+            box = item.Children[0] if isinstance(item, Grid) else item
+            if isinstance(box, CheckBox):
+                boxes.append(box)
+        positions = [i for i, box in enumerate(boxes)
+                     if Object.ReferenceEquals(box, last) or Object.ReferenceEquals(box, checkbox)]
+        if len(positions) != 2:
+            return [checkbox]
+        selected = boxes[positions[0]:positions[1] + 1]
+        for box in selected:
+            box.IsChecked = checkbox.IsChecked
+        return selected
 
     def _clear_categories(self, side):
         if not self.edit_cats[side]:
@@ -762,15 +819,6 @@ class ClashFinderForm(Window):
         self._fill_categories(side)
         self._changed()
         self._request_param_names(side)
-
-    def _update_category_count(self, side):
-        label = getattr(self, "txt_cats_" + side)
-        count = len(self.edit_cats[side])
-        if not count:
-            label.Text = u"No category ticked: any model category."
-        else:
-            label.Text = u"{} {} ticked.".format(
-                count, u"category" if count == 1 else u"categories")
 
     @staticmethod
     def _resize_list(listbox, args):
@@ -783,10 +831,13 @@ class ClashFinderForm(Window):
     def _fill_filters(self, side):
         listbox = getattr(self, "lst_filters_" + side)
         listbox.Items.Clear()
+        needle = (getattr(self, "txt_filter_search_" + side).Text or u"").strip().lower()
         names = list(self.filter_names)
         names += sorted((n for n in self.edit_filters[side] if n not in self.filter_names),
                         key=lambda n: n.lower())
         for name in names:
+            if needle and needle not in name.lower():
+                continue
             checkbox = CheckBox()
             checkbox.Content = name if name in self.filter_names else \
                 u"{} (not in this model)".format(name)
@@ -803,10 +854,11 @@ class ClashFinderForm(Window):
 
     def _filter_click_handler(self, side):
         def handler(sender, args):
-            if sender.IsChecked:
-                self.edit_filters[side].add(sender.Tag)
-            else:
-                self.edit_filters[side].discard(sender.Tag)
+            for box in self._shift_range("lst_filters_" + side, sender):
+                if box.IsChecked:
+                    self.edit_filters[side].add(box.Tag)
+                else:
+                    self.edit_filters[side].discard(box.Tag)
             self._changed()
         return handler
 
@@ -940,22 +992,18 @@ class ClashFinderForm(Window):
 
     def _show_summary(self, test, summary):
         """Conteggi accanto alle categorie, totali per insieme, riga di stato."""
+        empty = []
         for side in SIDES:
             self.counts[side] = summary.by_category[side]
             self._refresh_category_labels(side)
-            host = summary.host[side]
-            linked = summary.linked[side]
-            label = getattr(self, "txt_total_" + side)
-            if host + linked == 0:
-                label.Text = u"Set {} is empty.".format(side.upper())
-                label.Foreground = RED_BRUSH
-            else:
-                label.Foreground = SolidColorBrush(Colors.Black)
-                label.Text = u"{} in the set: {} in this model, {} in links.".format(
-                    _plural(host + linked, u"element"), host, linked)
+            if summary.host[side] + summary.linked[side] == 0:
+                empty.append(side.upper())
         lines = [u"{} selected in Revit.".format(_plural(len(self.loaded_ids), u"element"))]
+        if empty:
+            lines.append(u"Set {} {} empty.".format(u" and ".join(empty),
+                                                    u"is" if len(empty) == 1 else u"are"))
         lines += [note.split(u": ", 1)[-1] for note in summary.notes]
-        self.txt_summary_state.Foreground = GRAY_BRUSH
+        self.txt_summary_state.Foreground = RED_BRUSH if empty else GRAY_BRUSH
         self.txt_summary_state.Text = u"\n".join(lines)
 
     # ================================================================ ESECUZIONE
@@ -1017,6 +1065,11 @@ class ClashFinderForm(Window):
 
             result = ce.run_tests(self.doc, [test], self.loaded_ids, self.doc.ActiveView,
                                   self.links, progress)
+
+        # Report nella cartella del modello, per il pulsante Last Report; con la
+        # selezione usata, per il Refresh del report.
+        result.selection_ids = [int(cr.get_element_id_value(i)) for i in self.loaded_ids]
+        report_ui.save_run_reports(self.doc, result)
 
         if self.report is not None:
             try:

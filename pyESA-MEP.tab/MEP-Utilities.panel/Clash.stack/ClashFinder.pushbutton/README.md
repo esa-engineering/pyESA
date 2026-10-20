@@ -48,11 +48,15 @@ Resta aperta mentre si lavora in Revit. Ogni accesso al modello passa da un Exte
 Una sola pagina:
 
 - a sinistra la libreria: un clic carica il test nell'editor (sotto il nome, in grigio,
-  le sorgenti di A e B: `describe_scope()`); *New* (test vuoto, entra in libreria solo al
-  salvataggio), *Delete*, *Import JSON*, *Export JSON* (tutta la libreria);
+  le sorgenti di A e B: `describe_scope()`); *New* (chiede il nome nella finestra di
+  salvataggio e aggiunge subito alla libreria un test vuoto: nessuna categoria, link o filtro,
+  A e B dalla selezione corrente; le opzioni restano attive), *Delete*, *Import JSON*, *Export JSON* (tutta la libreria);
 - a destra l'editor (il nome del test caricato sta nel titolo della finestra, con `*` se
-  modificato): le colonne **Set A** e **Set B** con sorgenti, totale, categorie (conteggio in una colonna a destra),
-  filtri e regole, poi le opzioni del test;
+  modificato): le colonne **Set A** e **Set B** con la sorgente nel modello aperto sulla riga del titolo, i link, le
+  categorie (conteggio in una colonna a destra), i filtri di vista (con ricerca per nome) e
+  le regole, poi le opzioni del test. Negli elenchi di categorie e filtri SHIFT + clic porta
+  allo stato della casella cliccata tutte quelle visibili fra lei e l'ultima cliccata
+  (`_shift_range`). Un insieme vuoto e' segnalato in rosso nella riga di stato;
 - in fondo la riga di stato ("Unsaved changes", elementi selezionati in Revit, note), *Refresh*, *Save*,
   *Save as...*, *Close*, *Run*.
 
@@ -115,22 +119,82 @@ principale, che ne esegue uno) c'e' un livello in piu' per test.
 Un clic su una riga (gruppo, interferenza o elemento), via bridge e in una sola transazione
 "Clash Finder view":
 
+- **copie dei linkati**: Revit non ha override sul singolo elemento di un link, quindi per
+  ogni elemento linkato della riga si crea nel modello aperto un `DirectShape` (Generic
+  Model) con i solidi del link gia' trasformati (`ce.element_solids`), marcato con
+  `ApplicationId = cr.PREVIEW_APP_ID` (`"ESA_ClashFinder_Preview"`). A ogni clic e alla
+  chiusura si cancellano **tutti** i DirectShape con quel marchio, anche quelli orfani di una
+  chiusura anomala di Revit; la clash detection li ignora (`cr.is_model_element`). Un
+  elemento che non si riesce a copiare (nessun solido valido) e' segnalato e, con
+  l'isolamento, si isola l'istanza del link intera. Le copie seguono la visibilita' di
+  Generic Models nella vista;
 - **colori**: override di elemento nella vista attiva, Set A verde (0,170,0), Set B rosso
-  (220,0,0), linee e retino pieno di superficie e di taglio. Gli elementi colorati prima, in
-  quella vista, tornano all'override originale (salvato prima di toccarli). Gli elementi
-  linkati non si colorano: Revit non ha override sul singolo elemento di un link;
+  (220,0,0), linee e retino pieno di superficie e di taglio, sugli elementi host e sulle
+  copie. Gli host colorati prima, in quella vista, tornano all'override originale (salvato
+  prima di toccarli);
 - **section box**: solo se la vista attiva e' 3D, attorno agli elementi con 10 cm di margine;
 - **isolamento**: con il pulsante *Isolate selected* attivo, `IsolateElementsTemporary` sugli
-  elementi della riga (per un elemento linkato l'istanza del link intera). Spegnendo il
-  pulsante l'isolamento viene tolto;
-- **zoom**: `ShowElements` sugli elementi host, `UIView.ZoomAndCenterRectangle` sul box
-  memorizzato se c'e' un elemento linkato.
+  elementi host e sulle copie della riga. Spegnendo il pulsante l'isolamento viene tolto;
+- **zoom**: `ShowElements` su host e copie (`UIView.ZoomAndCenterRectangle` sul box
+  memorizzato se nessuno dei due e' disponibile).
+
+Ogni clic e' una transazione "Clash Finder view" (compare nell'annulla).
 
 La selezione di Revit non viene toccata: l'evidenziazione blu coprirebbe i colori. *Copy ID*
 copia negli appunti gli id della riga selezionata (separati da virgola; per un elemento
 linkato l'id nel link). Alla chiusura colori e isolamento vengono tolti. Con un view
 template che controlla Visibility/Graphics i colori non si applicano (nota nel report).
-Export CSV (`;`, UTF-8 con BOM, con il modello di ciascun elemento).
+Export CSV (`;`, UTF-8 con BOM, con il modello di ciascun elemento) ed Export JSON (il
+report intero, riapribile con Last Report; vedi sotto).
+
+### Refresh
+
+*Refresh* rifa' i test del report sul modello com'e' adesso (`ce.run_tests`, via bridge, con
+la vista attiva per la sorgente *Active view*) e confronta con il **report di partenza**
+(quello aperto, non l'ultimo refresh: `self.baseline`). Un'interferenza e' la coppia
+(istanza di link o host, id) dei due elementi (`ce.pair_key`):
+
+- quelle ancora presenti tengono il loro numero;
+- le nuove sono marcate **NEW** (arancio) e proseguono la numerazione;
+- quelle non piu' trovate finiscono nel gruppo grigio *✔ Resolved since the report*, con il
+  loro numero, ancora navigabili.
+
+La sorgente *Current selection* usa la selezione del run, salvata nel report
+(`selection_ids`): gli elementi cancellati nel frattempo sono segnalati. Un report senza
+`selection_ids` (scritto prima di questa versione) usa la selezione corrente, con una nota.
+Il refresh **non scrive** il file: Export JSON salva le interferenze di adesso (il file
+precedente va in `_old`, perche' non e' piu' lo stesso report). Export CSV ha la colonna
+*Status* (`new` / `resolved`) e le risolte in coda.
+
+## Cartella dei report e Last Report
+
+Ogni modello ha una **cartella dei report**, ricordata nella config
+(`ESA_ClashFinder` / `report_folders`, voci `"<model_key>::<cartella>"`, al massimo 50;
+`model_key` e' il percorso del centrale, poi del file, poi il titolo). Viene chiesta al
+primo run (o se non esiste piu') e cambiata con *Export JSON...*, che chiede sempre la
+cartella e la fa diventare quella del modello.
+
+Dopo ogni run (`report_ui.save_run_reports`) e con Export JSON (`ce.save_reports`) si
+scrive **un file per clash test**, `<nome del test>.json` (caratteri vietati da Windows
+sostituiti con `_`). Se il file esiste gia' viene spostato in `_old\<test>_<aaaammgg_hhmmss>.json`
+(data del file spostato); un file scritto per lo stesso report (export dopo il
+salvataggio automatico, o di un report riaperto da quel file) viene solo riscritto. Se si
+rinuncia a scegliere la cartella o la scrittura fallisce, il report si apre comunque con
+una nota nell'intestazione.
+
+Last Report e' il terzo pulsante dello stack (`LastReport.pushbutton`): CLICK apre il
+report piu' recente della cartella del modello (`ce.latest_report`, per data del file,
+escluso `_old`); se non ce n'e' chiede un file. SHIFT + CLICK importa un file qualsiasi,
+partendo dalla cartella del modello (anche da `_old`). Il report riaperto ha la stessa
+navigazione; nell'intestazione la data del run e, se il file viene da un altro modello,
+un avviso. Gli elementi si ritrovano per id (le istanze di link per UniqueId): se il
+modello e' cambiato, alcune righe possono non trovare piu' l'elemento.
+
+Formato: `{"format": "ESA_ClashFinder_Report", "version": 1, "model", "model_key",
+"created", "seconds", "cancelled", "scope", "link_labels", "selection_ids", "elements": [...], "tests":
+[{"name", "test", contatori e diagnostica, "clashes": [[indice A, indice B], ...]}]}`;
+ogni elemento (`ElementInfo.to_dict()`) e' scritto una volta e richiamato per indice. La
+coppia piu' vicina della diagnostica non viene salvata.
 
 ## Dati
 
@@ -164,6 +228,7 @@ pulsanti, cosi' i due comandi usano lo stesso codice senza copie. Gli XAML si ri
 | --- | --- |
 | `ClashFinder.pushbutton/ClashFinder_script.py` | controlli sul documento, crea il bridge e apre la finestra completa; `__persistentengine__ = True` |
 | `QuickClash.pushbutton/QuickClash_script.py` | idem per la finestra rapida |
+| `LastReport.pushbutton/LastReport_script.py` | riapre l'ultimo report del modello o ne importa uno (`ce.load_report`) |
 | `lib/clashfinder_rules.py` | modello dati dei test, JSON, valutazione di categorie e regole sugli elementi |
 | `lib/clashfinder_engine.py` | risoluzione degli insiemi sulle sorgenti, ricerca delle interferenze, `ElementInfo` |
 | `lib/clashfinder_bridge.py` | coda di funzioni eseguite in un ExternalEvent |

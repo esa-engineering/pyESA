@@ -1,0 +1,15 @@
+title:
+  Last
+
+  Report
+tooltip: >
+  Opens again the last Clash Finder report made on this model, with the same
+  navigation (colours, section box, isolation, export). Every run of Clash Finder
+  or Quick Clash saves its report in the report folder of the model (asked the
+  first time, changed with Export JSON in the report window): one file per clash
+  test, the earlier ones moved to the _old subfolder.
+
+  CLICK - most recent report in the folder (a file to import if there is none).
+
+  SHIFT + CLICK - import a report file (also an older one from _old).
+author: Claude + Matteo Maiorano

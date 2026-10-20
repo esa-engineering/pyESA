@@ -319,6 +319,16 @@ def library_path():
     return script.get_universal_data_file(LIBRARY_FILE_ID, "json")
 
 
+def _json_number(value):
+    """Numeri .NET (System.Int64, System.Double...) che json non riconosce."""
+    convert = int if "Int" in type(value).__name__ else float
+    try:
+        return convert(value)
+    except Exception:
+        pass
+    raise TypeError("{!r} is not JSON serializable".format(value))
+
+
 def write_json_file(path, data):
     """JSON indentato via file temporaneo.
 
@@ -326,7 +336,8 @@ def write_json_file(path, data):
     unicode e fallisce sulle lettere accentate: si serializza senza escape e si fa
     l'escape \\uXXXX a mano (come mepqto_store.write_json_file). Solleva IOError / OSError.
     """
-    payload = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True)
+    payload = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True,
+                         default=_json_number)
     payload = u"".join(c if ord(c) < 128 else u"\\u{:04x}".format(ord(c)) for c in payload)
     temp_path = path + ".tmp"
     with io.open(temp_path, "w", encoding="utf-8") as handle:
@@ -482,10 +493,22 @@ def builtin_category_from_value(value):
     return System.Enum.ToObject(DB.BuiltInCategory, int(value))
 
 
+# Marchio dei DirectShape creati dal report come copia degli elementi linkati: la
+# clash detection li ignora e il report li cancella (anche quelli rimasti orfani).
+PREVIEW_APP_ID = "ESA_ClashFinder_Preview"
+
+
+def is_preview(element):
+    try:
+        return isinstance(element, DB.DirectShape) and element.ApplicationId == PREVIEW_APP_ID
+    except Exception:
+        return False
+
+
 def is_model_element(element):
     """Istanza di una categoria di modello, non vincolata a una vista."""
     try:
-        if element is None or isinstance(element, DB.ElementType):
+        if element is None or isinstance(element, DB.ElementType) or is_preview(element):
             return False
         category = element.Category
         if category is None or category.CategoryType != DB.CategoryType.Model:

@@ -14,15 +14,20 @@ I numeri seguono l'ordine dell'elenco (gruppi, poi ordine di ricerca) e sono gli
 dell'export CSV. Ogni riga porta in Tag le coppie (ElementInfo, lato) da mostrare.
 
 Un clic su una riga, via RevitBridge:
-  - colora gli elementi host della riga nella vista attiva, Set A verde e Set B rosso
-    (override di elemento; quelli di prima tornano all'originale). Gli elementi linkati
-    non si possono colorare: Revit non ha override sul singolo elemento di un link;
+  - per ogni elemento linkato crea nel modello aperto una copia DirectShape (Generic
+    Model, solidi del link gia' trasformati), marcata con cr.PREVIEW_APP_ID: Revit non
+    ha override sul singolo elemento di un link, sulla copia si'. Le copie della riga
+    precedente (e quelle orfane di una chiusura anomala) vengono cancellate;
+  - colora gli elementi host e le copie, Set A verde e Set B rosso (override di
+    elemento; gli host colorati prima tornano all'originale);
   - in una vista 3D adatta la section box agli elementi, margine 10 cm;
-  - con "Isolate selected" attivo li isola temporaneamente (per un elemento linkato si
-    isola l'istanza del link);
+  - con "Isolate selected" attivo isola temporaneamente elementi host e copie;
   - inquadra gli elementi.
 La selezione di Revit non viene cambiata: l'evidenziazione blu coprirebbe i colori.
-Colori e isolamento vengono tolti chiudendo il report.
+Colori, copie e isolamento vengono tolti chiudendo il report.
+
+Export JSON scrive il report in un file che Last Report sa riaprire (ce.save_report);
+dopo ogni run la finestra principale lo salva da se' come ultimo report del modello.
 
 Il report lavora sui dati raccolti al momento dell'esecuzione (ElementInfo) e rilegge
 il modello solo per mostrare gli elementi. Le modifiche alla vista (colori, section
@@ -31,6 +36,7 @@ box, isolamento) stanno in una transazione per clic.
 
 import io
 import os
+import time
 from collections import OrderedDict
 
 import clr
@@ -73,6 +79,9 @@ def _brush(rgb):
 GRAY_BRUSH = SolidColorBrush(Colors.Gray)
 GRAY_BRUSH.Freeze()
 GROUP_BRUSH = _brush((0x2D, 0x5A, 0x8A))
+TEXT_BRUSH = _brush((0, 0, 0))
+NEW_BRUSH = _brush((0xD9, 0x6C, 0x00))
+RESOLVED_BRUSH = _brush((0x80, 0x80, 0x80))
 SIDE_BRUSHES = dict((side, _brush(rgb)) for side, rgb in SET_COLORS.items())
 
 
@@ -143,16 +152,18 @@ class ClashReportForm(Window):
         self._solid_fill = False
         self._group_borders = []
 
-        # Ordine di visualizzazione: per gruppo di categorie, poi ordine di ricerca.
-        # I numeri seguono quest'ordine (gli stessi nell'export).
-        self.numbers = {}
-        self.ordered = {}
+        # Refresh: stato rispetto al report di partenza ({id(clash): "new" / "resolved"}),
+        # interferenze risolte per test e ora dell'ultimo refresh.
+        self.status = {}
+        self.resolved = {}
+        self.refreshed_at = None
+        self._order({})
+        # Report di partenza, base di ogni refresh: {test: {chiave coppia: (clash, numero)}}.
+        self.baseline = {}
         for test_result in result.tests:
-            ordered = sorted(test_result.clashes, key=lambda c: (
-                group_key(c)[0].lower(), group_key(c)[1].lower()))
-            self.ordered[id(test_result)] = ordered
-            for number, clash in enumerate(ordered, 1):
-                self.numbers[id(clash)] = number
+            self.baseline[test_result.name] = OrderedDict(
+                (ce.pair_key(c), (c, self.numbers[id(c)]))
+                for c in self.ordered[id(test_result)])
 
         self._load_xaml()
         self._fill_header()
@@ -183,7 +194,7 @@ class ClashReportForm(Window):
 
         for name in ("txt_result", "txt_result_hint", "txt_search", "btn_clear_search",
                      "tree", "btn_copy_id", "btn_expand", "btn_collapse", "btn_isolate",
-                     "btn_export", "btn_close"):
+                     "btn_refresh", "btn_export", "btn_export_json", "btn_close"):
             setattr(self, name, root.FindName(name))
 
         self.txt_search.TextChanged += lambda s, e: self._fill_tree()
@@ -194,11 +205,32 @@ class ClashReportForm(Window):
         self.tree.SelectedItemChanged += self.OnTreeSelection
         self.tree.SizeChanged += lambda s, e: self._fit_group_borders()
         self.btn_isolate.Click += self.OnIsolateToggled
+        self.btn_refresh.Click += lambda s, e: self.bridge.run(self._refresh_api)
         self.btn_export.Click += self.OnExport
+        self.btn_export_json.Click += self.OnExportJson
         self.btn_close.Click += lambda s, e: self.Close()
         self.Closed += self.OnWindowClosed
 
     # ----------------------------------------------------------------- contenuto
+
+    def _order(self, keep):
+        """Ordine di visualizzazione (per gruppo di categorie, poi ordine di ricerca) e
+        numeri, gli stessi nell'export. keep {test: {chiave coppia: numero}} conserva
+        i numeri del report di partenza; le altre interferenze proseguono la serie."""
+        self.numbers = {}
+        self.ordered = {}
+        for test_result in self.result.tests:
+            ordered = sorted(test_result.clashes, key=lambda c: (
+                group_key(c)[0].lower(), group_key(c)[1].lower()))
+            self.ordered[id(test_result)] = ordered
+            kept = keep.get(test_result.name, {})
+            following = max(list(kept.values()) or [0])
+            for clash in ordered:
+                number = kept.get(ce.pair_key(clash))
+                if number is None:
+                    following += 1
+                    number = following
+                self.numbers[id(clash)] = number
 
     def _fill_header(self):
         result = self.result
@@ -208,6 +240,10 @@ class ClashReportForm(Window):
             names, _plural(result.clash_count, u"clash", u"clashes"), result.seconds)
         if result.cancelled:
             text += u" Stopped by the user: the result is partial."
+        if self.refreshed_at:
+            states = list(self.status.values())
+            text += u" Refreshed at {}: {} new, {} resolved.".format(
+                self.refreshed_at, states.count("new"), states.count("resolved"))
         self.txt_result.Text = text
 
         unsupported = sum(r.unsupported for r in result.tests)
@@ -226,7 +262,14 @@ class ClashReportForm(Window):
 
         hint = u"Set A from {}, Set B from {}. Model: {}.".format(
             scope_text(scope.source_a, scope.links_a),
-            scope_text(scope.source_b, scope.links_b), self.doc.Title)
+            scope_text(scope.source_b, scope.links_b), result.model or self.doc.Title)
+        if result.saved_path:
+            hint = u"Saved report of {}. ".format(result.created or u"an earlier run") + hint
+            if result.model_key and result.model_key != ce.model_key(self.doc):
+                hint += (u" It was made on another model ({}): elements are found by id "
+                         u"and may not match.".format(result.model))
+        if result.save_note:
+            hint += u" " + result.save_note
         details = []
         if unsupported:
             details.append(u"{} skipped (no solid that Revit can test)".format(
@@ -263,6 +306,7 @@ class ClashReportForm(Window):
                 add = self.tree.Items.Add
             for note in self._test_notes(test_result):
                 add(self._text_item(u"ℹ️ " + note, [], gray=True))
+            resolved = self._filtered(self.resolved.get(id(test_result), []))
             if not test_result.clashes:
                 add(self._text_item(u"No clashes.", [], gray=True))
             elif not clashes:
@@ -271,18 +315,22 @@ class ClashReportForm(Window):
             for clash in clashes:
                 groups.setdefault(group_key(clash), []).append(clash)
             for (cat_a, cat_b), members in groups.items():
-                add(self._group_item(cat_a, cat_b, members))
+                add(self._group_item(u"{}  ×  {}".format(cat_a or u"?", cat_b or u"?"),
+                                     members))
+            if resolved:
+                add(self._group_item(u"✔ Resolved since the report", resolved,
+                                     RESOLVED_BRUSH))
         self._fit_group_borders()
 
-    def _group_item(self, cat_a, cat_b, members):
-        """Gruppo di categorie: linea spessa sopra, nome e numero di interferenze."""
+    def _group_item(self, title, members, brush=GROUP_BRUSH):
+        """Gruppo (di categorie, o delle risolte): linea spessa sopra, nome e numero."""
         text = TextBlock()
-        text.Text = u"{}  ×  {}   ({})".format(cat_a or u"?", cat_b or u"?", len(members))
+        text.Text = u"{}   ({})".format(title, len(members))
         text.FontWeight = FontWeights.Bold
-        text.Foreground = GROUP_BRUSH
+        text.Foreground = brush
         text.Margin = Thickness(0, 4, 0, 2)
         border = Border()
-        border.BorderBrush = GROUP_BRUSH
+        border.BorderBrush = brush
         border.BorderThickness = Thickness(0, 2, 0, 0)
         border.Margin = Thickness(0, 6, 0, 0)
         border.Child = text
@@ -296,9 +344,15 @@ class ClashReportForm(Window):
         return item
 
     def _clash_item(self, clash):
-        """Riga "Clash #n"; espandendola, i due elementi."""
-        item = self._text_item(u"Clash #{}".format(self.numbers[id(clash)]),
-                               [(clash.a, "a"), (clash.b, "b")], bold=True)
+        """Riga "Clash #n" (NEW / resolved dopo un refresh); espandendola, i due
+        elementi."""
+        status = self.status.get(id(clash))
+        text = u"Clash #{}".format(self.numbers[id(clash)])
+        if status:
+            text += u"   NEW" if status == "new" else u"   resolved"
+        item = self._text_item(text, [(clash.a, "a"), (clash.b, "b")], bold=True)
+        if status:
+            item.Foreground = NEW_BRUSH if status == "new" else RESOLVED_BRUSH
         item.Items.Add(self._element_item(clash.a, "a"))
         item.Items.Add(self._element_item(clash.b, "b"))
         return item
@@ -316,6 +370,9 @@ class ClashReportForm(Window):
         mark.VerticalAlignment = VerticalAlignment.Center
         label = TextBlock()
         label.Text = u"{}   {}".format(SIDE_LABELS[side], element_row_text(info))
+        # Non eredita il colore della riga NEW / resolved.
+        label.Foreground = TEXT_BRUSH
+        label.FontWeight = FontWeights.Normal
         panel.Children.Add(mark)
         panel.Children.Add(label)
         item = TreeViewItem()
@@ -437,14 +494,14 @@ class ClashReportForm(Window):
         if uidoc is None:
             return
         host = []        # (elemento, lato)
-        linked = []      # (istanza di link, elemento)
+        linked = []      # (istanza di link, elemento, lato)
         boxes = []
         for info, side in pairs:
             if info.is_link:
                 pair = self._linked_element(info)
                 if pair is None:
                     continue
-                linked.append(pair)
+                linked.append((pair[0], pair[1], side))
             else:
                 element = self.doc.GetElement(info.id)
                 if element is None:
@@ -457,19 +514,25 @@ class ClashReportForm(Window):
             return
         box = union_box(boxes)
         view = self.doc.ActiveView
-        self._update_view(view, host, linked, box, isolate)
-        if linked and box is not None:
-            self._zoom_to_box(uidoc, box)
-        elif host:
+        shown = self._update_view(view, host, linked, box, isolate)
+        if shown:
             ids = List[DB.ElementId]()
-            for element, _ in host:
-                ids.Add(element.Id)
+            for element_id in shown:
+                ids.Add(element_id)
             uidoc.ShowElements(ids)
+        elif box is not None:
+            self._zoom_to_box(uidoc, box)
 
     def _linked_element(self, info):
-        """(istanza di link, elemento nel link), o None se non piu' disponibile."""
+        """(istanza di link, elemento nel link), o None se non piu' disponibile.
+
+        L'istanza si cerca per UniqueId (stabile anche in un report riaperto da file),
+        poi per id.
+        """
         try:
-            instance = self.doc.GetElement(info.link_id)
+            instance = self.doc.GetElement(info.link_uid) if info.link_uid else None
+            if instance is None:
+                instance = self.doc.GetElement(info.link_id)
             if not isinstance(instance, DB.RevitLinkInstance):
                 return None
             link_doc = instance.GetLinkDocument()
@@ -495,28 +558,123 @@ class ClashReportForm(Window):
     # ------------------------------------------------------------- vista attiva
 
     def _update_view(self, view, host, linked, box, isolate):
-        """Colori, section box (viste 3D) e isolamento in una sola transazione."""
+        """Copie dei linkati, colori, section box (viste 3D) e isolamento in una sola
+        transazione. Restituisce gli id da inquadrare (host e copie), o [] se nulla."""
         if view is None or view.IsTemplate or isinstance(view, DB.ViewSheet):
             self.txt_result_hint.Text = u"The active view is not a model view."
-            return
+            return []
         notes = []
+        shown = []
         transaction = DB.Transaction(self.doc, "Clash Finder view")
         try:
             transaction.Start()
+            self._delete_previews()
+            previews, failed = self._create_previews(linked)
             notes.append(self._apply_colors(view, host))
+            notes.append(self._color_previews(view, previews))
             if isinstance(view, DB.View3D) and box is not None:
                 notes.append(self._fit_section_box(view, box))
+            # Un linkato senza copia: si isola l'istanza del link intera.
+            fallback = [instance for instance, element, side in failed]
             if isolate:
-                notes.append(self._isolate(view, host, linked))
+                notes.append(self._isolate(view, [e for e, _ in host] +
+                                           [d for d, _ in previews] + fallback))
             transaction.Commit()
+            shown = [e.Id for e, _ in host] + [d.Id for d, _ in previews]
+            if failed:
+                notes.append(u"{} could not be copied for display.".format(
+                    _plural(len(failed), u"linked element")))
         except Exception as error:
             if transaction.HasStarted() and not transaction.HasEnded():
                 transaction.RollBack()
             notes.append(u"View not updated: {}".format(error))
-        notes = [n for n in notes if n]
-        if linked and not host:
-            notes.append(u"Linked elements cannot be coloured: they are only zoomed to.")
-        self.txt_result_hint.Text = u" ".join(notes)
+        self.txt_result_hint.Text = u" ".join(n for n in notes if n)
+        return shown
+
+    # Copie DirectShape degli elementi linkati ------------------------------------
+
+    def _create_previews(self, linked):
+        """Copia DirectShape di ogni elemento linkato. ([(copia, lato)], [linkati falliti])."""
+        created = []
+        failed = []
+        category_id = DB.ElementId(DB.BuiltInCategory.OST_GenericModel)
+        for instance, element, side in linked:
+            solids = ce.element_solids(element, instance.GetTotalTransform())
+            shape = None
+            try:
+                shape = DB.DirectShape.CreateElement(self.doc, category_id)
+                shape.ApplicationId = cr.PREVIEW_APP_ID
+                shape.ApplicationDataId = u"{}:{}".format(
+                    instance.UniqueId, cr.get_element_id_value(element.Id))
+                geometry = List[DB.GeometryObject]()
+                for solid in solids:
+                    geometry.Add(solid)
+                if not geometry.Count:
+                    raise ValueError("no solid")
+                try:
+                    shape.SetShape(geometry)
+                except Exception:
+                    # Qualche solido non accettato: si tengono quelli validi uno per uno.
+                    valid = List[DB.GeometryObject]()
+                    for solid in solids:
+                        single = List[DB.GeometryObject]()
+                        single.Add(solid)
+                        if shape.IsValidShape(single):
+                            valid.Add(solid)
+                    if not valid.Count:
+                        raise ValueError("no valid solid")
+                    shape.SetShape(valid)
+                try:
+                    shape.SetName(u"Clash Finder preview")
+                except Exception:
+                    pass
+                created.append((shape, side))
+            except Exception:
+                if shape is not None:
+                    try:
+                        self.doc.Delete(shape.Id)
+                    except Exception:
+                        pass
+                failed.append((instance, element, side))
+        return created, failed
+
+    def _delete_previews(self):
+        """Cancella tutte le copie del report nel modello, anche quelle orfane."""
+        ids = List[DB.ElementId]()
+        collector = DB.FilteredElementCollector(self.doc).OfClass(DB.DirectShape)
+        try:
+            for shape in collector:
+                if cr.is_preview(shape):
+                    ids.Add(shape.Id)
+        finally:
+            collector.Dispose()
+        if ids.Count:
+            self.doc.Delete(ids)
+        return ids.Count
+
+    def _color_previews(self, view, previews):
+        try:
+            overrides = {"a": self._color_override("a"), "b": self._color_override("b")}
+            for shape, side in previews:
+                view.SetElementOverrides(shape.Id, overrides[side])
+        except Exception as error:
+            return u"Copies not coloured: {}".format(error)
+        return None
+
+    def _delete_previews_api(self, uiapp=None):
+        if not self.doc.IsValidObject or self.doc.IsReadOnly:
+            return
+        transaction = DB.Transaction(self.doc, "Clash Finder remove previews")
+        try:
+            transaction.Start()
+            count = self._delete_previews()
+            if count:
+                transaction.Commit()
+            else:
+                transaction.RollBack()
+        except Exception:
+            if transaction.HasStarted() and not transaction.HasEnded():
+                transaction.RollBack()
 
     def _solid_fill_id(self):
         """Id del retino pieno di disegno, cercato una volta sola (None se assente)."""
@@ -587,11 +745,11 @@ class ClashReportForm(Window):
             return u"Section box not set: {}".format(error)
         return None
 
-    def _isolate(self, view, host, linked):
-        """Isolamento temporaneo: elementi host e istanze dei link degli elementi linkati."""
+    def _isolate(self, view, elements):
+        """Isolamento temporaneo degli elementi (host, copie, istanze di link)."""
         ids = List[DB.ElementId]()
         seen = set()
-        for element in [e for e, _ in host] + [i for i, _ in linked]:
+        for element in elements:
             value = cr.get_element_id_value(element.Id)
             if value not in seen:
                 seen.add(value)
@@ -603,8 +761,6 @@ class ClashReportForm(Window):
             self._isolated_views.add(cr.get_element_id_value(view.Id))
         except Exception as error:
             return u"Elements not isolated: {}".format(error)
-        if linked:
-            return u"Linked elements: the whole link is isolated with them."
         return None
 
     def _end_isolation_api(self, uiapp=None):
@@ -666,6 +822,81 @@ class ClashReportForm(Window):
             collector.Dispose()
         return found
 
+    # ------------------------------------------------------------------ refresh
+
+    def _refresh_api(self, uiapp):
+        """Rifa' i test del report sul modello di adesso e mostra cosa e' cambiato
+        rispetto al report di partenza. Il file in cartella non viene toccato."""
+        if self._uidoc_api(uiapp) is None:
+            return
+        tests = [r.test for r in self.result.tests]
+        uses_selection = any(test[key]["source"] == cr.SOURCE_SELECTION
+                             for test in tests for key in ("set_a", "set_b"))
+        notes = []
+        selection = []
+        if self.result.selection_ids:
+            for value in self.result.selection_ids:
+                element_id = ce.make_element_id(value)
+                if self.doc.GetElement(element_id) is not None:
+                    selection.append(element_id)
+            gone = len(self.result.selection_ids) - len(selection)
+            if uses_selection and gone:
+                notes.append(u"{} of the run selection no longer in the model.".format(
+                    _plural(gone, u"element")))
+        elif uses_selection:
+            selection = list(uiapp.ActiveUIDocument.Selection.GetElementIds())
+            notes.append(u"The report does not record its selection: the current Revit "
+                         u"selection was used ({}).".format(_plural(len(selection), u"element")))
+
+        with forms.ProgressBar(title="Clash Report refresh: {value} of {max_value} elements",
+                               cancellable=True) as progress_bar:
+            def progress(done, total):
+                if done == total or done % 20 == 0:
+                    progress_bar.update_progress(done, total)
+                return progress_bar.cancelled
+
+            fresh = ce.run_tests(self.doc, tests, selection, self.doc.ActiveView,
+                                 ce.list_links(self.doc), progress)
+        if fresh.cancelled:
+            self.txt_result_hint.Text = u"Refresh stopped: the report was not changed."
+            return
+        self._apply_refresh(fresh, notes)
+
+    def _apply_refresh(self, fresh, notes):
+        """Nuove = non nel report di partenza; risolte = del report di partenza ma non
+        piu' trovate. Le altre tengono il loro numero."""
+        old = self.result
+        fresh.model = old.model or self.doc.Title
+        fresh.model_key = old.model_key or ce.model_key(self.doc)
+        fresh.created = old.created
+        fresh.selection_ids = old.selection_ids
+        fresh.save_note = u" ".join(notes + [u"The refresh is not saved: Export JSON... "
+                                             u"saves the current clashes."])
+        self.result = fresh
+        self.status = {}
+        self.resolved = {}
+        keep = {}
+        for test_result in fresh.tests:
+            base = self.baseline.get(test_result.name, OrderedDict())
+            keep[test_result.name] = dict((key, number) for key, (_, number) in base.items())
+            now = set()
+            for clash in test_result.clashes:
+                key = ce.pair_key(clash)
+                now.add(key)
+                if key not in base:
+                    self.status[id(clash)] = "new"
+            self.resolved[id(test_result)] = [c for key, (c, _) in base.items()
+                                              if key not in now]
+        self._order(keep)
+        for test_result in fresh.tests:
+            base = self.baseline.get(test_result.name, OrderedDict())
+            for clash in self.resolved[id(test_result)]:
+                self.numbers[id(clash)] = base[ce.pair_key(clash)][1]
+                self.status[id(clash)] = "resolved"
+        self.refreshed_at = time.strftime("%H:%M")
+        self._fill_header()
+        self._fill_tree()
+
     # ------------------------------------------------------------------- export
 
     def OnExport(self, sender, args):
@@ -673,13 +904,15 @@ class ClashReportForm(Window):
                                title="Export clash report")
         if not path:
             return
-        headers = [u"Test", u"Clash",
+        headers = [u"Test", u"Clash", u"Status",
                    u"A Model", u"A Id", u"A Category", u"A Family : Type", u"A Level",
                    u"B Model", u"B Id", u"B Category", u"B Family : Type", u"B Level"]
         lines = [u";".join(headers)]
         for test_result in self.result.tests:
-            for clash in self.ordered[id(test_result)]:
-                cells = [test_result.name, cr.text(self.numbers[id(clash)])]
+            clashes = self.ordered[id(test_result)] + self.resolved.get(id(test_result), [])
+            for clash in clashes:
+                cells = [test_result.name, cr.text(self.numbers[id(clash)]),
+                         self.status.get(id(clash), u"")]
                 for info in (clash.a, clash.b):
                     cells += [info.model, cr.text(info.id_value), info.category,
                               info.family_type, info.level]
@@ -695,18 +928,33 @@ class ClashReportForm(Window):
             _plural(self.result.clash_count, u"clash", u"clashes"), path),
             TITLE, MessageBoxButton.OK, MessageBoxImage.Information)
 
+    def OnExportJson(self, sender, args):
+        """Report nella cartella scelta, un file per test; diventa la cartella dei
+        report del modello."""
+        folder = ask_report_folder(self.doc)
+        if not folder:
+            return
+        try:
+            paths = ce.save_reports(folder, self.result, self.doc)
+        except Exception as error:
+            _warn(u"The report could not be written to:\n{}\n\n{}".format(folder, error))
+            return
+        self.result.report_paths = paths
+        MessageBox.Show(u"Report saved to:\n{}\n\nEarlier reports of the same test were "
+                        u"moved to {}. The reports of the next runs on this model are "
+                        u"saved in this folder too.".format(
+                            u"\n".join(paths), ce.OLD_FOLDER),
+                        TITLE, MessageBoxButton.OK, MessageBoxImage.Information)
+
     # ----------------------------------------------------------------- chiusura
 
     def OnWindowClosed(self, sender, args):
-        if not self._colored and not self._isolated_views:
-            self.bridge.dispose()
-            return
-
-        # Colori e isolamento vanno tolti prima di chiudere. L'ExternalEvent non viene
-        # eliminato dal suo stesso handler: resta inattivo e lo libera Revit.
+        # Colori, copie e isolamento vanno tolti prima di chiudere. L'ExternalEvent non
+        # viene eliminato dal suo stesso handler: resta inattivo e lo libera Revit.
         def restore(uiapp):
             self._restore_colors_api(uiapp)
             self._end_isolation_api(uiapp)
+            self._delete_previews_api(uiapp)
         self.bridge.run(restore)
 
 
@@ -715,6 +963,31 @@ def _csv_cell(value):
     if u";" in value or u'"' in value or u"\n" in value:
         return u'"{}"'.format(value.replace(u'"', u'""'))
     return value
+
+
+def ask_report_folder(doc):
+    """Chiede la cartella dei report del modello e la ricorda; None se si rinuncia."""
+    folder = forms.pick_folder(title="Folder for the clash reports of this model")
+    if folder:
+        ce.set_report_folder(doc, folder)
+    return folder or None
+
+
+def save_run_reports(doc, result):
+    """Salva il report di un run nella cartella del modello, chiesta la prima volta
+    (o se non esiste piu'). Rinuncia ed errori finiscono nella nota del report:
+    non devono impedire di vederlo."""
+    folder = ce.report_folder(doc)
+    if not folder or not os.path.isdir(folder):
+        folder = ask_report_folder(doc)
+    if not folder:
+        result.save_note = u"Not saved: no report folder chosen (use Export JSON...)."
+        return
+    try:
+        result.report_paths = ce.save_reports(folder, result, doc)
+        result.save_note = u"Saved in {}.".format(folder)
+    except Exception as error:
+        result.save_note = u"Not saved in {}: {}".format(folder, error)
 
 
 def show_report(doc, result, display_names, owner_handle=None):

@@ -84,7 +84,7 @@
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Text="💥 CLASHES" Style="{StaticResource SectionHeader}"/>
                     <TextBlock Grid.Row="1" Style="{StaticResource HintText}"
-                               Text="Click a row to zoom to its elements: Set A elements turn green, Set B elements red (elements of linked models cannot be coloured). In a 3D view the section box is fitted around them."/>
+                               Text="Click a row to zoom to its elements: Set A elements turn green, Set B elements red (linked elements are shown by a temporary copy, removed when this window closes). In a 3D view the section box is fitted around them."/>
                     <Grid Grid.Row="2" Margin="0,0,0,5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -114,11 +114,19 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <ToggleButton x:Name="btn_isolate" Grid.Column="0" Content="🔍 Isolate selected" Width="150" Height="30"
-                          ToolTip="While on, the elements of the selected row are temporarily isolated in the active view. Turn it off to end the isolation."/>
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <ToggleButton x:Name="btn_isolate" Content="🔍 Isolate selected" Width="150" Height="30"
+                              ToolTip="While on, the elements of the selected row are temporarily isolated in the active view. Turn it off to end the isolation."/>
+                <Button x:Name="btn_refresh" Content="🔄 Refresh" Width="100" Height="30" Margin="10,0,0,0"
+                        ToolTip="Run the tests of this report again on the model as it is now: new clashes are marked NEW, the ones no longer found are listed as resolved. The saved report file is not changed."/>
+            </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button x:Name="btn_export_json" Content="Export JSON..." Width="110" Height="30"
+                        Margin="0,0,10,0"
+                        ToolTip="Save the report in a folder, one file per clash test (earlier ones go to _old). The folder becomes the report folder of this model, used by the next runs and by Last Report."/>
                 <Button x:Name="btn_export" Content="Export CSV..." Width="100" Height="30"
-                        Margin="0,0,10,0"/>
+                        Margin="0,0,10,0"
+                        ToolTip="Save the clashes as a table for Excel"/>
                 <Button x:Name="btn_close" Content="Close" Width="100" Height="30"
                         Background="#2D5A8A" Foreground="White"/>
             </StackPanel>
