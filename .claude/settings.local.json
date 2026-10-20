@@ -42,7 +42,15 @@
       "Bash(awk 'BEGIN{n=0} /^[[:space:]]*$/{n++; if\\(n>2\\) print NR\": \"n\" vuote consecutive\"; next} {n=0}' MEPAlign_script.py)",
       "Bash(py /tmp/chk.py)",
       "Bash(py -)",
-      "Bash(py /tmp/order.py)"
+      "Bash(py /tmp/order.py)",
+      "Bash(cd \"c:/Users/matteoma/AppData/Roaming/pyRevit/Extensions/ESAextensions.extension/pyESA-MEP.tab/MEP-Parameters.panel\" && ls -la . Parameters.stack && cat bundle.yaml Parameters.stack/bundle.yaml; cat Parameters.stack/ParamCopyType.pushbutton/script.py | head -60; ls Parameters.stack/CheckTypeMarkDuplicates.pushbutton; cat ../../pyESA-MEP.tab/bundle.yaml 2>/dev/null)",
+      "Read(//c/Users/matteoma/AppData/Roaming/pyRevit/pyESA-MEP.tab/**)",
+      "Bash(mkdir \"c:/Users/matteoma/AppData/Roaming/pyRevit/Extensions/ESAextensions.extension/pyESA-MEP.tab/MEP-Parameters.panel/MultiIDSelect.pushbutton\" && echo ok)",
+      "PowerShell($s=\"C:\\\\Users\\\\matteoma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\9ed90474-626d-488e-a505-390253799f79\\\\scratchpad\"; & \"$s\\\\make_icons.ps1\"; & \"$s\\\\check.ps1\")",
+      "PowerShell(& \"C:\\\\Users\\\\matteoma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\9ed90474-626d-488e-a505-390253799f79\\\\scratchpad\\\\check.ps1\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\matteoma\\AppData\\Roaming\\pyRevit\\Extensions\\ESAextensions.extension\\pyESA-MEP.tab\\MEP-Parameters.panel"
     ]
   }
 }

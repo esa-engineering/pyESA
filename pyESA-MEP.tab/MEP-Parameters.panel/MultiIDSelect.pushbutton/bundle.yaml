@@ -1,0 +1,9 @@
+title: "Multi ID\nSelect"
+tooltip: >
+  Select elements by Element Id, also in linked models, and read the Ids of the current selection.
+
+  CLICK: opens the window (it stays open while you work in Revit). Paste one or more Ids and press Select:
+  each Id is searched in this model and in every loaded link. Load selection lists the elements selected in
+  Revit (links included) in a table, with the parameters you choose as extra columns.
+author: ESA Engineering
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx
