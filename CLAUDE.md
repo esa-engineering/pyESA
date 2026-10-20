@@ -125,6 +125,14 @@ The one exception to "one file per tool" is MEPQTO, which splits a large tool in
 modules *inside its own bundle folder* (see "Multi-module tools" below). That is still not
 a shared library: nothing outside the bundle imports those modules.
 
+Openings (`pyESA-MEP.tab/MEP-Utilities.panel/Openings.pulldown`) is the second exception: its
+buttons share one code base in `Openings.pulldown/openings_modules/` (a folder without a bundle
+suffix, so pyRevit does not load it as a button), which each button's `script.py` adds to
+`sys.path`. It is scoped to that pulldown, not a shared library: only Openings buttons import it.
+Its modules keep no document, output or settings at module level; they live in
+`openings_core.ctx`, filled by `start(MODE)` at the start of every command. Read the tool
+`README.md` before changing it.
+
 Standard header:
 
 ```python

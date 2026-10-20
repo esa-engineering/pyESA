@@ -1,0 +1,12 @@
+title: Last Report
+tooltip: >-
+  In the Openings model: opens the last New Report of this model again, same scope, without checking: quick.
+  Statuses as written in the model now. Export report writes the report read by the MEP / ARC models (every opening
+  of the model) to a folder of your choice.
+
+  In a MEP / ARC model (no openings here): opens the last report imported for this model, read again from the file,
+  so a new Export is seen at once. Import report loads another file. Read-only: show and select the elements of
+  this model and the openings that cite them.
+
+  Then a Text Report (export to Excel) or an Interactive Report.
+author: Matteo Maiorano
