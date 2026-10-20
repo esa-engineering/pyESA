@@ -1,0 +1,18 @@
+title: "MEP\nWorkset Fix"
+tooltip: >
+  Moves MEP elements to the workset of their discipline. A dialog asks for four target
+  worksets: mechanical, plumbing, fire protection and electrical (any of them can be left
+  as "do not change"), one or more worksets to leave untouched (for example temporary
+  elements: "+ Add workset" adds another one), and whether to process the whole model, the
+  active view or the current selection.
+
+  Cable Trays and Cable Tray Fittings always go to electrical. Air Terminals, Ducts, Duct
+  Fittings and Duct Accessories follow their System Type: DS.FF to fire protection, DS.HV
+  and DS.OT to mechanical. Pipes and Pipe Fittings: PS.FF to fire protection, PS.PD to
+  mechanical, PS.SS and PS.GA to plumbing. Insulation and lining follow their host.
+
+  A summary is shown before anything is written; answering No prints the report as a
+  preview. Model groups are never changed: elements inside a model group are skipped. Elements
+  whose System Type matches no rule, elements nested in families and elements owned by another
+  user are left untouched too. All of them are listed in the report.
+author: Andrea Patti
