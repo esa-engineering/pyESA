@@ -569,17 +569,21 @@ class ReportWindow(object):
     def _on_find(self, sender, args):
         self._call("selected", (), self._show_found, "Reading the selection in the model...")
 
-    def _matches(self, ids, uids, refs):
+    def _matches(self, ids, uids, refs, codes):
         """Nodi dell'albero per la selezione del modello, in ordine di lista: i fori selezionati (Id, o UniqueId se
-        stanno in un link) e gli elementi MEP selezionati sotto ogni foro che li elenca. Ritorna [(nodo del gruppo,
-        nodo del foro, nodo dell'elemento o None)]."""
-        ids, uids, refs = set(ids), set(uids), set(refs)
+        stanno in un link; nei report importati anche per codice, l'Id del foro nel modello Openings) e gli elementi
+        MEP selezionati sotto ogni foro che li elenca. Ritorna [(nodo del gruppo, nodo del foro, nodo dell'elemento
+        o None)]."""
+        ids, uids, refs, codes = set(ids), set(uids), set(refs), set(codes)
         found = []
         for group in self.tree.Items:
             for item in group.Items:
                 entry = item.Tag[2]
                 first = entry.select_ids[0] if entry.select_ids else None
-                if not entry.key.startswith("new:") and (first in ids or first in uids):
+                # report importato: il foro non ha un'istanza qui, select_ids[0] e' "opening:<UniqueId>"
+                imported = isinstance(first, basestring) and first.startswith("opening:")
+                if not entry.key.startswith("new:") and (first in ids or first in uids or
+                                                         (imported and entry.key in codes)):
                     found.append((group, item, None))
                 for child in item.Items:
                     if child.Tag[3] in refs:
@@ -589,17 +593,21 @@ class ReportWindow(object):
     def _show_found(self, selection):
         """Evidenzia nella lista la voce della selezione del modello. Piu' voci (un elemento sotto piu' fori, piu'
         oggetti selezionati): ogni clic passa alla successiva."""
-        ids, uids, refs = selection
+        ids, uids, refs, codes, note = selection
         if not (ids or uids):
-            self.status.Text = "Nothing selected in the model: pick an opening or a MEP element, then Find."
+            self.status.Text = u"Nothing selected in the model: pick an opening or a MEP element, then Find."
             return
-        found = self._matches(ids, uids, refs)
+        found = self._matches(ids, uids, refs, codes)
         if not found and (self.search.Text or u"").strip():
             self.search.Text = u""  # la ricerca nasconde la voce: si toglie (TextChanged ricostruisce l'albero)
-            found = self._matches(ids, uids, refs)
+            found = self._matches(ids, uids, refs, codes)
         if not found:
-            self.status.Text = ("The selected objects are not in this report (not an opening or MEP element of its "
-                                "scope).")
+            keys = [e.key for _, entries in self.groups for e in entries]
+            first = [e.select_ids[0] for _, entries in self.groups for e in entries if e.select_ids][:1]
+            self.status.Text = (u"Not found in this report. Read from the model: {}. In the report: {} openings, "
+                                u"Ids {}{}; first key {}.".format(
+                                    note, len(keys), u", ".join(keys[:4]), u"..." if len(keys) > 4 else u"",
+                                    first[0] if first else u"-"))
             return
         signature = tuple(sorted(str(i) for i in ids) + sorted(uids))
         self.found_at = self.found_at + 1 if signature == self.found_signature else 0

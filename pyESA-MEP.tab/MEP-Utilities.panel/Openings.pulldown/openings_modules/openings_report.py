@@ -845,28 +845,48 @@ class ReportController(object):
         """Cosa e' selezionato ora nel modello, per cercarlo nella lista: (Id di elementi del modello aperto, che
         possono essere fori; UniqueId dei fori selezionati in un link, "opening:<UniqueId>", come in opening_select;
         riferimenti degli elementi MEP, ref_text: Id nudo per il modello aperto, "PRJ_MEC:333" per un link).
-        Gli elementi dei link si leggono dai Reference della selezione (Revit 2023+)."""
+        Gli elementi dei link si leggono dai Reference della selezione (Revit 2023+). Per un foro in un link si
+        danno due chiavi: lo UniqueId e l'Id nel link (= codice del foro nel report, "codes"), cosi' basta una delle
+        due. Ritorna anche una nota di diagnosi per il messaggio quando non si trova niente."""
         selection = ctx.uidoc.Selection
         ids = [id_value(e) for e in selection.GetElementIds()]
-        uids, refs = [], [str(i) for i in ids]
+        uids, codes, refs = [], [], [str(i) for i in ids]
+        link_refs, problems = 0, []
         if hasattr(selection, "GetReferences"):
-            for reference in selection.GetReferences():
+            try:
+                references = list(selection.GetReferences())
+            except Exception as ex:
+                references = []
+                problems.append("references not readable: {}".format(ex))
+            for reference in references:
                 linked = reference.LinkedElementId
                 if linked is None or linked == DB.ElementId.InvalidElementId:
                     continue
+                link_refs += 1
+                codes.append(str(id_value(linked)))
                 link = ctx.doc.GetElement(reference.ElementId)
                 try:
-                    link_doc = link.GetLinkDocument()
-                    uids.append("opening:" + link_doc.GetElement(linked).UniqueId)
-                except Exception:
-                    pass
+                    element = link.GetLinkDocument().GetElement(linked)
+                    uids.append("opening:" + element.UniqueId)
+                    # diagnosi: cosa e' stato letto nel link (tipo di elemento, Id, modello)
+                    problems.append("link element {} {} in '{}', UniqueId {}".format(
+                        type(element).__name__, id_value(linked), link.GetLinkDocument().Title, element.UniqueId))
+                except Exception as ex:
+                    problems.append("link element {} not readable: {}".format(id_value(linked), ex))
                 try:
                     source = source_by_link(id_value(link.Id))
                     if source is not None:
                         refs.append(ref_text(source.key, id_value(linked)))
                 except Exception:
                     pass
-        return ids, uids, refs
+        else:
+            problems.append("this Revit version cannot read selected link elements (2023 or later needed)")
+        note = "{} element(s) of this model, {} in links".format(len(ids), link_refs)
+        if problems:
+            note += "; " + "; ".join(problems)
+        elif ids and not link_refs:
+            note += " (to find a linked opening, pick the opening itself inside the link, not the whole link)"
+        return ids, uids, refs, codes, note
 
     def select(self, ids, zoom):
         element_ids = List[DB.ElementId]([DB.ElementId(i) for i in ids if ctx.doc.GetElement(DB.ElementId(i))])
