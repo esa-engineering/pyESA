@@ -11,7 +11,7 @@ def skip_links(skipped):
 
 
 def missing_families_exit(missing_families):
-    forms.alert("Load the opening families first (or choose others in Settings):\n{}".format(
+    forms.alert("Load the opening families first (company library):\n{}".format(
         "\n".join(missing_families)), title=ctx.title, exitscript=True)
 
 

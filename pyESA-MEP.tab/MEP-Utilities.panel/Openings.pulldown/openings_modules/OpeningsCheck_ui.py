@@ -334,7 +334,8 @@ class TextReportWindow(object):
 
 
 class OpeningEntry(object):
-    """Riga di un foro nel report: key = Id del foro (testo), elements = [(testo, [Id da selezionare])]."""
+    """Riga di un foro nel report: key = Id del foro (testo), elements = [(testo, [Id da selezionare], riferimento
+    dell'elemento)]: il riferimento (ref_text) serve a ritrovare l'elemento scelto nel modello."""
 
     def __init__(self, key, label, detail, select_ids, elements, can_recreate=False, can_move=False, checkable=True,
                  can_delete=False):
@@ -342,7 +343,7 @@ class OpeningEntry(object):
         self.select_ids, self.elements = list(select_ids), list(elements)
         self.can_recreate, self.can_move, self.checkable = can_recreate, can_move, checkable
         self.can_delete = can_delete
-        self.search = u" ".join([label] + [text for text, _ in elements]).lower()
+        self.search = u" ".join([label] + [element[0] for element in elements]).lower()
 
 
 class ReportWindow(object):
@@ -353,7 +354,7 @@ class ReportWindow(object):
     della finestra. Mentre una richiesta e' in coda i pulsanti delle azioni sono spenti."""
 
     EXPANDED = ("Missing openings", "Not Associated", "To Be Refreshed")  # gruppi aperti all'inizio
-    BUTTONS = ("ShowButton", "SelectCloseButton", "RecreateButton", "MoveButton", "DeleteButton", "TextButton",
+    BUTTONS = ("ShowButton", "FindButton", "RecreateButton", "MoveButton", "DeleteButton", "TextButton",
                "RefreshButton")
 
     def __init__(self, xaml_path, groups, actions, owner=None, text_xaml=None, readonly=False):
@@ -363,9 +364,12 @@ class ReportWindow(object):
             # report importato in un modello MEP / ARC: niente spunte, azioni sui fori e Refresh (solo Show / Select)
             for name in ("ActionsBorder", "TickButtons", "RefreshButton"):
                 find(name).Visibility = Visibility.Collapsed
-            find("StatusText").Text = ("Report imported from the Openings model: read-only. Show / Select picks the "
-                                       "elements of this model and, if the Openings model is linked here, the "
-                                       "openings.")
+            find("StatusText").Text = ("Report imported from the Openings model: read-only. Show picks the MEP "
+                                       "elements of this model, or the openings if the Openings model is linked "
+                                       "here (Revit does not select both together).")
+            find("SelectWhatPanel").Visibility = Visibility.Visible
+        self.readonly = readonly
+        self.select_openings = find("SelectOpeningsRadio")
         self.actions = actions
         self.owner, self.text_xaml = owner, text_xaml  # per aprire il Text Report da qui
         _set_owner(self.window, owner)
@@ -377,13 +381,14 @@ class ReportWindow(object):
         self.checked = set()
         self.boxes = {}  # chiave del foro -> casella nell'albero attuale
         self.anchor = None  # chiave dell'ultima casella cliccata: Shift + clic spunta da li' a quella cliccata
+        self.found_signature, self.found_at = None, 0  # ultima selezione cercata con Find, voce raggiunta
         self.expanded = set(self.EXPANDED)
         self.search.TextChanged += self._on_search
         self.tree.SelectedItemChanged += self._on_selected
         find("SelectAllButton").Click += self._on_select_all
         find("DeselectAllButton").Click += self._on_deselect_all
         find("ShowButton").Click += self._on_show
-        find("SelectCloseButton").Click += self._on_select_close
+        find("FindButton").Click += self._on_find
         find("RecreateButton").Click += self._on_recreate
         find("MoveButton").Click += self._on_move
         find("DeleteButton").Click += self._on_delete
@@ -446,10 +451,10 @@ class ReportWindow(object):
         row.Children.Add(label)
         item.Header = row
         item.Tag = ("entry", entry.label, entry)
-        for text, ids in entry.elements:
+        for text, ids, ref in entry.elements:
             child = TreeViewItem()
             child.Header = text
-            child.Tag = ("element", text, ids)
+            child.Tag = ("element", text, ids, ref)
             item.Items.Add(child)
         return item
 
@@ -553,14 +558,61 @@ class ReportWindow(object):
         if not ids:
             MessageBox.Show("Pick an opening, an element or a status group in the list first.", TITLE)
             return
-        self._call("select", (ids, True), lambda result: setattr(self.status, "Text", result))
+        self._call("select", self._select_args(ids, True), lambda result: setattr(self.status, "Text", result))
 
-    def _on_select_close(self, sender, args):
-        ids = self._selected_ids()
-        if not ids:
-            MessageBox.Show("Pick an opening, an element or a status group in the list first.", TITLE)
+    def _select_args(self, ids, zoom):
+        """Argomenti di select: nel report importato anche cosa selezionare ("meps" / "openings")."""
+        if not self.readonly:
+            return ids, zoom
+        return ids, zoom, "openings" if self.select_openings.IsChecked else "meps"
+
+    def _on_find(self, sender, args):
+        self._call("selected", (), self._show_found, "Reading the selection in the model...")
+
+    def _matches(self, ids, uids, refs):
+        """Nodi dell'albero per la selezione del modello, in ordine di lista: i fori selezionati (Id, o UniqueId se
+        stanno in un link) e gli elementi MEP selezionati sotto ogni foro che li elenca. Ritorna [(nodo del gruppo,
+        nodo del foro, nodo dell'elemento o None)]."""
+        ids, uids, refs = set(ids), set(uids), set(refs)
+        found = []
+        for group in self.tree.Items:
+            for item in group.Items:
+                entry = item.Tag[2]
+                first = entry.select_ids[0] if entry.select_ids else None
+                if not entry.key.startswith("new:") and (first in ids or first in uids):
+                    found.append((group, item, None))
+                for child in item.Items:
+                    if child.Tag[3] in refs:
+                        found.append((group, item, child))
+        return found
+
+    def _show_found(self, selection):
+        """Evidenzia nella lista la voce della selezione del modello. Piu' voci (un elemento sotto piu' fori, piu'
+        oggetti selezionati): ogni clic passa alla successiva."""
+        ids, uids, refs = selection
+        if not (ids or uids):
+            self.status.Text = "Nothing selected in the model: pick an opening or a MEP element, then Find."
             return
-        self._call("select", (ids, False), lambda result: self.window.Close())
+        found = self._matches(ids, uids, refs)
+        if not found and (self.search.Text or u"").strip():
+            self.search.Text = u""  # la ricerca nasconde la voce: si toglie (TextChanged ricostruisce l'albero)
+            found = self._matches(ids, uids, refs)
+        if not found:
+            self.status.Text = ("The selected objects are not in this report (not an opening or MEP element of its "
+                                "scope).")
+            return
+        signature = tuple(sorted(str(i) for i in ids) + sorted(uids))
+        self.found_at = self.found_at + 1 if signature == self.found_signature else 0
+        self.found_signature = signature
+        group, item, child = found[self.found_at % len(found)]
+        group.IsExpanded = True
+        item.IsExpanded = child is not None
+        node = child if child is not None else item
+        node.IsSelected = True
+        node.BringIntoView()
+        self.tree.Focus()
+        self.status.Text = u"Found in the list: {} of {} ({}).".format(self.found_at % len(found) + 1, len(found),
+                                                                      group.Tag[1])
 
     def _ticked(self, flag):
         return [e for _, entries in self.groups for e in entries if e.key in self.checked and getattr(e, flag)]

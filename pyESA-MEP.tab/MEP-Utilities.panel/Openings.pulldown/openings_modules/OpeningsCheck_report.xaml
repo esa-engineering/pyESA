@@ -85,10 +85,21 @@
                             Margin="0,0,0,10">
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionHeader}" Text="👆 SELECTED ITEM"/>
+                            <!-- solo report importato (modello MEP / ARC): Revit non seleziona insieme elementi del
+                                 modello e del link Openings -->
+                            <StackPanel x:Name="SelectWhatPanel" Orientation="Horizontal" Margin="0,0,0,8"
+                                        Visibility="Collapsed">
+                                <TextBlock Text="Select:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <RadioButton x:Name="SelectMepsRadio" Content="MEP elements" GroupName="SelectWhat"
+                                             IsChecked="True" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <RadioButton x:Name="SelectOpeningsRadio" Content="Openings (in the link)"
+                                             GroupName="SelectWhat" VerticalAlignment="Center"/>
+                            </StackPanel>
                             <Button x:Name="ShowButton" Content="Show in model" Height="28" Margin="0,0,0,5"/>
-                            <Button x:Name="SelectCloseButton" Content="Select and close" Height="28" Margin="0,0,0,5"/>
+                            <Button x:Name="FindButton" Content="Find selection in list" Height="28" Margin="0,0,0,5"
+                                    ToolTip="Select an opening or a MEP element in the model, then click here: the list jumps to it. With several matches, click again for the next one."/>
                             <TextBlock Style="{StaticResource HintText}"
-                                       Text="An opening selects it with its elements; a status group selects all its openings and elements."/>
+                                       Text="Show: zooms on the picked item and selects it (a status group selects all its openings and elements). Find: pick an opening or MEP element in the model, then click it."/>
                         </StackPanel>
                     </Border>
                     <Border x:Name="ActionsBorder" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10"

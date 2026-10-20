@@ -832,18 +832,22 @@ def find_crossings(hosts, stats, only=None, keep_existing=False, progress=None, 
                         continue
                     p0, p1 = segment.GetEndPoint(0), segment.GetEndPoint(1)
                     mid = p0.Add(p1).Divide(2.0)
-                    if host_kind == "auto":
-                        # strutture: foro a solaio per elementi MEP verticali, a muro per gli altri; oltre 1 m
-                        # dentro la struttura l'elemento ci corre dentro (es. montante in un pilastro)
-                        if segment.Length > MAX_LAYER:
+                    if host_kind == "floor":
+                        # solai: solo elementi verticali (oltre 85 gradi); gli scarichi in pendenza no
+                        if abs(line.Direction.Z) <= VERTICAL_SIN:
                             stats["inside"] += 1
                             continue
-                        kind = "floor" if abs(line.Direction.Z) > VERTICAL_SIN else "wall"
-                    else:
-                        kind = host_kind
+                    elif segment.Length > MAX_INSIDE:
+                        # muri e strutture: qualunque inclinazione, ma oltre 1 m dentro l'elemento ci corre
+                        # dentro (traccia, montante nel muro o nel pilastro)
+                        stats["inside"] += 1
+                        continue
+                    # strutture: foro a solaio per elementi MEP verticali, a muro per gli altri
+                    kind = host_kind if host_kind != "auto" else \
+                        ("floor" if abs(line.Direction.Z) > VERTICAL_SIN else "wall")
                     w = crossing_normal(element, transform, mid, kind, line.Direction)
-                    if abs(line.Direction.DotProduct(w)) < ctx.min_cross_sin:
-                        stats["inside"] += 1  # corre dentro il muro o il solaio: nessun foro
+                    if abs(line.Direction.DotProduct(w)) < 1e-3:
+                        stats["inside"] += 1  # parallelo al muro: nessun piano di foro
                         continue
                     p0, p1, used = extend_through(p0, p1, layers, options, kind, w)
                     if area is not None and not crossing_in_area(area, p0, p1):
@@ -1011,10 +1015,13 @@ def recross(mep, frame, data, limit_reach=True):
     u, v, w = frame
     direction = line.Direction
     cos = direction.DotProduct(w)
-    if abs(cos) < ctx.min_cross_sin:
-        return None
-    start = line.GetEndPoint(0)
     half = data["depth"] / MM_PER_FT / 2.0
+    if abs(w.Z) > 0.5:
+        if abs(cos) <= VERTICAL_SIN:
+            return None  # foro a solaio: l'elemento non e' piu' verticale (oltre 85 gradi)
+    elif abs(cos) < 1e-3 or 2.0 * half / abs(cos) > 2.0 * half + MAX_INSIDE:
+        return None  # foro a muro: l'elemento ci corre dentro (piu' largo di Place, che guarda ogni strato)
+    start = line.GetEndPoint(0)
     base = data["center"].Subtract(start).DotProduct(w)
     t0, t1 = sorted(((base - half) / cos, (base + half) / cos))
     if t1 < -1e-6 or t0 > line.Length + 1e-6:

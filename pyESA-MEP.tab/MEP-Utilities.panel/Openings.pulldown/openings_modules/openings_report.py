@@ -237,7 +237,7 @@ def row_entry(ui, row, owners):
         ids = e["element"].select_ids() if e["element"] is not None else []
         select.extend(ids)
         elements.append(("{} {} - {}".format(e["name"], e["id"], e["state"]),
-                         ids + [i for _, _, i in owners.get(e["id"], []) if e["element"] is not None]))
+                         ids + [i for _, _, i in owners.get(e["id"], []) if e["element"] is not None], e["id"]))
     label = row_label(row)
     detail = "{}\nStatus: {}\n\n{}".format(label, row["status"], "\n".join(row["notes"]) or "Elements in place.")
     local = row["instance"] is not None
@@ -285,9 +285,7 @@ def report_data(report):
                           "notes": list(row["notes"]),
                           "rows": [(e["id"], e["name"], e["state"]) for e in row["elements"]]})
         sections.append({"title": status, "items": items})
-    settings = "Settings: MEC/ELE {}, To Be Refreshed {}, minimum angle {:g} deg, layers joined across {:g} mm.".format(
-        "separate" if ctx.settings["separate"] else "together", "on" if ctx.settings["misaligned"] else "off",
-        ctx.settings["min_angle_deg"], ctx.settings["layer_gap_mm"])
+    settings = "Settings: {}.".format(settings_line())
     return {"title": report.title, "model": ctx.doc.Title, "date": getattr(report, "date", "") or
             datetime.now().strftime("%d.%m.%Y %H:%M"), "summary": report.totals(), "warning": report.warning(),
             "details": [settings] + report.details(), "log": list(report.log), "sections": sections}
@@ -312,7 +310,7 @@ def missing_entry(ui, row, owners, released):
     if row["host"] is not None:
         select.append(id_value(row["host"].Id))  # muro/solaio del modello host (quelli dei link non si selezionano)
     elements = [("{} {} - {}".format(mep_name(m), m.text, missing_status(m, owners, released)),
-                 m.select_ids() + [i for _, _, i in owners.get(m.text, [])]) for m in row["meps"]]
+                 m.select_ids() + [i for _, _, i in owners.get(m.text, [])], m.text) for m in row["meps"]]
     detail = "{}\n\nNo opening at this crossing. Create makes it as Place would (status Valid).".format(row["label"])
     return ui.OpeningEntry(row["key"], row["label"], detail, select, elements, can_recreate=True)
 
@@ -496,7 +494,7 @@ class CheckSession(object):
     def recreate(self, keys):
         """Crea i fori mancanti spuntati e ricrea i fori spuntati, in una transazione; poi ricontrolla e scrive."""
         if self.missing_families:
-            return "Creating openings needs the families chosen in Settings: {}.".format(
+            return "Load the opening families first (company library): {}.".format(
                 ", ".join(self.missing_families))
         # elementi usciti dai fori da ricreare (anche dai fori di un gruppo da unire non spuntati): perdono
         # l'associazione ma restano nell'ambito, cosi' la scansione li riporta in Missing openings
@@ -843,6 +841,33 @@ class ReportController(object):
         self.check_again()
         return "New Report done on the scope: {} openings.".format(len(self.report.rows)), self.groups()
 
+    def selected(self):
+        """Cosa e' selezionato ora nel modello, per cercarlo nella lista: (Id di elementi del modello aperto, che
+        possono essere fori; UniqueId dei fori selezionati in un link, "opening:<UniqueId>", come in opening_select;
+        riferimenti degli elementi MEP, ref_text: Id nudo per il modello aperto, "PRJ_MEC:333" per un link).
+        Gli elementi dei link si leggono dai Reference della selezione (Revit 2023+)."""
+        selection = ctx.uidoc.Selection
+        ids = [id_value(e) for e in selection.GetElementIds()]
+        uids, refs = [], [str(i) for i in ids]
+        if hasattr(selection, "GetReferences"):
+            for reference in selection.GetReferences():
+                linked = reference.LinkedElementId
+                if linked is None or linked == DB.ElementId.InvalidElementId:
+                    continue
+                link = ctx.doc.GetElement(reference.ElementId)
+                try:
+                    link_doc = link.GetLinkDocument()
+                    uids.append("opening:" + link_doc.GetElement(linked).UniqueId)
+                except Exception:
+                    pass
+                try:
+                    source = source_by_link(id_value(link.Id))
+                    if source is not None:
+                        refs.append(ref_text(source.key, id_value(linked)))
+                except Exception:
+                    pass
+        return ids, uids, refs
+
     def select(self, ids, zoom):
         element_ids = List[DB.ElementId]([DB.ElementId(i) for i in ids if ctx.doc.GetElement(DB.ElementId(i))])
         ctx.uidoc.Selection.SetElementIds(element_ids)
@@ -929,33 +954,38 @@ class ImportController(ReportController):
         return [link for link in DB.FilteredElementCollector(ctx.doc).OfClass(DB.RevitLinkInstance)
                 if link.GetLinkDocument() is not None and model_name(link.GetLinkDocument()) == name]
 
-    def select(self, ids, zoom):
+    def select(self, ids, zoom, what="meps"):
+        """what: "meps" seleziona gli elementi di questo modello, "openings" i fori nel link Openings. Revit non
+        tiene insieme in una selezione elementi del modello e riferimenti in un link (con SetReferences gli elementi
+        MEP andavano persi): si sceglie nella finestra. Lo zoom inquadra comunque elementi e fori."""
         uids = [i[len("opening:"):] for i in ids if isinstance(i, basestring) and i.startswith("opening:")]
         elements = [ctx.doc.GetElement(DB.ElementId(i)) for i in ids if not isinstance(i, basestring)]
         elements = [e for e in elements if e is not None]
-        refs = [DB.Reference(e) for e in elements]
-        links = self.openings_links()
-        found = 0
-        for uid in uids:
-            for link in links:
-                opening = link.GetLinkDocument().GetElement(uid)
-                if opening is not None:
-                    refs.append(DB.Reference(opening).CreateLinkReference(link))
-                    found += 1
-                    break
         selection = ctx.uidoc.Selection
-        if hasattr(selection, "SetReferences"):
-            selection.SetReferences(List[DB.Reference](refs))
-        else:  # Revit 2022: solo gli elementi di questo modello
+        if what == "openings":
+            links = self.openings_links()
+            refs = []
+            for uid in uids:
+                for link in links:
+                    opening = link.GetLinkDocument().GetElement(uid)
+                    if opening is not None:
+                        refs.append(DB.Reference(opening).CreateLinkReference(link))
+                        break
+            if hasattr(selection, "SetReferences"):
+                selection.SetReferences(List[DB.Reference](refs))
+                message = "Selected {} of {} openings in the link".format(len(refs), len(uids))
+            else:
+                message = "Selecting openings in a link needs Revit 2023 or later"
+            if uids and not links:
+                message += " (the Openings model is not linked here: only zoomed on them)"
+        else:
             selection.SetElementIds(List[DB.ElementId]([e.Id for e in elements]))
+            message = "Selected {} MEP elements of this model".format(len(elements))
+            if not elements:
+                message += " (the elements of this item are in other models, or no longer here)"
         if zoom:
             self.zoom_to(elements, uids)
         ctx.uidoc.RefreshActiveView()
-        message = "Selected {} elements of this model".format(len(elements))
-        if uids:
-            message += ", {} of {} openings".format(found, len(uids))
-            if not links:
-                message += " (the Openings model is not linked here: only zoomed on them)"
         return message + "."
 
     def zoom_to(self, elements, uids):

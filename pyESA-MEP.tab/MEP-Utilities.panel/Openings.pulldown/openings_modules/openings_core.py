@@ -38,7 +38,7 @@ class Context(object):
     """Stato del comando in corso. Un solo oggetto (ctx), mai riassegnato: start() e restore() ne cambiano i campi,
     cosi' chi l'ha importato con `from openings_core import *` vede sempre quelli attuali."""
     FIELDS = ("mode", "title", "doc", "uidoc", "output", "settings", "status_param", "id_param", "cat_param",
-              "min_cross_sin", "neighbour_cache", "sources", "mep_cache", "skipped_links", "phase_name")
+              "neighbour_cache", "sources", "mep_cache", "skipped_links", "phase_name")
 
     def __init__(self):
         for name in self.FIELDS:
@@ -62,9 +62,6 @@ def start(mode):
     ctx.restore({"mode": mode, "title": TITLES[mode], "doc": revit.doc, "uidoc": revit.uidoc,
                  "output": script.get_output(), "settings": settings, "status_param": settings["status_param"],
                  "id_param": settings["related_id_param"], "cat_param": settings["related_cat_param"],
-                 # sotto quest'angolo con il piano di muro o solaio l'elemento MEP corre dentro (scarichi a
-                 # pavimento, montanti nel muro): nessun foro
-                 "min_cross_sin": math.sin(math.radians(min(max(settings["min_angle_deg"], 0.0), 89.0))),
                  # (id del link o 0, id dell'elemento) -> solidi in coordinate host
                  "neighbour_cache": {},
                  # modelli letti (host e link caricati) e riferimenti MEP gia' risolti: vedi reset_models()
@@ -92,11 +89,14 @@ DEFAULTS = {"fam_wall_rect": "e_GM.PH.VD_Void Demand_Wall_Rect", "fam_wall_round
             "status_param": "e_GEN_Void_Status", "related_id_param": "e_GEN_RelatedElement_ID",
             "related_cat_param": "e_GEN_RelatedElement_Cat",
             "clearance_mm": 25.0, "rounding_mm": 50.0, "merge_mm": 100.0, "extra_depth_mm": 0.0, "layer_gap_mm": 200.0,
-            "min_angle_deg": 15.0,
-            "separate": False, "misaligned": True}
-NUMBER_KEYS = ("clearance_mm", "rounding_mm", "merge_mm", "extra_depth_mm", "layer_gap_mm", "min_angle_deg")
-BOOL_KEYS = ("separate", "misaligned")
-TEXT_KEYS = ("status_param", "related_id_param", "related_cat_param")  # vuoti: tornano al predefinito
+            "separate": False}
+NUMBER_KEYS = ("clearance_mm", "rounding_mm", "merge_mm", "extra_depth_mm", "layer_gap_mm")
+BOOL_KEYS = ("separate",)
+# famiglie e parametri non si scelgono piu' in Settings (decisione del 19.10.2026): i parametri stanno nelle famiglie
+# della libreria aziendale. Restano in DEFAULTS (il codice li legge da ctx.settings) ma non si leggono dalla
+# configurazione: valori salvati da versioni precedenti non contano
+FIXED_KEYS = ("fam_wall_rect", "fam_wall_round", "fam_floor_rect", "fam_floor_round", "status_param",
+              "related_id_param", "related_cat_param")
 FAMILY_KEYS = {("wall", "rect"): "fam_wall_rect", ("wall", "round"): "fam_wall_round",
                ("floor", "rect"): "fam_floor_rect", ("floor", "round"): "fam_floor_round"}
 # famiglie Generic Model NON ospitate, origine al centro, parametri di istanza (condivisi), lunghezza.
@@ -128,7 +128,12 @@ WRITTEN_RANK = {VALID: 0, TO_REFRESH: 1, NOT_ASSOCIATED: 2}
 MOVE_TOL_MM = 5.0
 SIZE_TOL_MM = 1.0
 MM_PER_FT = 304.8
-VERTICAL_SIN = math.sin(math.radians(45.0))   # oltre: elemento MEP verticale, foro a solaio
+# foro a solaio solo per elementi MEP inclinati oltre 85 gradi sull'orizzontale (gli scarichi in pendenza no); oltre
+# la stessa soglia un elemento che attraversa una struttura ha un foro a solaio, sotto un foro a muro
+VERTICAL_SIN = math.sin(math.radians(85.0))
+# un attraversamento di muro o struttura piu' lungo di cosi': l'elemento ci corre dentro (traccia, montante nel
+# muro), nessun foro. Per i muri non c'e' altra soglia d'angolo
+MAX_INSIDE = 1000.0 / MM_PER_FT
 ROUND_COS = 0.995            # tondo solo se l'attraversamento e' (quasi) perpendicolare
 Z = DB.XYZ.BasisZ
 MEP_CLASSES = (Pipe, Duct, CableTray, Conduit)
@@ -175,14 +180,12 @@ def load_settings(config=None):
     try:
         if config is None:
             config = script.get_config(CONFIG_NAME)
-        for key in DEFAULTS:
+        for key in NUMBER_KEYS + BOOL_KEYS:
             value = config.get_option(key, DEFAULTS[key])
             if key in NUMBER_KEYS:
                 value = float(value)
-            elif key in BOOL_KEYS and not isinstance(value, bool):
+            elif not isinstance(value, bool):
                 value = str(value).strip().lower() in ("true", "1", "yes")
-            elif key in TEXT_KEYS:
-                value = str(value or "").strip() or DEFAULTS[key]
             settings[key] = value
     except Exception:
         pass
@@ -340,7 +343,7 @@ def size_text(data):
 def settings_line():
     return ("clearance {clearance_mm:g} mm per side, rounding {rounding_mm:g} mm, merge within {merge_mm:g} mm, "
             "extra depth {extra_depth_mm:g} mm per side, layers joined across gaps up to {layer_gap_mm:g} mm, "
-            "elements under {min_angle_deg:g} degrees to the wall/floor skipped, MEC/ELE {sep}").format(
+            "floors only for elements steeper than 85 degrees, MEC/ELE {sep}").format(
         sep="separate" if ctx.settings["separate"] else "together", **ctx.settings)
 
 

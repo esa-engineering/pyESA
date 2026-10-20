@@ -151,13 +151,12 @@ def check_opening(instance, extra=(), scanned=None):
     diffs = differences(old, new)
     result["notes"].extend(diffs)
     if lost or not all_inside:
-        # elementi ancora dentro o in parte fuori: To Be Refreshed (se attivo in Settings); Not Associated solo se
-        # non ne resta nessuno
+        # elementi ancora dentro o in parte fuori: To Be Refreshed; Not Associated solo se non ne resta nessuno
         present = (ELEMENT_INSIDE, ELEMENT_PARTLY_OUT, ELEMENT_ADDED, ELEMENT_ADDED_OUT)
         kept = [e for e in result["elements"] if e["state"] in present]
-        result["state"] = PARTIAL if kept and ctx.settings["misaligned"] else CHANGED
+        result["state"] = PARTIAL if kept else CHANGED
     elif diffs:
-        result["state"] = MISALIGNED if ctx.settings["misaligned"] else CHANGED
+        result["state"] = MISALIGNED
     return keep_status(result, instance)
 
 

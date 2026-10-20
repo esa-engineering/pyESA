@@ -106,9 +106,10 @@ Terzo pulsante del riepilogo (`OpeningsCheck_summary.xaml`, `ThirdAction`), che 
   con lo UniqueId ("not in this model any more" se mancano o l'Id e' stato riusato). Riepilogo con *Report of*,
   *From*, *Exported by*, *File*.
 - Interactive Report di un report importato: **sola lettura** (`ReportWindow(readonly=True)`, `ImportController`):
-  niente spunte, Recreate, Move, Delete, Refresh. Show / Select: elementi di questo modello per Id; fori come
-  riferimenti nel link Openings, se e' linkato qui (`Selection.SetReferences`, Revit 2023+; il foro si ritrova per
-  UniqueId); zoom anche sul box del foro, portato nelle coordinate di questo modello con l'inverso del transform
+  niente spunte, Recreate, Move, Delete, Refresh. Show seleziona, a scelta (*Select: MEP elements /
+  Openings*), gli elementi di questo modello per Id **oppure** i fori come riferimenti nel link Openings, se e'
+  linkato qui (`Selection.SetReferences`, Revit 2023+; il foro si ritrova per UniqueId). Non insieme: in una
+  selezione mista Revit perdeva gli elementi MEP; zoom anche sul box del foro, portato nelle coordinate di questo modello con l'inverso del transform
   salvato nel report (`models.<modello>.transform`).
 - Last Report nel modello Openings senza un New Report su questo computer: non si ferma piu', mostra tutto il
   modello con gli stati scritti (e l'Export).
@@ -117,7 +118,8 @@ Formato del file in `Openings_NOTE-LINK.md` ("Report JSON").
 
 ## Parametri
 
-Nomi predefiniti; i tre `e_GEN` si possono cambiare in Settings (le misure no).
+Nomi fissi (`DEFAULTS` / `FIXED_KEYS` in `openings_core`): stanno nelle famiglie della libreria aziendale e non si
+cambiano piu' in Settings (decisione del 19.10.2026); valori salvati da versioni precedenti si ignorano.
 
 | Elemento | e_GEN_RelatedElement_ID | e_GEN_RelatedElement_Cat | e_GEN_Void_Status |
 | --- | --- | --- | --- |
@@ -136,17 +138,17 @@ Stati scritti, dal migliore al peggiore:
 | To Be Refreshed | elementi spostati ma ancora dentro il foro (il vecchio Misaligned); foro da dividere o unire secondo Settings; foro con almeno un elemento ancora dentro o in parte fuori (anche se altri sono tolti o usciti) | Misaligned, Regroup, Partial |
 | Not Associated | elementi tolti o usciti e nessuno rimasto dentro o in parte fuori; foro senza elementi; elemento MEP senza piu' fori | Changed, Obsolete |
 
-Se un foro ha elementi ancora dentro o in parte fuori vale To Be Refreshed (Partial; se To Be Refreshed e' spento
-in Settings, Not Associated), anche con altri elementi tolti o usciti. Not Associated solo se non ne resta
+Se un foro ha elementi ancora dentro o in parte fuori vale To Be Refreshed (Partial), anche con altri elementi tolti
+o usciti (l'opzione per spegnere To Be Refreshed e' stata tolta il 19.10.2026). Not Associated solo se non ne resta
 nessuno. I fori Partial non entrano nelle unioni, come i Changed. Split e Joined
 non esistono piu': un foro ricreato (anche diviso o unito) e' Valid. Lo stato interno serve solo al New Report e al
 dettaglio del report; nel modello va solo lo stato scritto (`WRITTEN`).
 
-Un foro e' "gestito" se ha lo stato compilato, qualunque sia la famiglia: si possono cambiare le famiglie in
-Settings senza perdere i fori gia' posati. Rinominando il parametro di stato, invece, i fori posati con il nome
-vecchio non vengono piu' trovati.
+Un foro e' "gestito" se ha lo stato compilato, qualunque sia la famiglia: i fori posati con famiglie scelte in
+versioni precedenti restano gestiti.
 
-Famiglie predefinite (Generic Model non ospitate, origine al centro, parametri di istanza condivisi):
+Famiglie (fisse; Settings dice solo se sono caricate. Generic Model non ospitate, origine al centro, parametri di
+istanza condivisi):
 
 - `e_GM.PH.VD_Void Demand_Wall_Rect`: X `e_DIM_Width_1`, Y `e_DIM_Depth_1`, Z `e_DIM_Height_1`
 - `e_GM.PH.VD_Void Demand_Wall_Circ`: cilindro lungo X, `e_DIM_Diameter_1`, lunghezza `e_DIM_Width_1`
@@ -161,25 +163,26 @@ Le famiglie rettangolari non sono centrate in Z: il solido poggia sul livello di
 inserimento e' il centro della faccia inferiore. `BASE_PARAMS` dice quale parametro misura la famiglia lungo Z
 (muro: Height, solaio: Depth): Place inserisce il foro meta' di quella misura sotto il centro dell'attraversamento,
 il New Report (`opening_center()`) ricava il centro alzando il punto di inserimento della stessa quantita'. Le
-circolari restano centrate sull'origine. Una famiglia scelta in Settings deve seguire gli
-stessi assi e gli stessi nomi di parametro.
+circolari restano centrate sull'origine.
 
 ## Settings (per utente)
 
-Famiglie dei quattro casi; nomi dei tre parametri `e_GEN` (vuoto = predefinito); franco per lato (25 mm),
-arrotondamento per eccesso (50 mm; una misura entro 0,5 mm sopra un multiplo resta su quel multiplo, `ROUND_TOL_MM`:
-il rumore numerico faceva saltare un passo in modo diverso tra Place e New Report), accorpamento entro (100 mm), sporgenza oltre ogni faccia (0 mm); MEC ed ELE
-separati (no); stato To Be Refreshed nel New Report (si'; spento, ogni spostamento rende il foro Not Associated).
+Franco per lato (25 mm), arrotondamento per eccesso (50 mm; una misura entro 0,5 mm sopra un multiplo resta su quel
+multiplo, `ROUND_TOL_MM`: il rumore numerico faceva saltare un passo in modo diverso tra Place e New Report),
+accorpamento entro (100 mm), sporgenza oltre ogni faccia (0 mm), intercapedine tra strati (200 mm); MEC ed ELE
+separati (no). Le quattro famiglie si mostrano con caricata / non caricata. Tolti il 19.10.2026: scelta delle
+famiglie, nomi dei parametri, angolo minimo, opzione To Be Refreshed (sempre attiva).
 
 ## Place
 
 1. `PickObjects(PointOnElement)`: muri e solai, host o link.
 2. Solidi dell'elemento in coordinate host, MEP rettilinei vicini (bounding box), intersezione asse/solido
    (`IntersectWithCurve`): ogni segmento interno e' un attraversamento.
-3. Muro: normale nel punto (vale anche per muri curvi). Solaio: verticale. Elemento MEP quasi parallelo (sotto
-   l'angolo minimo di Settings, default 15 gradi = pendenza 27%): corre dentro, nessun foro. Esclude scarichi
-   a pavimento e montanti dentro i muri. Nel New Report la stessa soglia rende Not Associated un elemento ruotato fino a
-   correre dentro.
+3. Muro: normale nel punto (vale anche per muri curvi). Solaio: verticale. **Solai**: foro solo per elementi
+   inclinati oltre 85 gradi sull'orizzontale (`VERTICAL_SIN`): niente scarichi in pendenza. **Muri e strutture**:
+   qualunque inclinazione; un attraversamento lungo oltre 1 m (`MAX_INSIDE`) e' un elemento che ci corre dentro
+   (traccia, montante), nessun foro. Nel New Report (`recross()`) le stesse regole rendono "no longer crosses" un
+   elemento ruotato: a solaio sotto 85 gradi, a muro se attraversa il foro per oltre profondita' + 1 m.
 4. Sezione esterna con isolamento, dai solidi di elemento e isolamento sugli assi del connettore (vale per
    canali ruotati e passerelle di costa). La sezione all'ingresso e all'uscita, proiettata sul piano del foro,
    da' l'ingombro anche per gli attraversamenti obliqui.
@@ -216,7 +219,11 @@ of* con la data, nel Last Report) e due schede grandi:
   Excel installato): foglio *Report* (una riga per elemento, foro ripetuto, filtro automatico) e foglio *Summary*;
   file aperto in Excel -> messaggio. Non tocca il modello: niente ExternalEvent.
 - **Interactive Report** (`OpeningsCheck_report.xaml`): albero stato -> foro -> elementi, ricerca, dettaglio del
-  nodo scelto. *Show in model* / *Select and close* sul nodo scelto (un foro con i suoi elementi, un gruppo intero);
+  nodo scelto. *Show in model* sul nodo scelto (un foro con i suoi elementi, un gruppo intero); *Find selection in
+  list* fa il contrario: si selezionano fori o elementi MEP nel modello (anche di un link, o fori nel link Openings
+  nei report importati: `ReportController.selected()` legge `GetElementIds()` e i `Reference`) e il clic porta la
+  lista sulla voce, aprendo gruppo e foro (`_matches()`, `_show_found()`); con piu' voci, un clic per la successiva.
+  Se la ricerca la nasconde, si svuota;
   *Create / Recreate*, *Move onto their elements* e *Delete (Not Associated)* sui fori spuntati (Delete solo sui Not
   Associated: conferma con l'elenco, una transazione, le righe dei fori cancellati spariscono). Prima e dopo ogni
   azione si ricontrollano **solo i fori toccati** (`CheckSession.run_partial()`), si riscrive e l'albero si aggiorna
@@ -329,8 +336,7 @@ restano piano e profondita' attuali. Per ogni foro gestito, con gli Id di `e_GEN
 - elemento sparito, non piu' attraversante, o uscito oltre meta' foro + accorpamento, oppure sezione (con
   isolamento) non piu' tutta dentro il foro: Partial (**To Be Refreshed**) se resta almeno un elemento dentro o in
   parte fuori; altrimenti Changed (**Not Associated**);
-- tutti dentro ma il foro ideale si e' spostato (5 mm) o ha altre misure (1 mm): Misaligned (**To Be Refreshed**; Not
-  Associated se l'opzione e' spenta);
+- tutti dentro ma il foro ideale si e' spostato (5 mm) o ha altre misure (1 mm): Misaligned (**To Be Refreshed**);
 - nessun elemento rimasto: Obsolete (**Not Associated**; il foro resta, non si ricrea).
 
 Si ricreano dalla finestra del report i fori spuntati Not Associated o To Be Refreshed con elementi ancora
@@ -423,7 +429,7 @@ Gli elementi MEP che escono dall'area contano, ma solo per gli attraversamenti d
   si vede perche') o *Nothing to do* (selezione senza elementi utili). Openings non apre piu' il pannello di output.
 - `OpeningsPlace_ui.py` si importa dentro `place_main()`: New Report e Last Report non lo caricano.
 - **Strutture** (anche nella modalita' normale e nell'ambito del New Report): foro a solaio per elementi MEP verticali
-  (oltre 45 gradi), a muro per gli altri, con asse perpendicolare alla trave o, per i pilastri, lungo l'elemento MEP;
+  (oltre 85 gradi), a muro per gli altri, con asse perpendicolare alla trave o, per i pilastri, lungo l'elemento MEP;
   un attraversamento piu' lungo di 1 m e' scartato (l'elemento ci corre dentro). Niente allungamento per strati.
 
 ## Elementi sovrapposti (trave nel muro, pilastro nel muro...)

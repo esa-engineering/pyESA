@@ -1,8 +1,5 @@
 title: Settings
 tooltip: >-
-  Settings of Openings Place and Check&Report, saved per user: the four families (wall / floor, rectangular / round,
-  chosen among the Generic Models of the model or typed), the status / related Ids / related categories parameters
-  (default e_GEN_Void_Status, e_GEN_RelatedElement_ID, e_GEN_RelatedElement_Cat), clearance per side, rounding, merge
-  distance, extra depth beyond each face, separate MEC (pipes, ducts) and ELE (cable trays, conduits) openings, To Be
-  Refreshed status in Check&Report.
+  Settings of Openings, saved per user: clearance, rounding, merge distance, extra depth, layers joined across a gap,
+  separate MEC and ELE openings. Shows whether the four opening families are loaded.
 author: Matteo Maiorano

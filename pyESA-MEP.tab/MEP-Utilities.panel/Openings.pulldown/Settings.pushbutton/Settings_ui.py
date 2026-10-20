@@ -1,26 +1,21 @@
 # -*- coding: utf-8 -*-
-import math
-
 import clr
 clr.AddReference("PresentationFramework")
 clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
 from System.IO import File
-from System.Windows import MessageBox
+from System.Windows import FontWeights, GridLength, GridUnitType, MessageBox, TextWrapping, Thickness, \
+    VerticalAlignment
+from System.Windows.Controls import ColumnDefinition, Grid, TextBlock
 from System.Windows.Markup import XamlReader
+from System.Windows.Media import Brushes
 
-FAMILY_CONTROLS = (("fam_wall_rect", "FamWallRect"), ("fam_wall_round", "FamWallRound"),
-                   ("fam_floor_rect", "FamFloorRect"), ("fam_floor_round", "FamFloorRound"))
-PARAM_CONTROLS = (("status_param", "StatusParamBox", "Status"), ("related_id_param", "RelatedIdParamBox",
-                                                                  "Related element Ids"),
-                  ("related_cat_param", "RelatedCatParamBox", "Related element categories"))
 NUMBER_CONTROLS = (("clearance_mm", "ClearanceBox", "Clearance per side"), ("rounding_mm", "RoundingBox", "Round up to"),
                    ("merge_mm", "MergeBox", "Merge within"), ("extra_depth_mm", "ExtraDepthBox",
                                                               "Extra depth per side"),
-                   ("layer_gap_mm", "LayerGapBox", "Join layers across"),
-                   ("min_angle_deg", "MinAngleBox", "Minimum angle"))
-MAX_ANGLE = 89.0
+                   ("layer_gap_mm", "LayerGapBox", "Join layers across"))
+LOADED, NOT_LOADED = u"✔ loaded", u"✖ not loaded"
 
 
 def parse_number(text):
@@ -32,87 +27,68 @@ def parse_number(text):
 
 
 class SettingsWindow(object):
-    """Impostazioni di Openings: famiglie (scelte tra i Generic Model caricati, o scritte), misure, opzioni.
+    """Impostazioni di Openings: famiglie (fisse, solo se caricate), misure, MEC/ELE separati.
+    families: [(caso, nome della famiglia, caricata: True / False / None senza modello aperto)].
     show() ritorna il dict aggiornato, o None se annullata."""
 
-    def __init__(self, xaml_path, settings, defaults, family_names, params_text):
+    def __init__(self, xaml_path, settings, families):
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
         self.settings = dict(settings)
-        self.defaults = defaults
         find = self.window.FindName
-        self.combos = {}
-        for key, control in FAMILY_CONTROLS:
-            combo = find(control)
-            for name in family_names:
-                combo.Items.Add(name)
-            combo.Text = settings[key]
-            self.combos[key] = combo
-        self.param_boxes = {}
-        for key, control, _ in PARAM_CONTROLS:
-            box = find(control)
-            box.Text = settings[key]
-            self.param_boxes[key] = box
+        rows = find("FamilyRows")
+        for case, name, loaded in families:
+            rows.Children.Add(self._family_row(case, name, loaded))
+        missing = [f for f in families if f[2] is False]
+        if any(f[2] is None for f in families):
+            hint = "No model open: open a model to check the families."
+        elif missing:
+            hint = "Load the missing families from the company library: Place&Check needs all four."
+        else:
+            hint = "All four families are loaded."
+        find("FamilyHint").Text = hint
         self.boxes = {}
         for key, control, _ in NUMBER_CONTROLS:
             box = find(control)
             box.Text = "{:g}".format(settings[key])
             self.boxes[key] = box
-        self.slope_text = find("MinAngleSlope")
-        self.boxes["min_angle_deg"].TextChanged += self._on_angle
-        self._on_angle(None, None)
         self.separate = find("SeparateCheck")
         self.separate.IsChecked = bool(settings["separate"])
-        self.misaligned = find("MisalignedCheck")
-        self.misaligned.IsChecked = bool(settings["misaligned"])
-        find("FamilyHint").Text = ("Generic Model families loaded in this model are listed; a name can also be "
-                                   "typed. Not hosted, origin at the centre, size parameters by instance.")
-        find("ParamsInfo").Text = params_text
-        find("DefaultsButton").Click += self._on_defaults
-        find("DefaultParamsButton").Click += self._on_default_params
         find("OkButton").Click += self._on_ok
         self.result = None
 
-    def _on_angle(self, sender, args):
-        """Accanto all'angolo, la pendenza equivalente in percentuale."""
-        ok, angle = parse_number(self.boxes["min_angle_deg"].Text)
-        if ok and 0 <= angle <= MAX_ANGLE:
-            self.slope_text.Text = "degrees (= {:.0f}% slope)".format(math.tan(math.radians(angle)) * 100.0)
-        else:
-            self.slope_text.Text = "degrees (0 to {:g})".format(MAX_ANGLE)
-
-    def _on_defaults(self, sender, args):
-        for key, combo in self.combos.items():
-            combo.Text = self.defaults[key]
-
-    def _on_default_params(self, sender, args):
-        for key, box in self.param_boxes.items():
-            box.Text = self.defaults[key]
+    def _family_row(self, case, name, loaded):
+        """Riga: caso (muro, rettangolare...), nome della famiglia, caricata / non caricata."""
+        grid = Grid()
+        grid.Margin = Thickness(0, 3, 0, 3)
+        for width in (GridLength(130), GridLength(1, GridUnitType.Star), GridLength(90)):
+            column = ColumnDefinition()
+            column.Width = width
+            grid.ColumnDefinitions.Add(column)
+        cells = [(case, None), (name, Brushes.Gray), (
+            "-" if loaded is None else (LOADED if loaded else NOT_LOADED),
+            Brushes.Gray if loaded is None else (Brushes.Green if loaded else Brushes.Firebrick))]
+        for index, (text, brush) in enumerate(cells):
+            block = TextBlock()
+            block.Text = text
+            block.VerticalAlignment = VerticalAlignment.Center
+            block.TextWrapping = TextWrapping.Wrap
+            if brush is not None:
+                block.Foreground = brush
+            if index == 2:
+                block.FontWeight = FontWeights.Bold
+            Grid.SetColumn(block, index)
+            grid.Children.Add(block)
+        return grid
 
     def _validate(self):
         """(ok, messaggio, valori): tutti i campi insieme."""
         values = {}
-        for key, combo in self.combos.items():
-            name = (combo.Text or "").strip()
-            if not name:
-                return False, "Choose a family for every case.", None
-            values[key] = name
-        for key, _, label in PARAM_CONTROLS:
-            name = (self.param_boxes[key].Text or "").strip()
-            if not name:
-                return False, "{} parameter: enter a name.".format(label), None
-            values[key] = name
-        if len(set(values[key] for key, _, _ in PARAM_CONTROLS)) < len(PARAM_CONTROLS):
-            return False, "The status, related Ids and related categories parameters must be three different " \
-                          "parameters.", None
         for key, _, label in NUMBER_CONTROLS:
             ok, number = parse_number(self.boxes[key].Text)
             if not ok or number < 0:
                 return False, "{}: enter a number of 0 or more.".format(label), None
-            if key == "min_angle_deg" and number > MAX_ANGLE:
-                return False, "Minimum angle: enter a number from 0 to {:g} degrees.".format(MAX_ANGLE), None
             values[key] = number
         values["separate"] = bool(self.separate.IsChecked)
-        values["misaligned"] = bool(self.misaligned.IsChecked)
         return True, "", values
 
     def _on_ok(self, sender, args):
