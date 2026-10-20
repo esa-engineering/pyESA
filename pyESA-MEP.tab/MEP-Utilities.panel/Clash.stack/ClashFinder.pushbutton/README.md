@@ -50,7 +50,8 @@ Una sola pagina:
 - a sinistra la libreria: un clic carica il test nell'editor (sotto il nome, in grigio,
   le sorgenti di A e B: `describe_scope()`); *New* (chiede il nome nella finestra di
   salvataggio e aggiunge subito alla libreria un test vuoto: nessuna categoria, link o filtro,
-  A e B dalla selezione corrente; le opzioni restano attive), *Delete*, *Import JSON*, *Export JSON* (tutta la libreria);
+  A e B dalla selezione corrente; le opzioni restano attive), *▲* / *▼* (sposta il test
+  selezionato; l'ordine si salva subito nella libreria e vale anche per Quick Clash), *Delete*, *Import JSON*, *Export JSON* (tutta la libreria);
 - a destra l'editor (il nome del test caricato sta nel titolo della finestra, con `*` se
   modificato): le colonne **Set A** e **Set B** con la sorgente nel modello aperto sulla riga del titolo, i link, le
   categorie (conteggio in una colonna a destra), i filtri di vista (con ricerca per nome) e
@@ -74,6 +75,16 @@ queste ultime all'uscita dal campo) ricalcola i conteggi via bridge (`ce.summari
 riapertura.
 
 ## Ricerca delle interferenze
+
+**Fasi.** Ogni sorgente (selezione, vista attiva, intero modello, link) passa dalla fase e dal
+filtro di fase della **vista attiva** (`ce.PhaseScope`, in `SetResolver`): un elemento entra
+se il filtro della vista lo mostra (`PhaseFilter.GetPhaseStatusPresentation` diverso da
+`DontShow`); con filtro `<none>` entrano tutti tranne gli stati *Past* e *Future*; gli
+elementi senza fasi entrano sempre. Nei link si usa la fase con lo **stesso nome** (senza
+distinzione di maiuscole): un link che non ce l'ha resta fuori, con una nota. Se la vista
+attiva non ha i parametri Phase / Phase Filter (tavola, abaco, legenda...) Run e il Refresh
+del report sono bloccati con un messaggio; il riepilogo lo segnala in rosso. Fase e filtro
+usati sono nella riga di stato, nell'intestazione del report e nel file (`"phase"`).
 
 Stesso criterio dell'Interference Check: intersezione dei solidi. Ogni elemento e' un `Item`
 con la sua `ModelSource` (documento, istanza e trasformazione del link). Per ogni elemento
@@ -130,7 +141,16 @@ Un clic su una riga (gruppo, interferenza o elemento), via bridge e in una sola 
   chiusura anomala di Revit; la clash detection li ignora (`cr.is_model_element`). Un
   elemento che non si riesce a copiare (nessun solido valido) e' segnalato e, con
   l'isolamento, si isola l'istanza del link intera. Le copie seguono la visibilita' di
-  Generic Models nella vista. *Hide overlay* / *Show overlay* (`overlay_on`, attivo
+  Generic Models nella vista. In un modello condiviso il workset delle copie si sceglie in
+  fondo alla finestra di Clash Finder (sezione OPTIONS, *Workset for the copies of linked
+  elements*), per modello e non nel test (config `ESA_ClashFinder` / `preview_worksets`,
+  voci `"<model_key>::<scelta>"`; `ce.preview_workset_choice`):
+  - **Active workset** (default): dove Revit mette i nuovi elementi. Nessun workset viene
+    creato dallo strumento; una vecchia scelta del workset dedicato (voce vuota) vale come
+    workset attivo;
+  - **un workset esistente**, per nome: la sua visibilita' non viene toccata (cambierebbe
+    anche gli elementi veri); se e' nascosto nella vista attiva c'e' una nota, se non esiste
+    piu' le copie restano nel workset attivo. *Hide overlay* / *Show overlay* (`overlay_on`, attivo
   all'apertura) spegne colori e copie insieme: i colori tornano all'originale, le copie
   vengono cancellate, la navigazione resta (section box, isolamento del link intero, zoom
   sul box di tutti gli elementi della riga);
@@ -206,9 +226,25 @@ coppia piu' vicina della diagnostica non viene salvata.
 
 | Dato | Dove |
 | --- | --- |
-| Libreria test | `pyRevit_ESA_ClashFinder_tests.json` nella cartella dati di pyRevit (`%APPDATA%\pyRevit`), creata al primo salvataggio; alla prima apertura propone tre test di esempio |
+| Libreria test | `pyRevit_ESA_ClashFinder_tests.json` nella cartella dati di pyRevit (`%APPDATA%\pyRevit`), creata al primo salvataggio; alla prima apertura contiene i test predefiniti (`cr.DEFAULT_TESTS`), vedi sotto |
 | Import / export | stesso formato: `{"format": "ESA_ClashFinder_Tests", "version": 1, "tests": [...]}`; si accettano anche una lista di test o un test singolo |
 | Impostazioni utente | `script.get_config('ESA_ClashFinder')`: `last_test` (test caricato alla riapertura). Sorgenti e link stanno nei test; il report non ha opzioni |
+
+### Test predefiniti
+
+| Test | Set A | Set B | Sorgente (A e B) |
+| --- | --- | --- | --- |
+| All vs All | tutte le categorie | tutte le categorie | Current selection |
+| Pipes vs Ducts | tubi, raccordi, accessori, tubi flessibili | canali, raccordi, accessori, canali flessibili | Current selection |
+| Mec vs Generic Models | distribuzione meccanica + terminali aria, apparecchiature meccaniche, apparecchi sanitari, sprinkler | Generic Models | Whole model |
+| Mec vs Ele | distribuzione meccanica (canali e tubi con raccordi, accessori, flessibili) | passerelle, tubi protettivi e loro raccordi | Current selection |
+| Equipments vs Distribution | apparecchiature meccaniche ed elettriche | distribuzione meccanica ed elettrica | Whole model |
+
+Tutti con *Ignore connected* e *Ignore an element and its host* attivi. In una libreria gia'
+esistente i predefiniti mancanti (per nome) si aggiungono una volta sola per
+`DEFAULTS_VERSION` (config `ESA_ClashFinder` / `defaults_version`, `cr.pending_defaults`):
+un test con lo stesso nome non viene toccato e un predefinito cancellato non torna, finche'
+la versione non sale.
 
 ## Quick Clash
 

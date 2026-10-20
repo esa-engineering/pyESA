@@ -79,26 +79,35 @@ PSEUDO_FIELDS = (FIELD_FAMILY, FIELD_TYPE, FIELD_WORKSET)
 
 NUMBER_PATTERN = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 
-# Libreria iniziale, creata solo se il file non esiste ancora.
-STRUCTURE = ["OST_Walls", "OST_Floors", "OST_StructuralFraming",
-             "OST_StructuralColumns", "OST_Roofs", "OST_Ceilings"]
+# Test predefiniti: la libreria iniziale e, una volta per DEFAULTS_VERSION, quelli che
+# mancano (per nome) in una libreria gia' esistente (pending_defaults).
+DEFAULTS_VERSION = 2
+CONFIG_SECTION = "ESA_ClashFinder"
+
+DUCTS = ["OST_DuctCurves", "OST_DuctFitting", "OST_DuctAccessory", "OST_FlexDuctCurves"]
+PIPES = ["OST_PipeCurves", "OST_PipeFitting", "OST_PipeAccessory", "OST_FlexPipeCurves"]
+MEC_DISTRIBUTION = DUCTS + PIPES
+MEC_ALL = MEC_DISTRIBUTION + ["OST_DuctTerminal", "OST_MechanicalEquipment",
+                              "OST_PlumbingFixtures", "OST_Sprinklers"]
+ELE_DISTRIBUTION = ["OST_CableTray", "OST_CableTrayFitting", "OST_Conduit",
+                    "OST_ConduitFitting"]
+EQUIPMENT = ["OST_MechanicalEquipment", "OST_ElectricalEquipment"]
+
+
+def _default(name, cats_a, cats_b, source):
+    return {"name": name,
+            "set_a": {"source": source, "categories": cats_a, "match": MATCH_ALL, "rules": []},
+            "set_b": {"source": source, "categories": cats_b, "match": MATCH_ALL, "rules": []},
+            "ignore_connected": True, "ignore_hosted": True}
+
+
 DEFAULT_TESTS = [
-    {"name": "Ducts vs Structure",
-     "set_a": {"categories": ["OST_DuctCurves", "OST_DuctFitting", "OST_DuctAccessory",
-                              "OST_FlexDuctCurves"], "match": MATCH_ALL, "rules": []},
-     "set_b": {"categories": STRUCTURE, "match": MATCH_ALL, "rules": []},
-     "ignore_connected": True, "ignore_hosted": True},
-    {"name": "Pipes vs Structure",
-     "set_a": {"categories": ["OST_PipeCurves", "OST_PipeFitting", "OST_PipeAccessory",
-                              "OST_FlexPipeCurves"], "match": MATCH_ALL, "rules": []},
-     "set_b": {"categories": STRUCTURE, "match": MATCH_ALL, "rules": []},
-     "ignore_connected": True, "ignore_hosted": True},
-    {"name": "Ducts vs Pipes",
-     "set_a": {"categories": ["OST_DuctCurves", "OST_DuctFitting"], "match": MATCH_ALL,
-               "rules": []},
-     "set_b": {"categories": ["OST_PipeCurves", "OST_PipeFitting"], "match": MATCH_ALL,
-               "rules": []},
-     "ignore_connected": True, "ignore_hosted": True},
+    _default("All vs All", [], [], SOURCE_SELECTION),
+    _default("Pipes vs Ducts", PIPES, DUCTS, SOURCE_SELECTION),
+    _default("Mec vs Generic Models", MEC_ALL, ["OST_GenericModel"], SOURCE_MODEL),
+    _default("Mec vs Ele", MEC_DISTRIBUTION, ELE_DISTRIBUTION, SOURCE_SELECTION),
+    _default("Equipments vs Distribution", EQUIPMENT, MEC_DISTRIBUTION + ELE_DISTRIBUTION,
+             SOURCE_MODEL),
 ]
 
 
@@ -372,11 +381,35 @@ def load_library():
     """Test della libreria personale; alla prima apertura quelli di DEFAULT_TESTS."""
     path = library_path()
     if not os.path.exists(path):
+        _set_defaults_version()
         return [normalize_test(t) for t in DEFAULT_TESTS]
     try:
         return read_tests_file(path)
     except Exception:
         return []
+
+
+def _set_defaults_version():
+    try:
+        cfg = script.get_config(CONFIG_SECTION)
+        cfg.defaults_version = DEFAULTS_VERSION
+        script.save_config()
+    except Exception:
+        pass
+
+
+def pending_defaults(tests):
+    """Test predefiniti da aggiungere a una libreria esistente: quelli che mancano per
+    nome, una sola volta per DEFAULTS_VERSION (un predefinito cancellato non torna)."""
+    try:
+        done = int(script.get_config(CONFIG_SECTION).get_option("defaults_version", 1) or 1)
+    except Exception:
+        return []
+    if done >= DEFAULTS_VERSION:
+        return []
+    _set_defaults_version()
+    names = set(t["name"].lower() for t in tests)
+    return [normalize_test(t) for t in DEFAULT_TESTS if t["name"].lower() not in names]
 
 
 def save_library(tests):

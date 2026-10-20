@@ -324,6 +324,98 @@ def view_usable(view):
         return False
 
 
+# Stati di fase senza filtro: None = elemento senza fasi (sempre preso); Past e Future
+# (demolito prima, costruito dopo) non esistono nella fase della vista.
+_PHASE_NONE = getattr(DB.ElementOnPhaseStatus, "None")
+_PHASE_OUTSIDE = (DB.ElementOnPhaseStatus.Past, DB.ElementOnPhaseStatus.Future)
+
+
+def phase_problem(view):
+    """Messaggio se la vista non ha fase / filtro di fase, altrimenti None."""
+    return PhaseScope(None, view).problem
+
+
+class PhaseScope(object):
+    """Fase e filtro di fase della vista attiva, applicati a ogni sorgente.
+
+    Un elemento entra se il filtro della vista lo mostra (PhaseStatusPresentation diversa
+    da DontShow); filtro "<none>": tutti tranne Past e Future. Nei link si usa la fase con
+    lo stesso nome; un link senza quella fase resta fuori (missing_links).
+    """
+
+    def __init__(self, doc, view):
+        self.phase = None
+        self.phase_filter = None
+        self.problem = None
+        self.missing_links = []
+        self._link_phases = {}
+        phase_param = filter_param = None
+        try:
+            if view is not None:
+                phase_param = view.get_Parameter(DB.BuiltInParameter.VIEW_PHASE)
+                filter_param = view.get_Parameter(DB.BuiltInParameter.VIEW_PHASE_FILTER)
+        except Exception:
+            phase_param = filter_param = None
+        view_doc = doc if doc is not None else (view.Document if view is not None else None)
+        if phase_param is not None and view_doc is not None:
+            self.phase = view_doc.GetElement(phase_param.AsElementId())
+        if filter_param is not None and view_doc is not None:
+            # "<none>" e' un valore valido: nessun filtro.
+            self.phase_filter = view_doc.GetElement(filter_param.AsElementId())
+        if not isinstance(self.phase, DB.Phase) or filter_param is None:
+            self.phase = None
+            self.problem = (u"The active view has no Phase / Phase Filter. Clash detection "
+                            u"uses the phase of the active view: activate a model view "
+                            u"(plan, section, elevation or 3D) and try again.")
+
+    def describe(self):
+        if self.problem:
+            return u"No phase: the active view has no Phase / Phase Filter."
+        name = DB.Element.Name.GetValue(self.phase)
+        filter_name = (DB.Element.Name.GetValue(self.phase_filter)
+                       if isinstance(self.phase_filter, DB.PhaseFilter) else u"<none>")
+        return u"Phase {}, phase filter {}.".format(name, filter_name)
+
+    def host_phase_id(self):
+        return self.phase.Id if self.phase is not None else None
+
+    def link_phase_id(self, link):
+        """Fase del link con il nome di quella della vista, o None."""
+        if self.phase is None:
+            return None
+        if link.key not in self._link_phases:
+            wanted = DB.Element.Name.GetValue(self.phase).lower()
+            found = None
+            try:
+                for phase in link.doc.Phases:
+                    if DB.Element.Name.GetValue(phase).lower() == wanted:
+                        found = phase.Id
+                        break
+            except Exception:
+                found = None
+            self._link_phases[link.key] = found
+            if found is None:
+                self.missing_links.append(link.label)
+        return self._link_phases[link.key]
+
+    def passes(self, element, phase_id):
+        try:
+            status = element.GetPhaseStatus(phase_id)
+        except Exception:
+            return True
+        if status == _PHASE_NONE:
+            return True
+        if status in _PHASE_OUTSIDE:
+            return False
+        if not isinstance(self.phase_filter, DB.PhaseFilter):
+            return True
+        try:
+            return (self.phase_filter.GetPhaseStatusPresentation(status)
+                    != DB.PhaseStatusPresentation.DontShow)
+        except Exception:
+            return True
+
+
 class SetResolver(object):
     """Risolve gli insiemi dei test sulle sorgenti scelte.
 
@@ -342,6 +434,9 @@ class SetResolver(object):
         self._loaded = None
         self._loaded_ids = loaded_ids or []
         self.view_link_fallback = False
+        # Fase della vista attiva per tutte le sorgenti. Senza fase (problem) gli insiemi
+        # non vengono filtrati: il run e' bloccato prima, il riepilogo lo segnala.
+        self.phases = PhaseScope(doc, view)
 
     def loaded_elements(self):
         if self._loaded is None:
@@ -357,6 +452,13 @@ class SetResolver(object):
         return view_usable(self.view)
 
     def resolve_host(self, compiled, source):
+        elements = self._resolve_host(compiled, source)
+        phase_id = self.phases.host_phase_id()
+        if phase_id is None:
+            return elements
+        return [e for e in elements if self.phases.passes(e, phase_id)]
+
+    def _resolve_host(self, compiled, source):
         if source == SOURCE_NONE:
             return []
         if source == SOURCE_SELECTION:
@@ -370,6 +472,11 @@ class SetResolver(object):
     def resolve_link(self, compiled, link, in_view):
         if compiled.impossible:
             return []
+        phase_id = None
+        if self.phases.phase is not None:
+            phase_id = self.phases.link_phase_id(link)
+            if phase_id is None:
+                return []
         collector = None
         if in_view and self.view_usable():
             try:
@@ -384,7 +491,8 @@ class SetResolver(object):
             category_filter = compiled.category_filter()
             if category_filter is not None:
                 collector = collector.WherePasses(category_filter)
-            return [e for e in collector if compiled.matches(e, link.doc)]
+            return [e for e in collector if compiled.matches(e, link.doc)
+                    and (phase_id is None or self.phases.passes(e, phase_id))]
         finally:
             collector.Dispose()
 
@@ -593,6 +701,8 @@ class RunResult(object):
         # Id della selezione di Revit usata dal run (sorgente "Current selection"):
         # il Refresh del report rifa' il test sugli stessi elementi.
         self.selection_ids = []
+        # Fase e filtro di fase della vista usata ("Phase X, phase filter Y.").
+        self.phase_text = u""
 
     @property
     def clash_count(self):
@@ -799,6 +909,8 @@ class Summary(object):
         self.host = {"a": 0, "b": 0}
         self.linked = {"a": 0, "b": 0}
         self.notes = []
+        self.phase_text = u""
+        self.phase_problem = None
 
 
 def _category_name(element):
@@ -842,6 +954,8 @@ def summarize(doc, tests, loaded_ids, view, links):
         # Prima il modello aperto, poi i link; dentro, categorie in ordine alfabetico.
         for key in sorted(counts, key=lambda k: (k[0], k[2].lower())):
             summary.rows[side].append((key[1], key[2], counts[key]))
+    summary.phase_text = resolver.phases.describe()
+    summary.phase_problem = resolver.phases.problem
     return summary
 
 
@@ -849,6 +963,9 @@ def set_note(set_a, set_b, count_a, count_b, resolver, scope):
     notes = []
     if SOURCE_VIEW in (scope.source_a, scope.source_b) and not resolver.view_usable():
         notes.append(u"The active view is not a model view")
+    if resolver.phases.missing_links:
+        notes.append(u"Links without a phase named like the active view's, left out: "
+                     u"{}".format(u", ".join(resolver.phases.missing_links)))
     if resolver.view_link_fallback:
         notes.append(u"Linked elements taken from the whole link (needs Revit 2024+ "
                      u"to limit them to the view)")
@@ -905,6 +1022,7 @@ def run_tests(doc, tests, loaded_ids, view, links, progress=None):
     except ClashCancelled:
         result.cancelled = True
     result.seconds = time.time() - started
+    result.phase_text = resolver.phases.describe()
     return result
 
 
@@ -1059,36 +1177,74 @@ def model_key(doc):
     return doc.PathName or doc.Title
 
 
-def _folder_entries():
+def _model_entries(option):
+    """Voci "<model_key>::<valore>" di un'opzione per modello della config."""
     from pyrevit import script
     try:
-        raw = script.get_config(CONFIG_SECTION).get_option(REPORT_FOLDERS_KEY, []) or []
+        raw = script.get_config(CONFIG_SECTION).get_option(option, []) or []
     except Exception:
         return []
     return [cr.text(entry) for entry in raw if u"::" in cr.text(entry)]
 
 
-def report_folder(doc):
-    """Cartella dei report scelta per il modello, o None."""
+def _model_value(doc, option):
     key = model_key(doc)
-    for entry in _folder_entries():
-        entry_key, _, folder = entry.partition(u"::")
-        if entry_key == key and folder:
-            return folder
+    for entry in _model_entries(option):
+        entry_key, _, value = entry.partition(u"::")
+        if entry_key == key:
+            return value
     return None
 
 
-def set_report_folder(doc, folder):
+def _set_model_value(doc, option, value):
+    """Il modello va in cima; al massimo MAX_REPORT_FOLDERS voci."""
     from pyrevit import script
     key = model_key(doc)
-    entries = [e for e in _folder_entries() if e.partition(u"::")[0] != key]
-    entries.insert(0, u"{}::{}".format(key, folder))
+    entries = [e for e in _model_entries(option) if e.partition(u"::")[0] != key]
+    entries.insert(0, u"{}::{}".format(key, value))
     try:
         cfg = script.get_config(CONFIG_SECTION)
-        cfg.set_option(REPORT_FOLDERS_KEY, entries[:MAX_REPORT_FOLDERS])
+        cfg.set_option(option, entries[:MAX_REPORT_FOLDERS])
         script.save_config()
     except Exception:
         pass
+
+
+def report_folder(doc):
+    """Cartella dei report scelta per il modello, o None."""
+    return _model_value(doc, REPORT_FOLDERS_KEY) or None
+
+
+def set_report_folder(doc, folder):
+    _set_model_value(doc, REPORT_FOLDERS_KEY, folder)
+
+
+# Workset delle copie dei linkati nei modelli condivisi, per modello: quello attivo
+# (default) o un workset esistente, per nome.
+PREVIEW_WORKSETS_KEY = "preview_worksets"
+WORKSET_ACTIVE = u"<active>"
+
+
+def preview_workset_choice(doc):
+    # Vuoto: la voce del vecchio workset dedicato, ora tolto; vale come workset attivo.
+    return _model_value(doc, PREVIEW_WORKSETS_KEY) or WORKSET_ACTIVE
+
+
+def set_preview_workset_choice(doc, value):
+    _set_model_value(doc, PREVIEW_WORKSETS_KEY, value)
+
+
+def user_worksets(doc):
+    """Nomi dei workset utente del modello (vuoto se non condiviso)."""
+    if not doc.IsWorkshared:
+        return []
+    names = []
+    try:
+        for workset in DB.FilteredWorksetCollector(doc).OfKind(DB.WorksetKind.UserWorkset):
+            names.append(workset.Name)
+    except Exception:
+        return []
+    return sorted(names, key=lambda n: n.lower())
 
 
 def report_file_name(test_name):
@@ -1131,6 +1287,7 @@ def save_reports(folder, result, doc):
         single.cancelled = result.cancelled
         single.created = result.created
         single.selection_ids = result.selection_ids
+        single.phase_text = result.phase_text
         single.tests = [test_result]
         path = os.path.join(folder, report_file_name(test_result.name))
         if os.path.exists(path) and not any(_same_file(path, p) for p in own):
@@ -1190,6 +1347,7 @@ def save_report(path, result, doc):
         "scope": dict((f, getattr(result.scope, f)) for f in SCOPE_FIELDS),
         "link_labels": result.link_labels,
         "selection_ids": [int(value) for value in result.selection_ids],
+        "phase": result.phase_text,
         "elements": elements, "tests": tests}
     cr.write_json_file(path, payload)
 
@@ -1215,6 +1373,7 @@ def load_report(path):
     result.created = data.get("created") or u""
     result.saved_path = path
     result.selection_ids = [int(value) for value in data.get("selection_ids") or []]
+    result.phase_text = data.get("phase") or u""
     for test_data in data.get("tests") or []:
         test = cr.normalize_test(test_data.get("test")) or cr.new_test(
             test_data.get("name") or u"Test")

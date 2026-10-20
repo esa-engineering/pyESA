@@ -90,6 +90,10 @@
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
                     <WrapPanel Grid.Row="3" Margin="0,8,0,0">
+                        <Button x:Name="btn_up" Content="▲" Width="28" Style="{StaticResource ToolButton}"
+                                ToolTip="Move the selected test up"/>
+                        <Button x:Name="btn_down" Content="▼" Width="28" Style="{StaticResource ToolButton}"
+                                ToolTip="Move the selected test down"/>
                         <Button x:Name="btn_new" Content="➕ New" Style="{StaticResource ToolButton}"
                                 ToolTip="Start an empty test (it is added to the list when you save it)"/>
                         <Button x:Name="btn_delete" Content="Delete" Style="{StaticResource ToolButton}"
@@ -289,6 +293,17 @@
                                 <CheckBox x:Name="chk_ignore_hosted" Margin="0,4,0,0"
                                           Content="Ignore an element and its host (e.g. a door and its wall)"/>
                             </StackPanel>
+                            <Grid Margin="20,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="320"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Workset for the copies of linked elements:" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox x:Name="cbo_preview_workset" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                          ToolTip="Where the report puts the temporary copies of linked elements (active workset by default). Saved for this model, not in the test. The visibility of the chosen workset is not changed."/>
+                                <TextBlock Grid.Column="2" Text="this model" Style="{StaticResource UnitLabel}"/>
+                            </Grid>
                         </StackPanel>
                     </Border>
 

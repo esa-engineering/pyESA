@@ -86,14 +86,15 @@ class QuickClashForm(cu.ClashFinderForm):
             self.txt_summary_state.Foreground = cu.RED_BRUSH
             self.txt_summary_state.Text = u"No test selected."
             return
-        lines = [u"{}; {} selected in Revit.".format(
-            test["name"], cu._plural(len(self.loaded_ids), u"element"))]
+        lines = [u"{}; {} selected in Revit. {}".format(
+            test["name"], cu._plural(len(self.loaded_ids), u"element"), summary.phase_text)]
         for side in cu.SIDES:
             lines.append(u"Set {}: {} from {}.".format(
                 side.upper(), self._count_text(summary, side),
                 cr.describe_sources(test[cu.SET_KEYS[side]])))
         lines += [note.split(u": ", 1)[-1] for note in summary.notes]
-        self.txt_summary_state.Foreground = cu.GRAY_BRUSH
+        self.txt_summary_state.Foreground = cu.RED_BRUSH if summary.phase_problem \
+            else cu.GRAY_BRUSH
         self.txt_summary_state.Text = u"\n".join(lines)
 
     @staticmethod

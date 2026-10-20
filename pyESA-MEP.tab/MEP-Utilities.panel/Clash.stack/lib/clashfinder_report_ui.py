@@ -275,6 +275,8 @@ class ClashReportForm(Window):
         hint = u"Set A from {}, Set B from {}. Model: {}.".format(
             scope_text(scope.source_a, scope.links_a),
             scope_text(scope.source_b, scope.links_b), result.model or self.doc.Title)
+        if result.phase_text:
+            hint += u" " + result.phase_text
         if result.saved_path:
             hint = u"Saved report of {}. ".format(result.created or u"an earlier run") + hint
             if result.model_key and result.model_key != ce.model_key(self.doc):
@@ -619,7 +621,8 @@ class ClashReportForm(Window):
             transaction.Start()
             self._delete_previews()
             if self.overlay_on:
-                previews, failed = self._create_previews(linked)
+                previews, failed, workset_note = self._create_previews(linked, view)
+                notes.append(workset_note)
             else:
                 previews, failed = [], list(linked)
             # Overlay spento: nessun colore (quelli messi prima tornano all'originale).
@@ -646,10 +649,49 @@ class ClashReportForm(Window):
 
     # Copie DirectShape degli elementi linkati ------------------------------------
 
-    def _create_previews(self, linked):
-        """Copia DirectShape di ogni elemento linkato. ([(copia, lato)], [linkati falliti])."""
+    def _find_workset(self, name):
+        for candidate in DB.FilteredWorksetCollector(self.doc).OfKind(
+                DB.WorksetKind.UserWorkset):
+            if candidate.Name == name:
+                return candidate
+        return None
+
+    def _preview_workset(self, view):
+        """Workset delle copie in un modello condiviso: (WorksetId o None, nota).
+
+        Scelto in fondo alla finestra di Clash Finder (ce.preview_workset_choice): il
+        workset attivo (None: le copie restano dove Revit le mette) o un workset esistente,
+        la cui visibilita' non si tocca (cambierebbe anche gli elementi veri che
+        contiene); se e' nascosto nella vista, una nota.
+        """
+        if not self.doc.IsWorkshared:
+            return None, None
+        choice = ce.preview_workset_choice(self.doc)
+        if choice == ce.WORKSET_ACTIVE:
+            return None, None
+        try:
+            workset = self._find_workset(choice)
+        except Exception:
+            workset = None
+        if workset is None:
+            return None, (u"Workset {} not found: copies left in the active "
+                          u"workset.".format(choice))
+        try:
+            if not view.IsWorksetVisible(workset.Id):
+                return workset.Id, (u"The copies are hidden: the workset {} is not "
+                                    u"visible in this view.".format(choice))
+        except Exception:
+            pass
+        return workset.Id, None
+
+    def _create_previews(self, linked, view):
+        """Copia DirectShape di ogni elemento linkato, nel workset delle copie se il
+        modello e' condiviso. ([(copia, lato)], [linkati falliti], nota)."""
         created = []
         failed = []
+        if not linked:
+            return created, failed, None
+        workset_id, note = self._preview_workset(view)
         category_id = DB.ElementId(DB.BuiltInCategory.OST_GenericModel)
         for instance, element, side in linked:
             solids = ce.element_solids(element, instance.GetTotalTransform())
@@ -681,6 +723,12 @@ class ClashReportForm(Window):
                     shape.SetName(u"Clash Finder preview")
                 except Exception:
                     pass
+                if workset_id is not None:
+                    try:
+                        shape.get_Parameter(DB.BuiltInParameter.ELEM_PARTITION_PARAM).Set(
+                            workset_id.IntegerValue)
+                    except Exception:
+                        note = u"Some copies stayed in the active workset."
                 created.append((shape, side))
             except Exception:
                 if shape is not None:
@@ -689,7 +737,7 @@ class ClashReportForm(Window):
                     except Exception:
                         pass
                 failed.append((instance, element, side))
-        return created, failed
+        return created, failed, note
 
     def _delete_previews(self):
         """Cancella tutte le copie del report nel modello, anche quelle orfane."""
@@ -882,6 +930,10 @@ class ClashReportForm(Window):
         rispetto al report di partenza. Il file in cartella non viene toccato."""
         if self._uidoc_api(uiapp) is None:
             return
+        problem = ce.phase_problem(self.doc.ActiveView)
+        if problem:
+            _warn(problem)
+            return
         tests = [r.test for r in self.result.tests]
         uses_selection = any(test[key]["source"] == cr.SOURCE_SELECTION
                              for test in tests for key in ("set_a", "set_b"))
@@ -923,6 +975,10 @@ class ClashReportForm(Window):
         fresh.model_key = old.model_key or ce.model_key(self.doc)
         fresh.created = old.created
         fresh.selection_ids = old.selection_ids
+        if old.phase_text and fresh.phase_text != old.phase_text:
+            notes.append(u"The report was made with {} The refresh used {}".format(
+                old.phase_text[0].lower() + old.phase_text[1:], fresh.phase_text[0].lower()
+                + fresh.phase_text[1:]))
         fresh.save_note = u" ".join(notes + [u"The refresh is not saved: Export JSON... "
                                              u"saves the current clashes."])
         self.result = fresh

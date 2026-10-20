@@ -157,6 +157,14 @@ class ClashFinderForm(Window):
 
         self.library_path = cr.library_path()
         self.library = cr.load_library()
+        # Nuovi test predefiniti in una libreria gia' esistente (una volta sola).
+        added = cr.pending_defaults(self.library)
+        if added:
+            self.library.extend(added)
+            try:
+                cr.write_tests_file(self.library_path, self.library)
+            except Exception:
+                pass
         self.display_names = cr.category_display_names(doc)
         self.all_categories = cr.model_categories(doc)
         self.category_values = dict((key, cr.category_id_value(key))
@@ -206,9 +214,10 @@ class ClashFinderForm(Window):
     # ------------------------------------------------------------------ setup
 
     def _find_controls(self):
-        names = ("lst_tests", "btn_new", "btn_delete", "btn_import", "btn_export",
+        names = ("lst_tests", "btn_up", "btn_down", "btn_new", "btn_delete", "btn_import",
+                 "btn_export",
                  "txt_library_path", "pnl_editor", "txt_editor_state",
-                 "chk_ignore_connected", "chk_ignore_hosted",
+                 "chk_ignore_connected", "chk_ignore_hosted", "cbo_preview_workset",
                  "txt_summary_state", "txt_links_hint",
                  "btn_refresh", "btn_save", "btn_save_as", "btn_close", "btn_run")
         for name in names:
@@ -239,12 +248,15 @@ class ClashFinderForm(Window):
         self.txt_library_path.ToolTip = self.library_path
 
         self.lst_tests.SelectionChanged += self.OnTestSelected
+        self.btn_up.Click += lambda s, e: self._move_test(-1)
+        self.btn_down.Click += lambda s, e: self._move_test(1)
         self.btn_new.Click += self.OnNewTest
         self.btn_delete.Click += self.OnDeleteTest
         self.btn_import.Click += self.OnImport
         self.btn_export.Click += self.OnExport
         self.chk_ignore_connected.Click += lambda s, e: self._mark_dirty()
         self.chk_ignore_hosted.Click += lambda s, e: self._mark_dirty()
+        self._fill_preview_worksets()
 
         self.btn_refresh.Click += lambda s, e: self._request_summary()
         self.btn_save.Click += lambda s, e: self._save()
@@ -253,6 +265,30 @@ class ClashFinderForm(Window):
         self.btn_run.Click += self.OnRun
         self.Closing += self.OnWindowClosing
         self.Closed += self.OnWindowClosed
+
+    def _fill_preview_worksets(self):
+        """Workset delle copie dei linkati nel report: impostazione del modello."""
+        combo = self.cbo_preview_workset
+        self._workset_choices = []
+        if not self.doc.IsWorkshared:
+            combo.Items.Add(u"Model not workshared")
+            combo.SelectedIndex = 0
+            combo.IsEnabled = False
+            return
+        self._workset_choices = [(ce.WORKSET_ACTIVE, u"Active workset")]
+        self._workset_choices += [(name, name) for name in ce.user_worksets(self.doc)]
+        current = ce.preview_workset_choice(self.doc)
+        if current not in [value for value, _ in self._workset_choices]:
+            self._workset_choices.append((current, u"{} (not found)".format(current)))
+        for _, label in self._workset_choices:
+            combo.Items.Add(label)
+        combo.SelectedIndex = [value for value, _ in self._workset_choices].index(current)
+        combo.SelectionChanged += self.OnPreviewWorksetChanged
+
+    def OnPreviewWorksetChanged(self, sender, args):
+        index = self.cbo_preview_workset.SelectedIndex
+        if 0 <= index < len(self._workset_choices):
+            ce.set_preview_workset_choice(self.doc, self._workset_choices[index][0])
 
     def _wire_side(self, side):
         search = getattr(self, "txt_search_" + side)
@@ -439,6 +475,23 @@ class ClashFinderForm(Window):
         self._fill_tests()
         self._select_in_list(name)
         self._load_editor(cr.copy_test(test), name)
+
+    def _move_test(self, step):
+        """Sposta di una posizione il test selezionato; l'ordine si salva subito (vale
+        anche per Quick Clash). L'editor non cambia."""
+        item = self.lst_tests.SelectedItem
+        if item is None:
+            _info(u"Select the test to move in the list.")
+            return
+        names = [t["name"] for t in self.library]
+        index = names.index(item.Tag) if item.Tag in names else -1
+        target = index + step
+        if index < 0 or not 0 <= target < len(self.library):
+            return
+        self.library[index], self.library[target] = self.library[target], self.library[index]
+        self._save_library()
+        self._fill_tests()
+        self._select_in_list(item.Tag)
 
     def OnDeleteTest(self, sender, args):
         item = self.lst_tests.SelectedItem
@@ -998,12 +1051,14 @@ class ClashFinderForm(Window):
             self._refresh_category_labels(side)
             if summary.host[side] + summary.linked[side] == 0:
                 empty.append(side.upper())
-        lines = [u"{} selected in Revit.".format(_plural(len(self.loaded_ids), u"element"))]
+        lines = [u"{} selected in Revit. {}".format(
+            _plural(len(self.loaded_ids), u"element"), summary.phase_text)]
         if empty:
             lines.append(u"Set {} {} empty.".format(u" and ".join(empty),
                                                     u"is" if len(empty) == 1 else u"are"))
         lines += [note.split(u": ", 1)[-1] for note in summary.notes]
-        self.txt_summary_state.Foreground = RED_BRUSH if empty else GRAY_BRUSH
+        self.txt_summary_state.Foreground = RED_BRUSH if (
+            empty or summary.phase_problem) else GRAY_BRUSH
         self.txt_summary_state.Text = u"\n".join(lines)
 
     # ================================================================ ESECUZIONE
@@ -1041,7 +1096,9 @@ class ClashFinderForm(Window):
     def _before_run(self, uidoc):
         """Rilegge la selezione; True se gli insiemi possono contenere qualcosa."""
         self._read_selection(uidoc)
-        problem = self._scope_problem(self._current_test(), check_selection=True)
+        # Fase e filtro di fase della vista attiva valgono per ogni sorgente: senza, stop.
+        problem = ce.phase_problem(self.doc.ActiveView) or \
+            self._scope_problem(self._current_test(), check_selection=True)
         if problem:
             _info(problem)
             return False
