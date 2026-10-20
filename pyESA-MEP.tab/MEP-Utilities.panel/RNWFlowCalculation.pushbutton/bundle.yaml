@@ -1,0 +1,18 @@
+title: "RNW Flow\nCalculation"
+tooltip: >
+  Rainwater network sizing. The design flow [l/s] of each fixture is written in the Fixture
+  Units of its connector, and Revit sums it along the network. Choose the piping system type
+  and the systems to check (elements selected at start are pre-ticked).
+
+  Horizontal pipes are checked against Table 6.3 / 6.4 / 6.5 (fill degree 0.5 / 0.6 / 0.7),
+  pipes steeper than 60 degrees as stacks against Table 6.2, in the column of their pipe
+  material. Velocity and fill degree are checked too.
+
+  CLICK: results window, upstream to downstream, one row per section. Pick a new size from
+  the sizes of the pipe type, or simulate a slope; Apply Changes resizes pipes and connected
+  fittings (with transitions where needed), one section at a time. Fixture areas and
+  coefficients are editable in the Fixtures tab. Export to Excel.
+
+  SHIFT + CLICK: fitting test. Tries a DN on a fitting connector in a rolled-back
+  transaction and reports the result. The model is not changed.
+author: ESA Engineering

@@ -1,0 +1,221 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Rainwater Flow Calculation"
+        Height="960" Width="560"
+        MinHeight="600" MinWidth="470"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="True">
+
+    <Window.Resources>
+        <!-- Common Styles -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,10,0,5"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,15,0"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0"
+                   Text="🌧️ Rainwater Flow Calculation"
+                   FontSize="16" FontWeight="Bold"
+                   Margin="0,0,0,10"
+                   HorizontalAlignment="Center"/>
+
+        <!-- Main content with scroll -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,5,0">
+            <StackPanel Margin="0,0,10,0">
+
+                <!-- SECTION: Piping systems -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="💧 PIPING SYSTEMS" Style="{StaticResource SectionHeader}"/>
+
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="The flow of every pipe is its Fixture Units value, read as l/s: the rainwater fixtures write their flow there and Revit sums it along the network."/>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="System type:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_system" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                      ToolTip="Piping system type of the rainwater drainage"/>
+                        </Grid>
+                        <TextBlock x:Name="txt_selection_info" Style="{StaticResource HintText}"
+                                   Foreground="#2D5A8A" Text=""/>
+
+                        <TextBlock x:Name="txt_system_info" Style="{StaticResource HintText}" Margin="0,6,0,0"
+                                   Text=""/>
+
+                        <TextBlock Text="Systems to calculate" Margin="0,8,0,4" FontWeight="Bold" FontSize="11"/>
+
+                        <!-- Search Box -->
+                        <Grid Margin="0,0,0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="🔍" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBox x:Name="txt_search" Grid.Column="1" Padding="5,3"
+                                     ToolTip="Filter systems by name"/>
+                            <Button x:Name="btn_clear_search" Grid.Column="2"
+                                    Content="✕" Width="25" Margin="5,0,0,0"
+                                    ToolTip="Clear search"/>
+                        </Grid>
+
+                        <ListBox x:Name="lst_systems"
+                                 MinHeight="60" Height="120"
+                                 SelectionMode="Extended"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        </ListBox>
+
+                        <Thumb x:Name="thumb_resize" Height="8" Cursor="SizeNS"
+                               HorizontalAlignment="Stretch"
+                               Background="#CCCCCC" Opacity="0.5"
+                               ToolTip="Drag to resize list"/>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                            <Button x:Name="btn_select_all" Content="Select All" Padding="10,3" Margin="0,0,5,0"/>
+                            <Button x:Name="btn_select_none" Content="Deselect All" Padding="10,3" Margin="0,0,5,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="txt_system_count" Style="{StaticResource HintText}" Margin="0,6,0,0"
+                                   Text=""/>
+                    </StackPanel>
+                </Border>
+
+                <!-- INFO: Pipe series -->
+                <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
+                        CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="🧪 PIPE SERIES"
+                                   Style="{StaticResource SectionHeader}" Foreground="Gray"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11"
+                                   Text="Read from the model, nothing to choose: the column of Table 6.2 comes from the material of the pipe segment of every pipe (PE, PP, Triplus, Silere; if it is not recognized, the most conservative column), and the suggested diameters are the sizes of the pipe type."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- SECTION: Horizontal pipes -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="➡️ HORIZONTAL PIPES" Style="{StaticResource SectionHeader}"/>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Fill degree f:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_fill" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                      ToolTip="Fill degree of the sloped pipes: selects Table 6.3, 6.4 or 6.5"/>
+                        </Grid>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="The slope is read from the pipe geometry. A slope between two table rows uses the lower row. Slopes under 0.5 cm/m cannot be checked; slopes over 10 cm/m use the 10 cm/m row."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- SECTION: Velocity -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="💨 VELOCITY" Style="{StaticResource SectionHeader}"/>
+
+                        <Grid Margin="0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="Minimum v:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txt_vmin" Grid.Row="0" Grid.Column="1" Style="{StaticResource InputField}"
+                                     ToolTip="Sloped pipes slower than this at the design flow are LOW VELOCITY. Empty: no check"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="m/s (empty = no check)" Style="{StaticResource UnitLabel}"/>
+                            <TextBlock Grid.Row="1" Text="Maximum v:" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txt_vmax" Grid.Row="1" Grid.Column="1" Style="{StaticResource InputField}"
+                                     ToolTip="Sloped pipes faster than this at the design flow are HIGH VELOCITY. Empty: no check"/>
+                            <TextBlock Grid.Row="1" Grid.Column="2" Text="m/s (empty = no check)" Style="{StaticResource UnitLabel}"/>
+                        </Grid>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="Velocity of the sloped pipes at the design flow (not the table velocity, which holds at the table fill degree), derived from the tables with the partial-fill relation of a circular pipe. Set the limits required by the project. Stacks are not checked."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- SECTION: Stacks -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="⬇️ VERTICAL STACKS" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="Pipes steeper than 60° from the horizontal are checked as vertical stacks against Table 6.2, with fill degree f = 0.33. Runs at 45° are checked as horizontal pipes (10 cm/m row). Each section is listed as a horizontal part and a vertical part."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- INFO -->
+                <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
+                        CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="ℹ️ OUTPUT"
+                                   Style="{StaticResource SectionHeader}" Foreground="Gray"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                            <Run Text="The whole systems ticked above are calculated, in the whole model. Start the tool with an element selected to tick its system."/>
+                            <LineBreak/>
+                            <Run Text="The results open in a second window, one row per section part (System + Section parameter)."/>
+                            <LineBreak/>
+                            <Run Text="The model is changed only for the rows whose new size differs from the model, after confirmation."/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button x:Name="btn_cancel" Content="Cancel" Width="100" Height="30"
+                    Margin="0,0,10,0"/>
+            <Button x:Name="btn_ok" Content="OK" Width="100" Height="30"
+                    IsDefault="True"
+                    Background="#2D5A8A" Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>

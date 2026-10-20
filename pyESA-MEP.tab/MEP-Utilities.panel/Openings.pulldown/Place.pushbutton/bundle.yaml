@@ -1,0 +1,19 @@
+title: Place&Check
+tooltip: >-
+  Checks where new openings are needed and creates them. Pipes, ducts, cable trays and conduits of this model and of
+  the RVT links are checked against the walls, floors and structural elements (beams, columns, foundations) of this
+  model and of the links.
+
+  With nothing selected: a window asks what to select (walls, floors and structure; MEP elements; or an area) and
+  which linked models to read. With elements already selected: openings and MEP elements already associated with an
+  opening are checked as in New Report; the other MEP elements and the walls, floors and structural elements of this
+  model get openings, reading the links ticked last time.
+
+  Size: section with insulation plus the clearance, rounded up; depth = whole stack of parallel walls or floors.
+  Nearby crossings share one opening. Walls and structures: any angle (not elements running inside for more than
+  1 m). Floors: only elements steeper than 85 degrees, so no floor drains. Crossings that already have an opening are
+  skipped. A preview comes first, then you confirm.
+
+  Opening: e_GEN_RelatedElement_ID = its MEP elements, e_GEN_RelatedElement_Cat = their categories,
+  e_GEN_Void_Status = Valid. MEP elements are not written.
+author: Matteo Maiorano
