@@ -1,0 +1,8 @@
+title: "Quick\nSection"
+tooltip: >-
+  Quick Section: a section moved to an element or two points. Quick SectionBox: a 3D view boxed around an element
+  or a rectangle of the plan.
+author: Matteo Maiorano
+layout:
+  - QuickSection
+  - QuickSectionBox

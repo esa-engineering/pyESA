@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "Quick\nOverpass"
-__doc__ = """Version = 0.3
-Date    = 12.10.2026
+__doc__ = """Version = 0.4
+Date    = 16.10.2026
 ________________________________________________________________
 Manual overpass between two clicked points.
 Makes a straight horizontal run of pipe, duct, cable tray or conduit
@@ -16,6 +16,11 @@ Instruction:
 - The part between the two points is moved by the offset and joined
   to the rest of the run with two legs and four elbows; inclined legs
   start at the clicked points and go inwards
+- If the second point is beyond a free end of the run, the run goes
+  up (or down) at the first point, continues at the new elevation,
+  comes back to the original elevation and ends with a horizontal part
+  (at least 300 mm or 3 times the size) at the second point, where it
+  stays free (two legs, four elbows)
 - If an elbow does not fit, the run is left unchanged
 - Press ESC (at the first click) to finish and get the report
 The route with clash check is done by Clash Overpass.
@@ -79,6 +84,7 @@ MM_PER_FT = 304.8
 STRAIGHT_TOL = 0.999
 HORIZONTAL_TOL = 1e-4
 MIN_REMAINING_MM = 20.0  # lunghezza minima di ogni tratto dopo l'inserimento dei gomiti
+TAIL_MIN_MM = 300.0  # tratto orizzontale minimo dopo l'ultimo gomito: sotto Revit inverte il tratto
 
 CATEGORY_NAMES = (
     (Pipe, "Pipe"),
@@ -352,12 +358,71 @@ def check_remaining_space(parts):
                                 "(minimum {:.0f} mm)".format(name, remaining, MIN_REMAINING_MM))
 
 
-def project_on_run(reference, element, curve):
-    """Proietta il punto cliccato sull'asse del tratto."""
-    point = reference.GlobalPoint
-    if point is None:
-        point = curve.Evaluate(0.5, True)
-    return curve.Project(point).XYZPoint
+def along_run(point, curve):
+    """Posizione del punto lungo l'asse del tratto, in piedi dall'inizio. Non limitata: oltre gli estremi
+    risulta < 0 o > lunghezza (curve.Project invece si fermerebbe all'estremo)."""
+    return point.Subtract(curve.GetEndPoint(0)).DotProduct(curve.Direction)
+
+
+def is_free_end(element, point):
+    """True se l'estremo del tratto vicino al punto non e' collegato fisicamente ad altri elementi."""
+    conn = nearest_connector(element, point)
+    return not any(r.Owner.Id != element.Id and r.ConnectorType in PHYSICAL_TYPES for r in conn.AllRefs)
+
+
+def section_height(element):
+    """Altezza esterna della sezione (diametro se tonda), in piedi; 0 se non leggibile."""
+    for bip in (DB.BuiltInParameter.RBS_PIPE_OUTER_DIAMETER, DB.BuiltInParameter.RBS_CABLETRAY_HEIGHT_PARAM,
+                DB.BuiltInParameter.RBS_CURVE_HEIGHT_PARAM, DB.BuiltInParameter.RBS_CURVE_DIAMETER_PARAM,
+                DB.BuiltInParameter.RBS_CONDUIT_OUTER_DIAM_PARAM):
+        param = element.get_Parameter(bip)
+        if param is not None and param.HasValue and param.AsDouble() > 0:
+            return param.AsDouble()
+    return 0.0
+
+
+def tail_length_ft(element):
+    """Tratto orizzontale finale dopo l'ultimo gomito: TAIL_MIN_MM o 3 volte la sezione."""
+    return max(TAIL_MIN_MM / MM_PER_FT, 3.0 * section_height(element))
+
+
+def build_extension(element, curve, p_in, p_out, offset_ft, inset_ft, vertical_legs, level_id, tail_ft):
+    """Secondo punto oltre un estremo libero: il tratto si accorcia a p_in, sale (o scende), prosegue in quota,
+    torna alla quota originale tail_ft prima di p_out e prosegue orizzontale fino a p_out, dove resta libero.
+    Ritorna come build_overpass."""
+    start, end = curve.GetEndPoint(0), curve.GetEndPoint(1)
+    toward = p_out.Subtract(p_in).Normalize()
+    shift = DB.XYZ(0, 0, offset_ft)
+    inset = toward.Multiply(inset_ft)
+    landing = p_out.Subtract(toward.Multiply(tail_ft))
+    top_start = p_in.Add(inset).Add(shift)
+    top_end = landing.Subtract(inset).Add(shift)
+
+    STAGE[0] = "shortening the original run"
+    # si conserva il verso della curva: si sposta solo l'estremo libero
+    if toward.DotProduct(curve.Direction) > 0:
+        element.Location.Curve = DB.Line.CreateBound(start, p_in)
+    else:
+        element.Location.Curve = DB.Line.CreateBound(p_in, end)
+    doc.Regenerate()
+
+    conn = nearest_connector(element, p_in)
+    STAGE[0] = "first leg"
+    leg1, conn, f1 = extend(element, conn, top_start, element, level_id, vertical_legs)
+    STAGE[0] = "raised run"
+    top, conn, f2 = extend(leg1, conn, top_end, element, level_id, False)
+    STAGE[0] = "second leg"
+    leg2, conn, f3 = extend(top, conn, landing, element, level_id, vertical_legs)
+    STAGE[0] = "last part of the run"
+    tail, conn, f4 = extend(leg2, conn, p_out, element, level_id, False)
+
+    STAGE[0] = "checking the remaining space"
+    check_remaining_space([("remaining part of the run", element), ("first leg", leg1), ("raised run", top),
+                           ("second leg", leg2), ("last part of the run", tail)])
+    STAGE[0] = "copying parameters and insulation"
+    inherited = inherit(element, [leg1, top, leg2, tail], [f1, f2, f3, f4])
+    fittings = [f for f in (f1, f2, f3, f4) if f is not None]
+    return top, [leg1, top, leg2, tail], len(fittings), inherited, fittings
 
 
 def build_overpass(element, curve, p1, p2, offset_ft, inset_ft, vertical_legs, level_id):
@@ -424,8 +489,8 @@ def leg_inset_ft(offset_ft, angle_deg):
     return abs(offset_ft) / math.tan(math.radians(angle_deg))
 
 
-def process_run(element, ref1, ref2, offset_mm, angle_deg):
-    """Elabora un tratto. Ritorna un dict con l'esito (usato per il report)."""
+def process_run(element, point1, point2, offset_mm, angle_deg):
+    """Elabora un tratto tra due punti cliccati (XYZ). Ritorna un dict con l'esito (usato per il report)."""
     result = {"element": element, "category": category_name(element), "status": "", "ok": False,
               "top": None, "new_count": 0, "elbows": 0, "z_mm": None, "level": "", "rel_mm": None}
 
@@ -444,34 +509,53 @@ def process_run(element, ref1, ref2, offset_mm, angle_deg):
     ref_level = doc.GetElement(level_id)
     result["level"] = ref_level.Name
 
-    start = curve.GetEndPoint(0)
+    start, end = curve.GetEndPoint(0), curve.GetEndPoint(1)
     direction = curve.Direction
-    points = sorted((project_on_run(ref1, element, curve), project_on_run(ref2, element, curve)),
-                    key=lambda p: p.Subtract(start).DotProduct(direction))
-    p1, p2 = points
+    length = curve.Length
+    t1, t2 = sorted((along_run(point1, curve), along_run(point2, curve)))
+    p1, p2 = start.Add(direction.Multiply(t1)), start.Add(direction.Multiply(t2))
     min_ft = MIN_REMAINING_MM / MM_PER_FT
-    t1 = p1.Subtract(start).DotProduct(direction)
-    t2 = p2.Subtract(start).DotProduct(direction)
-    if t1 < min_ft or curve.Length - t2 < min_ft or t2 - t1 < min_ft:
-        result["status"] = ("Points too close to each other or to the ends of the run "
-                            "(minimum {:.0f} mm)".format(MIN_REMAINING_MM))
+    if t2 - t1 < min_ft:
+        result["status"] = "Points too close to each other (minimum {:.0f} mm)".format(MIN_REMAINING_MM)
         return result
+
+    # un punto oltre (o a ridosso di) un estremo libero: il tratto prosegue in quota fino a quel punto
+    before, after = t1 < min_ft, length - t2 < min_ft
+    if before and after:
+        result["status"] = "Both points are at or beyond the ends of the run: one must be on the run"
+        return result
+    extension = False
+    if before or after:
+        out_end = start if before else end
+        if not is_free_end(element, out_end):
+            result["status"] = ("A point is beyond (or within {:.0f} mm of) an end connected to another element: "
+                                "only a free end can be extended".format(MIN_REMAINING_MM))
+            return result
+        extension = True
 
     offset_ft = offset_mm / MM_PER_FT
     inset_ft = leg_inset_ft(offset_ft, angle_deg)
-    raised_ft = (t2 - t1) - 2 * inset_ft
+    tail_ft = tail_length_ft(element) if extension else 0.0
+    raised_ft = (t2 - t1) - 2 * inset_ft - tail_ft
     if raised_ft < min_ft:
-        result["status"] = ("Points too close for {:g} degree legs: each leg needs {:.0f} mm horizontally, "
+        result["status"] = ("Points too close for {:g} degree legs: each leg needs {:.0f} mm horizontally{}, "
                             "the points are {:.0f} mm apart".format(
-                                angle_deg, inset_ft * MM_PER_FT, (t2 - t1) * MM_PER_FT))
+                                angle_deg, inset_ft * MM_PER_FT,
+                                " plus {:.0f} mm of final horizontal run".format(tail_ft * MM_PER_FT)
+                                if extension else "", (t2 - t1) * MM_PER_FT))
         return result
 
     vertical_legs = inset_ft == 0.0
     transaction = DB.Transaction(doc, "Overpass")
     transaction.Start()
     try:
-        top, new_elements, elbows, inherited, _ = build_overpass(element, curve, p1, p2, offset_ft, inset_ft,
-                                                                 vertical_legs, level_id)
+        if extension:
+            p_in, p_out = (p2, p1) if before else (p1, p2)
+            top, new_elements, elbows, inherited, _ = build_extension(element, curve, p_in, p_out, offset_ft,
+                                                                      inset_ft, vertical_legs, level_id, tail_ft)
+        else:
+            top, new_elements, elbows, inherited, _ = build_overpass(element, curve, p1, p2, offset_ft, inset_ft,
+                                                                     vertical_legs, level_id)
         transaction.Commit()
     except OverpassError as ex:
         transaction.RollBack()
@@ -1135,6 +1219,32 @@ def route_main():
         print_route_report(runs, rows, settings, accepted, skipped)
 
 
+def clicked_point(reference, element):
+    """Punto cliccato su un elemento; se Revit non lo restituisce, il centro del tratto."""
+    point = reference.GlobalPoint
+    return point if point is not None else element.Location.Curve.Evaluate(0.5, True)
+
+
+def pick_second_point(element):
+    """Secondo punto: libero (sul tratto o oltre il suo estremo), conta solo la posizione in pianta.
+    Senza piano di lavoro (vista 3D, sezione) PickPoint fallisce: si ripiega sul click sullo stesso tratto.
+    Ritorna XYZ, o None con ESC."""
+    try:
+        return uidoc.Selection.PickPoint(
+            "Click the SECOND point: on the same run, or beyond its free end to extend it (ESC to skip this run)")
+    except OperationCanceledException:
+        return None
+    except Exception:
+        pass
+    try:
+        ref = uidoc.Selection.PickObject(
+            ObjectType.Element, SameElementFilter(element.Id),
+            "Click the SECOND point on the same run (ESC to skip this run)")
+    except OperationCanceledException:
+        return None
+    return clicked_point(ref, element)
+
+
 def overpass_main():
     config = script.get_config(CONFIG_NAME)
     default_offset, default_angle = 500.0, 90.0
@@ -1167,16 +1277,13 @@ def overpass_main():
         except OperationCanceledException:
             break
         element = doc.GetElement(ref1.ElementId)
-        try:
-            ref2 = uidoc.Selection.PickObject(
-                ObjectType.Element, SameElementFilter(element.Id),
-                "Click the SECOND point on the same run (ESC to skip this run)")
-        except OperationCanceledException:
+        point2 = pick_second_point(element)
+        if point2 is None:
             results.append({"element": element, "category": category_name(element),
                             "status": "Skipped: second point not picked", "ok": False, "top": None,
                             "new_count": 0, "elbows": 0, "z_mm": None, "level": "", "rel_mm": None})
             continue
-        results.append(process_run(element, ref1, ref2, offset_mm, angle_deg))
+        results.append(process_run(element, clicked_point(ref1, element), point2, offset_mm, angle_deg))
 
     problems = len([r for r in results if not r["ok"]])
     if want_report(len(results), problems, "overpasses created"):

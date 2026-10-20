@@ -12,3 +12,4 @@ tooltip: >-
   the point on the face of any element. Only free ends are moved; connected ends are left unchanged, and an alert with the reason
   appears (no report).
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

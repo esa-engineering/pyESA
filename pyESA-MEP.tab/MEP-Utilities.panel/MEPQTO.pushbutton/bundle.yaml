@@ -14,3 +14,4 @@ tooltip: >
   Everything typed is saved to <Model>_MEPQTO.json next to the central model, never to
   the model. Export Excel writes the same tables to a workbook.
 author: ESA Engineering
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

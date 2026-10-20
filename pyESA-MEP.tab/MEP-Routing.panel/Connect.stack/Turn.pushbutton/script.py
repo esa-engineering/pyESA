@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "Turn"
-__doc__ = """Version = 0.6
-Date    = 13.10.2026
+__doc__ = """Version = 0.7
+Date    = 16.10.2026
 ________________________________________________________________
 Description:
 Adds a run of fixed length that starts at the free end of a pipe, duct,
@@ -14,15 +14,18 @@ Instruction:
   1000 mm) and a tick to keep the slope of the existing run (default
   off: the new run is horizontal). Both are saved
 - Click the element to extend, near its free end
-- Click the element to align to (also in linked RVT and IFC models).
-  An element with an axis is followed along its axis, anything else
-  along the clicked face. If it is perpendicular to the run, the side
-  of the click sets the side of the turn
+- Second click: a point to the left or right of the run gives a classic
+  90 degree turn to that side
+- To follow an element instead, press ESC at the second click and click
+  the element to align to (also in linked RVT and IFC models). An element
+  with an axis is followed along its axis, anything else along the clicked
+  face. If it is perpendicular to the run, the side of the click sets the
+  side of the turn. ESC again skips the element, ESC on the first click
+  finishes
 - The old run is not changed: the new run starts exactly at its free end,
   is horizontal (or keeps its slope, if ticked), and the elbow joins the two
 - Ducts and cable trays are copied and rotated, so width and height stay
   as in the original (also for a tray or duct on edge)
-- ESC on the second click skips the element, ESC on the first finishes
 
 Turns of more than 90 degrees are refused. Vertical ends are skipped.
 The new parts keep the parameters and the insulation of the starting
@@ -306,6 +309,24 @@ def reference_line(pick, origin, travel):
     return tangent, note
 
 
+def right_angle_line(origin, travel):
+    """Curva classica a 90 gradi: clic libero, il lato del punto rispetto al tratto (visto dall'alto) decide se si
+    gira a sinistra o a destra. Ritorna (direzione unitaria, nota), o (None, "") con ESC."""
+    try:
+        point = uidoc.Selection.PickPoint("Turn: click a point on the side to turn to (90 degrees). "
+                                          "ESC: choose an element to be parallel to instead")
+    except OperationCanceledException:
+        return None, ""
+    except Exception as ex:
+        raise TurnError("Cannot pick a point in this view (set a work plane or use a plan view): {}".format(ex))
+    side = side_of(travel, origin, point)
+    if side is None:
+        raise TurnError("Click to the left or to the right of the run, on the side to turn to")
+    forward = flat_forward(travel)
+    left = DB.XYZ(-forward.Y, forward.X, 0)
+    return (left if side == "left" else left.Negate()), "90 degrees to the {} (clicked point)".format(side)
+
+
 def turn_direction(travel, tangent, keep_slope):
     """Direzione del nuovo tratto: la tangente di riferimento in pianta, orizzontale (predefinito) o con la stessa
     pendenza del tratto di partenza (stessa salita per unita' di percorso orizzontale)."""
@@ -496,11 +517,15 @@ def process_pick(reference, length_mm, keep_slope):
 
     # direzione di riferimento: a ogni elemento, prima di aprire la transazione
     try:
-        pick = pick_alignment("Turn: click the element the new run must be parallel to, also in a linked model "
-                              "(ESC to skip this element)")
-        if pick is None:
-            return None
-        tangent, result["note"] = reference_line(pick, conn.Origin, travel)
+        # predefinito: curva classica a 90 gradi dal lato del punto cliccato; con ESC si sceglie un elemento di
+        # riferimento (anche in un link), con un secondo ESC l'elemento viene saltato
+        tangent, result["note"] = right_angle_line(conn.Origin, travel)
+        if tangent is None:
+            pick = pick_alignment("Turn: click the element the new run must be parallel to, also in a linked "
+                                  "model (ESC to skip this element)")
+            if pick is None:
+                return None
+            tangent, result["note"] = reference_line(pick, conn.Origin, travel)
         signed_deg = signed_angle_to(flat_forward(travel), tangent)
         check_angle(signed_deg)
     except TurnError as ex:

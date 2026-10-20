@@ -1,8 +1,9 @@
 title: Multi Turn
 tooltip: >-
   CLICK: opens the settings first: angle (common angles or a custom one) or a direction of the view (arrows up, down,
-  left, right), length after the bend, and the option to align to an element. Then select the parallel horizontal
-  pipes, ducts or cable trays and click where the bend starts (on one of them, or any point, also on a linked model:
+  left, right and the four diagonals at 45 degrees), length after the bend, slope of the new runs for sloped elements
+  (keep it or make them horizontal), and the option to align to an element. Then select the pipes, ducts or cable
+  trays (also sloped, parallel within 5 degrees) and click where the bend starts (on one of them, or any point, also on a linked model:
   the closest element is stretched to it). With an angle, click to the left or right of the row on the side to turn
   to; with an arrow the row turns towards that direction of the view; with the alignment, click a wall, beam, pipe or
   other element (also in linked RVT and IFC models) and the row bends parallel to it. The elements keep their spacing.
@@ -12,3 +13,4 @@ tooltip: >-
   A report lists the result. The new parts keep the parameters and the insulation of the starting element; cable trays
   keep the orientation of their section (a tray on edge stays on edge).
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

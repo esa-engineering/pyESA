@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 __title__ = "Multi\nGap"
-__doc__ = """Version = 0.2
-Date    = 09.10.2026
+__doc__ = """Version = 0.3
+Date    = 16.10.2026
 ________________________________________________________________
 Description:
 Opens a gap in straight pipes, ducts, cable trays and conduits.
 
 1. Select the elements (or select them first) and press Finish
 2. Click two points: between them, each element is cut and the
-   piece in between is removed. Each element is cut where the two
-   points project on its axis. Where a point is beyond the end of an
-   element, the whole rest of it is removed, up to that end
+   piece in between is removed. All the cuts lie on the same two
+   planes, perpendicular to the mean direction of the elements in
+   plan, so the cut is clean even if the elements are sloped or not
+   exactly parallel (the height of the clicks does not matter). Where
+   a point is beyond the end of an element, the whole rest of it is
+   removed, up to that end
 3. The report lists the elements, the gap length and what could not
    be cut. An element that cannot be cut is left unchanged
 Vertical or not is detected from the selection. Vertical elements: the
@@ -233,31 +236,73 @@ def cut_by_break(element, p1, p2):
     doc.Delete(middle.Id)
 
 
-def diagnostics(element, click1, click2):
+def cut_reference(elements, vertical_mode):
+    """Riferimento dei piani di taglio, uguale per tutti gli elementi: None per i verticali (piani orizzontali, conta
+    solo la quota dei click), altrimenti la direzione media in pianta degli elementi (unitaria, concorde con il
+    primo). I tagli di tutti gli elementi stanno cosi' sullo stesso piano, anche se non sono esattamente paralleli."""
+    if vertical_mode:
+        return None
+    total, first = DB.XYZ.Zero, None
+    for element in elements:
+        d = element.Location.Curve.Direction
+        flat = DB.XYZ(d.X, d.Y, 0)
+        if flat.GetLength() < 1e-6:
+            continue
+        flat = flat.Normalize()
+        if first is None:
+            first = flat
+        elif flat.DotProduct(first) < 0:
+            flat = flat.Negate()
+        total = total.Add(flat)
+    if first is None or total.GetLength() < 1e-6:
+        raise GapError("The elements have no direction in plan")
+    return total.Normalize()
+
+
+def axis_positions(element, click1, click2, ref):
+    """Posizione dei due tagli lungo l'asse dell'elemento (piedi dall'estremo 0, ordinate). Ogni taglio e' il punto
+    dell'asse che sta sul piano passante per il click: perpendicolare a ref in pianta (Z del click ignorata, la quota
+    della vista non c'entra), oppure orizzontale per gli elementi verticali."""
+    curve = element.Location.Curve
+    a, d = curve.GetEndPoint(0), curve.Direction
+    positions = []
+    for click in (click1, click2):
+        if ref is None:
+            if abs(d.Z) < 1e-6:
+                raise GapError("The element is horizontal: its position along the axis cannot be read from a height")
+            positions.append((click.Z - a.Z) / d.Z)
+        else:
+            slope = d.X * ref.X + d.Y * ref.Y
+            if abs(slope) < 1e-6:
+                raise GapError("The element is perpendicular to the direction of the cut")
+            positions.append(((click.X - a.X) * ref.X + (click.Y - a.Y) * ref.Y) / slope)
+    return sorted(positions)
+
+
+def diagnostics(element, click1, click2, t):
     """Dati geometrici per capire perche' un taglio non riesce (distanze in mm lungo l'asse dell'elemento)."""
     try:
         curve = element.Location.Curve
         a, d = curve.GetEndPoint(0), curve.Direction
-        t = [click.Subtract(a).DotProduct(d) * MM_PER_FT for click in (click1, click2)]
-        return ("length {:.0f} mm | direction ({:.2f}, {:.2f}, {:.2f}) | clicks at {:.0f} and {:.0f} mm along the "
+        return ("length {:.0f} mm | direction ({:.2f}, {:.2f}, {:.2f}) | cuts at {:.0f} and {:.0f} mm along the "
                 "axis | clicks Z {:.0f} / {:.0f} mm, element Z {:.0f} mm".format(
-                    curve.Length * MM_PER_FT, d.X, d.Y, d.Z, t[0], t[1], click1.Z * MM_PER_FT,
-                    click2.Z * MM_PER_FT, a.Z * MM_PER_FT))
+                    curve.Length * MM_PER_FT, d.X, d.Y, d.Z, t[0] * MM_PER_FT, t[1] * MM_PER_FT,
+                    click1.Z * MM_PER_FT, click2.Z * MM_PER_FT, a.Z * MM_PER_FT))
     except Exception as ex:
         return "geometry not readable: {}".format(ex)
 
 
-def make_gap(element, click1, click2):
-    """Taglia un elemento. Ritorna (lunghezza eliminata in mm, stato per il report). Se un punto cade oltre un
-    estremo, o a meno di MIN_REMAINING_MM da esso, il vuoto arriva fino a quell'estremo: si elimina tutto il tratto
-    restante e quanto era collegato a quell'estremo resta, scollegato."""
+def make_gap(element, t):
+    """Taglia un elemento nelle posizioni t (due valori ordinati, vedi axis_positions). Ritorna (lunghezza eliminata
+    in mm, stato per il report). Se un punto cade oltre un estremo, o a meno di MIN_REMAINING_MM da esso, il vuoto
+    arriva fino a quell'estremo: si elimina tutto il tratto restante e quanto era collegato a quell'estremo resta,
+    scollegato."""
     curve = element.Location.Curve
     if not isinstance(curve, DB.Line):
         raise GapError("Only straight elements are supported")
     a, b = curve.GetEndPoint(0), curve.GetEndPoint(1)
     d = curve.Direction
     length = curve.Length
-    t = sorted((click1.Subtract(a).DotProduct(d), click2.Subtract(a).DotProduct(d)))
     min_ft = MIN_REMAINING_MM / MM_PER_FT
     if t[1] - t[0] < MIN_GAP_MM / MM_PER_FT:
         raise GapError("The gap would be shorter than {:g} mm".format(MIN_GAP_MM))
@@ -489,13 +534,21 @@ def main():
                     "elevation or 3D view and click the two heights on the element.", title="Multi Gap")
         script.exit()
 
+    try:
+        ref = cut_reference(elements, vertical_mode)
+    except GapError as ex:
+        forms.alert(str(ex), title="Multi Gap")
+        script.exit()
+
     rows, done = [], 0
     for element in elements:
-        info = diagnostics(element, click1, click2)
         transaction = DB.Transaction(doc, "Split gap")
         transaction.Start()
+        info = ""
         try:
-            gap, status = make_gap(element, click1, click2)
+            t = axis_positions(element, click1, click2, ref)
+            info = diagnostics(element, click1, click2, t)
+            gap, status = make_gap(element, t)
             transaction.Commit()
             rows.append((element, "{:.0f}".format(gap), status, info))
             done += 1

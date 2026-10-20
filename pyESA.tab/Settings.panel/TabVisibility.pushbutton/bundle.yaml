@@ -1,5 +1,5 @@
 title: Tab Visibility
 tooltip: >-
-  Shows or hides the Revit ribbon tabs: one checkbox per tab (checked = shown). The pyESA tab is never listed.
+  Shows or hides the add-in tabs of the Revit ribbon: one checkbox per tab (checked = shown). Default Revit tabs and the pyESA tab are never listed; the default tabs are managed in File > Options > User Interface > Configure.
   With "Keep these tabs hidden when Revit restarts" ticked, the hidden tabs are hidden again at every Revit start.
 author: Matteo Maiorano

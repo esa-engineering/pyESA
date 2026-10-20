@@ -32,9 +32,12 @@
 
         <Border Grid.Row="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Top" Style="{StaticResource SectionHeader}" Text="TABS (checked = shown)"/>
-                <TextBlock DockPanel.Dock="Top" Style="{StaticResource HintText}" Margin="0,0,0,6"
-                           Text="The pyESA tab is not listed: hiding it would leave this tool out of reach."/>
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource SectionHeader}" Text="ADD-IN TABS (checked = shown)"/>
+                <Border DockPanel.Dock="Top" BorderBrush="#E8E8E8" BorderThickness="1" CornerRadius="5"
+                        Background="#F8F8F8" Padding="8" Margin="0,0,0,6">
+                    <TextBlock Style="{StaticResource HintText}"
+                               Text="The default Revit tabs are not listed. To show or hide them go to File > Options > User Interface > Configure. The pyESA tab is not listed either: hiding it would leave this tool out of reach."/>
+                </Border>
                 <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
                     <CheckBox x:Name="RememberCheck" Content="Keep these tabs hidden when Revit restarts"/>
                     <TextBlock Style="{StaticResource HintText}" Margin="20,3,0,0"

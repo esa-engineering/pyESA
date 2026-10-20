@@ -1,9 +1,12 @@
 title: Turn
 tooltip: >-
-  CLICK: click the pipe, duct, cable tray or conduit near its free end, then the element to be parallel to (wall,
-  beam, pipe, duct, grid or vertical face, also in linked RVT and IFC models). The new run starts at the free end and
-  turns to run parallel to that element; an elbow joins the two. It uses the saved settings (default: 1000 mm long,
-  horizontal). ESC on the second click skips the element, ESC on the first click finishes.
+  CLICK: click the pipe, duct, cable tray or conduit near its free end, then a point to the left or right of it: the
+  new run starts at the free end and makes a classic 90 degree turn to that side; an elbow joins the two. It uses the
+  saved settings (default: 1000 mm long, horizontal).
+
+  To follow an element instead, press ESC at the second click and click the element to be parallel to (wall, beam,
+  pipe, duct, grid or vertical face, also in linked RVT and IFC models). ESC again skips the element, ESC on the first
+  click finishes.
 
   SHIFT + CLICK: window with the length of the new run and a tick to keep the slope of the existing run (off: new run
   horizontal). The settings are saved.
@@ -11,3 +14,4 @@ tooltip: >-
   Ducts and cable trays keep width and height as in the original, also when on edge. Turns of more than 90 degrees
   are refused. A report lists the result. The new parts keep the parameters and the insulation of the starting element.
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

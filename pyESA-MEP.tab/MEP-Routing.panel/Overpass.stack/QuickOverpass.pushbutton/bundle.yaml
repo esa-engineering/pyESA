@@ -3,7 +3,10 @@ tooltip: >-
   Makes a straight horizontal run of pipe, duct, cable tray or conduit go up or down between two points you click,
   with two vertical or inclined legs and four elbows. Set the offset (relative to the current run) and the leg angle
   (from the horizontal), then click the first and the second point on the run. Repeat on other runs; ESC to finish.
+  If the second point is beyond a free end, the run goes up at the first point, continues at the new elevation and
+  comes back down and ends with a short horizontal part at the second point, where it stays free.
 
   A report lists the result. The new parts keep the parameters and the insulation of the starting element. To route
   around clashes automatically use Clash Overpass.
 author: Matteo Maiorano
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

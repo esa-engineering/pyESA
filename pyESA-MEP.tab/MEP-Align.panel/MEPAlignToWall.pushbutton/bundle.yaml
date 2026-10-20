@@ -17,3 +17,4 @@ tooltip: >
   ignored silently. Devices beyond the tolerance, hosted by a wall, pinned, inside a group
   or in an inactive design option are left untouched and listed.
 author: ESA Engineering
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx

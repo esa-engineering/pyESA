@@ -1,6 +1,0 @@
-title: Settings
-tooltip: >-
-  Settings of Openings Place and Refresh, saved per user: the four families (wall / floor, rectangular / round,
-  chosen among the Generic Models of the model or typed), clearance per side, rounding, merge distance, extra depth
-  beyond each face, separate MEC (pipes, ducts) and ELE (cable trays, conduits) openings, Misaligned status in Refresh.
-author: Matteo Maiorano
