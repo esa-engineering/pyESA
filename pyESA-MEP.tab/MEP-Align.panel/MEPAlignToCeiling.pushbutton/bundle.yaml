@@ -1,0 +1,22 @@
+title: "MEP\nAlign to Ceiling"
+tooltip: >
+  Moves the selected MEP devices vertically so that their insertion point lies on the bottom
+  face of the ceiling above them or, where there is no ceiling, on the soffit of the floor
+  slab that closes their level. Plan position and rotation are never changed.
+
+  CLICK: select the devices, then run the command. Only instances with the Yes/No instance
+  parameter u_VIS_Ceiling_installation = Yes are processed. A dialog asks which categories to
+  process, which target surfaces to use, the tolerance (50 cm by default) and whether to run a
+  simulation first.
+
+  A vertical line twice the tolerance long, centred on the insertion point, must cross the
+  bottom face of the ceiling or slab. Ceilings and slabs are read in this model and in the
+  linked models; stacked instances in contact count as one package and the target is its
+  bottom face. A ceiling in the storey always comes first: if it is beyond the tolerance the
+  element is skipped, never pushed above the ceiling.
+
+  Every selected element appears in the report with its own outcome and reason. Devices beyond
+  the tolerance, hosted, pinned, inside a group or in an inactive design option are left
+  untouched and listed.
+author: ESA Engineering
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx
