@@ -5,7 +5,8 @@ controsoffitto** che hanno sopra o, dove il controsoffitto manca, all'**intrados
 solaio** che chiude il loro piano di riferimento.
 
 È il gemello verticale di [MEPAlignToWall](../MEPAlignToWall.pushbutton/README.md): stessa
-retta di analisi, stessa ricerca in host e collegamenti, stesso resoconto, stessa gestione
+retta di analisi, stessa ricerca in host e collegamenti, stesso resoconto (qui come report
+avanzato, dietro una finestra di esito con i totali e i non allineati), stessa gestione
 degli avvisi di Revit.
 
 > **Lo spostamento è solo verticale.** Posizione in pianta e rotazione non vengono mai
@@ -17,8 +18,11 @@ degli avvisi di Revit.
 | File | Ruolo |
 | --- | --- |
 | `MEPAlignToCeiling_script.py` | Logica dello strumento (Revit API, motore IronPython) |
-| `MEPAlignToCeiling_ui.py` | Finestra di dialogo (`XamlReader`, nessuna Revit API) |
-| `MEPAlignToCeiling_form.xaml` | Layout della finestra |
+| `MEPAlignToCeiling_ui.py` | Finestra di avvio (`XamlReader`, nessuna Revit API) |
+| `MEPAlignToCeiling_form.xaml` | Layout della finestra di avvio |
+| `MEPAlignToCeiling_result_ui.py` | Finestra di esito: tabella interrogabile (nessuna Revit API) |
+| `MEPAlignToCeiling_result.xaml` | Layout della finestra di esito |
+| `MEPAlignToCeiling_grid_filter.py` | Filtri per colonna in stile Excel: copia di `MEPQTO/mepqto_grid_filter.py` con nome proprio (Rocket mode). Le correzioni vanno riportate su entrambe le copie |
 | `bundle.yaml` | Etichetta e descrizione del pulsante |
 | `icon.png` / `icon.dark.png` | Icone per il tema chiaro e per quello scuro |
 | `README.md` | Questo file |
@@ -34,13 +38,17 @@ degli avvisi di Revit.
    | --- | --- |
    | Elements | Quanti elementi sono selezionati e quanti hanno `u_VIS_Ceiling_installation = Yes` |
    | Categories | Solo le categorie presenti nella selezione, con i due conteggi. Ricerca, Select All / Deselect All |
-   | Target surface | *Ceilings* e/o *Floor slab soffit*. Almeno una delle due |
+   | False ceiling detectors | Quanti rilevatori da controsoffitto ci sono nella selezione e il valore di riserva di `dz_Buzzer` (cm, predefinito 50) |
    | Tolerance | Predefinita 50 cm, massimo 300 cm. Accetta virgola o punto |
    | Options | Cerca nei modelli collegati (attiva), salta gli elementi connessi (non attiva), simulazione (non attiva) |
 
+   Il bersaglio non si sceglie: lo strumento riconosce da solo se sulla verticale del
+   dispositivo il piano ha un controsoffitto (vedi "Controsoffitto prima del solaio").
    Le scelte (tranne la simulazione) restano memorizzate nella sezione `ESA_MEPAlignToCeiling`
    della configurazione pyRevit. Le categorie tolte restano tolte alla prossima apertura.
-3. **Resoconto** nel pannello di output: ogni elemento selezionato compare con il suo esito.
+3. **Finestra di esito**: i totali e la tabella degli elementi non allineati, con le note e un
+   pulsante per vederli nel modello. Il resoconto completo nel pannello di output è il **report avanzato**, stampato
+   con il pulsante *Advanced Report* (vedi "Esito").
 
 Le categorie gestite sono le stesse di MEPAlignToWall: Air Terminals, Communication Devices,
 Data Devices, Electrical Fixtures, Fire Alarm Devices, Lighting Devices, Lighting Fixtures,
@@ -129,12 +137,14 @@ lui in un pacchetto che sta sotto il livello, e non viene scambiato per un intra
 
 ## Controsoffitto prima del solaio
 
+Il bersaglio è automatico, non c'è nessuna scelta nella finestra:
+
 | Situazione sulla verticale del punto | Bersaglio |
 | --- | --- |
-| C'è un controsoffitto nel piano | Il controsoffitto più vicino al punto |
+| C'è un controsoffitto nel piano | Il controsoffitto più vicino al punto (faccia inferiore del suo pacchetto) |
 | Nessun controsoffitto | Il solaio di chiusura |
-| *Ceilings* tolto nella finestra | Il solaio di chiusura, anche se c'è un controsoffitto |
-| *Floor slab soffit* tolto e nessun controsoffitto | Elemento saltato |
+| Nessun controsoffitto e nessun solaio | Elemento saltato |
+| Rilevatore da controsoffitto | Sempre il solaio di chiusura (sezione seguente) |
 
 Se nel piano c'è un controsoffitto, il bersaglio resta il controsoffitto **anche quando è
 fuori tolleranza**: l'elemento viene saltato e riportato, non portato all'intradosso del
@@ -143,6 +153,34 @@ il solaio sarebbe stato entro tolleranza.
 
 Con due controsoffitti nel piano sulla stessa verticale vince il più vicino al punto; se il
 secondo è entro 20 mm di differenza la nota lo segnala come ambiguo.
+
+## Rilevatori da controsoffitto (`dz_Buzzer`)
+
+Le istanze il cui **family name** contiene sia `e_FA.DE` sia `False Ceiling` (confronto senza
+distinzione fra maiuscole e minuscole, `BUZZER_FAMILY_TOKENS`) sono rilevatori installati nel
+plenum, con la parte visibile sul controsoffitto:
+
+- passano lo **stesso screening** delle altre famiglie (`u_VIS_Ceiling_installation` = Yes);
+- vanno **sempre all'intradosso del solaio di chiusura**, anche quando il piano ha un
+  controsoffitto;
+- il parametro di istanza `dz_Buzzer` (lunghezza) riceve la distanza **intradosso solaio -
+  faccia inferiore del controsoffitto**, misurata sulla verticale del dispositivo con le stesse
+  regole del bersaglio (controsoffitto del piano più vicino al punto, pacchetti di più istanze
+  sulla faccia inferiore);
+- dove sotto il dispositivo **non c'è controsoffitto**, `dz_Buzzer` prende il valore della
+  finestra di avvio, e la nota lo dichiara.
+
+La retta di analisi vale se interseca **il solaio oppure il controsoffitto**: questi rilevatori
+sono di solito modellati all'altezza del controsoffitto, e misurare solo dal solaio li
+manderebbe quasi tutti oltre tolleranza.
+
+Senza un `dz_Buzzer` scrivibile il rilevatore viene **saltato**, non spostato: portato al
+solaio, la sua parte visibile resterebbe lassù. Motivi: parametro mancante, di tipo invece
+che di istanza, non di tipo lunghezza, in sola lettura (pilotato da una formula). Senza
+solaio di chiusura sopra il dispositivo, viene saltato anch'esso.
+
+Spostamento e scrittura di `dz_Buzzer` avvengono nella stessa `SubTransaction`: riescono o
+falliscono insieme. Dopo il commit anche `dz_Buzzer` viene riletto.
 
 ## Modelli collegati
 
@@ -202,13 +240,55 @@ sbloccarlo, uno a 400 mm probabilmente no.
   per il resoconto, elimina solo i warning senza risoluzioni e chiede il rollback sugli
   errori. Nessun vincolo dell'utente viene sbloccato.
 
-## Resoconto
+## Esito
+
+### Finestra di esito
+
+È il report semplificato. In testa solo i **totali**: elementi selezionati, allineati (in
+simulazione: da allineare), di cui rilevatori da controsoffitto con `dz_Buzzer`, già a posto,
+non allineati. Gli elementi allineati **non sono elencati**.
+
+Sotto, la tabella dei soli **elementi non allineati**: falliti in applicazione, oltre
+tolleranza e saltati, screening compreso. Se non ce n'è nessuno la tabella lo dice.
+
+| Colonna | Contenuto |
+| --- | --- |
+| Show | Pulsante 🔍: seleziona l'elemento nel modello e lascia navigare la vista (sotto) |
+| Status | `Failed` (errore, rollback, quota o `dz_Buzzer` diversi dal bersaglio dopo il commit) o `Not aligned` |
+| Id, Category, Family: Type, Level | Identificazione dell'elemento; il livello è quello del piano di riferimento usato |
+| Target | `Ceiling` o `Floor soffit`, se un bersaglio c'era |
+| Move (mm) | Spostamento che servirebbe, positivo verso l'alto |
+| dz_Buzzer (mm) | Valore che si è tentato di scrivere sui rilevatori falliti |
+| Notes | Motivo |
+
+La tabella è **interrogabile**: ricerca su tutte le colonne, filtro per valore dall'imbuto di
+ogni intestazione (come in Excel), ordinamento cliccando l'intestazione, *Clear Filters*.
+Le righe `Not aligned` sono in arancio chiaro, le `Failed` in rosso chiaro. La griglia usa
+lo schema di MEPQTO: `DataTable` legata alla `DataGrid`, ricerca con `DataView.RowFilter` e
+`LIKE` con escape, filtri per colonna da `GridFilters`.
+
+**Navigazione nel modello**, con lo schema di RNWFlowCalculation: il pulsante 🔍 di una riga
+chiude la finestra, seleziona l'elemento e lo inquadra (`ShowElements`), poi lascia navigare
+la vista attiva (pan, zoom, orbita) con una `PickObjects` in cui si possono cliccare solo gli
+elementi della riga. Con **Fine** o **Esc** la finestra si riapre com'era: ricerca, filtri per
+colonna e riga di partenza (`ResultState`). *🔍 Show All Listed* fa lo stesso con tutte le
+righe visibili con la ricerca e i filtri correnti. La selezione resta sugli elementi anche
+dopo il ritorno alla tabella.
+
+La finestra è modale: una finestra non modale richiederebbe un `ExternalEvent` per ogni
+chiamata alla Revit API.
+
+### Report avanzato
+
+Il pulsante **Advanced Report** chiude la finestra e stampa nel pannello di output il
+resoconto completo, con le sezioni elencate qui sotto. Se la finestra di esito non si apre
+(per esempio per un errore nel layout), il report avanzato viene stampato comunque.
 
 | Sezione | Contenuto |
 | --- | --- |
 | Intestazione | Impostazioni usate, quanti esclusi dallo screening |
 | Summary by category | Selezionati, allineati, già a posto, non a soffitto, saltati, oltre tolleranza |
-| Elements aligned / to align | Livello, bersaglio, superficie, quota prima e dopo rispetto al livello, spostamento (positivo verso l'alto), note, esito |
+| Elements aligned / to align | Livello, bersaglio, superficie, quota prima e dopo rispetto al livello, spostamento (positivo verso l'alto), `dz_Buzzer` prima -> dopo, note, esito |
 | Elements already aligned | Già entro 1 mm dalla superficie |
 | Skipped as beyond the tolerance | Superficie, spostamento necessario, sforamento, e una riga che dice di quanto alzare la tolleranza |
 | Skipped elements | Motivo, superficie bersaglio, spostamento necessario |
@@ -237,11 +317,17 @@ Le superfici dei modelli collegati non sono selezionabili dall'host: per loro si
 
 ## Da verificare in Revit
 
-Lo strumento è stato provato fuori da Revit (sintassi, finestra con il motore IronPython di
-pyRevit, logica di decisione con superfici finte). Va ancora provato su un modello reale:
+Lo strumento è stato provato fuori da Revit (sintassi, le due finestre con il motore
+IronPython di pyRevit, logica di decisione e righe della finestra di esito con superfici e
+record finti). Va ancora provato su un modello reale:
 
 1. `Face.Intersect` con la sonda verticale su solai con aperture e su controsoffitti *Basic*;
 2. spostamento in Z di famiglie basate sul livello e basate su piano di lavoro;
-3. pacchetto solaio strutturale (link STR) + finiture (link ARC);
+3. pacchetto solaio strutturale (link STR) + finiture (link ARC), e controsoffitto in più
+   istanze;
 4. dispositivo riferito al livello superiore con scostamento negativo;
-5. tempi su una selezione grande in un modello con molti controsoffitti.
+5. rilevatori `e_FA.DE` / `False Ceiling`: scrittura di `dz_Buzzer` e posizione della parte
+   visibile sul controsoffitto;
+6. pulsante 🔍: selezione, inquadratura, navigazione con `PickObjects` e ritorno alla
+   finestra con lo stato di prima;
+7. tempi su una selezione grande in un modello con molti controsoffitti.

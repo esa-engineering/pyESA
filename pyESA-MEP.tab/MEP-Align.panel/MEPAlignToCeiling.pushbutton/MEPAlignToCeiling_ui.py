@@ -26,7 +26,7 @@ def parse_number(text):
 
 
 class AlignToCeilingWindow(object):
-    """Categorie, superfici bersaglio, tolleranza e opzioni."""
+    """Categorie, tolleranza, dz_Buzzer di riserva e opzioni."""
 
     def __init__(self, xaml_path, info):
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
@@ -40,14 +40,14 @@ class AlignToCeilingWindow(object):
         self.search_box = find("SearchBox")
         self.tolerance_box = find("ToleranceBox")
         self.tolerance_hint = find("ToleranceHint")
-        self.use_ceilings = find("UseCeilings")
-        self.use_floors = find("UseFloors")
+        self.buzzer_box = find("BuzzerBox")
         self.include_links = find("IncludeLinks")
         self.skip_connected = find("SkipConnected")
         self.dry_run = find("DryRun")
 
         find("SelectionText").Text = info["selection_text"]
         find("SelectionDetail").Text = info["detail_text"]
+        find("BuzzerText").Text = info["buzzer_text"]
 
         for name, label, count, flagged, checked in info["categories"]:
             check = CheckBox()
@@ -61,8 +61,7 @@ class AlignToCeilingWindow(object):
         self._populate_list()
 
         self.tolerance_box.Text = u"{:g}".format(info["tolerance_cm"])
-        self.use_ceilings.IsChecked = info["use_ceilings"]
-        self.use_floors.IsChecked = info["use_floors"]
+        self.buzzer_box.Text = u"{:g}".format(info["buzzer_cm"])
         self.include_links.IsChecked = info["include_links"]
         self.skip_connected.IsChecked = info["skip_connected"]
         self.dry_run.IsChecked = False
@@ -163,16 +162,21 @@ class AlignToCeilingWindow(object):
         if tolerance > self._info["max_tolerance_cm"]:
             return False, u"The tolerance looks out of scale (over {:g} cm).".format(
                 self._info["max_tolerance_cm"]), None
+        ok, buzzer = parse_number(self.buzzer_box.Text)
+        if not ok:
+            return False, u"dz_Buzzer must be a number (cm).", None
+        if buzzer < 0:
+            return False, u"dz_Buzzer cannot be negative.", None
+        if buzzer > self._info["max_buzzer_cm"]:
+            return False, u"dz_Buzzer looks out of scale (over {:g} cm).".format(
+                self._info["max_buzzer_cm"]), None
         categories = [c.Tag for c in self._checks if c.IsChecked]
         if not categories:
             return False, u"Select at least one category to align.", None
-        if not (self.use_ceilings.IsChecked or self.use_floors.IsChecked):
-            return False, u"Select at least one target surface: ceilings, floor soffits or both.", None
         return True, u"", {
             "categories": categories,
             "tolerance_cm": tolerance,
-            "use_ceilings": bool(self.use_ceilings.IsChecked),
-            "use_floors": bool(self.use_floors.IsChecked),
+            "buzzer_cm": buzzer,
             "include_links": bool(self.include_links.IsChecked),
             "skip_connected": bool(self.skip_connected.IsChecked),
             "dry_run": bool(self.dry_run.IsChecked),

@@ -1,22 +1,27 @@
 title: "MEP\nAlign to Ceiling"
 tooltip: >
   Moves the selected MEP devices vertically so that their insertion point lies on the bottom
-  face of the ceiling above them or, where there is no ceiling, on the soffit of the floor
-  slab that closes their level. Plan position and rotation are never changed.
+  face of the ceiling above them or, where the storey has no ceiling there, on the soffit of
+  the floor slab that closes their level. Plan position and rotation are never changed.
 
   CLICK: select the devices, then run the command. Only instances with the Yes/No instance
   parameter u_VIS_Ceiling_installation = Yes are processed. A dialog asks which categories to
-  process, which target surfaces to use, the tolerance (50 cm by default) and whether to run a
+  process, the tolerance (50 cm by default), the dz_Buzzer fallback value and whether to run a
   simulation first.
 
-  A vertical line twice the tolerance long, centred on the insertion point, must cross the
-  bottom face of the ceiling or slab. Ceilings and slabs are read in this model and in the
-  linked models; stacked instances in contact count as one package and the target is its
-  bottom face. A ceiling in the storey always comes first: if it is beyond the tolerance the
-  element is skipped, never pushed above the ceiling.
+  The target is found automatically. A vertical line twice the tolerance long, centred on the
+  insertion point, must cross its bottom face. Ceilings and slabs are read in this model and in
+  the linked models; stacked instances in contact count as one package and the target is its
+  bottom face. A ceiling beyond the tolerance means the element is skipped, never pushed above
+  the ceiling.
 
-  Every selected element appears in the report with its own outcome and reason. Devices beyond
-  the tolerance, hosted, pinned, inside a group or in an inactive design option are left
-  untouched and listed.
+  False ceiling detectors (family name with "e_FA.DE" and "False Ceiling") always go to the
+  slab soffit, and their dz_Buzzer parameter gets the slab to ceiling distance measured at the
+  device, or the dialog value where there is no ceiling.
+
+  At the end a window shows the totals and a searchable table of the elements that were not
+  aligned, with the reason. The search button of a row selects the element in the model and
+  lets you navigate the view; Finish or Esc returns to the table. The full report is one click
+  away (Advanced Report).
 author: ESA Engineering
 help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx
