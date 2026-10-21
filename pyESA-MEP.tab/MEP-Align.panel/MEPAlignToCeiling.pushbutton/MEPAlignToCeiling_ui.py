@@ -26,7 +26,7 @@ def parse_number(text):
 
 
 class AlignToCeilingWindow(object):
-    """Categorie, tolleranza, dz_Buzzer di riserva e opzioni."""
+    """Categorie, tolleranza (mm) e opzioni."""
 
     def __init__(self, xaml_path, info):
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
@@ -40,7 +40,6 @@ class AlignToCeilingWindow(object):
         self.search_box = find("SearchBox")
         self.tolerance_box = find("ToleranceBox")
         self.tolerance_hint = find("ToleranceHint")
-        self.buzzer_box = find("BuzzerBox")
         self.include_links = find("IncludeLinks")
         self.skip_connected = find("SkipConnected")
         self.dry_run = find("DryRun")
@@ -60,8 +59,7 @@ class AlignToCeilingWindow(object):
             self._checks.append(check)
         self._populate_list()
 
-        self.tolerance_box.Text = u"{:g}".format(info["tolerance_cm"])
-        self.buzzer_box.Text = u"{:g}".format(info["buzzer_cm"])
+        self.tolerance_box.Text = u"{:g}".format(info["tolerance_mm"])
         self.include_links.IsChecked = info["include_links"]
         self.skip_connected.IsChecked = info["skip_connected"]
         self.dry_run.IsChecked = False
@@ -138,7 +136,7 @@ class AlignToCeilingWindow(object):
     def _refresh_tolerance_hint(self):
         ok, value = parse_number(self.tolerance_box.Text)
         if ok and value > 0:
-            line = u"{:g} cm".format(value * self._info["line_factor"])
+            line = u"{:g} mm".format(value * self._info["line_factor"])
         else:
             line = u"twice the tolerance"
         self.tolerance_hint.Text = (
@@ -156,27 +154,18 @@ class AlignToCeilingWindow(object):
         """(ok, messaggio, valori)."""
         ok, tolerance = parse_number(self.tolerance_box.Text)
         if not ok:
-            return False, u"The tolerance must be a number (cm).", None
+            return False, u"The tolerance must be a number (mm).", None
         if tolerance <= 0:
             return False, u"The tolerance must be greater than zero.", None
-        if tolerance > self._info["max_tolerance_cm"]:
-            return False, u"The tolerance looks out of scale (over {:g} cm).".format(
-                self._info["max_tolerance_cm"]), None
-        ok, buzzer = parse_number(self.buzzer_box.Text)
-        if not ok:
-            return False, u"dz_Buzzer must be a number (cm).", None
-        if buzzer < 0:
-            return False, u"dz_Buzzer cannot be negative.", None
-        if buzzer > self._info["max_buzzer_cm"]:
-            return False, u"dz_Buzzer looks out of scale (over {:g} cm).".format(
-                self._info["max_buzzer_cm"]), None
+        if tolerance > self._info["max_tolerance_mm"]:
+            return False, u"The tolerance looks out of scale (over {:g} mm).".format(
+                self._info["max_tolerance_mm"]), None
         categories = [c.Tag for c in self._checks if c.IsChecked]
         if not categories:
             return False, u"Select at least one category to align.", None
         return True, u"", {
             "categories": categories,
-            "tolerance_cm": tolerance,
-            "buzzer_cm": buzzer,
+            "tolerance_mm": tolerance,
             "include_links": bool(self.include_links.IsChecked),
             "skip_connected": bool(self.skip_connected.IsChecked),
             "dry_run": bool(self.dry_run.IsChecked),

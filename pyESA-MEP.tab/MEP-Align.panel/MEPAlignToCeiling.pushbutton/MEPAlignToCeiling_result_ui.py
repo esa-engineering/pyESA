@@ -6,12 +6,12 @@ dei soli elementi NON allineati, con le note. La tabella e' interrogabile
 (ricerca su tutte le colonne, filtri per valore nell'intestazione,
 ordinamento per colonna).
 
-Navigazione, come in RNWFlowCalculation: il pulsante di una riga (o "Show All
-Listed") chiude la finestra con kind = KIND_SHOW e le chiavi delle righe; lo
-script seleziona gli elementi, li inquadra e lascia navigare la vista attiva
-finche' l'utente non preme Fine o Esc, poi riapre la finestra passando lo
-stesso ResultState (ricerca, filtri, riga da riportare in vista). Una finestra
-non modale richiederebbe ExternalEvent.
+La finestra e' NON MODALE: resta aperta a comando finito, quindi Revit e'
+libero e l'utente puo' spostare gli elementi e cambiarne i parametri mentre la
+tabella e' a video. Il pulsante di una riga (o "Show All Listed") chiama
+info["show"](chiavi), "Advanced Report" chiama info["report"](): lo script le
+esegue tramite un ExternalEvent, l'unico modo di usare la Revit API da una
+finestra non modale. set_status() mostra l'esito dell'ultima richiesta.
 
 Il modulo non conosce la Revit API. Nessun riferimento a documento o output a
 livello di modulo (Rocket mode).
@@ -29,14 +29,10 @@ from System.IO import File
 from System.Windows import RoutedEventHandler, Visibility
 from System.Windows.Controls import Button
 from System.Windows.Controls.Primitives import ButtonBase
+from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
 import MEPAlignToCeiling_grid_filter as grid_filter
-
-
-KIND_CLOSE = "close"
-KIND_SHOW = "show"
-KIND_REPORT = "report"
 
 # (colonna della DataTable, chiave della riga, tipo .NET). Key resta nascosta:
 # lega la riga all'elemento.
@@ -82,25 +78,12 @@ def build_table(rows):
     return table
 
 
-class ResultState(object):
-    """Stato della finestra che sopravvive alla navigazione nella vista."""
-
-    def __init__(self):
-        self.search = u""
-        self.filter_values = {}     # campo -> insieme dei valori ammessi
-        self.last_key = None        # riga da riportare in vista alla riapertura
-
-
 class ResultWindow(object):
-    """Totali e tabella dei non allineati. show() ritorna se stesso: kind,
-    show_keys e state dicono allo script cosa fare."""
+    """Totali e tabella dei non allineati, in una finestra non modale."""
 
-    def __init__(self, xaml_path, info, state=None):
+    def __init__(self, xaml_path, info):
         self.window = XamlReader.Parse(File.ReadAllText(xaml_path))
         self.info = info
-        self.state = state if state is not None else ResultState()
-        self.kind = KIND_CLOSE
-        self.show_keys = []
 
         find = self.window.FindName
         self.window.Title = info["title"]
@@ -109,6 +92,7 @@ class ResultWindow(object):
         self.search_box = find("SearchBox")
         self.row_count = find("RowCount")
         self.empty_text = find("EmptyText")
+        self.status_text = find("StatusText")
         # Titolo da impostare PRIMA di GridFilters, che sostituisce le
         # intestazioni con titolo + imbuto.
         find("BuzzerColumn").Header = info["buzzer_header"]
@@ -121,7 +105,6 @@ class ResultWindow(object):
             formatters={"Id": lambda value: u"{:.0f}".format(value),
                         "Move": lambda value: u"{:+.0f}".format(value),
                         "Buzzer": lambda value: u"{:.0f}".format(value)})
-        self._restore_state()
 
         self.search_box.TextChanged += self._on_search
         find("ClearSearchButton").Click += self._on_clear_search
@@ -134,39 +117,15 @@ class ResultWindow(object):
         self.window.Closed += self._on_window_closed
 
         self._apply_filter()
-        self._scroll_to_last()
 
-    # --- stato ---------------------------------------------------------
-
-    def _restore_state(self):
-        self.search_box.Text = self.state.search or u""
-        for field, values in self.state.filter_values.items():
-            column_filter = self.filters.filters.get(field)
-            if column_filter is None:
-                continue
-            column_filter.values = set(values)
-            self.filters._update_header(column_filter)
-
-    def _save_state(self):
-        self.state.search = self.search_box.Text or u""
-        self.state.filter_values = dict(
-            (field, set(f.values)) for field, f in self.filters.filters.items() if f.active)
-
-    def _scroll_to_last(self):
-        key = self.state.last_key
-        if key is None:
-            return
-        for item in self.table.DefaultView:
-            if item["Key"] == key:
-                try:
-                    self.grid.SelectedItem = item
-                    self.grid.ScrollIntoView(item)
-                except Exception:
-                    pass
-                break
+    def set_status(self, text):
+        """Esito dell'ultima richiesta, sotto la tabella."""
+        self.status_text.Text = text or u""
 
     def _on_window_closed(self, sender, args):
-        self._save_state()
+        closed = self.info.get("closed")
+        if closed is not None:
+            closed()
 
     # --- filtri --------------------------------------------------------
 
@@ -213,41 +172,55 @@ class ResultWindow(object):
         except Exception:
             return None
 
-    def _request_show(self, keys, last_key):
-        """Chiude la finestra chiedendo allo script di mostrare gli elementi."""
+    def _request_show(self, keys):
+        """Chiede allo script di selezionare e inquadrare gli elementi.
+
+        La finestra resta aperta: l'utente lavora in Revit e torna qui quando
+        vuole.
+        """
         if not keys:
+            self.set_status(u"No row to show.")
             return
-        self.kind = KIND_SHOW
-        self.show_keys = list(keys)
-        self.state.last_key = last_key
-        self.window.Close()
+        self.set_status(u"Selecting {} element(s) in the model...".format(len(keys)))
+        self.info["show"](list(keys))
 
     def _on_row_button(self, sender, args):
         key = self._button_key(args)
         if key is None:
             return
         args.Handled = True
-        self._request_show([key], key)
+        self.grid.SelectedItem = args.OriginalSource.DataContext
+        self._request_show([key])
 
     def _on_show_all(self, sender, args):
-        keys = [int(item["Key"]) for item in self.table.DefaultView]
-        self._request_show(keys, None)
+        self._request_show([int(item["Key"]) for item in self.table.DefaultView])
 
-    # --- chiusura ------------------------------------------------------
+    # --- report e chiusura ---------------------------------------------
 
     def _on_advanced(self, sender, args):
-        self.kind = KIND_REPORT
-        self.window.Close()
+        self.set_status(u"Printing the advanced report in the pyRevit output panel...")
+        self.info["report"]()
 
     def _on_close(self, sender, args):
-        self.kind = KIND_CLOSE
         self.window.Close()
 
-    def show(self):
-        self.window.ShowDialog()
+    def show_modeless(self, owner_handle=None):
+        """Mostra la finestra senza bloccare Revit.
+
+        Owner = finestra di Revit: resta davanti a Revit e si riduce con lui.
+        EnableModelessKeyboardInterop fa arrivare i tasti alla ricerca invece
+        che alle scorciatoie di Revit.
+        """
+        if owner_handle is not None:
+            try:
+                WindowInteropHelper(self.window).Owner = owner_handle
+            except Exception:
+                pass
+        try:
+            clr.AddReference("WindowsFormsIntegration")
+            from System.Windows.Forms.Integration import ElementHost
+            ElementHost.EnableModelessKeyboardInterop(self.window)
+        except Exception:
+            pass
+        self.window.Show()
         return self
-
-
-def show_result(xaml_path, info, state=None):
-    """Mostra la finestra; ritorna la finestra chiusa (kind, show_keys, state)."""
-    return ResultWindow(xaml_path, info, state).show()

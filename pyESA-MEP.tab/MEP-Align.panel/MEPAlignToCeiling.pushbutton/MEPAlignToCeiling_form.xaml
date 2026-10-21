@@ -112,19 +112,8 @@
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionHeader}" Text="🔔 FALSE CEILING DETECTORS"/>
                         <TextBlock x:Name="BuzzerText" TextWrapping="Wrap" Text="-"/>
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="90"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="dz_Buzzer:"/>
-                            <TextBox x:Name="BuzzerBox" Grid.Column="1" Style="{StaticResource InputField}"/>
-                            <TextBlock Grid.Column="2" Style="{StaticResource UnitLabel}"
-                                       Text="cm, slab soffit to ceiling, where no ceiling is found"/>
-                        </Grid>
                         <TextBlock Style="{StaticResource HintText}"
-                                   Text="Families whose name contains both &quot;e_FA.DE&quot; and &quot;False Ceiling&quot; always go to the slab soffit, even when the storey has a ceiling. Their dz_Buzzer parameter gets the distance between the slab soffit and the bottom face of the ceiling, measured on the model at each device. The value above is used only where there is no ceiling under the device."/>
+                                   Text="Families whose name contains both &quot;e_FA.DE&quot; and &quot;False Ceiling&quot; always go to the soffit, even when the storey has a ceiling. The soffit is the slab, or the bottom face of a ceiling in contact with the slab (a finish or an insulation layer). Their dz_Buzzer parameter is always measured on the model, at each device: from the soffit to the bottom face of the false ceiling below. A detector with no false ceiling detached from the slab below it is reported as unsuitable and left untouched."/>
                     </StackPanel>
                 </Border>
 
@@ -142,7 +131,7 @@
                             <TextBlock Style="{StaticResource FieldLabel}" Text="Tolerance:"/>
                             <TextBox x:Name="ToleranceBox" Grid.Column="1" Style="{StaticResource InputField}"/>
                             <TextBlock x:Name="ToleranceUnit" Grid.Column="2" Style="{StaticResource UnitLabel}"
-                                       Text="cm above and below the insertion point"/>
+                                       Text="mm above and below the insertion point"/>
                         </Grid>
                         <TextBlock x:Name="ToleranceHint" Style="{StaticResource HintText}" Text="-"/>
                     </StackPanel>
@@ -172,7 +161,7 @@
                         <TextBlock Style="{StaticResource SectionHeader}" Foreground="Gray"
                                    Text="ℹ️ HOW IT WORKS"/>
                         <TextBlock Style="{StaticResource HintText}" Margin="0"
-                                   Text="Only instances with the Yes/No instance parameter u_VIS_Ceiling_installation = Yes are processed. The target is found automatically: the bottom face of the ceiling where the storey has one on the vertical of the device, otherwise the soffit of the floor slab that closes the storey. A ceiling beyond the tolerance means the element is skipped, never pushed above the ceiling. Stacked ceiling or floor instances in contact, also from different linked models, count as one package and the target is its bottom face. Each element is moved vertically only: plan position and rotation never change. At the end a table lists every selected element with its outcome."/>
+                                   Text="Only instances with the Yes/No instance parameter u_VIS_Ceiling_installation = Yes are processed. The target is found automatically: the bottom face of the ceiling where the storey has one on the vertical of the device, otherwise the soffit of the floor slab that closes the storey. A ceiling beyond the tolerance means the element is skipped, never pushed above the ceiling. Stacked ceiling or floor instances in contact, also from different linked models, count as one package and the target is its bottom face. Each element is moved vertically only: plan position and rotation never change. At the end a window shows the totals and the elements not aligned; it stays open while you work in Revit."/>
                     </StackPanel>
                 </Border>
 

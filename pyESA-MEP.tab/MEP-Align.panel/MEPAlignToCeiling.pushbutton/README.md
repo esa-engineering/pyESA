@@ -38,16 +38,16 @@ degli avvisi di Revit.
    | --- | --- |
    | Elements | Quanti elementi sono selezionati e quanti hanno `u_VIS_Ceiling_installation = Yes` |
    | Categories | Solo le categorie presenti nella selezione, con i due conteggi. Ricerca, Select All / Deselect All |
-   | False ceiling detectors | Quanti rilevatori da controsoffitto ci sono nella selezione e il valore di riserva di `dz_Buzzer` (cm, predefinito 50) |
-   | Tolerance | Predefinita 50 cm, massimo 300 cm. Accetta virgola o punto |
+   | False ceiling detectors | Quanti rilevatori da controsoffitto ci sono nella selezione (solo informazione: `dz_Buzzer` è sempre misurato) |
+   | Tolerance | **In mm**, predefinita 500, massimo 5000. Accetta virgola o punto. Il valore salvato in cm dalle versioni precedenti viene convertito |
    | Options | Cerca nei modelli collegati (attiva), salta gli elementi connessi (non attiva), simulazione (non attiva) |
 
    Il bersaglio non si sceglie: lo strumento riconosce da solo se sulla verticale del
    dispositivo il piano ha un controsoffitto (vedi "Controsoffitto prima del solaio").
    Le scelte (tranne la simulazione) restano memorizzate nella sezione `ESA_MEPAlignToCeiling`
    della configurazione pyRevit. Le categorie tolte restano tolte alla prossima apertura.
-3. **Finestra di esito**: i totali e la tabella degli elementi non allineati, con le note e un
-   pulsante per vederli nel modello. Il resoconto completo nel pannello di output è il **report avanzato**, stampato
+3. **Finestra di esito**, non modale: i totali e la tabella degli elementi non allineati, con
+   le note e un pulsante per selezionarli nel modello e modificarli a finestra aperta. Il resoconto completo nel pannello di output è il **report avanzato**, stampato
    con il pulsante *Advanced Report* (vedi "Esito").
 
 Le categorie gestite sono le stesse di MEPAlignToWall: Air Terminals, Communication Devices,
@@ -161,23 +161,29 @@ distinzione fra maiuscole e minuscole, `BUZZER_FAMILY_TOKENS`) sono rilevatori i
 plenum, con la parte visibile sul controsoffitto:
 
 - passano lo **stesso screening** delle altre famiglie (`u_VIS_Ceiling_installation` = Yes);
-- vanno **sempre all'intradosso del solaio di chiusura**, anche quando il piano ha un
-  controsoffitto;
-- il parametro di istanza `dz_Buzzer` (lunghezza) riceve la distanza **intradosso solaio -
-  faccia inferiore del controsoffitto**, misurata sulla verticale del dispositivo con le stesse
-  regole del bersaglio (controsoffitto del piano più vicino al punto, pacchetti di più istanze
-  sulla faccia inferiore);
-- dove sotto il dispositivo **non c'è controsoffitto**, `dz_Buzzer` prende il valore della
-  finestra di avvio, e la nota lo dichiara.
+- vanno **sempre all'intradosso**, anche quando il piano ha un controsoffitto. L'intradosso è
+  il solaio di chiusura **più i controsoffitti a contatto con la sua faccia inferiore**
+  (faccia superiore del Ceiling che coincide, entro `STACK_GAP_MM`, con la faccia inferiore del
+  solaio): una finitura o uno strato di isolante modellati come Ceiling. In quel caso il
+  rilevatore va alla faccia inferiore di quel controsoffitto (`soffit_package()`);
+- il **controsoffitto vero** (false ceiling) è un controsoffitto del piano **staccato**
+  dall'intradosso. Il parametro di istanza `dz_Buzzer` (lunghezza) riceve **sempre e solo il
+  valore misurato**: distanza fra l'intradosso e la faccia inferiore del false ceiling, sulla
+  verticale del dispositivo (il false ceiling più vicino al punto, pacchetti di più istanze
+  sulla faccia inferiore). Non c'è nessun valore da digitare nella finestra;
+- se sotto il dispositivo **non c'è un false ceiling** (nessun controsoffitto, oppure solo
+  uno incollato al solaio), il rilevatore è la famiglia sbagliata: viene **saltato** con
+  l'errore *Unsuitable detector: no false ceiling below it*. Il rilevatore da controsoffitto
+  si mette solo dove c'è un controsoffitto non allineato al solaio.
 
-La retta di analisi vale se interseca **il solaio oppure il controsoffitto**: questi rilevatori
-sono di solito modellati all'altezza del controsoffitto, e misurare solo dal solaio li
-manderebbe quasi tutti oltre tolleranza.
+La retta di analisi vale se interseca **l'intradosso oppure il false ceiling**: questi
+rilevatori sono di solito modellati all'altezza del controsoffitto, e misurare solo
+dall'intradosso li manderebbe quasi tutti oltre tolleranza.
 
-Senza un `dz_Buzzer` scrivibile il rilevatore viene **saltato**, non spostato: portato al
-solaio, la sua parte visibile resterebbe lassù. Motivi: parametro mancante, di tipo invece
-che di istanza, non di tipo lunghezza, in sola lettura (pilotato da una formula). Senza
-solaio di chiusura sopra il dispositivo, viene saltato anch'esso.
+Senza un `dz_Buzzer` scrivibile il rilevatore viene **saltato**, non spostato: portato
+all'intradosso, la sua parte visibile resterebbe lassù. Motivi: parametro mancante, di tipo
+invece che di istanza, non di tipo lunghezza, in sola lettura (pilotato da una formula).
+Senza solaio di chiusura sopra il dispositivo, viene saltato anch'esso.
 
 Spostamento e scrittura di `dz_Buzzer` avvengono nella stessa `SubTransaction`: riescono o
 falliscono insieme. Dopo il commit anche `dz_Buzzer` viene riletto.
@@ -267,20 +273,29 @@ Le righe `Not aligned` sono in arancio chiaro, le `Failed` in rosso chiaro. La g
 lo schema di MEPQTO: `DataTable` legata alla `DataGrid`, ricerca con `DataView.RowFilter` e
 `LIKE` con escape, filtri per colonna da `GridFilters`.
 
-**Navigazione nel modello**, con lo schema di RNWFlowCalculation: il pulsante 🔍 di una riga
-chiude la finestra, seleziona l'elemento e lo inquadra (`ShowElements`), poi lascia navigare
-la vista attiva (pan, zoom, orbita) con una `PickObjects` in cui si possono cliccare solo gli
-elementi della riga. Con **Fine** o **Esc** la finestra si riapre com'era: ricerca, filtri per
-colonna e riga di partenza (`ResultState`). *🔍 Show All Listed* fa lo stesso con tutte le
-righe visibili con la ricerca e i filtri correnti. La selezione resta sugli elementi anche
-dopo il ritorno alla tabella.
+**La finestra è non modale** e resta aperta a comando finito: Revit è libero. Il pulsante 🔍
+di una riga (pulsante per riga come in RNWFlowCalculation) seleziona l'elemento e lo
+inquadra (`ShowElements`); da lì si naviga la vista, si sposta l'elemento, si cambiano i
+parametri nelle Proprietà, e si torna alla tabella per la riga successiva. *🔍 Show All
+Listed* fa lo stesso con tutte le righe visibili con la ricerca e i filtri correnti. Sotto la
+tabella una riga di stato dice l'esito dell'ultima richiesta (elemento cancellato nel
+frattempo, modello diverso attivo, vista che non può inquadrare).
 
-La finestra è modale: una finestra non modale richiederebbe un `ExternalEvent` per ogni
-chiamata alla Revit API.
+**La tabella non si aggiorna** dopo le modifiche fatte a mano: per ricontrollarle si rilancia
+il comando.
+
+Come funziona: da una finestra non modale la Revit API si usa solo tramite `ExternalEvent`.
+`ResultEventHandler` (un `IExternalEventHandler`) esegue le richieste della finestra (mostra,
+report avanzato) quando Revit è libero. Il motore IronPython deve restare vivo dopo il
+comando: `engine: persistent: true` nel `bundle.yaml`, come ColorSplasher e Keynotes di
+pyRevit. Finestra, gestore ed evento restano referenziati in `OPEN_RESULT_WINDOWS` finché la
+finestra è aperta. La finestra ha come owner la finestra di Revit e
+`EnableModelessKeyboardInterop`, perché i tasti arrivino alla ricerca e non alle scorciatoie
+di Revit.
 
 ### Report avanzato
 
-Il pulsante **Advanced Report** chiude la finestra e stampa nel pannello di output il
+Il pulsante **Advanced Report** (la finestra resta aperta) stampa nel pannello di output il
 resoconto completo, con le sezioni elencate qui sotto. Se la finestra di esito non si apre
 (per esempio per un errore nel layout), il report avanzato viene stampato comunque.
 
@@ -326,8 +341,9 @@ record finti). Va ancora provato su un modello reale:
 3. pacchetto solaio strutturale (link STR) + finiture (link ARC), e controsoffitto in più
    istanze;
 4. dispositivo riferito al livello superiore con scostamento negativo;
-5. rilevatori `e_FA.DE` / `False Ceiling`: scrittura di `dz_Buzzer` e posizione della parte
-   visibile sul controsoffitto;
-6. pulsante 🔍: selezione, inquadratura, navigazione con `PickObjects` e ritorno alla
-   finestra con lo stato di prima;
+5. rilevatori `e_FA.DE` / `False Ceiling`: scrittura di `dz_Buzzer`, posizione della parte
+   visibile sul controsoffitto, caso con finitura (Ceiling) incollata al solaio;
+6. finestra non modale: pulsante 🔍 con l'`ExternalEvent`, modifica degli elementi con la
+   finestra aperta, digitazione nella ricerca, *Advanced Report* stampato dopo la fine del
+   comando, comportamento con Rocket mode attivo;
 7. tempi su una selezione grande in un modello con molti controsoffitti.

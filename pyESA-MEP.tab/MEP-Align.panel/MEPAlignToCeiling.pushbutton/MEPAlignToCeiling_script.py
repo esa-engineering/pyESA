@@ -21,23 +21,24 @@
 # Il bersaglio non lo sceglie l'utente: se sulla verticale del dispositivo
 # c'e' un controsoffitto nel piano si va li', altrimenti all'intradosso del
 # solaio. Fanno eccezione i rilevatori da controsoffitto (family name con
-# "e_FA.DE" e "False Ceiling"): vanno SEMPRE all'intradosso del solaio, e il
-# loro parametro dz_Buzzer riceve la distanza solaio - controsoffitto, misurata
-# sul modello o, dove il controsoffitto manca, presa dalla finestra di avvio.
+# "e_FA.DE" e "False Ceiling"): vanno SEMPRE all'intradosso (il solaio, o un
+# controsoffitto incollato al solaio come finitura o isolante), e il loro
+# parametro dz_Buzzer riceve la distanza, sempre misurata, fino al
+# controsoffitto staccato sottostante. Senza quel controsoffitto il rilevatore
+# e' segnalato come non adeguato e non si sposta.
 #
-# Esito: una finestra con i totali e la tabella interrogabile dei soli
-# elementi non allineati; il pulsante di una riga mostra l'elemento nel
-# modello e lascia navigare la vista (schema di RNWFlowCalculation). Il
-# resoconto dettagliato nel pannello di output e' il "report avanzato",
-# stampato su richiesta.
+# Esito: una finestra NON MODALE con i totali e la tabella interrogabile dei
+# soli elementi non allineati; il pulsante di una riga seleziona e inquadra
+# l'elemento, e Revit resta libero per modificarlo. Il resoconto dettagliato
+# nel pannello di output e' il "report avanzato", stampato su richiesta.
 #
 # La logica completa (piano di riferimento, pacchetti di piu' istanze anche
 # da modelli collegati, precedenza del controsoffitto, limiti noti) e'
 # descritta nel README.md della cartella: va tenuto allineato al codice.
 # --------------------------------------------------------------------------
 __title__ = "MEP\nAlign to Ceiling"
-__doc__ = """Version = 1.1
-Date    = 20.10.2026
+__doc__ = """Version = 1.3
+Date    = 21.10.2026
 ________________________________________________________________
 Description:
 Moves the selected MEP devices vertically so that their insertion point
@@ -46,8 +47,8 @@ ceiling, on the soffit of the floor slab that closes their level.
 Only instances with the Yes/No instance parameter
 u_VIS_Ceiling_installation = Yes are processed.
 False ceiling detectors (family name with "e_FA.DE" and "False Ceiling")
-always go to the slab soffit, and dz_Buzzer gets the slab - ceiling
-distance.
+always go to the soffit, and dz_Buzzer gets the measured distance down to
+the false ceiling; without a false ceiling they are reported as unsuitable.
 Plan position and rotation are never changed.
 ________________________________________________________________
 Author(s): ESA Engineering
@@ -112,13 +113,8 @@ CONFIG_SECTION = 'ESA_MEPAlignToCeiling'
 
 TRANSACTION_NAME = u'Align MEP to ceilings'
 
-DEFAULT_TOLERANCE_CM = 50.0     # soglia proposta nella finestra
-MAX_TOLERANCE_CM = 300.0        # oltre e' quasi certamente un errore di battitura
-
-# dz_Buzzer usato dove sotto un rilevatore da controsoffitto non c'e' nessun
-# controsoffitto da misurare. Valore proposto nella finestra di avvio.
-DEFAULT_BUZZER_CM = 50.0
-MAX_BUZZER_CM = 500.0
+DEFAULT_TOLERANCE_MM = 500.0    # soglia proposta nella finestra (in mm)
+MAX_TOLERANCE_MM = 5000.0      # oltre e' quasi certamente un errore di battitura
 
 # La retta di analisi e' lunga LINE_FACTOR volte la tolleranza ed e'
 # centrata sul punto di inserimento: si estende di una tolleranza sopra e di
@@ -179,6 +175,10 @@ R_CATEGORY_NOT_HANDLED = u'category not handled by the tool'
 R_CATEGORY_NOT_SELECTED = u'category cleared in the dialog'
 R_NO_SURFACE = u'no ceiling and no floor slab above the element in its storey'
 R_BUZZER_NO_SLAB = u'false ceiling detector: no floor slab above the element in its storey'
+# Il rilevatore da controsoffitto ha senso solo sotto un controsoffitto
+# staccato dal solaio. Senza, e' la famiglia sbagliata: errore, non si sposta.
+R_BUZZER_NO_CEILING = u'Unsuitable detector: no false ceiling below it (no ceiling detached ' \
+                      u'from the slab under the device)'
 R_BUZZER_MISSING = u'false ceiling detector: parameter "{}" not found on the instance'.format(BUZZER_PARAM)
 R_BUZZER_TYPE = u'false ceiling detector: "{}" is a type parameter, an instance parameter is ' \
                 u'expected'.format(BUZZER_PARAM)
@@ -218,10 +218,6 @@ def mm_to_internal(value_mm):
 def internal_to_mm(value_internal):
     """Converte dalle unita' interne di Revit a millimetri."""
     return DB.UnitUtils.ConvertFromInternalUnits(value_internal, DB.UnitTypeId.Millimeters)
-
-
-def cm_to_internal(value_cm):
-    return mm_to_internal(value_cm * 10.0)
 
 
 def format_mm(value_internal):
@@ -956,18 +952,13 @@ def collect_surface_sources(host_min, host_max, options, context):
 class AlignOptions(object):
     """Scelte effettuate dall'utente nella finestra di dialogo."""
 
-    def __init__(self, category_keys, tolerance_cm, buzzer_fallback_cm,
-                 include_links, skip_connected, dry_run):
+    def __init__(self, category_keys, tolerance_mm, include_links, skip_connected, dry_run):
         self.category_keys = category_keys
-        self.tolerance_cm = tolerance_cm
-        self.tolerance_internal = cm_to_internal(tolerance_cm)
+        self.tolerance_mm = tolerance_mm
+        self.tolerance_internal = mm_to_internal(tolerance_mm)
         # Semilunghezza della retta di analisi: la retta e' lunga
         # LINE_FACTOR volte la tolleranza e centrata sul punto.
         self.half_line = self.tolerance_internal * LINE_FACTOR / 2.0
-        # dz_Buzzer dei rilevatori da controsoffitto senza controsoffitto
-        # misurabile sotto.
-        self.buzzer_fallback_cm = buzzer_fallback_cm
-        self.buzzer_fallback = cm_to_internal(buzzer_fallback_cm)
         self.include_links = include_links
         self.skip_connected = skip_connected
         self.dry_run = dry_run
@@ -1012,6 +1003,7 @@ class TargetSearch(object):
         self.ceiling = None             # controsoffitto del piano piu' vicino, se c'e'
         self.second = None              # secondo controsoffitto candidato
         self.closing = None             # pacchetto del solaio di chiusura
+        self.attached = 0               # rilevatori: controsoffitti incollati al solaio
         self.reason = None              # motivo se target e' None
 
 
@@ -1162,6 +1154,26 @@ def above_storey_floor(package, storey):
     return package.bottom > storey.bound + LEVEL_TOL
 
 
+def soffit_package(closing, ceiling_packages):
+    """(intradosso, controsoffitti incollati) per un rilevatore da controsoffitto.
+
+    Si parte dal solaio di chiusura e si scende finche' c'e' un pacchetto di
+    controsoffitti la cui faccia superiore coincide (scarto <= STACK_GAP) con
+    la faccia inferiore raggiunta: e' una finitura o un isolante modellato
+    come Ceiling, e l'intradosso diventa la sua faccia inferiore.
+    """
+    soffit = Package(closing.layers[0])
+    for layer in closing.layers[1:]:
+        soffit.add(layer)
+    attached = []
+    for package in sorted(ceiling_packages, key=lambda p: -p.top):
+        if package.top >= soffit.bottom - STACK_GAP:
+            for layer in package.layers:
+                soffit.add(layer)
+            attached.append(package)
+    return soffit, attached
+
+
 def find_target(point, storey, options, context, buzzer=False):
     """Superficie bersaglio di un elemento.
 
@@ -1180,9 +1192,14 @@ def find_target(point, storey, options, context, buzzer=False):
        perche' finirebbe nel plenum sopra il controsoffitto.
     5. Altrimenti il bersaglio e' il solaio di chiusura.
 
-    Un rilevatore da controsoffitto (buzzer=True) va invece sempre al
-    solaio di chiusura; il controsoffitto, se c'e', resta in search.ceiling
-    per misurare dz_Buzzer.
+    Un rilevatore da controsoffitto (buzzer=True) va invece sempre
+    all'INTRADOSSO: il solaio di chiusura piu' i controsoffitti a contatto con
+    la sua faccia inferiore (una finitura, uno strato di isolante modellati
+    come Ceiling), quindi la faccia inferiore del controsoffitto quando questo
+    e' incollato al solaio. Il controsoffitto vero, quello che giustifica il
+    rilevatore, e' uno STACCATO dall'intradosso: va in search.ceiling e serve
+    a misurare dz_Buzzer. Se non c'e', search.ceiling resta None e lo script
+    segnala il rilevatore come non adeguato.
     """
     search = TargetSearch()
     low_z, high_z = search_window(point.Z, storey, options.half_line)
@@ -1195,18 +1212,24 @@ def find_target(point, storey, options, context, buzzer=False):
     ceiling_packages = [p for p in merge_layers(ceiling_layers)
                         if above_storey_floor(p, storey)
                         and (closing is None or p.bottom < closing.bottom)]
+
+    if buzzer:
+        if closing is None:
+            search.reason = R_BUZZER_NO_SLAB
+            return search
+        soffit, attached = soffit_package(closing, ceiling_packages)
+        search.attached = len(attached)
+        search.target = Target(K_CEILING if attached else K_FLOOR, soffit, point.Z,
+                               options.half_line)
+        ceiling_packages = [p for p in ceiling_packages if not any(p is a for a in attached)]
+
     ceilings = [Target(K_CEILING, p, point.Z, options.half_line) for p in ceiling_packages]
     ceilings.sort(key=lambda t: (0.0 if t.inside else abs(t.distance), t.z))
     if ceilings:
         search.ceiling = ceilings[0]
     if len(ceilings) > 1:
         search.second = ceilings[1]
-
     if buzzer:
-        if closing is None:
-            search.reason = R_BUZZER_NO_SLAB
-        else:
-            search.target = Target(K_FLOOR, closing, point.Z, options.half_line)
         return search
 
     if search.ceiling is not None:
@@ -1358,7 +1381,11 @@ def stack_note(package, kind):
     """Nota per un intradosso formato da piu' istanze impilate."""
     if len(package.layers) < 2:
         return None
-    noun = u'ceilings' if kind == K_CEILING else u'floors'
+    kinds = set(layer.info.kind for layer in package.layers)
+    if len(kinds) > 1:
+        noun = u'floors and ceilings'      # intradosso di un rilevatore con finitura
+    else:
+        noun = u'ceilings' if kind == K_CEILING else u'floors'
     linked = len(set(layer.info.source.key for layer in package.layers))
     note = u'soffit of {} stacked {} (lowest: {})'.format(
         len(package.layers), noun, package.lowest.info.label)
@@ -1404,6 +1431,13 @@ def plan_element(element, options, context):
 
     buzzer_param = None
     if buzzer:
+        if search.target is None:
+            return SkippedElement(element, category_name, category_key, search.reason)
+        # Il rilevatore da controsoffitto si mette solo sotto un controsoffitto
+        # staccato dal solaio: senza, la famiglia e' quella sbagliata.
+        if search.ceiling is None:
+            return skipped_with_target(element, category_name, category_key,
+                                       R_BUZZER_NO_CEILING, search)
         # Senza un dz_Buzzer scrivibile il rilevatore non si sposta: portato
         # al solaio, la sua parte visibile resterebbe lassu' invece che sul
         # controsoffitto.
@@ -1421,14 +1455,12 @@ def plan_element(element, options, context):
 
     ceiling = search.ceiling
     if buzzer:
-        # Il rilevatore va al solaio, ma di solito e' modellato all'altezza
-        # del controsoffitto: la retta vale se interseca l'uno o l'altro.
-        on_line = target.on_line or (ceiling is not None and ceiling.on_line)
-        if not on_line:
-            nearest = abs(target.distance)
-            if ceiling is not None:
-                nearest = min(nearest, abs(ceiling.distance))
-            notes.append(u'false ceiling detector: neither the slab soffit nor the ceiling is '
+        # Il rilevatore va all'intradosso, ma di solito e' modellato
+        # all'altezza del controsoffitto: la retta vale se interseca l'uno o
+        # l'altro.
+        if not (target.on_line or ceiling.on_line):
+            nearest = min(abs(target.distance), abs(ceiling.distance))
+            notes.append(u'false ceiling detector: neither the soffit nor the false ceiling is '
                          u'within tolerance')
             return OverTolerance(element, category_name, category_key, target,
                                  options.half_line, u'; '.join(notes), nearest)
@@ -1460,19 +1492,19 @@ def plan_element(element, options, context):
     record.needs_move = abs(target.distance) > POSITION_TOL
 
     if buzzer:
+        # dz_Buzzer e' sempre misurato: dall'intradosso alla faccia
+        # inferiore del controsoffitto staccato.
         record.is_buzzer = True
         record.buzzer_before = buzzer_param.AsDouble()
-        if ceiling is not None:
-            record.buzzer_value = target.z - ceiling.z
-            record.buzzer_measured = True
-            notes.append(u'false ceiling detector: dz_Buzzer measured to {}'.format(ceiling.label))
-            note = stack_note(ceiling.package, K_CEILING)
-            if note:
-                notes.append(u'ceiling ' + note)
-        else:
-            record.buzzer_value = options.buzzer_fallback
-            notes.append(u'false ceiling detector: no ceiling below the slab, dz_Buzzer from '
-                         u'the dialog')
+        record.buzzer_value = target.z - ceiling.z
+        record.buzzer_measured = True
+        notes.append(u'false ceiling detector: dz_Buzzer measured to {}'.format(ceiling.label))
+        if search.attached:
+            notes.append(u'soffit includes a ceiling in contact with the slab (finish or '
+                         u'insulation): aligned to its bottom face')
+        note = stack_note(ceiling.package, K_CEILING)
+        if note:
+            notes.append(u'false ceiling ' + note)
         record.needs_param = abs(record.buzzer_value - record.buzzer_before) > POSITION_TOL
 
     if not record.needs_move and not record.needs_param:
@@ -1829,20 +1861,20 @@ def resolve_xaml_path(file_name):
 
 def load_settings():
     settings = {
-        'tolerance_cm': DEFAULT_TOLERANCE_CM,
-        'buzzer_cm': DEFAULT_BUZZER_CM,
+        'tolerance_mm': DEFAULT_TOLERANCE_MM,
         'include_links': True,
         'skip_connected': False,
         'excluded_categories': u'',
     }
     try:
         config = script.get_config(CONFIG_SECTION)
-        tolerance = float(config.get_option('tolerance_cm', DEFAULT_TOLERANCE_CM))
-        if 0.0 < tolerance <= MAX_TOLERANCE_CM:
-            settings['tolerance_cm'] = tolerance
-        buzzer = float(config.get_option('buzzer_cm', DEFAULT_BUZZER_CM))
-        if 0.0 <= buzzer <= MAX_BUZZER_CM:
-            settings['buzzer_cm'] = buzzer
+        # La tolleranza era in cm fino alla versione 1.1 (chiave tolerance_cm).
+        tolerance = config.get_option('tolerance_mm', None)
+        if tolerance is None:
+            tolerance = float(config.get_option('tolerance_cm', DEFAULT_TOLERANCE_MM / 10.0)) * 10.0
+        tolerance = float(tolerance)
+        if 0.0 < tolerance <= MAX_TOLERANCE_MM:
+            settings['tolerance_mm'] = tolerance
         for key in ('include_links', 'skip_connected'):
             settings[key] = bool(config.get_option(key, settings[key]))
         settings['excluded_categories'] = u'{}'.format(config.get_option('excluded_categories', u''))
@@ -1926,8 +1958,8 @@ def ask_options(elements, source_label, category_info):
     buzzers, buzzers_flagged = buzzer_count(elements)
     if buzzers:
         buzzer_text = (u'{} false ceiling detectors in the selection ({} with {} = Yes): they '
-                       u'always go to the slab soffit.'.format(buzzers, buzzers_flagged,
-                                                               INSTALLATION_PARAM))
+                       u'always go to the soffit, and {} is measured on the model.'.format(
+                           buzzers, buzzers_flagged, INSTALLATION_PARAM, BUZZER_PARAM))
     else:
         buzzer_text = u'No false ceiling detector in the selection.'
 
@@ -1936,12 +1968,10 @@ def ask_options(elements, source_label, category_info):
         'detail_text': detail,
         'categories': [(name, label, count, flagged, name not in excluded)
                        for name, label, count, flagged in category_info],
-        'tolerance_cm': settings['tolerance_cm'],
-        'max_tolerance_cm': MAX_TOLERANCE_CM,
+        'tolerance_mm': settings['tolerance_mm'],
+        'max_tolerance_mm': MAX_TOLERANCE_MM,
         'line_factor': LINE_FACTOR,
         'buzzer_text': buzzer_text,
-        'buzzer_cm': settings['buzzer_cm'],
-        'max_buzzer_cm': MAX_BUZZER_CM,
         'include_links': settings['include_links'],
         'skip_connected': settings['skip_connected'],
     }
@@ -1954,8 +1984,7 @@ def ask_options(elements, source_label, category_info):
     shown = set(row[0] for row in category_info)
     excluded = (excluded - shown) | (shown - set(chosen['categories']))
     save_settings({
-        'tolerance_cm': chosen['tolerance_cm'],
-        'buzzer_cm': chosen['buzzer_cm'],
+        'tolerance_mm': chosen['tolerance_mm'],
         'include_links': chosen['include_links'],
         'skip_connected': chosen['skip_connected'],
         'excluded_categories': u'|'.join(sorted(excluded)),
@@ -1963,8 +1992,8 @@ def ask_options(elements, source_label, category_info):
 
     by_name = dict(MEP_CATEGORIES)
     keys = [bic_key(by_name[name]) for name in chosen['categories'] if name in by_name]
-    return AlignOptions(keys, chosen['tolerance_cm'], chosen['buzzer_cm'],
-                        chosen['include_links'], chosen['skip_connected'], chosen['dry_run'])
+    return AlignOptions(keys, chosen['tolerance_mm'], chosen['include_links'],
+                        chosen['skip_connected'], chosen['dry_run'])
 
 
 # =========================================================================
@@ -2006,13 +2035,13 @@ def print_header(options, elements, source_label, result):
             INSTALLATION_PARAM, screened),
         u'- Target: the ceiling bottom face where the storey has a ceiling on the vertical of '
         u'the device, otherwise the floor slab soffit',
-        u'- False ceiling detectors (family name with {}): always the slab soffit, {} = '
-        u'slab - ceiling distance, or **{:.0f} cm** where there is no ceiling'.format(
-            u' and '.join(u'"{}"'.format(t) for t in BUZZER_FAMILY_TOKENS), BUZZER_PARAM,
-            options.buzzer_fallback_cm),
-        u'- Analysis line: vertical, **{:.0f} cm** long, centred on the insertion point '
-        u'(tolerance {:.0f} cm above and below)'.format(
-            options.tolerance_cm * LINE_FACTOR, options.tolerance_cm * LINE_FACTOR / 2.0),
+        u'- False ceiling detectors (family name with {}): always the soffit (slab, or a '
+        u'ceiling in contact with it), {} measured from the soffit to the false ceiling below; '
+        u'without a false ceiling the detector is reported as unsuitable'.format(
+            u' and '.join(u'"{}"'.format(t) for t in BUZZER_FAMILY_TOKENS), BUZZER_PARAM),
+        u'- Analysis line: vertical, **{:.0f} mm** long, centred on the insertion point '
+        u'(tolerance {:.0f} mm above and below)'.format(
+            options.tolerance_mm * LINE_FACTOR, options.tolerance_mm * LINE_FACTOR / 2.0),
         u'- Only surfaces above the reference level of the element count',
         u'- Stacked instances closer than {:.0f} mm form one package: the target is its '
         u'bottom face'.format(STACK_GAP_MM),
@@ -2178,21 +2207,28 @@ def tolerance_suggestion(ordered, options):
     """Riga che dice di quanto alzare la soglia e quanto si recupererebbe."""
     if not ordered:
         return None
-    index = min(int(len(ordered) * 0.8), len(ordered) - 1)
-    target_cm = internal_to_mm(abs(ordered[index].target.distance)) / 10.0
-    step_cm = 5.0
-    candidate_cm = (int(target_cm / step_cm) + 1) * step_cm
-    if candidate_cm <= options.tolerance_cm:
-        candidate_cm = options.tolerance_cm + step_cm
-    if candidate_cm > MAX_TOLERANCE_CM:
+
+    # Distanza dalla superficie piu' vicina: per i rilevatori da controsoffitto
+    # puo' essere il controsoffitto e non il bersaglio, ed e' gia' in excess.
+    def nearest(record):
+        return record.excess + options.tolerance_internal
+
+    ranked = sorted(ordered, key=nearest)
+    index = min(int(len(ranked) * 0.8), len(ranked) - 1)
+    target_mm = internal_to_mm(nearest(ranked[index]))
+    step_mm = 50.0
+    candidate_mm = (int(target_mm / step_mm) + 1) * step_mm
+    if candidate_mm <= options.tolerance_mm:
+        candidate_mm = options.tolerance_mm + step_mm
+    if candidate_mm > MAX_TOLERANCE_MM:
         return None
-    limit = cm_to_internal(candidate_cm)
-    recovered = len([r for r in ordered if abs(r.target.distance) <= limit])
+    limit = mm_to_internal(candidate_mm)
+    recovered = len([r for r in ranked if nearest(r) <= limit])
     if not recovered:
         return None
-    return u'_Raising the tolerance to **{:.0f} cm** would bring in **{}** more elements. Check ' \
+    return u'_Raising the tolerance to **{:.0f} mm** would bring in **{}** more elements. Check ' \
            u'first that the target is the right one: a large move often means the family or the ' \
-           u'level is wrong._'.format(candidate_cm, recovered)
+           u'level is wrong._'.format(candidate_mm, recovered)
 
 
 def print_surface_problems(result):
@@ -2279,17 +2315,21 @@ def print_report(options, elements, source_label, result, preprocessor,
 # finestra non conosce la Revit API: riceve righe gia' pronte, ciascuna con
 # una chiave che lo script traduce in ElementId.
 #
-# Navigazione come in RNWFlowCalculation: il pulsante di una riga chiude la
-# finestra, lo script seleziona e inquadra l'elemento e lascia navigare la
-# vista attiva (PickObjects limitata agli elementi della riga) finche'
-# l'utente non preme Fine o Esc; poi la finestra si riapre con ricerca,
-# filtri e riga di prima. Una finestra non modale richiederebbe ExternalEvent.
+# La finestra e' NON MODALE: il comando termina e la lascia aperta, cosi'
+# Revit e' libero e l'utente puo' spostare gli elementi e cambiarne i
+# parametri. Il pulsante di una riga seleziona e inquadra l'elemento (come in
+# RNWFlowCalculation, ma senza la PickObjects che bloccava le modifiche).
+# Da una finestra non modale la Revit API si usa solo tramite ExternalEvent:
+# ResultEventHandler esegue le richieste nel contesto API. Il motore
+# IronPython deve restare vivo dopo il comando: "engine: persistent: true"
+# nel bundle.yaml, come ColorSplasher e Keynotes di pyRevit.
 
 STATUS_FAILED = u'Failed'
 STATUS_NOT_ALIGNED = u'Not aligned'
 
-NAVIGATE_PROMPT = (u'MEP Align to Ceiling: the elements of the row are selected. Navigate the '
-                   u'view (pan, zoom, orbit), then press Finish or Esc to return to the table')
+# Finestre aperte e relativi ExternalEvent: un riferimento vivo evita che il
+# garbage collector li raccolga mentre la finestra e' a video.
+OPEN_RESULT_WINDOWS = []
 
 
 def mark_rolled_back(result):
@@ -2391,7 +2431,7 @@ def result_summary(options, result, rolled_back):
     else:
         lines.append(u'Aligned: {}'.format(done))
     if buzzers:
-        lines.append(u'   of which false ceiling detectors (to the slab soffit, {} {}): {}'.format(
+        lines.append(u'   of which false ceiling detectors (to the soffit, {} {}): {}'.format(
             BUZZER_PARAM, u'to set' if options.dry_run else u'set', buzzers))
     lines.append(u'Already aligned: {}'.format(len(result.already_ok)))
     if not_aligned:
@@ -2402,70 +2442,119 @@ def result_summary(options, result, rolled_back):
     return u'\n'.join(lines)
 
 
-class OnlyTheseElements(UI.Selection.ISelectionFilter):
-    """Durante la navigazione si possono cliccare solo gli elementi della riga."""
+class ResultEventHandler(UI.IExternalEventHandler):
+    """Esegue nel contesto API di Revit le richieste della finestra non modale.
 
-    def __init__(self, ids):
-        self.ids = set(ids)
+    La finestra imposta request (una funzione che riceve la UIApplication) e
+    alza l'ExternalEvent; Revit chiama Execute appena e' libero. Un errore
+    finisce nella riga di stato della finestra, non in un popup.
+    """
 
-    def AllowElement(self, element):
+    def __init__(self):
+        self.request = None
+        self.window = None
+
+    def Execute(self, uiapp):
+        request, self.request = self.request, None
+        if request is None:
+            return
         try:
-            return element_id_value(element.Id) in self.ids
-        except Exception:
-            return False
+            message = request(uiapp)
+        except Exception as error:
+            logger.debug('Richiesta della finestra di esito fallita: %s', error)
+            message = u'The request failed: {}'.format(error)
+        if self.window is not None and message:
+            try:
+                self.window.set_status(message)
+            except Exception:
+                pass
 
-    def AllowReference(self, reference, position):
-        return False
+    def GetName(self):
+        return u'MEP Align to Ceiling - result window'
 
 
-def navigate(elements):
-    """Seleziona e inquadra gli elementi, poi lascia navigare la vista attiva
-    finche' l'utente non preme Fine o Esc (schema di RNWFlowCalculation)."""
+def show_elements(uiapp, document, elements):
+    """Seleziona e inquadra gli elementi nel documento attivo. Ritorna l'esito.
+
+    Le chiamate partono da una finestra non modale, quindi a comando finito:
+    il documento attivo puo' essere un altro, gli elementi possono essere
+    stati cancellati nel frattempo. Si controlla tutto e lo si dice.
+    """
+    active = uiapp.ActiveUIDocument
+    if active is None or not active.Document.Equals(document):
+        return u'Switch back to the model "{}" to show its elements.'.format(document.Title)
     valid = [e for e in elements if e is not None and e.IsValidObject]
     if not valid:
-        return
+        return u'The element no longer exists in the model.'
     element_ids = List[DB.ElementId]([e.Id for e in valid])
+    active.Selection.SetElementIds(element_ids)
     try:
-        uidoc.Selection.SetElementIds(element_ids)
-        uidoc.ShowElements(element_ids)
-    except Exception as error:
-        logger.debug('Zoom non riuscito: %s', error)
-    references = List[DB.Reference]([DB.Reference(e) for e in valid])
-    try:
-        uidoc.Selection.PickObjects(
-            UI.Selection.ObjectType.Element,
-            OnlyTheseElements([element_id_value(e.Id) for e in valid]),
-            NAVIGATE_PROMPT, references)
+        active.ShowElements(element_ids)
     except Exception:
-        # Esc solleva OperationCanceledException: e' il modo normale di uscire.
-        pass
-    # La selezione resta sugli elementi della riga anche dopo il ritorno.
-    try:
-        uidoc.Selection.SetElementIds(element_ids)
-    except Exception:
-        pass
+        return u'{} element(s) selected, but the active view cannot zoom to them: open a ' \
+               u'plan, section or 3D view.'.format(len(valid))
+    missing = len(elements) - len(valid)
+    message = u'{} element(s) selected and shown: edit them in Revit, this window stays ' \
+              u'open.'.format(len(valid))
+    if missing:
+        message += u' {} no longer exist.'.format(missing)
+    return message
 
 
-def show_result_window(options, result, context, rolled_back):
-    """Finestra di esito, alternata alla navigazione finche' l'utente non la
-    chiude. Ritorna True se chiede il report avanzato."""
+def show_result_window(options, result, context, rolled_back, advanced_report):
+    """Apre la finestra di esito NON MODALE e ritorna subito.
+
+    Il comando termina con la finestra a video: da li' il pulsante di una
+    riga seleziona l'elemento e Revit resta libero per modificarlo.
+    """
     rows, elements = result_rows(options, result, context)
+    document = doc
+    handler = ResultEventHandler()
+    event = UI.ExternalEvent.Create(handler)
+
+    def request(action):
+        handler.request = action
+        event.Raise()
+
+    def show(keys):
+        request(lambda uiapp: show_elements(uiapp, document, [elements.get(k) for k in keys]))
+
+    def report():
+        def run(uiapp):
+            advanced_report()
+            return u'Advanced report printed in the pyRevit output panel.'
+        request(run)
+
+    entry = {}
+
+    def closed():
+        if entry in OPEN_RESULT_WINDOWS:
+            OPEN_RESULT_WINDOWS.remove(entry)
+        try:
+            event.Dispose()
+        except Exception:
+            pass
+
     info = {
         'title': u'MEP Align to Ceiling - simulation' if options.dry_run
         else u'MEP Align to Ceiling - result',
         'summary': result_summary(options, result, rolled_back),
         'buzzer_header': u'{} (mm)'.format(BUZZER_PARAM),
         'rows': rows,
+        'show': show,
+        'report': report,
+        'closed': closed,
     }
-    xaml_path = resolve_xaml_path(RESULT_XAML_FILE_NAME)
-    state = None
-    while True:
-        window = result_ui.show_result(xaml_path, info, state)
-        state = window.state
-        if window.kind == result_ui.KIND_SHOW:
-            navigate([elements.get(key) for key in window.show_keys])
-            continue
-        return window.kind == result_ui.KIND_REPORT
+    window = result_ui.ResultWindow(resolve_xaml_path(RESULT_XAML_FILE_NAME), info)
+    handler.window = window
+    entry.update({'window': window, 'handler': handler, 'event': event})
+    OPEN_RESULT_WINDOWS.append(entry)
+    owner = None
+    try:
+        owner = uidoc.Application.MainWindowHandle
+    except Exception:
+        owner = None
+    window.show_modeless(owner)
 
 
 # =========================================================================
@@ -2645,17 +2734,15 @@ def main():
         print_report(options, elements, source_label, result, preprocessor,
                      applied_ok, applied_failed, mismatched, rolled_back)
 
-    # Esito nella finestra; il resoconto completo nel pannello di output e'
-    # il report avanzato, su richiesta. Se la finestra non si apre il
-    # resoconto si stampa comunque: l'utente deve sempre vedere l'esito.
+    # Esito nella finestra non modale; il resoconto completo nel pannello di
+    # output e' il report avanzato, su richiesta. Se la finestra non si apre
+    # il resoconto si stampa subito: l'utente deve sempre vedere l'esito.
     try:
-        wants_report = show_result_window(options, result, context, rolled_back)
+        show_result_window(options, result, context, rolled_back, advanced_report)
     except Exception as error:
         logger.debug('Finestra di esito non disponibile: %s', error)
         warn(u'The result window could not be opened ({}): the full report is shown '
              u'instead.'.format(error))
-        wants_report = True
-    if wants_report:
         advanced_report()
 
 

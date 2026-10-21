@@ -4,7 +4,8 @@
         Width="1150" Height="650"
         MinWidth="700" MinHeight="400"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="CanResizeWithGrip">
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="False">
 
     <Window.Resources>
         <Style x:Key="SectionHeader" TargetType="TextBlock">
@@ -135,7 +136,7 @@
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Button Content="🔍" Padding="2,0" Margin="1" Height="22" VerticalAlignment="Top"
-                                            ToolTip="Select this element in the model and navigate the active view; Finish or Esc returns to this window"/>
+                                            ToolTip="Select this element in the model and zoom to it; the window stays open while you edit it in Revit"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
@@ -157,8 +158,12 @@
                     </DataGrid.Columns>
                 </DataGrid>
 
-                <TextBlock Grid.Row="3" Style="{StaticResource HintText}"
-                           Text="The 🔍 button of a row selects the element in the model, zooms to it and lets you navigate the active view (pan, zoom, orbit); Finish or Esc returns to this window as it was. The funnel in each column header filters by value. Move: the move the element would need, positive upwards."/>
+                <StackPanel Grid.Row="3">
+                    <TextBlock Style="{StaticResource HintText}"
+                               Text="The 🔍 button of a row selects the element in the model and zooms to it. This window stays open and Revit is free: navigate the view, move the element or change its parameters, then come back here for the next one. The table is not refreshed after your edits: run the command again to check them. The funnel in each column header filters by value. Move: the move the element would need, positive upwards."/>
+                    <TextBlock x:Name="StatusText" Margin="0,4,0,0" FontSize="11"
+                               Foreground="#2D5A8A" TextWrapping="Wrap" Text=""/>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -170,11 +175,11 @@
             </Grid.ColumnDefinitions>
             <Button x:Name="ShowAllButton" Grid.Column="0" Content="🔍 Show All Listed"
                     Padding="10,3" Height="30"
-                    ToolTip="Select in the model every element listed with the current search and filters, and navigate the active view; Finish or Esc returns to this window"/>
+                    ToolTip="Select in the model every element listed with the current search and filters, and zoom to them"/>
             <StackPanel Grid.Column="2" Orientation="Horizontal">
                 <Button x:Name="AdvancedButton" Content="Advanced Report" Width="130" Height="30"
                         Margin="0,0,10,0"
-                        ToolTip="Close this window and print the full report in the pyRevit output panel"/>
+                        ToolTip="Print the full report in the pyRevit output panel; this window stays open"/>
                 <Button x:Name="CloseButton" Content="Close" Width="100" Height="30" IsDefault="True"
                         IsCancel="True" Background="#2D5A8A" Foreground="White"/>
             </StackPanel>
