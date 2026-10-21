@@ -14,7 +14,7 @@ originariamente in Dynamo:
 
 Le due variabili che distinguevano i quattro grafi (fonte degli elementi e
 metodo di determinazione del livello) sono diventate opzioni della finestra
-di dialogo definita in LevelReassignmentWindow.xaml.
+di dialogo definita in ReLevelMEP_Window.xaml.
 
 --------------------------------------------------------------------------
 LOGICA APPLICATA (identica ai grafi Dynamo originali)
@@ -185,7 +185,7 @@ REFERENCE_LEVEL_PARAM_NAMES = [
     'Livello di riferimento',
 ]
 
-XAML_FILE_NAME = 'LevelReassignmentWindow.xaml'
+XAML_FILE_NAME = 'ReLevelMEP_Window.xaml'
 
 GROUP_A = 'A'
 GROUP_B = 'B'
@@ -576,7 +576,7 @@ class ReassignmentOptions(object):
 
 
 class LevelReassignmentWindow(forms.WPFWindow):
-    """Finestra di dialogo definita in LevelReassignmentWindow.xaml."""
+    """Finestra di dialogo definita in ReLevelMEP_Window.xaml."""
 
     def __init__(self, xaml_file, levels, selected_count, view_count,
                  view_name, preselect_level=None):

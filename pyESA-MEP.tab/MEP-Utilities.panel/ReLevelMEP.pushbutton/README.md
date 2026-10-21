@@ -16,8 +16,8 @@ Unifica in un unico comando le quattro varianti realizzate originariamente in Dy
 
 | File | Ruolo |
 | --- | --- |
-| `script.py` | Logica dello strumento (Revit API, motore IronPython) |
-| `LevelReassignmentWindow.xaml` | Interfaccia grafica della finestra di dialogo |
+| `ReLevelMEP_script.py` | Logica dello strumento (Revit API, motore IronPython) |
+| `ReLevelMEP_Window.xaml` | Interfaccia grafica della finestra di dialogo |
 | `bundle.yaml` | Etichetta e descrizione del pulsante nella barra pyRevit |
 | `icon.png` | Icona del pulsante |
 | `README.md` | Questo file |
@@ -40,8 +40,8 @@ ESA.extension\
   ESA.tab\
     MEP.panel\
       LevelReassignment.pushbutton\
-        script.py
-        LevelReassignmentWindow.xaml
+        ReLevelMEP_script.py
+        ReLevelMEP_Window.xaml
         bundle.yaml
         icon.png
 ```
@@ -127,10 +127,10 @@ riportati nel resoconto.
    nel gruppo C.
 6. **`Generic Models` e `Lighting Fixtures`.** Erano presenti nel gruppo A di uno
    solo dei quattro file. Sono state mantenute nell'elenco unificato; per
-   escluderle basta rimuoverle da `GROUP_A_CATEGORY_NAMES` in `script.py`.
+   escluderle basta rimuoverle da `GROUP_A_CATEGORY_NAMES` in `ReLevelMEP_script.py`.
 
 Tutte le liste di categorie e di parametri sono raccolte in un blocco di
-configurazione in testa a `script.py`, per poterle adattare senza toccare la
+configurazione in testa a `ReLevelMEP_script.py`, per poterle adattare senza toccare la
 logica.
 
 ## Motore Python
