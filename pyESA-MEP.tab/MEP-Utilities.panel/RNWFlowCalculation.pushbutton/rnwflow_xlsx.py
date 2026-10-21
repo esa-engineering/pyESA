@@ -4,7 +4,7 @@ rnwflow_xlsx.py - writer .xlsx minimale (zip + xml), senza Excel installato, per
 l'esportazione del calcolo di RNWFlowCalculation.
 
 La parte generica (celle, fogli, zip) e' copiata da MEPQTO.pushbutton/
-mepqto_xlsx.py, che importa i moduli di MEPQTO e quindi non si puo' usare da un
+MEPQTO_xlsx.py, che importa i moduli di MEPQTO e quindi non si puo' usare da un
 altro pulsante (gli helper sono duplicati per strumento, vedi CLAUDE.md). Gli
 stili sono propri: intestazione, numeri a 0 / 1 / 2 decimali, titolo, testo a
 capo, e i tre colori dell'esito (errore, avviso, OK) come nella finestra.

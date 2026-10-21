@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_allowance_ui.py - finestra dell'override della maggiorazione sulle voci del
+MEPQTO_allowance_ui.py - finestra dell'override della maggiorazione sulle voci del
 computo.
 
 Mostra le voci scelte (Type Mark, codice, categorie lineari con la loro maggiorazione e
@@ -21,7 +21,7 @@ from System.Windows.Markup import XamlReader
 
 from pyrevit import script
 
-import mepqto_store as qs
+import MEPQTO_store as qs
 
 XAML_FILE_NAME = 'MEPQTO_allowance.xaml'
 TITLE = "Allowance override"

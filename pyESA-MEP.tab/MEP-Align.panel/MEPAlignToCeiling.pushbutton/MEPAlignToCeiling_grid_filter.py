@@ -3,7 +3,7 @@
 MEPAlignToCeiling_grid_filter.py - filtri per colonna, in stile Excel, sulle griglie legate
 a una DataTable.
 
-Copia di MEPQTO/mepqto_grid_filter.py con un nome proprio (Rocket mode: due moduli con lo
+Copia di MEPQTO/MEPQTO_grid_filter.py con un nome proprio (Rocket mode: due moduli con lo
 stesso nome e contenuto diverso si sovrascrivono). Unica differenza: il glifo dell'imbuto
 e' scritto come escape. Le correzioni vanno riportate su entrambe le copie.
 

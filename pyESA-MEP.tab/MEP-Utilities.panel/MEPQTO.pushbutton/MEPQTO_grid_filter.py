@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_grid_filter.py - filtri per colonna, in stile Excel, sulle griglie legate a una
+MEPQTO_grid_filter.py - filtri per colonna, in stile Excel, sulle griglie legate a una
 DataTable.
 
 Ogni colonna della griglia riceve nell'intestazione un pulsante a imbuto che apre un

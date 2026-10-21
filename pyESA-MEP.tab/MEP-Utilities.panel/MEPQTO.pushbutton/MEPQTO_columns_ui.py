@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_columns_ui.py - foglio e colonne di un listino Excel / CSV / PriMus o della
+MEPQTO_columns_ui.py - foglio e colonne di un listino Excel / CSV / PriMus o della
 struttura WBS.
 
-Un .xpwe si presenta come un foglio unico (mepqto_store.XPWE_HEADERS): qui si sceglie
+Un .xpwe si presenta come un foglio unico (MEPQTO_store.XPWE_HEADERS): qui si sceglie
 fra l'altro quale dei cinque prezzi di PriMus usare.
 
 Si apre quando si sceglie un listino .xlsx / .xlsm / .csv / .xpwe (Browse... ed editor del
@@ -17,7 +17,7 @@ stanno affiancate sullo stesso foglio, quindi per ogni livello WBS attivo si sce
 coppia di colonne codice / descrizione, con una riga di partenza comune. Le differenze fra
 i due usi stanno nelle classi PriceListKind e WbsKind.
 
-La finestra restituisce un mepqto_store.PriceListLayout (listino) o WbsLayout (struttura
+La finestra restituisce un MEPQTO_store.PriceListLayout (listino) o WbsLayout (struttura
 WBS), oppure None se annullata.
 """
 
@@ -41,7 +41,7 @@ from System.Windows.Markup import XamlReader
 
 from pyrevit import script
 
-import mepqto_store as qs
+import MEPQTO_store as qs
 
 XAML_FILE_NAME = 'MEPQTO_columns.xaml'
 TITLE = "Price list columns"

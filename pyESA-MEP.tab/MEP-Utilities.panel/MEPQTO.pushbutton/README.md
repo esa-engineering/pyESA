@@ -20,8 +20,8 @@ Plumbing Fixtures, Security Devices, Sprinklers, Specialty Equipment.
 **Lineari:** Ducts, Flex Ducts, Pipes, Flex Pipes, Cable Trays, Conduits, Duct Insulation,
 Pipe Insulation.
 
-L'elenco è la tabella `CATEGORY_RULES` in `mepqto_model.py`, con il tipo di misura di
-ogni categoria. Le formule stanno in `mepqto_rules.py`.
+L'elenco è la tabella `CATEGORY_RULES` in `MEPQTO_model.py`, con il tipo di misura di
+ogni categoria. Le formule stanno in `MEPQTO_rules.py`.
 
 ## Modelli e categorie da leggere
 
@@ -137,9 +137,9 @@ Vale per il modello aperto e per i link.
 - un'opzione con `IsPrimary = True`: si legge;
 - un'opzione con `IsPrimary = False`: è un'opzione secondaria e si salta.
 
-Il controllo sta in `_collect_source()` in `mepqto_model.py` ed è comandato da
+Il controllo sta in `_collect_source()` in `MEPQTO_model.py` ed è comandato da
 `CollectOptions.primary_only`; la finestra passa sempre `PRIMARY_OPTIONS_ONLY = True`
-(costante in `mepqto_ui.py`). La logica è rimasta intatta, quindi la funzione si può
+(costante in `MEPQTO_ui.py`). La logica è rimasta intatta, quindi la funzione si può
 riattivare.
 
 **Prima versione (da ripristinare, se serve).** Nella sezione SETTINGS c'era la casella
@@ -308,7 +308,7 @@ trovati su un campione di elementi, oppure se ne scrive il nome.
     vale per la ricerca. Un gruppo chiuso resta chiuso anche con i filtri.
   - I filtri cambiano solo cosa si vede: il totale in fondo alla finestra e l'export Excel
     comprendono tutte le voci. I filtri non si salvano.
-  - Il codice sta in `mepqto_grid_filter.py` (`GridFilters`), riusabile su qualsiasi
+  - Il codice sta in `MEPQTO_grid_filter.py` (`GridFilters`), riusabile su qualsiasi
     griglia legata a una `DataTable`.
 - **Colonne della scheda EPU** (intestazioni in inglese nella finestra). N. articolo EPU
   (`epu_item`) e prezzario di riferimento (`price_book`) non sono più colonne delle
@@ -543,7 +543,7 @@ maggiorazione diversa da quella della sua categoria:
 ### Come si fondono listino e progetto
 
 I due file non si scambiano dati: la finestra li legge entrambi e per ogni codice
-costruisce la voce **campo per campo** (`merge_item` in `mepqto_store.py`):
+costruisce la voce **campo per campo** (`merge_item` in `MEPQTO_store.py`):
 
 1. si parte da una voce vuota;
 2. si copiano i campi non vuoti del listino;
@@ -839,24 +839,24 @@ di default è `YYMMDD_HHMMSS_MEPQTO_<Modello>.xlsx`. I fogli sono gli stessi del
 | File | Ruolo |
 | --- | --- |
 | `MEPQTO_script.py` | entry point: controlli sul documento e apertura della finestra |
-| `mepqto_model.py` | categorie, elenco dei link, raccolta dal modello e dai link (geometria inclusa), aggregazione, computo, riepilogo Type Mark, anomalie |
-| `mepqto_rules.py` | formule di misura delle categorie lineari, maggiorazioni, tabelle kg/mq e densità |
-| `mepqto_store.py` | lettura del listino, unità, file di progetto, fusione delle voci |
-| `mepqto_xlsx.py` | writer `.xlsx` e fogli del computo |
-| `mepqto_ui.py` | finestra (griglie su `DataTable`, salvataggio, export) |
+| `MEPQTO_model.py` | categorie, elenco dei link, raccolta dal modello e dai link (geometria inclusa), aggregazione, computo, riepilogo Type Mark, anomalie |
+| `MEPQTO_rules.py` | formule di misura delle categorie lineari, maggiorazioni, tabelle kg/mq e densità |
+| `MEPQTO_store.py` | lettura del listino, unità, file di progetto, fusione delle voci |
+| `MEPQTO_xlsx.py` | writer `.xlsx` e fogli del computo |
+| `MEPQTO_ui.py` | finestra (griglie su `DataTable`, salvataggio, export) |
 | `MEPQTO_form.xaml` | layout della finestra |
-| `mepqto_grid_filter.py` | filtri per colonna in stile Excel sulle griglie legate a una `DataTable` |
-| `mepqto_layout_ui.py` | finestra Layout del Bill of quantities: livelli sulle righe e livelli WBS sulle colonne |
+| `MEPQTO_grid_filter.py` | filtri per colonna in stile Excel sulle griglie legate a una `DataTable` |
+| `MEPQTO_layout_ui.py` | finestra Layout del Bill of quantities: livelli sulle righe e livelli WBS sulle colonne |
 | `MEPQTO_layout.xaml` | layout della finestra Layout |
-| `mepqto_columns_ui.py` | finestra Price list columns / WBS structure columns: foglio e colonne di un listino Excel / CSV / PriMus o della struttura WBS (una coppia codice / descrizione per livello e la riga di partenza; `PriceListKind` / `WbsKind`), con anteprima |
+| `MEPQTO_columns_ui.py` | finestra Price list columns / WBS structure columns: foglio e colonne di un listino Excel / CSV / PriMus o della struttura WBS (una coppia codice / descrizione per livello e la riga di partenza; `PriceListKind` / `WbsKind`), con anteprima |
 | `MEPQTO_columns.xaml` | layout della finestra delle colonne |
-| `mepqto_scope_ui.py` | finestra di scelta dei modelli (link), dei workset e delle categorie da leggere, con i set di categorie e di workset |
+| `MEPQTO_scope_ui.py` | finestra di scelta dei modelli (link), dei workset e delle categorie da leggere, con i set di categorie e di workset |
 | `MEPQTO_scope.xaml` | layout della finestra di scelta |
-| `mepqto_wbs_ui.py` | finestra di scelta dei livelli WBS |
+| `MEPQTO_wbs_ui.py` | finestra di scelta dei livelli WBS |
 | `MEPQTO_wbs.xaml` | layout della finestra WBS |
-| `mepqto_params_ui.py` | finestra di mappatura dei parametri del modello |
+| `MEPQTO_params_ui.py` | finestra di mappatura dei parametri del modello |
 | `MEPQTO_params.xaml` | layout della finestra dei parametri |
-| `mepqto_allowance_ui.py` | finestra dell'override della maggiorazione sulle voci del computo |
+| `MEPQTO_allowance_ui.py` | finestra dell'override della maggiorazione sulle voci del computo |
 | `MEPQTO_allowance.xaml` | layout della finestra dell'override |
-| `mepqto_pricelist_ui.py` | editor del listino JSON |
+| `MEPQTO_pricelist_ui.py` | editor del listino JSON |
 | `MEPQTO_pricelist.xaml` | layout dell'editor del listino |

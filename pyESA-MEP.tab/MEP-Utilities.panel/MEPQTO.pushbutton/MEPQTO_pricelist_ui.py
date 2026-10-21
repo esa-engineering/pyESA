@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_pricelist_ui.py - editor del listino comune in formato JSON.
+MEPQTO_pricelist_ui.py - editor del listino comune in formato JSON.
 
 Il listino si apre, si modifica in una griglia (capitolo, sottocapitolo, n. articolo
 EPU, prezzario di riferimento, codice prezzario, descrizione, unita' da tendina,
-prezzo) e si salva in un file .json (struttura in mepqto_store.PriceListDocument).
+prezzo) e si salva in un file .json (struttura in MEPQTO_store.PriceListDocument).
 Si puo' partire da un Excel / CSV o da un file PriMus .xpwe con Import.
 
 Le modifiche si ricostruiscono al salvataggio confrontando la griglia con l'istantanea
@@ -37,8 +37,8 @@ from Microsoft.Win32 import OpenFileDialog, SaveFileDialog
 
 from pyrevit import script
 
-import mepqto_store as qs
-from mepqto_columns_ui import show_columns_dialog
+import MEPQTO_store as qs
+from MEPQTO_columns_ui import show_columns_dialog
 
 XAML_FILE_NAME = 'MEPQTO_pricelist.xaml'
 TITLE = "Price list editor"

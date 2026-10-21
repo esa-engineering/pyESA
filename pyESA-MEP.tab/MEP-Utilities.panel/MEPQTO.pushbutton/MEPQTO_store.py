@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_store.py - archivio delle voci di computo, fuori dal modello Revit.
+MEPQTO_store.py - archivio delle voci di computo, fuori dal modello Revit.
 
 Due livelli, fusi campo per campo (il progetto vince):
 
@@ -1194,17 +1194,17 @@ class ProjectStore(object):
         self.price_list_path = None
         # mappatura delle colonne del listino Excel / CSV (dict), None = A..I
         self.price_list_layout = None
-        # rules: dizionario di mepqto_rules.Rules.to_dict(), None = valori di default
+        # rules: dizionario di MEPQTO_rules.Rules.to_dict(), None = valori di default
         self.rules = None
         # wbs: nomi dei parametri dei livelli WBS (stringhe vuote per i livelli spenti)
         self.wbs = []
-        # parameters: dizionario di mepqto_model.ParameterMap.to_dict(), None = default
+        # parameters: dizionario di MEPQTO_model.ParameterMap.to_dict(), None = default
         self.parameters = None
         # allowance_overrides: {(Type Mark, codice): frazione} che sostituisce la
         # maggiorazione della categoria su quella voce del computo
         self.allowance_overrides = {}
         # manual_items: voci non modellate della scheda Manual items (dict di
-        # mepqto_model.ManualItem.to_dict()), salvate in blocco
+        # MEPQTO_model.ManualItem.to_dict()), salvate in blocco
         self.manual_items = []
         # struttura WBS: percorso dell'Excel / CSV e sua mappatura (dict), salvati insieme
         self.wbs_structure_path = None

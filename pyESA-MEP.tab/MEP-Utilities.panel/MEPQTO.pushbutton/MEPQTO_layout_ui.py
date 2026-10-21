@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_layout_ui.py - disposizione della scheda Bill of quantities: livelli sulle righe e
+MEPQTO_layout_ui.py - disposizione della scheda Bill of quantities: livelli sulle righe e
 livelli WBS sulle colonne.
 
 Tre elenchi: campi disponibili, righe, colonne. Un campo si aggiunge in coda alle righe o
@@ -23,7 +23,7 @@ from System.Windows.Markup import XamlReader
 
 from pyrevit import script
 
-import mepqto_model as qm
+import MEPQTO_model as qm
 
 XAML_FILE_NAME = 'MEPQTO_layout.xaml'
 TITLE = "Bill of quantities layout"

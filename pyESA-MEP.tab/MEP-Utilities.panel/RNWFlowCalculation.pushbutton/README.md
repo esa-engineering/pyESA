@@ -313,7 +313,7 @@ nulla.
 ### Esportazione Excel
 
 **Export Excel** nella finestra dei risultati scrive un .xlsx (`rnwflow_xlsx.py`, writer
-zip + XML senza Excel installato, parte generica copiata da `mepqto_xlsx.py`):
+zip + XML senza Excel installato, parte generica copiata da `MEPQTO_xlsx.py`):
 
 - foglio **Calculation**: tutte le righe, tratti e terminali, nell'ordine della rete da
   monte a valle (filtro e ricerca della griglia non contano), con le sole colonne del

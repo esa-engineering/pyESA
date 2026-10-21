@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_rules.py - regole di misura delle categorie lineari e loro valori di default.
+MEPQTO_rules.py - regole di misura delle categorie lineari e loro valori di default.
 
 Le formule vengono dai fogli QTO aziendali (XXXXEN_QTO_Ducts, _Pipes, _Flex Ducts,
 _Cable Trays, _Conduits):

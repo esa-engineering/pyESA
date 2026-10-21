@@ -22,7 +22,7 @@ degli avvisi di Revit.
 | `MEPAlignToCeiling_form.xaml` | Layout della finestra di avvio |
 | `MEPAlignToCeiling_result_ui.py` | Finestra di esito: tabella interrogabile (nessuna Revit API) |
 | `MEPAlignToCeiling_result.xaml` | Layout della finestra di esito |
-| `MEPAlignToCeiling_grid_filter.py` | Filtri per colonna in stile Excel: copia di `MEPQTO/mepqto_grid_filter.py` con nome proprio (Rocket mode). Le correzioni vanno riportate su entrambe le copie |
+| `MEPAlignToCeiling_grid_filter.py` | Filtri per colonna in stile Excel: copia di `MEPQTO/MEPQTO_grid_filter.py` con nome proprio (Rocket mode). Le correzioni vanno riportate su entrambe le copie |
 | `bundle.yaml` | Etichetta e descrizione del pulsante |
 | `icon.png` / `icon.dark.png` | Icone per il tema chiaro e per quello scuro |
 | `README.md` | Questo file |
