@@ -50,34 +50,34 @@ ESA.extension\
 
 Il comando apre una sola finestra con tutte le scelte.
 
-**1. Elementi da elaborare**
+**1. Elements to process** (elementi da elaborare)
 
-- *Elementi selezionati in Revit*: opera sulla selezione corrente. La voce è
+- *Elements selected in Revit*: opera sulla selezione corrente. La voce è
   disabilitata se non c'è nulla di selezionato.
-- *Elementi MEP della vista attiva*: opera su tutti gli elementi delle categorie
+- *MEP elements in the active view*: opera su tutti gli elementi delle categorie
   gestite visibili nella vista. La voce è disabilitata sulle viste che non
   ammettono la raccolta di elementi (per esempio gli abachi).
 
 Il conteggio degli elementi disponibili è mostrato sotto ciascuna voce.
 
-**2. Livello di destinazione**
+**2. Target level** (livello di destinazione)
 
-- *Livello scelto manualmente*: lo stesso livello per tutti gli elementi. Se la
+- *Manual level*: lo stesso livello per tutti gli elementi. Se la
   vista attiva è associata a un livello, quello è proposto come predefinito.
-- *Livello automatico*: per ogni singolo elemento viene cercato il primo livello
+- *Automatic level*: per ogni singolo elemento viene cercato il primo livello
   di progetto immediatamente sottostante il suo punto di riferimento (punto di
   inserimento, oppure punto medio della linea per gli elementi lineari). Se
   nessun livello risulta sottostante, si usa il livello più basso del progetto.
 
 Con il metodo automatico si può indicare lo **spessore del pacchetto di
-finitura** in millimetri: viene sottratto alla quota del livello prima del
+finitura** (*Floor finish thickness*) in millimetri: viene sottratto alla quota del livello prima del
 confronto, così un elemento appoggiato sopra un pavimento finito viene comunque
 attribuito al livello sottostante. Il valore si applica a tutti e tre i gruppi
 di categorie, come nei grafi Dynamo originali.
 
-**3. Opzioni**
+**3. Options**
 
-- *Simulazione*: calcola e riporta il risultato senza aprire alcuna transazione,
+- *Dry run* (simulazione): calcola e riporta il risultato senza aprire alcuna transazione,
   quindi senza modificare il modello. Utile per verificare l'esito prima di
   applicarlo.
 
@@ -148,5 +148,5 @@ finestre WPF di pyRevit non sono attualmente supportate: si veda la issue
 - Con il livello automatico, prestare particolare attenzione in presenza di doppi
   volumi, mezzanini o piani sfalzati: il criterio "primo livello sottostante" può
   non produrre il risultato atteso.
-- Conviene provare l'esecuzione in *Simulazione* su un sottoinsieme di elementi
+- Conviene provare l'esecuzione in *Dry run* su un sottoinsieme di elementi
   prima di applicare la modifica a un'intera vista.
