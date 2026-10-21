@@ -5,6 +5,8 @@ layout:
   - Insulation
   - ReLevelMEP
   - IsVertical
+  - Openings
   - MEPQTO
   - RNWFlowCalculation
   - MEPWorksetFix
+  - ClashFinder

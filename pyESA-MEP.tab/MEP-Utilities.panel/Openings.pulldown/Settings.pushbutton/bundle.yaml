@@ -1,0 +1,5 @@
+title: Settings
+tooltip: >-
+  Settings of Openings, saved per user: clearance, rounding, merge distance, extra depth, layers joined across a gap,
+  separate MEC and ELE openings. Shows whether the four opening families are loaded.
+author: Matteo Maiorano

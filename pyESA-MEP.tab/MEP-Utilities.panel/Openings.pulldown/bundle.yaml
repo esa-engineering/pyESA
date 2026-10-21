@@ -1,0 +1,11 @@
+title: Openings
+tooltip: >-
+  Openings (void demand) for pipes, ducts, cable trays and conduits crossing walls and floors, also in linked
+  models: Place, New Report, Last Report and Settings.
+author: Matteo Maiorano
+
+layout:
+  - Place
+  - NewReport
+  - LastReport
+  - Settings
