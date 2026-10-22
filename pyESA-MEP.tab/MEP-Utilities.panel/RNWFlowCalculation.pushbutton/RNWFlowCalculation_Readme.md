@@ -45,7 +45,7 @@ manuale.
 
 **La serie di tubo non si sceglie**: si legge per ogni tubo dal modello (`pipe_series`):
 dal nome del materiale del suo segmento, se non basta dal nome del segmento, poi dal nome
-del tipo di tubazione (`rnwflow_tables.series_from_text`: polietilene / PE / HDPE / PEAD,
+del tipo di tubazione (`RNWFlowCalculation_Tables.series_from_text`: polietilene / PE / HDPE / PEAD,
 polipropilene / PP, Triplus, Silere). La serie dà la colonna della tabella 6.2; se non è
 riconosciuta si usa il valore più cautelativo fra le colonne che hanno quel De, con una
 nota sulla riga. Il riepilogo delle serie riconosciute per segmento è nel testo in cima alla
@@ -75,7 +75,7 @@ finestra dei risultati e nel report.
 La v delle tabelle 6.3 - 6.5 vale al grado di riempimento della tabella, cioè alla portata
 Q tabellare, non alla portata reale del tubo: un tubo che porta meno della sua capacità
 lavora più vuoto e più lento. Lo script calcola quindi velocità e riempimento **alla
-portata di progetto** (`rnwflow_tables.partial_state`):
+portata di progetto** (`RNWFlowCalculation_Tables.partial_state`):
 
 1. le tabelle seguono la relazione di moto uniforme a riempimento parziale di un tubo
    circolare (Gauckler-Strickler / Manning): Q(f=0,7)/Q(f=0,5) vale 1,674 in teoria e 1,67
@@ -108,7 +108,7 @@ la parte verticale, verificate e dimensionate separatamente. Chiave della riga:
 (sistema, Section, orientamento); `group_key` riunisce le righe della stessa Section. Un
 tubo senza Section forma una riga da solo, con una nota.
 
-Aggregazione di una riga in `rnwflow_check.py`:
+Aggregazione di una riga in `RNWFlowCalculation_Check.py`:
 
 - portata del tratto = la massima dei suoi tubi (se differiscono c'è una nota);
 - De suggerito = il massimo fra quelli dei suoi tubi; nessuno se un tubo non è
@@ -148,7 +148,7 @@ Le righe seguono la rete **dal punto di monte al punto di valle** (colonna `#`):
 2. in ogni nodo il tratto di valle è quello più carico (la portata cresce verso valle), a
    parità di portata il più basso; gli altri vi confluiscono, quindi i rami di una braga
    restano fratelli e non uno a monte dell'altro. I terminali sono sempre a monte;
-3. `rnwflow_check.order_network` parte da ogni punto di valle (il più carico per primo) e
+3. `RNWFlowCalculation_Check.order_network` parte da ogni punto di valle (il più carico per primo) e
    risale i rami scrivendo prima ciò che sta a monte: ogni ramo compare dal suo terminale in
    giù, prima del tratto in cui confluisce, e lo sbocco è l'ultima riga.
 
@@ -164,7 +164,7 @@ danno il punto di partenza dei rami. Cliccando un'intestazione la griglia si rio
 quella colonna; cliccando `#` si torna all'ordine della rete.
 
 
-`rnwflow_results_ui.py` + `RNWFlowCalculation_results.xaml`: tre schede, **General**,
+`RNWFlowCalculation_Results_ui.py` + `RNWFlowCalculation_Results.xaml`: tre schede, **General**,
 **Sections** e **Fixtures**, griglie legate a `DataTable` come in MEPQTO. La finestra si
 apre su Sections; dopo la navigazione o il ricalcolo torna sulla scheda da cui si era
 partiti.
@@ -222,7 +222,7 @@ della misura nuova e celle Status / Check new.
   del modello.
 - **Sim. slope [%]** (dopo New size, solo per le righe orizzontali): pendenza simulata, una
   per ogni riga delle tabelle 6.3 - 6.5: da 0,5 a 5 cm/m ogni 0,5, poi da 6 a 10 cm/m ogni 1
-  (`rnwflow_check.SIMULATED_SLOPES` = `rnwflow_tables.HORIZONTAL_SLOPES`); "Model" = pendenza del modello. Serve quando la portata non sta in tabella alla
+  (`RNWFlowCalculation_Check.SIMULATED_SLOPES` = `RNWFlowCalculation_Tables.HORIZONTAL_SLOPES`); "Model" = pendenza del modello. Serve quando la portata non sta in tabella alla
   pendenza del modello (pendenza sotto 0,5 cm/m, portata oltre la tabella). Tutti i tubi
   orizzontali della riga si verificano a quella riga di tabella
   (`SectionResult.evaluate_at(de, slope)`), e De suggerito, Qmax, v, riempimento ed esito
@@ -310,25 +310,56 @@ Lo script scrive prima le modifiche ai terminali, poi ridimensiona i tubi. Non �
 predefinito: Invio nella griglia non modifica il modello. **Close** chiude senza modificare
 nulla.
 
-### Esportazione Excel
+### Esportazione
 
-**Export Excel** nella finestra dei risultati scrive un .xlsx (`rnwflow_xlsx.py`, writer
-zip + XML senza Excel installato, parte generica copiata da `MEPQTO_xlsx.py`):
+**Export** nella finestra dei risultati apre la finestra **Export Calculation**
+(`RNWFlowCalculation_Export_ui.py` + `RNWFlowCalculation_Export.xaml`), su tre colonne:
 
-- foglio **Calculation**: tutte le righe, tratti e terminali, nell'ordine della rete da
-  monte a valle (filtro e ricerca della griglia non contano), con le sole colonne del
-  **risultato del calcolo**: #, System, Element code, Section, Part (Horizontal / Vertical /
-  Fixture),
-  Fed by, Pipes, Pipe Type, Min slope (del modello), Simulated slope (vuota se non simulata), Q, DN e De
-  della misura di calcolo (la tendina New size), Qmax,
-  Use, v e Fill con quella misura, Check (colorato come nella finestra), Element (famiglia e
-  id dei terminali). Lo stato attuale del modello (DN / De, Qmax, utilizzo, velocità e
-  riempimento attuali, stato) non viene esportato;
-- foglio **Settings**: modello, data e impostazioni del calcolo (`settings_rows`, le stesse
-  del report).
+- **Format**: Excel (.xlsx) o PDF (.pdf); per il PDF il foglio, A4 o A3 orizzontale;
+- **General**: colonne della tabella dei sistemi (riepilogo e impostazioni si esportano
+  sempre);
+- **Sections** e **Fixtures**: una casella per colonna, con *Default*, *Select All* e
+  *Deselect All*. Ogni tabella deve avere almeno una colonna.
 
-Il nome proposto è `<Modello>_RainwaterCalculation_<aaaammgg>.xlsx` nella cartella del
-modello. Un file aperto in Excel non si sovrascrive: la finestra lo segnala.
+Le scelte si salvano in `ESA_RNWFlowCalculation` (`export_format`, `export_paper`,
+`export_general_columns`, `export_section_columns`, `export_fixture_columns`: chiavi
+separate da virgole; una chiave che non esiste più si ignora). Le colonne predefinite di
+Sections sono quelle del **risultato del calcolo**, come nell'export Excel delle versioni
+precedenti: #, System, Element code, Section, Pipes, Pipe Type, Run, Fed by, Min slope, Q,
+New DN / New De (la tendina New size), Sim. slope, Qmax / Use / v / Fill con quella misura,
+Check new, Notes. Le colonne dello stato attuale (Model DN / De, Qmax, Use, v e Fill del
+modello, Suggested De, Status) si aggiungono a mano. Fixtures: tutte tranne le colonne
+*from* e *Changes not written*.
+
+Il contenuto è lo stesso nei due formati (`RNWFlowCalculation_Report.py`, Python puro:
+cataloghi delle colonne, schede come blocchi di coppie, note e tabelle):
+
+- **General**: superficie, indice pluviometrico, portata, note (compreso il numero di
+  modifiche ai terminali non ancora scritte), tabella dei sistemi;
+- **Sections**: tutte le righe, tratti e terminali, nell'ordine della rete (filtro e
+  ricerca della griglia non contano). Status e Check new hanno i colori della finestra
+  (rosso, giallo, testo blu per OVERSIZED, verde per OK), i terminali sono in corsivo su
+  verde chiaro, le righe senza portata in grigio (solo PDF);
+- **Fixtures**: i valori della griglia, **modifiche non ancora scritte comprese** (colonna
+  *Changes not written*);
+- impostazioni del calcolo (`settings_rows`): foglio **Settings** in Excel, in coda alla
+  scheda General nel PDF.
+
+Excel (`RNWFlowCalculation_Xlsx.py`, writer zip + XML senza Excel installato, parte
+generica copiata da `MEPQTO_xlsx.py`): un foglio per scheda più Settings; nei fogli
+Sections e Fixtures intestazione bloccata e filtro automatico; i numeri restano numeri.
+
+PDF (`RNWFlowCalculation_Pdf.py`): scritto a mano, senza librerie né stampanti. PDF 1.4
+con i font standard Helvetica (non incorporati) e codifica WinAnsi: i caratteri fuori da
+cp1252 diventano un sostituto (`<=`, `->`) o `?`, le emoji si tolgono. Ogni scheda parte su
+una pagina nuova; intestazione con modello e scheda, piede con data dell'esportazione e
+numero di pagina; le tabelle ripetono l'intestazione a ogni pagina. Le colonne prendono la
+larghezza del contenuto; se non ci stanno il carattere scende da 7 a 5,5 pt, poi le colonne
+di testo si stringono fino alla parola più lunga e vanno a capo.
+
+Il nome proposto è `<Modello>_RainwaterCalculation_<aaaammgg>.xlsx` (o `.pdf`) nella
+cartella del modello. Un file aperto in un altro programma non si sovrascrive: la finestra
+lo segnala. Dopo l'esportazione il file si può aprire con il programma predefinito.
 
 ## Modifica del modello
 
@@ -421,11 +452,14 @@ diametri si rilancia lo strumento.
 | File | Ruolo |
 | --- | --- |
 | `RNWFlowCalculation_script.py` | lettura dei tubi, modifica del modello, report |
-| `rnwflow_check.py` | verifica del tubo e aggregazione per tratto (Python puro) |
-| `rnwflow_tables.py` | tabelle 6.2 - 6.5 e regole di lettura (Python puro) |
-| `rnwflow_ui.py` + `RNWFlowCalculation_form.xaml` | finestra delle impostazioni |
-| `rnwflow_results_ui.py` + `RNWFlowCalculation_results.xaml` | finestra dei risultati |
-| `rnwflow_xlsx.py` | writer .xlsx e foglio del calcolo (Python + .NET, nessun Revit) |
+| `RNWFlowCalculation_Check.py` | verifica del tubo e aggregazione per tratto (Python puro) |
+| `RNWFlowCalculation_Tables.py` | tabelle 6.2 - 6.5 e regole di lettura (Python puro) |
+| `RNWFlowCalculation_Form_ui.py` + `RNWFlowCalculation_Form.xaml` | finestra delle impostazioni |
+| `RNWFlowCalculation_Results_ui.py` + `RNWFlowCalculation_Results.xaml` | finestra dei risultati |
+| `RNWFlowCalculation_Xlsx.py` | writer .xlsx del report (Python + .NET, nessun Revit) |
+| `RNWFlowCalculation_Pdf.py` | writer PDF del report (Python + .NET, nessun Revit) |
+| `RNWFlowCalculation_Report.py` | contenuto dell'esportazione e cataloghi delle colonne (Python puro) |
+| `RNWFlowCalculation_Export_ui.py` + `RNWFlowCalculation_Export.xaml` | finestra di impostazione dell'esportazione |
 
 Le impostazioni si salvano nella sezione `ESA_RNWFlowCalculation` della config di pyRevit.
 

@@ -11,7 +11,7 @@ tooltip: >
   CLICK: results window, upstream to downstream, one row per section. Pick a new size from
   the sizes of the pipe type, or simulate a slope; Apply Changes resizes pipes and connected
   fittings (with transitions where needed), one section at a time. Fixture areas and
-  coefficients are editable in the Fixtures tab. Export to Excel.
+  coefficients are editable in the Fixtures tab. Export to Excel or PDF.
 
   SHIFT + CLICK: fitting test. Tries a DN on a fitting connector in a rolled-back
   transaction and reports the result. The model is not changed.

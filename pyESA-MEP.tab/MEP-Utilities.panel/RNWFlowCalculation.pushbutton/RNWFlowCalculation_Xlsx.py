@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-rnwflow_xlsx.py - writer .xlsx minimale (zip + xml), senza Excel installato, per
-l'esportazione del calcolo di RNWFlowCalculation.
+RNWFlowCalculation_Xlsx.py - writer .xlsx minimale (zip + xml), senza Excel installato, per
+l'esportazione del calcolo di RNWFlowCalculation (export_report: un foglio per
+scheda del report, RNWFlowCalculation_Report, piu' le impostazioni).
 
 La parte generica (celle, fogli, zip) e' copiata da MEPQTO.pushbutton/
 MEPQTO_xlsx.py, che importa i moduli di MEPQTO e quindi non si puo' usare da un
 altro pulsante (gli helper sono duplicati per strumento, vedi CLAUDE.md). Gli
 stili sono propri: intestazione, numeri a 0 / 1 / 2 decimali, titolo, testo a
-capo, e i tre colori dell'esito (errore, avviso, OK) come nella finestra.
+capo, e i colori dell'esito (errore, avviso, OK, sovradimensionato) come nella
+finestra.
 
 Nessun import di Revit; compatibile con Rocket mode (nessuno stato di modulo).
 """
@@ -22,6 +24,8 @@ from System.IO import File, IOException, StreamWriter
 from System.IO.Compression import ZipFile, ZipArchiveMode, CompressionLevel
 from System.Text import UTF8Encoding
 
+import RNWFlowCalculation_Report as rp
+
 # Indici di cellXfs in styles.xml
 STYLE_DEFAULT = 0
 STYLE_HEADER = 1
@@ -35,6 +39,7 @@ STYLE_ERROR = 8
 STYLE_WARNING = 9
 STYLE_PASS = 10
 STYLE_FIXTURE = 11
+STYLE_INFO = 12
 
 _INVALID_XML = re.compile(u"[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f]")
 MAX_CELL_TEXT = 32000
@@ -164,13 +169,14 @@ _STYLES = (
     u'<numFmt numFmtId="165" formatCode="0.0"/>'
     u'<numFmt numFmtId="166" formatCode="0"/>'
     u'</numFmts>'
-    u'<fonts count="6">'
+    u'<fonts count="7">'
     u'<font><sz val="10"/><name val="Arial"/></font>'
     u'<font><b/><sz val="10"/><name val="Arial"/></font>'
     u'<font><b/><sz val="13"/><name val="Arial"/></font>'
     u'<font><sz val="10"/><color rgb="FF9C0006"/><name val="Arial"/></font>'
     u'<font><sz val="10"/><color rgb="FF7A5B00"/><name val="Arial"/></font>'
     u'<font><i/><sz val="10"/><name val="Arial"/></font>'
+    u'<font><sz val="10"/><color rgb="FF2D5A8A"/><name val="Arial"/></font>'
     u'</fonts>'
     u'<fills count="7">'
     u'<fill><patternFill patternType="none"/></fill>'
@@ -186,7 +192,7 @@ _STYLES = (
     u'<border><left/><right/><top/><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border>'
     u'</borders>'
     u'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    u'<cellXfs count="12">'
+    u'<cellXfs count="13">'
     u'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
     u'<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" '
     u'applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="bottom"/></xf>'
@@ -201,6 +207,7 @@ _STYLES = (
     u'<xf numFmtId="0" fontId="4" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/>'
     u'<xf numFmtId="0" fontId="0" fillId="5" borderId="0" xfId="0" applyFill="1"/>'
     u'<xf numFmtId="0" fontId="5" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1"/>'
+    u'<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
     u'</cellXfs>'
     u'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
     u'</styleSheet>')
@@ -266,47 +273,95 @@ def write_workbook(path, sheets):
 # CONTENUTO DELL'ESPORTAZIONE
 # =============================================================================
 
-class Column(object):
-    """Colonna del foglio Calculation: intestazione, larghezza, stile dei numeri."""
+_NUMBER_STYLES = {0: STYLE_NUM0, 1: STYLE_NUM1, 2: STYLE_NUM2}
+_SEVERITY_STYLES = {
+    rp.SEV_ERROR: STYLE_ERROR,
+    rp.SEV_WARNING: STYLE_WARNING,
+    rp.SEV_PASS: STYLE_PASS,
+    rp.SEV_INFO: STYLE_INFO,
+}
 
-    def __init__(self, header, width, style=STYLE_DEFAULT):
-        self.header = header
-        self.width = width
-        self.style = style
+
+def _table_cell(column, row):
+    value = row.values.get(column.key)
+    if isinstance(value, bool):
+        value = u"Yes" if value else u""
+    is_number = isinstance(value, (int, float))
+    if is_number:
+        style = _NUMBER_STYLES.get(column.digits, STYLE_NUM2)
+    elif row.kind == rp.ROW_FIXTURE:
+        style = STYLE_FIXTURE
+    else:
+        style = STYLE_DEFAULT
+    severity = row.severities.get(column.key) if column.severity else None
+    if severity in _SEVERITY_STYLES:
+        style = _SEVERITY_STYLES[severity]
+    return Cell(value, style)
 
 
-def export_calculation(path, title, settings_rows, columns, rows):
-    """Scrive il calcolo: foglio Calculation (righe della rete) e Settings.
+def _add_table(sheet, table, filtered):
+    """Intestazione e righe; con filtered la tabella e' l'unica del foglio:
+    intestazione bloccata e filtro automatico."""
+    if table.title and not filtered:
+        sheet.add_row([Cell(table.title, STYLE_BOLD)])
+    header_row = sheet.add_row([Cell(column.header, STYLE_HEADER) for column in table.columns])
+    for row in table.rows:
+        sheet.add_row([_table_cell(column, row) for column in table.columns])
+    if filtered:
+        sheet.freeze_rows = header_row
+        sheet.filter_row = header_row
+        sheet.filter_columns = len(table.columns)
 
-    settings_rows: [(voce, valore)]; columns: [Column]; rows: [(valori, stile
-    dell'esito, terminale?)], i valori nell'ordine delle colonne, l'ultima colonna
-    di esito colorata con lo stile dato. FileLockedError se il file e' aperto.
-    """
-    calc = Sheet("Calculation")
-    calc.add_row([Cell(title, STYLE_TITLE)])
-    calc.add_row([])
-    header_row = calc.add_row([Cell(column.header, STYLE_HEADER) for column in columns])
-    calc.widths = [column.width for column in columns]
-    calc.freeze_rows = header_row
-    calc.filter_row = header_row
-    calc.filter_columns = len(columns)
-    check_index = len(columns) - 2      # penultima colonna: esito; ultima: elemento
-    for values, check_style, is_fixture in rows:
-        cells = []
-        for index, (column, value) in enumerate(zip(columns, values)):
-            style = column.style if isinstance(value, (int, float)) else STYLE_DEFAULT
-            if is_fixture and not isinstance(value, (int, float)):
-                style = STYLE_FIXTURE
-            if index == check_index and check_style:
-                style = check_style
-            cells.append(Cell(value, style))
-        calc.add_row(cells)
+
+def _tab_sheet(title, tab):
+    sheet = Sheet(tab.name)
+    sheet.add_row([Cell(title, STYLE_TITLE)])
+    sheet.add_row([])
+    single = len(tab.blocks) == 1 and isinstance(tab.blocks[0], rp.Table)
+    widths = []
+    for block in tab.blocks:
+        if isinstance(block, rp.Pairs):
+            if block.title:
+                sheet.add_row([Cell(block.title, STYLE_BOLD)])
+            for label, value in block.rows:
+                is_number = isinstance(value, (int, float)) and not isinstance(value, bool)
+                style = _NUMBER_STYLES.get(rp.PAIR_DIGITS, STYLE_NUM2) if is_number \
+                    else STYLE_DEFAULT
+                sheet.add_row([Cell(label), Cell(value, style)])
+            widths = _merge_widths(widths, [36, 18])
+        elif isinstance(block, rp.Text):
+            # Senza a capo: il testo continua nelle celle vuote a destra
+            sheet.add_row([Cell(block.text)])
+        elif isinstance(block, rp.Table):
+            _add_table(sheet, block, single)
+            widths = _merge_widths(widths, [column.width for column in block.columns])
+        sheet.add_row([])
+    sheet.widths = widths
+    return sheet
+
+
+def _merge_widths(current, new):
+    merged = list(current)
+    for index, width in enumerate(new):
+        if index < len(merged):
+            merged[index] = max(merged[index], width)
+        else:
+            merged.append(width)
+    return merged
+
+
+def export_report(path, report):
+    """Scrive il report (RNWFlowCalculation_Report.Report): un foglio per scheda
+    (General, Sections, Fixtures) e il foglio Settings. FileLockedError se il
+    file e' aperto in Excel."""
+    sheets = [_tab_sheet(report.title, tab) for tab in report.tabs]
 
     settings = Sheet("Settings")
-    settings.add_row([Cell(title, STYLE_TITLE)])
+    settings.add_row([Cell(report.title, STYLE_TITLE)])
     settings.add_row([])
-    for label, value in settings_rows:
+    for label, value in report.settings:
         settings.add_row([Cell(label, STYLE_BOLD), Cell(value, STYLE_WRAP)])
     settings.widths = [42, 110]
+    sheets.append(settings)
 
-    write_workbook(path, [calc, settings])
+    write_workbook(path, sheets)

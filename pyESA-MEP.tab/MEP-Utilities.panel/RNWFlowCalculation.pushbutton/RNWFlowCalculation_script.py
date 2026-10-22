@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "RNW Flow\nCalculation"
-__doc__ = """Version = 4.1
-Date    = 19.10.2026
+__doc__ = """Version = 4.2
+Date    = 22.10.2026
 _____________________________________________________________________
 Description:
 Rainwater network sizing. The rainwater fixtures write their design flow
@@ -25,6 +25,16 @@ Author(s): ESA Engineering
 """
 __author__ = "ESA Engineering"
 
+# ======================= STORICO REVISIONI =======================
+# Versione | Data       | Tipo     | Descrizione                                     | PR
+# 4.2      | 22.10.2026 | FEAT     | Pulsante Export: finestra di impostazione,      | -
+#          |            |          | Excel o PDF, le tre schede (General, Sections,  |
+#          |            |          | Fixtures) con le colonne scelte dall'utente     |
+# 4.2      | 22.10.2026 | REFACTOR | File e moduli rinominati secondo CLAUDE.md      | -
+# 4.1      | 19.10.2026 | FEAT     | Versione precedente al registro                 | #41
+# Testato su Revit: 4.2 non ancora provata in Revit
+# =================================================================
+
 # -----------------------------------------------------------------------------
 # Note di sviluppo (in italiano, come il resto dei commenti del repo)
 #
@@ -35,17 +45,17 @@ __author__ = "ESA Engineering"
 #
 # Flusso:
 #   1. raccolta dei tubi e dei tipi di sistema di tubazioni;
-#   2. finestra delle impostazioni (rnwflow_ui): tipo di sistema e sistemi da
+#   2. finestra delle impostazioni (RNWFlowCalculation_Form_ui): tipo di sistema e sistemi da
 #      calcolare (uno o piu'); la serie di tubo non si sceglie, si legge per ogni
 #      tubo dal materiale del suo segmento (pipe_series);
 #   3. ogni tubo diventa un PipeCheck (dati semplici: portata, geometria, De,
-#      DN, Section, misure del tipo di tubazione) verificato da rnwflow_check;
+#      DN, Section, misure del tipo di tubazione) verificato da RNWFlowCalculation_Check;
 #      le misure vengono dalle preferenze di instradamento del tipo (tutti i
 #      segmenti, ciascuno nel suo campo di diametri), vedi pipe_type_sizes;
 #   4. raggruppamento per tratto (sistema + Section), terminali (plumbing
 #      fixtures) collegati con la loro portata, ordine della rete da monte a valle
-#      (network_topology + rnwflow_check.order_network) e finestra dei risultati
-#      (rnwflow_results_ui), dove l'utente sceglie le misure nuove (si
+#      (network_topology + RNWFlowCalculation_Check.order_network) e finestra dei risultati
+#      (RNWFlowCalculation_Results_ui), dove l'utente sceglie le misure nuove (si
 #      modificano le righe con misura diversa da quella del modello) e i
 #      parametri dei terminali (scheda Fixtures, read_fixture_data);
 #   4b. "Apply and Recalculate": write_fixture_edits scrive i parametri dei
@@ -79,10 +89,10 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 
 from pyrevit import revit, script, forms, DB
 
-import rnwflow_tables as rt
-import rnwflow_check as rc
-import rnwflow_ui as rui
-import rnwflow_results_ui as rres
+import RNWFlowCalculation_Tables as rt
+import RNWFlowCalculation_Check as rc
+import RNWFlowCalculation_Form_ui as rui
+import RNWFlowCalculation_Results_ui as rres
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -2092,7 +2102,8 @@ def settings_rows(config):
 
 
 def export_info(config):
-    """Dati per l'esportazione Excel della finestra dei risultati."""
+    """Dati per l'esportazione (Excel o PDF) della finestra dei risultati; il nome
+    proposto ha .xlsx, la finestra lo cambia in .pdf se serve."""
     import datetime
     model = doc.Title or "Model"
     if model.lower().endswith(".rvt"):

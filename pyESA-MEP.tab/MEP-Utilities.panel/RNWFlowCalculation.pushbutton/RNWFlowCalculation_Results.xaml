@@ -555,8 +555,8 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <Button x:Name="btn_export" Content="Export Excel" Padding="10,3" Margin="0,0,5,0"
-                        ToolTip="Write the calculation to an .xlsx file: every row in network order, with the results of the calculation (calculation size, capacity, use, velocity, fill and check), not the current state of the model; plus a sheet with the settings"/>
+                <Button x:Name="btn_export" Content="Export" Padding="10,3" Margin="0,0,5,0"
+                        ToolTip="Export the General, Sections and Fixtures tabs to Excel or PDF, with the columns you choose"/>
                 <Button x:Name="btn_recalc" Content="Apply and Recalculate" Padding="10,3" Margin="15,0,0,0"
                         ToolTip="Write the fixture changes to the model, let Revit update the flows and recalculate the network; the pipes are not resized"/>
             </StackPanel>
