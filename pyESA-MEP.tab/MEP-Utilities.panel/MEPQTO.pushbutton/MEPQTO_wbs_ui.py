@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_wbs_ui.py - finestra di scelta dei parametri WBS (fino a 15 livelli).
+MEPQTO_wbs_ui.py - finestra di scelta dei parametri WBS (fino a 15 livelli).
 
 Ogni livello e' un ComboBox modificabile: si sceglie un parametro fra quelli trovati
 su un campione di elementi del modello, oppure se ne scrive il nome. I livelli vuoti

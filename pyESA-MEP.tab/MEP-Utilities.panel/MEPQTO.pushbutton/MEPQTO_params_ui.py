@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_params_ui.py - finestra di mappatura dei parametri del modello.
+MEPQTO_params_ui.py - finestra di mappatura dei parametri del modello.
 
 Tre gruppi, tutti con ComboBox modificabili (si sceglie fra i parametri trovati su un
 campione di elementi oppure se ne scrive il nome):
@@ -10,7 +10,7 @@ campione di elementi oppure se ne scrive il nome):
   sommano a quelli di tipo);
 * il Si/No d'istanza di inclusione nel computo, per tutte le categorie.
 
-Restituisce una mepqto_model.ParameterMap, oppure None se annullata.
+Restituisce una MEPQTO_model.ParameterMap, oppure None se annullata.
 """
 
 import os
@@ -27,7 +27,7 @@ from System.Windows.Markup import XamlReader
 
 from pyrevit import script
 
-import mepqto_model as qm
+import MEPQTO_model as qm
 
 XAML_FILE_NAME = 'MEPQTO_params.xaml'
 TITLE = "Model parameters"

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_ui.py - finestra XAML del computo MEP.
+MEPQTO_ui.py - finestra XAML del computo MEP.
 
 Cinque schede: elenco prezzi (modificabile: capitolo, sottocapitolo, n. articolo
 EPU, prezzario, descrizione, unita' da tendina, prezzo unitario), computo
@@ -48,19 +48,19 @@ from Microsoft.Win32 import OpenFileDialog, SaveFileDialog
 
 from pyrevit import DB, script
 
-import mepqto_model as qm
-import mepqto_rules as qr
-import mepqto_store as qs
-import mepqto_xlsx as qx
-from mepqto_wbs_ui import show_wbs_dialog
-from mepqto_params_ui import show_parameters_dialog
-from mepqto_pricelist_ui import show_pricelist_editor
-from mepqto_allowance_ui import show_allowance_dialog
-from mepqto_scope_ui import show_scope_dialog, ScopeSettings, SET_NAME_SEPARATOR
-from mepqto_grid_filter import GridFilters
-from mepqto_layout_ui import show_layout_dialog
-from mepqto_columns_ui import show_wbs_columns_dialog
-from mepqto_columns_ui import show_columns_dialog
+import MEPQTO_model as qm
+import MEPQTO_rules as qr
+import MEPQTO_store as qs
+import MEPQTO_xlsx as qx
+from MEPQTO_wbs_ui import show_wbs_dialog
+from MEPQTO_params_ui import show_parameters_dialog
+from MEPQTO_pricelist_ui import show_pricelist_editor
+from MEPQTO_allowance_ui import show_allowance_dialog
+from MEPQTO_scope_ui import show_scope_dialog, ScopeSettings, SET_NAME_SEPARATOR
+from MEPQTO_grid_filter import GridFilters
+from MEPQTO_layout_ui import show_layout_dialog
+from MEPQTO_columns_ui import show_wbs_columns_dialog
+from MEPQTO_columns_ui import show_columns_dialog
 
 XAML_FILE_NAME = 'MEPQTO_form.xaml'
 CONFIG_SECTION = 'ESA_MEPQTO'
@@ -79,7 +79,7 @@ MANUAL_ITEM_FIELDS = {"Description": "description", "Unit": "unit", "UnitPrice":
 # Separatore dei nomi dei workset nella config: Revit non ammette '|' nei nomi.
 # Si computano solo il modello principale e le opzioni di progetto primarie: la casella
 # che lo rendeva modificabile e' stata tolta dalla finestra (vedi README, "Opzioni di
-# progetto"). La logica di filtro resta in mepqto_model (CollectOptions.primary_only).
+# progetto"). La logica di filtro resta in MEPQTO_model (CollectOptions.primary_only).
 PRIMARY_OPTIONS_ONLY = True
 WORKSET_SEPARATOR = u"|"
 
@@ -201,7 +201,7 @@ class Session(object):
         self.wbs_structure_path = None
         self.wbs_structure_error = None
         self.exported_paths = []
-        # voci non modellate (mepqto_model.ManualItem), per l'export
+        # voci non modellate (MEPQTO_model.ManualItem), per l'export
         self.manual_items = []
         self.saved = False
         self.unsaved_on_close = False

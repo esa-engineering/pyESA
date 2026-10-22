@@ -32,7 +32,7 @@ incontrata.
 | File | Ruolo |
 | --- | --- |
 | `MEPAlignToWall_script.py` | Logica dello strumento (Revit API, motore IronPython) |
-| `MEPAlignToWallWindow.xaml` | Interfaccia grafica della finestra di dialogo |
+| `MEPAlignToWall_Window.xaml` | Interfaccia grafica della finestra di dialogo |
 | `bundle.yaml` | Etichetta e descrizione del pulsante nella barra pyRevit |
 | `icon.png` / `icon.dark.png` | Icone per il tema chiaro e per quello scuro |
 | `README.md` | Questo file |
