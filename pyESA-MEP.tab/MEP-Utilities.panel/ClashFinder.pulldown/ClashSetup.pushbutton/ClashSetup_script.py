@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 __title__ = "Clash\nSetup"
 
-__doc__ = """Version = 2.0
-Date    = 20.10.2026
+__doc__ = """Version = 2.1
+Date    = 22.10.2026
 _____________________________________________________________________
 Clash detection driven by saved tests, in the spirit of Navisworks.
 
@@ -14,7 +14,8 @@ JSON files to share them.
 The window stays open while you work in Revit. Click a saved
 test to load it, then edit it for Set A and Set B:
   Sources       - current Revit selection, active view, whole
-                  model or nothing, plus loaded links (by file name)
+                  model or links only, plus loaded links (chosen
+                  from a drop-down list, saved by file name)
   Categories    - ticked categories, with the number of elements
                   that enter the set
   Model filters - view filters of the model, ANDed with categories
@@ -35,6 +36,13 @@ Author(s): Claude + Matteo Maiorano
 """
 
 __author__ = "Claude + Matteo Maiorano"
+
+# ======================= STORICO REVISIONI =======================
+# Versione | Data       | Tipo | Descrizione                                              | PR
+# 2.1.0    | 22.10.2026 | UI   | Link scelti da un menu a discesa; riga del test con      |
+#          |            |      | "N links"; etichette "Links" e "Links only"              |
+# Testato su Revit: (da compilare dopo le prove)
+# =================================================================
 
 # Le finestre restano aperte dopo la fine dello script: il motore IronPython
 # deve sopravvivere per gestirne gli eventi.

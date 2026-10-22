@@ -51,11 +51,35 @@
         </Grid.RowDefinitions>
 
         <!-- Title -->
-        <TextBlock Grid.Row="0"
-                   Text="💥 Quick Clash"
-                   FontSize="16" FontWeight="Bold"
-                   Margin="0,0,0,10"
-                   HorizontalAlignment="Center"/>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="💥 Quick Clash"
+                       FontSize="16" FontWeight="Bold"
+                       HorizontalAlignment="Center"/>
+            <!-- Guida rapida: solo al passaggio del mouse -->
+            <TextBlock Text="ℹ️" FontSize="18" Foreground="#2D5A8A"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Help"
+                       ToolTipService.InitialShowDelay="200" ToolTipService.ShowDuration="120000">
+                <TextBlock.ToolTip>
+                    <ToolTip MaxWidth="520">
+                        <TextBlock TextWrapping="Wrap" FontSize="12">
+                            <Run Text="HOW TO USE" FontWeight="Bold" Foreground="#2D5A8A"/>
+                            <LineBreak/>
+                            <Run Text="1. Click the test to run in the list on the left."/>
+                            <LineBreak/>
+                            <Run Text="2. Check where Set A and Set B come from (From this model) and choose the Links to include. These changes are valid for this run only: the test is not changed."/>
+                            <LineBreak/>
+                            <Run Text="3. Read the status lines: the phase of the active view (red if the view has no phase), then how many elements each set holds (green if there are some, grey if none)."/>
+                            <LineBreak/>
+                            <Run Text="4. Click Refresh to read your Revit selection again."/>
+                            <LineBreak/>
+                            <Run Text="5. Click Run clash detection: the report opens."/>
+                            <LineBreak/><LineBreak/>
+                            <Run Text="Categories, model filters and custom rules are those of the test: change them in Clash Setup."/>
+                        </TextBlock>
+                    </ToolTip>
+                </TextBlock.ToolTip>
+            </TextBlock>
+        </Grid>
 
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
@@ -102,8 +126,15 @@
                             <ComboBox x:Name="cbo_source_a" Grid.Column="1" Style="{StaticResource ComboStyle}"
                                       ToolTip="Elements of the open model that can enter Set A"/>
                         </Grid>
-                        <TextBlock Text="Plus elements of these links:" FontSize="11" Margin="0,6,0,2"/>
-                        <ListBox x:Name="lst_links_a" Height="70" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                        <TextBlock Text="Links" FontSize="11" Margin="0,6,0,2"/>
+                        <Button x:Name="btn_links_a" HorizontalContentAlignment="Left" Padding="6,3"/>
+                        <Popup x:Name="pop_links_a" PlacementTarget="{Binding ElementName=btn_links_a}"
+                               Placement="Bottom" StaysOpen="False"
+                               Width="{Binding ActualWidth, ElementName=btn_links_a}">
+                            <Border Background="White" BorderBrush="#CCCCCC" BorderThickness="1">
+                                <ListBox x:Name="lst_links_a" MaxHeight="260" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                            </Border>
+                        </Popup>
                     </StackPanel>
                 </Border>
 
@@ -120,8 +151,15 @@
                             <ComboBox x:Name="cbo_source_b" Grid.Column="1" Style="{StaticResource ComboStyle}"
                                       ToolTip="Elements of the open model that can enter Set B"/>
                         </Grid>
-                        <TextBlock Text="Plus elements of these links:" FontSize="11" Margin="0,6,0,2"/>
-                        <ListBox x:Name="lst_links_b" Height="70" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                        <TextBlock Text="Links" FontSize="11" Margin="0,6,0,2"/>
+                        <Button x:Name="btn_links_b" HorizontalContentAlignment="Left" Padding="6,3"/>
+                        <Popup x:Name="pop_links_b" PlacementTarget="{Binding ElementName=btn_links_b}"
+                               Placement="Bottom" StaysOpen="False"
+                               Width="{Binding ActualWidth, ElementName=btn_links_b}">
+                            <Border Background="White" BorderBrush="#CCCCCC" BorderThickness="1">
+                                <ListBox x:Name="lst_links_b" MaxHeight="260" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                            </Border>
+                        </Popup>
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -144,6 +182,8 @@
 
         <!-- Buttons -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button x:Name="btn_help" Content="?" Width="30" Height="30" Margin="0,0,10,0" FontWeight="Bold"
+                    ToolTip="Open the guide of this tool"/>
             <Button x:Name="btn_close" Content="Close" Width="100" Height="30"
                     Margin="0,0,10,0"/>
             <Button x:Name="btn_run" Content="▶ Run clash detection" Width="160" Height="30"

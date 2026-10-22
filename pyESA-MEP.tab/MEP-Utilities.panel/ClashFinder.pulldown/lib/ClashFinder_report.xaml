@@ -51,11 +51,35 @@
         </Grid.RowDefinitions>
 
         <!-- Title -->
-        <TextBlock Grid.Row="0"
-                   Text="💥 Clash Report"
-                   FontSize="16" FontWeight="Bold"
-                   Margin="0,0,0,10"
-                   HorizontalAlignment="Center"/>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="💥 Clash Report"
+                       FontSize="16" FontWeight="Bold"
+                       HorizontalAlignment="Center"/>
+            <!-- Guida rapida: solo al passaggio del mouse -->
+            <TextBlock Text="ℹ️" FontSize="18" Foreground="#2D5A8A"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Help"
+                       ToolTipService.InitialShowDelay="200" ToolTipService.ShowDuration="120000">
+                <TextBlock.ToolTip>
+                    <ToolTip MaxWidth="560">
+                        <TextBlock TextWrapping="Wrap" FontSize="12">
+                            <Run Text="HOW TO READ THE REPORT" FontWeight="Bold" Foreground="#2D5A8A"/>
+                            <LineBreak/>
+                            <Run Text="1. Clashes are grouped by the category of the Set A element. Open a clash to see its two elements: Set A in green, Set B in red, with the link name for linked elements."/>
+                            <LineBreak/>
+                            <Run Text="2. Click a row to zoom to it in the active view. In a 3D view the section box is fitted around the elements."/>
+                            <LineBreak/>
+                            <Run Text="3. Isolate selected shows only the two elements. Hide overlay removes the colours; zoom and section box keep working."/>
+                            <LineBreak/>
+                            <Run Text="4. Use the search box and Group by Set A / Set B to find a clash. Copy ID copies the element ids of the selected row."/>
+                            <LineBreak/>
+                            <Run Text="5. After fixing the model, click Refresh: clashes not found any more are listed as resolved, new ones are marked NEW. The saved file is not changed."/>
+                            <LineBreak/>
+                            <Run Text="6. Export JSON saves the report in the report folder of the model (Last Report opens it again). Export CSV opens in Excel."/>
+                        </TextBlock>
+                    </ToolTip>
+                </TextBlock.ToolTip>
+            </TextBlock>
+        </Grid>
 
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
@@ -126,6 +150,8 @@
                         ToolTip="Run the tests of this report again on the model as it is now: new clashes are marked NEW, the ones no longer found are listed as resolved. The saved report file is not changed."/>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button x:Name="btn_help" Content="?" Width="30" Height="30" Margin="0,0,10,0" FontWeight="Bold"
+                        ToolTip="Open the guide of this tool"/>
                 <Button x:Name="btn_export_json" Content="Export JSON..." Width="110" Height="30"
                         Margin="0,0,10,0"
                         ToolTip="Save the report in a folder, one file per clash test (earlier ones go to _old). The folder becomes the report folder of this model, used by the next runs and by Last Report."/>
