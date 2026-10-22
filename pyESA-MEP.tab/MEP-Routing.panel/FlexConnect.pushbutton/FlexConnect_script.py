@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __title__ = "Flex\nConnect"
-__doc__ = """Version = 0.11.0
+__doc__ = """Version = 1.0.0
 Date    = 22.10.2026
 Connects a pipe or duct to equipment or an air terminal with a flex pipe or flex duct.
 Author(s): Matteo Maiorano
@@ -9,6 +9,7 @@ __author__ = "Matteo Maiorano"
 
 # ======================= STORICO REVISIONI =======================
 # Versione | Data       | Tipo | Descrizione                                   | PR
+# 1.0.0    | 22.10.2026 | FEAT | Prima versione per la main: funzioni delle 0.1-0.11 (vedi sotto) | -
 # 0.11.0   | 22.10.2026 | FEAT | Tolto Flex Pattern; impostazioni a sezioni (Pipes, Ducts, General); messaggio a fine comando se inserite riduzioni; Connector Description nell'elenco connettori; icona i anche nella scelta del connettore | -
 # 0.10.1   | 22.10.2026 | UI   | Titoli del tooltip How to use in blu come in Clash Setup | -
 # 0.10.0   | 22.10.2026 | UI   | Icona i nella finestra delle impostazioni con il tooltip How to use | -

@@ -2,6 +2,16 @@
 
 Registro dei tentativi, il piu' recente in alto.
 
+## 22.10.2026, versione 1.0.0: pubblicazione (con AI)
+
+**Richiesta**: portare la versione a 1.0 e preparare le note della pull request.
+
+**Fatto**: solo numero di versione e riga nello storico; nessun cambio di codice rispetto alla 0.11.0. Il tool arriva alla 1.0 con tutte le funzioni delle 0.x (tubi e condotti, estremita' e presa, riduzioni, isolamento, scelta del connettore, comando sempre attivo).
+
+**Da fare prima del merge**: compilare la riga "Testato su Revit" con le versioni provate davvero (oggi dice "non ancora testato"); inserire il numero della PR nello storico; chiedere al proprietario di creare la pagina wiki e poi compilare `help_url` in `bundle.yaml`.
+
+**Esito**: -
+
 ## 22.10.2026, versione 0.11.0: aggiustamenti dopo la prova (con AI)
 
 **Richiesta** (screenshot della scelta del connettore): togliere i pattern; raggruppare le impostazioni per categoria; messaggio breve se viene inserita una riduzione, una volta per attivazione; "Connector Description" della famiglia come prima voce dell'elenco connettori al posto del numero; icona `i` anche nella finestra del connettore; aggiornare i file e proporre in `docs/Claude_Suggestions.md` l'inversione di CLICK e SHIFT + CLICK (il messaggio dell'utente si e' interrotto prima del motivo).
