@@ -1,0 +1,8 @@
+title: "Flex\nConnect"
+tooltip: |-
+  Connects a pipe or duct to equipment or an air terminal with a flex pipe or flex duct. Esc ends the command.
+  CLICK: runs with the last settings (the first time it opens the settings window).
+  SHIFT + CLICK: opens the settings window, then runs.
+  Click the side of a duct to make a tap; start from the pipe, duct or equipment.
+author: Matteo Maiorano
+help_url:
