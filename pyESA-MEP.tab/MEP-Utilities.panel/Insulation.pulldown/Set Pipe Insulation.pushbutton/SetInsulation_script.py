@@ -1,25 +1,34 @@
 # -*- coding: utf-8 -*-
 __title__ = 'Set Pipe\nInsulation\nBy System'
 __author__ = 'Andrea Patti'
-__doc__ = """Version = 2.1
-Date = 14.10.2026
+__doc__ = """Version = 2.2
+Date = 22.10.2026
 ________________________________________________________________
 Adds or updates the insulation of the pipes and pipe fittings of a
-piping system. Thickness comes from an external table, by nominal
-diameter and thermal zone, or is a fixed value.
+piping system. Thickness comes from the DPR 412/93 table built into
+the tool or from an external table, by nominal diameter and thermal
+zone, or is a fixed value.
 1- Choose the piping system
 2- Choose the scope: all elements of the system, or the selected ones
 3- Choose the insulation type for exposed and concealed pipes
-4- Choose the thickness table file (template: ALT + CLICK on the
-   button opens the folder with insulation_table_template.txt)
+4- Tick the DPR 412/93 table, or choose the thickness table file
+   (template: ALT + CLICK on the button opens the folder with
+   insulation_table_template.txt) and check its preview
 5- Optionally use a fixed thickness instead of the table
 ________________________________________________________________
 Author(s):
 Andrea Patti
 """
 
+# ======================= STORICO REVISIONI =======================
+# Versione | Data       | Tipo | Descrizione                                         | PR
+# 2.2      | 22.10.2026 | FEAT | Opzione tabella DPR 412/93 interna (dallo strumento | -
+#          |            |      | DPR412-93); anteprima della tabella txt importata;  |
+#          |            |      | finestra su due colonne senza scorrimento           |
+# Testato su Revit: (2.2 da provare)
+# =================================================================
+
 import os
-import csv
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.DB.Plumbing import *
 from pyrevit import revit, DB
@@ -27,6 +36,7 @@ from pyrevit import forms, script
 import System
 
 import SetPipeInsulation_ui
+import SetPipeInsulation_Table as insulation_table
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -35,10 +45,10 @@ output = script.get_output()
 XAML_FILE_NAME = "SetPipeInsulation_form.xaml"
 CONFIG_NAME = "ESA_SetPipeInsulation"
 DEFAULTS = {"system": "", "selected_only": False, "visible_type": "", "hidden_type": "",
-            "table_path": "", "manual": False, "thickness": 13}
+            "builtin_table": False, "table_path": "", "manual": False, "thickness": 13}
 
 # Zone termiche valide (intestazioni della tabella e valori di e_EAN_ThermalPosition_1)
-zone_termiche_valide = ["Interno", "Non riscaldato", "Interrato", "Esterno"]
+zone_termiche_valide = insulation_table.THERMAL_ZONES
 
 
 def get_element_id_value(eid):
@@ -59,6 +69,7 @@ def load_settings(config):
         for key in ("system", "visible_type", "hidden_type", "table_path"):
             settings[key] = config.get_option(key, DEFAULTS[key]) or ""
         settings["selected_only"] = to_bool(config.get_option("selected_only", DEFAULTS["selected_only"]))
+        settings["builtin_table"] = to_bool(config.get_option("builtin_table", DEFAULTS["builtin_table"]))
         settings["manual"] = to_bool(config.get_option("manual", DEFAULTS["manual"]))
         settings["thickness"] = int(config.get_option("thickness", DEFAULTS["thickness"]))
     except Exception:
@@ -141,51 +152,6 @@ def get_elements_by_system_name(system_name):
 
     print("Elements found in system '{}': {} pipes, {} fittings".format(system_name, len(pipes), len(fittings)))
     return pipes, fittings
-
-
-# Funzione per caricare la tabella degli isolanti da un file di testo
-def load_insulation_table(file_path):
-    tabella_isolanti = []
-    try:
-        with open(file_path, 'r') as file:
-            # Leggi il file usando csv reader
-            reader = csv.reader(file, delimiter='\t')  # Assumiamo che il file sia delimitato da tab
-            headers = next(reader)  # Leggi l'intestazione
-
-            # Verifica che l'intestazione contenga almeno "Diameter" e alcune zone termiche
-            if "Diameter" not in headers:
-                forms.alert('The table has no "Diameter" column. Check the file format '
-                            '(tab-separated, see insulation_table_template.txt).', exitscript=True)
-
-            # Controlla le zone termiche disponibili nell'intestazione
-            available_zones = [h for h in headers if h in zone_termiche_valide]
-            if not available_zones:
-                forms.alert('The table has no thermal zone column ({}). Check the file format.'.format(
-                    ", ".join(zone_termiche_valide)), exitscript=True)
-
-            for row in reader:
-                if len(row) < len(headers):  # Verifica che la riga sia completa
-                    continue
-
-                row_dict = {}
-                for i, header in enumerate(headers):
-                    try:
-                        if header == "Diameter" or header in zone_termiche_valide:
-                            row_dict[header] = int(row[i])
-                    except ValueError:
-                        # Se la conversione fallisce, salta il valore
-                        print("Table: value '{}' in column {} is not a whole number, skipped".format(row[i], header))
-
-                if "Diameter" in row_dict:
-                    tabella_isolanti.append(row_dict)
-
-        # Ordina la tabella per diametro
-        tabella_isolanti.sort(key=lambda x: x["Diameter"])
-
-        return tabella_isolanti
-    except Exception as e:
-        forms.alert('Error reading the table file:\n{}'.format(str(e)), exitscript=True)
-        return []
 
 
 # Funzione per ottenere tutti i tipi di isolamento disponibili
@@ -463,12 +429,9 @@ def main():
     manual_thickness_mm = values["thickness"] if values["manual"] else None
     table_file_path = values["table_path"]
 
-    # Carica la tabella degli isolanti dal file (non serve con lo spessore fisso)
-    tabella_isolanti = []
-    if manual_thickness_mm is None:
-        tabella_isolanti = load_insulation_table(table_file_path)
-        if not tabella_isolanti:
-            forms.alert('The thickness table has no valid row.', exitscript=True)
+    # Tabella degli isolanti gia' letta e controllata dalla finestra (DPR 412/93 interna o file);
+    # vuota con lo spessore fisso
+    tabella_isolanti = values["table"]
 
     # Ottieni gli elementi in base al sistema selezionato o alla selezione corrente
     if not values["selected_only"]:
@@ -506,6 +469,8 @@ def main():
     output.print_md("- Scope: **{}**".format("selected elements" if values["selected_only"] else "all elements of the system"))
     if manual_thickness_mm is not None:
         output.print_md("- Thickness: **{} mm** (fixed)".format(manual_thickness_mm))
+    elif values["builtin_table"]:
+        output.print_md("- Thickness table: **DPR 412/93** (built into the tool)")
     else:
         output.print_md("- Thickness table: **{}**".format(os.path.basename(table_file_path)))
     output.print_table(

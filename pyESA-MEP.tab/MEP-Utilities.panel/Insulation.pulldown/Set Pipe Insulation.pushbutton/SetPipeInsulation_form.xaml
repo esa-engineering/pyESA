@@ -1,8 +1,8 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Set Pipe Insulation By System"
-        Width="500" Height="680"
-        MinWidth="440" MinHeight="560"
+        Width="940" Height="640"
+        MinWidth="800" MinHeight="520"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip">
 
@@ -47,8 +47,15 @@
         <TextBlock Grid.Row="0" Text="🧣 SET PIPE INSULATION" FontSize="16" FontWeight="Bold"
                    HorizontalAlignment="Center" Margin="0,0,0,10"/>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Colonna sinistra: sistema, tipi di isolamento, spessore fisso -->
+            <StackPanel Grid.Column="0">
                 <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
                         Padding="10" Margin="0,0,0,10">
                     <StackPanel>
@@ -94,22 +101,8 @@
                 <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
                         Padding="10" Margin="0,0,0,10">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="📏 THICKNESS"/>
-                        <Grid Margin="0,5">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="110"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Thickness table:"/>
-                            <TextBox Grid.Column="1" x:Name="TableBox" VerticalContentAlignment="Center"
-                                     ToolTip="Tab-separated text file: Diameter, Interno, Non riscaldato, Interrato, Esterno"/>
-                            <Button Grid.Column="2" x:Name="BrowseButton" Content="Browse..." Padding="10,3" Margin="5,0,0,0"/>
-                        </Grid>
-                        <TextBlock Style="{StaticResource HintText}"
-                                   Text="Thickness by nominal diameter (mm) and thermal zone (e_EAN_ThermalPosition_1). A template is in the button folder: insulation_table_template.txt (ALT + CLICK on the button opens it)."/>
-
-                        <CheckBox x:Name="ManualCheck" Margin="0,10,0,0"
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="📏 FIXED THICKNESS"/>
+                        <CheckBox x:Name="ManualCheck" Margin="0,5,0,0"
                                   Content="Use a fixed thickness instead of the table"/>
                         <Grid Margin="20,5,0,0">
                             <Grid.ColumnDefinitions>
@@ -130,7 +123,56 @@
                                Text="Pipes and fittings without insulation get a new one; existing insulation is updated (type and thickness). Elements with no diameter or no valid thermal zone are skipped and listed in the output window."/>
                 </Border>
             </StackPanel>
-        </ScrollViewer>
+
+            <!-- Colonna destra: tabella degli spessori (DPR 412/93 interna o file txt) e anteprima -->
+            <Border Grid.Column="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
+                    Padding="10" Margin="0,0,0,10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Style="{StaticResource SectionHeader}" Text="📏 THICKNESS TABLE"/>
+                    <CheckBox Grid.Row="1" x:Name="BuiltinCheck" Margin="0,0,0,8"
+                              Content="Use the DPR 412/93 table built into the tool"/>
+                    <Grid Grid.Row="2" Margin="0,0,0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Table file:"/>
+                        <TextBox Grid.Column="1" x:Name="TableBox" VerticalContentAlignment="Center"
+                                 ToolTip="Tab-separated text file: Diameter, Interno, Non riscaldato, Interrato, Esterno">
+                            <!-- grigio quando e' attiva la tabella DPR 412/93 interna -->
+                            <TextBox.Style>
+                                <Style TargetType="TextBox">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Background" Value="#E6E6E6"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBox.Style>
+                        </TextBox>
+                        <Button Grid.Column="2" x:Name="BrowseButton" Content="Browse..." Padding="10,3" Margin="5,0,0,0"/>
+                    </Grid>
+                    <TextBlock Grid.Row="3" Style="{StaticResource HintText}" Margin="0,0,0,8"
+                               Text="Thickness in mm by nominal diameter (mm) and thermal zone (e_EAN_ThermalPosition_1). Template: insulation_table_template.txt (ALT + CLICK on the button opens its folder)."/>
+                    <DataGrid Grid.Row="4" x:Name="PreviewGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserAddRows="False" CanUserSortColumns="False" CanUserReorderColumns="False"
+                              HeadersVisibility="Column" SelectionMode="Single"
+                              GridLinesVisibility="All" HorizontalGridLinesBrush="#E8E8E8" VerticalGridLinesBrush="#E8E8E8"
+                              HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"/>
+                    <TextBlock Grid.Row="5" x:Name="PreviewStatus" Style="{StaticResource HintText}" Margin="0,5,0,0"/>
+                </Grid>
+            </Border>
+        </Grid>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
             <Button x:Name="CancelButton" Content="Cancel" Width="80" Height="30" Margin="0,0,10,0" IsCancel="True"/>
