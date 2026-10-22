@@ -63,7 +63,6 @@ Compatibile con Rocket mode: nessun documento o output a livello di modulo.
 """
 
 import os
-import datetime
 import clr
 
 clr.AddReference('PresentationFramework')
@@ -1350,9 +1349,8 @@ class ResultsForm(Window):
                 "", rp.FIXTURE_COLUMNS, choice.columns[rexp.FIXTURES],
                 self._fixture_export_rows())]),
         ]
-        footer = "RNW Flow Calculation - exported {0}".format(
-            datetime.datetime.now().strftime("%d.%m.%Y %H:%M"))
-        return rp.Report(info.title, footer, tabs, info.settings_rows)
+        return rp.Report(info.title, "Rainwater flow calculation", "RNW Flow Calculation",
+                         tabs, info.settings_rows)
 
     def OnExport(self, sender, args):
         if self._export_info is None:

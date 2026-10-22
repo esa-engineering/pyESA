@@ -352,10 +352,11 @@ Sections e Fixtures intestazione bloccata e filtro automatico; i numeri restano 
 PDF (`RNWFlowCalculation_Pdf.py`): scritto a mano, senza librerie né stampanti. PDF 1.4
 con i font standard Helvetica (non incorporati) e codifica WinAnsi: i caratteri fuori da
 cp1252 diventano un sostituto (`<=`, `->`) o `?`, le emoji si tolgono. Ogni scheda parte su
-una pagina nuova; intestazione con modello e scheda, piede con data dell'esportazione e
-numero di pagina; le tabelle ripetono l'intestazione a ogni pagina. Le colonne prendono la
-larghezza del contenuto; se non ci stanno il carattere scende da 7 a 5,5 pt, poi le colonne
-di testo si stringono fino alla parola più lunga e vanno a capo.
+una pagina nuova; intestazione con nome dello strumento e scheda, piede con nome dello
+strumento e numero di pagina (né modello né data); le tabelle ripetono l'intestazione a
+ogni pagina. Le colonne prendono la larghezza del contenuto; se non ci stanno il carattere
+scende da 7 a 5,5 pt, poi le colonne di testo si stringono fino alla parola più lunga e
+vanno a capo.
 
 Il nome proposto è `<Modello>_RainwaterCalculation_<aaaammgg>.xlsx` (o `.pdf`) nella
 cartella del modello. Un file aperto in un altro programma non si sovrascrive: la finestra

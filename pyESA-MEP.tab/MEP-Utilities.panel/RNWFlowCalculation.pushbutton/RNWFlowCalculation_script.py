@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __title__ = "RNW Flow\nCalculation"
-__doc__ = """Version = 4.2
+__doc__ = """Version = 4.2.1
 Date    = 22.10.2026
 _____________________________________________________________________
 Description:
@@ -27,6 +27,8 @@ __author__ = "ESA Engineering"
 
 # ======================= STORICO REVISIONI =======================
 # Versione | Data       | Tipo     | Descrizione                                     | PR
+# 4.2.1    | 22.10.2026 | FIX      | PDF: tolto il modello dall'intestazione e la    | -
+#          |            |          | data dell'esportazione dal pie' di pagina       |
 # 4.2      | 22.10.2026 | FEAT     | Pulsante Export: finestra di impostazione,      | -
 #          |            |          | Excel o PDF, le tre schede (General, Sections,  |
 #          |            |          | Fixtures) con le colonne scelte dall'utente     |

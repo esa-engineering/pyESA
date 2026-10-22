@@ -9,6 +9,24 @@ allora non sono registrati.
 
 ---
 
+## 22.10.2026, versione 4.2.1
+
+**Richiesta.** Nel PDF esportato togliere la data dal piè di pagina e il nome del modello
+Revit dall'intestazione.
+
+**Fatto.** `Report` ha un campo `header` usato solo dall'intestazione del PDF
+("Rainwater flow calculation"); il piè di pagina è ora "RNW Flow Calculation" più il numero
+di pagina. `report.title` (con il modello) resta per i fogli Excel, che non cambiano: la
+richiesta riguardava solo il PDF. Tolto l'import di `datetime` rimasto inutilizzato in
+`_Results_ui.py`.
+
+**Scartato.** Togliere il modello da `ExportInfo.title` nello script: avrebbe cambiato anche
+l'Excel (titolo dei fogli e del foglio Settings).
+
+**Esito.** Sintassi verificata fuori da Revit. Non provato in Revit.
+
+---
+
 ## 22.10.2026, versione 4.2
 
 **Richiesta.** Il pulsante *Export Excel* diventa *Export* e apre una finestra di

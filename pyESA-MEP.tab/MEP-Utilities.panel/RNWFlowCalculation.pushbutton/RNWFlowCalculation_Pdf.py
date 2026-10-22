@@ -284,7 +284,7 @@ class _Layout(object):
 
     def new_page(self):
         self.doc.new_page()
-        self.doc.text(self.left, MARGIN + HEADER_SIZE, _clean(self.report.title), HEADER_SIZE,
+        self.doc.text(self.left, MARGIN + HEADER_SIZE, _clean(self.report.header), HEADER_SIZE,
                       FONT_BOLD, BLUE)
         name = _clean(self.tab_name)
         self.doc.text(self.right - text_width(name, HEADER_SIZE, FONT_BOLD),

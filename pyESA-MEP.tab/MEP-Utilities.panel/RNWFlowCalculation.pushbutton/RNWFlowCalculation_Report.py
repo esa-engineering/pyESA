@@ -105,12 +105,14 @@ class Tab(object):
 
 
 class Report(object):
-    """title: titolo (modello); footer: riga in fondo alle pagine del PDF;
-    tabs: [Tab]; settings: [(voce, valore)] (foglio Settings in Excel, in coda
-    alla scheda General nel PDF)."""
+    """title: titolo (modello) dei fogli Excel; header / footer: righe in cima e
+    in fondo alle pagine del PDF (senza modello ne' data); tabs: [Tab];
+    settings: [(voce, valore)] (foglio Settings in Excel, in coda alla scheda
+    General nel PDF)."""
 
-    def __init__(self, title, footer, tabs, settings):
+    def __init__(self, title, header, footer, tabs, settings):
         self.title = title
+        self.header = header
         self.footer = footer
         self.tabs = list(tabs)
         self.settings = list(settings)
