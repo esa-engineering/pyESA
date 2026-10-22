@@ -261,8 +261,14 @@ la versione non sale.
 Secondo comando del pulldown (`QuickClash.pushbutton`), per eseguire in fretta. A sinistra
 l'elenco dei test (un clic sceglie quello da eseguire), a destra sorgente nel modello aperto
 e link di Set A e Set B: vengono dal test e si possono cambiare per l'esecuzione, senza
-salvarli. Categorie, filtri e regole restano quelli del test. Nessuna tabella: una riga di
-stato riporta conteggi e note. Libreria e `last_test` condivisi con Clash Setup; il report
+salvarli. Categorie, filtri e regole restano quelli del test. Nessuna tabella: lo stato e'
+su tre righe, nell'ordine fase della vista attiva, Set A, Set B (`_show_summary`, scritte
+con `set_status_lines` di `clashfinder_ui.py`, una `Run` colorata per riga). Colori: verde
+per la fase se c'e' e per un insieme con elementi, grigio per un insieme con zero elementi,
+rosso solo se la vista non ha fase / filtro di fase. Eventuali note del riepilogo (per
+esempio link senza la fase) seguono in grigio; "Set A is empty" / "Set B is empty" non si
+mostrano, ripeterebbero il conteggio.
+Libreria e `last_test` condivisi con Clash Setup; il report
 e' lo stesso.
 
 `QuickClashForm` (`clashfinder_quick_ui.py`) eredita da `ClashFinderForm` e cambia

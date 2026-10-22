@@ -37,12 +37,14 @@ from System.Windows.Controls import (CheckBox, ComboBox, TextBox, TextBlock, But
                                      ColumnDefinition, ListBoxItem, StackPanel)
 from System.Windows.Input import Keyboard, ModifierKeys
 from System.Windows.Markup import XamlReader
-from System.Windows.Media import SolidColorBrush, Colors
+from System.Windows.Documents import Run, LineBreak
+from System.Windows.Media import SolidColorBrush, Colors, Color
 
 from pyrevit import DB, script, forms
 
 import clashfinder_rules as cr
 import clashfinder_engine as ce
+import clashfinder_guide_ui as guide_ui
 import clashfinder_report_ui as report_ui
 
 XAML_FILE_NAME = 'ClashFinder_form.xaml'
@@ -60,6 +62,19 @@ GRAY_BRUSH = SolidColorBrush(Colors.Gray)
 GRAY_BRUSH.Freeze()
 RED_BRUSH = SolidColorBrush(Colors.Firebrick)
 RED_BRUSH.Freeze()
+GREEN_BRUSH = SolidColorBrush(Color.FromRgb(23, 116, 63))
+GREEN_BRUSH.Freeze()
+
+
+def set_status_lines(text_block, lines):
+    """Riga di stato su piu' righe, ognuna col suo colore: lines = [(testo, pennello)]."""
+    text_block.Inlines.Clear()
+    for index, (text, brush) in enumerate(lines):
+        if index:
+            text_block.Inlines.Add(LineBreak())
+        run = Run(text)
+        run.Foreground = brush
+        text_block.Inlines.Add(run)
 
 
 def _ask(message, buttons=MessageBoxButton.YesNoCancel, image=MessageBoxImage.Question):
@@ -215,7 +230,7 @@ class ClashFinderForm(Window):
 
     def _find_controls(self):
         names = ("lst_tests", "btn_up", "btn_down", "btn_new", "btn_delete", "btn_import",
-                 "btn_export",
+                 "btn_export", "btn_help",
                  "txt_library_path", "pnl_editor", "txt_editor_state",
                  "txt_summary_state", "txt_links_hint",
                  "btn_refresh", "btn_save", "btn_save_as", "btn_close", "btn_run")
@@ -258,6 +273,7 @@ class ClashFinderForm(Window):
         self.btn_save.Click += lambda s, e: self._save()
         self.btn_save_as.Click += lambda s, e: self._save_as()
         self.btn_close.Click += lambda s, e: self.Close()
+        self.btn_help.Click += self.OnHelp
         self.btn_run.Click += self.OnRun
         self.Closing += self.OnWindowClosing
         self.Closed += self.OnWindowClosed
@@ -1066,6 +1082,10 @@ class ClashFinderForm(Window):
         self.txt_summary_state.Text = u"\n".join(lines)
 
     # ================================================================ ESECUZIONE
+
+    def OnHelp(self, sender, args):
+        """Guida a slide, la stessa di tutti i comandi del pulsante."""
+        guide_ui.show_guide(self)
 
     def OnRun(self, sender, args):
         valid, message = self._validate_rules(self._read_editor_raw())

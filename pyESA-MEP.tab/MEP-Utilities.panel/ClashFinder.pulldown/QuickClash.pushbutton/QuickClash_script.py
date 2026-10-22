@@ -25,7 +25,8 @@ __author__ = "Claude + Matteo Maiorano"
 # ======================= STORICO REVISIONI =======================
 # Versione | Data       | Tipo | Descrizione                                              | PR
 # 1.1.0    | 22.10.2026 | UI   | Link scelti da un menu a discesa; etichette "Links" e    |
-#          |            |      | "Links only" (modulo condiviso in lib)                   |
+#          |            |      | "Links only" (modulo condiviso in lib); riga di stato su |
+#          |            |      | tre righe (fase, Set A, Set B) con colori per esito      |
 # Testato su Revit: (da compilare dopo le prove)
 # =================================================================
 

@@ -57,6 +57,7 @@ from pyrevit import DB, script, forms
 
 import clashfinder_rules as cr
 import clashfinder_engine as ce
+import clashfinder_guide_ui as guide_ui
 
 # DirectContext3D di pyRevit: grafica temporanea nella vista, senza elementi nel modello.
 try:
@@ -236,8 +237,9 @@ class ClashReportForm(Window):
         for name in ("txt_result", "txt_result_hint", "txt_search", "btn_clear_search",
                      "tree", "btn_copy_id", "btn_expand", "btn_collapse", "btn_isolate",
                      "btn_refresh", "btn_export", "btn_export_json", "btn_close",
-                     "cbo_group", "btn_overlay"):
+                     "cbo_group", "btn_overlay", "btn_help"):
             setattr(self, name, root.FindName(name))
+        self.btn_help.Click += lambda s, e: guide_ui.show_guide(self)
 
         self.txt_search.TextChanged += lambda s, e: self._fill_tree()
         self.btn_clear_search.Click += lambda s, e: setattr(self.txt_search, "Text", u"")

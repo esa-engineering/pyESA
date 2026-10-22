@@ -25,7 +25,7 @@ class QuickClashForm(cu.ClashFinderForm):
 
     def _find_controls(self):
         for name in ("lst_tests", "txt_summary_state", "txt_links_hint",
-                     "btn_refresh", "btn_close", "btn_run",
+                     "btn_refresh", "btn_close", "btn_run", "btn_help",
                      "cbo_source_a", "cbo_source_b", "lst_links_a", "lst_links_b",
                      "btn_links_a", "btn_links_b", "pop_links_a", "pop_links_b"):
             setattr(self, name, self._root.FindName(name))
@@ -41,6 +41,7 @@ class QuickClashForm(cu.ClashFinderForm):
         self.lst_tests.SelectionChanged += self.OnTestSelected
         self.btn_refresh.Click += lambda s, e: self._request_summary()
         self.btn_close.Click += lambda s, e: self.Close()
+        self.btn_help.Click += self.OnHelp
         self.btn_run.Click += self.OnRun
         self.Closing += self.OnWindowClosing
         self.Closed += self.OnWindowClosed
@@ -83,21 +84,30 @@ class QuickClashForm(cu.ClashFinderForm):
     # ------------------------------------------------------------- riepilogo
 
     def _show_summary(self, test, summary):
-        """Nessuna tabella: solo la riga di stato con i conteggi."""
+        """Nessuna tabella: tre righe di stato, fase, Set A, Set B.
+
+        Verde: fase presente e insieme con elementi; grigio: insieme vuoto; rosso: solo la
+        vista senza fase.
+        """
         if self.edit_name is None:
-            self.txt_summary_state.Foreground = cu.RED_BRUSH
+            self.txt_summary_state.Foreground = cu.GRAY_BRUSH
             self.txt_summary_state.Text = u"No test selected."
             return
-        lines = [u"{}; {} selected in Revit. {}".format(
-            test["name"], cu._plural(len(self.loaded_ids), u"element"), summary.phase_text)]
+        lines = [(summary.phase_text,
+                  cu.RED_BRUSH if summary.phase_problem else cu.GREEN_BRUSH)]
         for side in cu.SIDES:
-            lines.append(u"Set {}: {} from {}.".format(
+            total = summary.host[side] + summary.linked[side]
+            lines.append((u"Set {}: {} from {}.".format(
                 side.upper(), self._count_text(summary, side),
-                cr.describe_sources(test[cu.SET_KEYS[side]])))
-        lines += [note.split(u": ", 1)[-1] for note in summary.notes]
-        self.txt_summary_state.Foreground = cu.RED_BRUSH if summary.phase_problem \
-            else cu.GRAY_BRUSH
-        self.txt_summary_state.Text = u"\n".join(lines)
+                cr.describe_sources(test[cu.SET_KEYS[side]])),
+                cu.GREEN_BRUSH if total else cu.GRAY_BRUSH))
+        # "Set A is empty" ripete il conteggio gia' mostrato sopra: si toglie, le altre note restano.
+        for note in summary.notes:
+            parts = [p for p in note.split(u": ", 1)[-1].split(u"; ")
+                     if p not in (u"Set A is empty", u"Set B is empty")]
+            if parts:
+                lines.append((u"; ".join(parts), cu.GRAY_BRUSH))
+        cu.set_status_lines(self.txt_summary_state, lines)
 
     @staticmethod
     def _count_text(summary, side):

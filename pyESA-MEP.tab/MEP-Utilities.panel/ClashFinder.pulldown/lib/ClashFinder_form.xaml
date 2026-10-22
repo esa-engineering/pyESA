@@ -61,11 +61,45 @@
         </Grid.RowDefinitions>
 
         <!-- Title -->
-        <TextBlock Grid.Row="0"
-                   Text="💥 Clash Setup"
-                   FontSize="16" FontWeight="Bold"
-                   Margin="0,0,0,10"
-                   HorizontalAlignment="Center"/>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="💥 Clash Setup"
+                       FontSize="16" FontWeight="Bold"
+                       HorizontalAlignment="Center"/>
+            <!-- Guida rapida: solo al passaggio del mouse -->
+            <TextBlock Text="ℹ️" FontSize="18" Foreground="#2D5A8A"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Help"
+                       ToolTipService.InitialShowDelay="200" ToolTipService.ShowDuration="120000">
+                <TextBlock.ToolTip>
+                    <ToolTip MaxWidth="560">
+                        <TextBlock TextWrapping="Wrap" FontSize="12">
+                            <Run Text="HOW TO USE" FontWeight="Bold" Foreground="#2D5A8A"/>
+                            <LineBreak/>
+                            <Run Text="1. Pick a test in the list on the left, or click New. Tests are saved in your personal library."/>
+                            <LineBreak/>
+                            <Run Text="2. For Set A and Set B, choose where the elements come from (From this model) and, if needed, the Links."/>
+                            <LineBreak/>
+                            <Run Text="3. Tick the Categories to check. Add Model filters and Custom rules only to narrow the set further."/>
+                            <LineBreak/>
+                            <Run Text="4. Click Refresh to read your Revit selection again. The status line shows the phase of the active view and how many elements each set holds."/>
+                            <LineBreak/>
+                            <Run Text="5. Click Run clash detection. The report opens: click a clash to see it in the active view."/>
+                            <LineBreak/>
+                            <Run Text="6. Click Save to keep your changes to the test, or Save as... to store it with a new name."/>
+                            <LineBreak/><LineBreak/>
+                            <Run Text="HOW SETS ARE BUILT" FontWeight="Bold" Foreground="#2D5A8A"/>
+                            <LineBreak/>
+                            <Run Text="An element enters a set when it comes from one of its sources, its category is ticked (no category ticked = any model category), it passes one of the ticked model filters (if any) and it matches the custom rules."/>
+                            <LineBreak/>
+                            <Run Text="Custom rules read the instance parameter first, then the type parameter, as text shown by Revit, ignoring case. Greater / less compare the first number in the value (e.g. '300 mm' = 300). [Family], [Type] and [Workset] work in any Revit language."/>
+                            <LineBreak/>
+                            <Run Text="On linked elements, model filters work with Revit's own parameters; filters on project or shared parameters do not match linked elements."/>
+                            <LineBreak/>
+                            <Run Text="Elements connected to each other (MEP connectors) and an element with its host (e.g. a door and its wall) are never reported as clashes."/>
+                        </TextBlock>
+                    </ToolTip>
+                </TextBlock.ToolTip>
+            </TextBlock>
+        </Grid>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
@@ -189,7 +223,7 @@
                                         <TextBox x:Name="txt_filter_search_a" Grid.Column="1" Padding="5,3" ToolTip="Filter the view filters by name"/>
                                         <Button x:Name="btn_clear_filter_search_a" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0" ToolTip="Clear search"/>
                                     </Grid>
-                                    <ListBox x:Name="lst_filters_a" Height="100" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                    <ListBox x:Name="lst_filters_a" MinHeight="100" Height="135" ScrollViewer.VerticalScrollBarVisibility="Auto"
                                              ToolTip="View filters of this model. With filters ticked, an element must pass at least one of them, as well as the ticked categories. SHIFT + click ticks or unticks a range."/>
 
                                     <TextBlock Text="Custom rules" Style="{StaticResource SubHeader}"/>
@@ -278,7 +312,7 @@
                                         <TextBox x:Name="txt_filter_search_b" Grid.Column="1" Padding="5,3" ToolTip="Filter the view filters by name"/>
                                         <Button x:Name="btn_clear_filter_search_b" Grid.Column="2" Content="✕" Width="25" Margin="5,0,0,0" ToolTip="Clear search"/>
                                     </Grid>
-                                    <ListBox x:Name="lst_filters_b" Height="100" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                    <ListBox x:Name="lst_filters_b" MinHeight="100" Height="135" ScrollViewer.VerticalScrollBarVisibility="Auto"
                                              ToolTip="View filters of this model. With filters ticked, an element must pass at least one of them, as well as the ticked categories. SHIFT + click ticks or unticks a range."/>
 
                                     <TextBlock Text="Custom rules" Style="{StaticResource SubHeader}"/>
@@ -297,22 +331,6 @@
                             </Border>
                     </Grid>
 
-                    <!-- INFO -->
-                    <Border BorderBrush="#E8E8E8" Background="#F8F8F8" BorderThickness="1"
-                            CornerRadius="5" Padding="10" Margin="0,0,0,10">
-                        <StackPanel>
-                            <TextBlock Text="ℹ️ HOW SETS ARE BUILT" Style="{StaticResource SectionHeader}" Foreground="Gray"/>
-                            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
-                                <Run Text="An element enters a set when it comes from one of its sources, its category is ticked (no category ticked = any model category), it passes one of the ticked model filters (if any) and it matches the custom rules."/>
-                                <LineBreak/>
-                                <Run Text="Custom rules read the instance parameter first, then the type parameter, as text shown by Revit, ignoring case. Greater / less compare the first number in the value (e.g. '300 mm' = 300). [Family], [Type] and [Workset] work in any Revit language."/>
-                                <LineBreak/>
-                                <Run Text="On linked elements, model filters work with Revit's own parameters; filters on project or shared parameters do not match linked elements."/>
-                                <LineBreak/>
-                                <Run Text="Elements connected to each other (MEP connectors) and an element with its host (e.g. a door and its wall) are never reported as clashes."/>
-                            </TextBlock>
-                        </StackPanel>
-                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Grid>
@@ -330,6 +348,8 @@
                 <TextBlock x:Name="txt_links_hint" Style="{StaticResource HintText}" Foreground="Firebrick" Text=""/>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+                <Button x:Name="btn_help" Content="?" Width="30" Height="30" Margin="0,0,10,0" FontWeight="Bold"
+                        ToolTip="Open the guide of this tool"/>
                 <Button x:Name="btn_refresh" Content="🔄 Refresh" Width="100" Height="30" Margin="0,0,10,0"
                         ToolTip="Read the Revit selection and count the sets again"/>
                 <Button x:Name="btn_save" Content="💾 Save" Width="90" Height="30" Margin="0,0,10,0"

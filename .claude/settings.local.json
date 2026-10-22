@@ -42,7 +42,11 @@
       "Bash(awk 'BEGIN{n=0} /^[[:space:]]*$/{n++; if\\(n>2\\) print NR\": \"n\" vuote consecutive\"; next} {n=0}' MEPAlign_script.py)",
       "Bash(py /tmp/chk.py)",
       "Bash(py -)",
-      "Bash(py /tmp/order.py)"
+      "Bash(py /tmp/order.py)",
+      "Bash(ls \"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" \"/c/Program Files/Google/Chrome/Application/chrome.exe\" 2>&1; ls \"C:/Users/matteoma/AppData/Local/Temp/claude/c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension/953879cd-b0b8-41b0-9f86-9f38de459a6f/scratchpad/artifact-files/ea80631f-7f7d-45bd-8838-f90d5d272b62/project/slides\")",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/Microsoft/Edge/Application/**)",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\matteoma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\953879cd-b0b8-41b0-9f86-9f38de459a6f\\\\scratchpad\\\\deck\\\\build.ps1\")",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\matteoma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\953879cd-b0b8-41b0-9f86-9f38de459a6f\\\\scratchpad\\\\deck\\\\build.ps1\" | Select-String \"True|False\")"
     ]
   }
 }

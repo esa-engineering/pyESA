@@ -2,19 +2,8 @@ title:
   Clash
 
   Setup
-tooltip: >
-  Clash detection driven by saved tests, as in Navisworks. A test compares Set A
-  with Set B; each set has its sources (current Revit selection, active view,
-  whole model or links only, plus loaded links), ticked categories with the number of
-  elements found, view filters of the model and custom rules on parameter values.
-  Tests live in a personal library and can be exported to and imported from JSON
-  files.
-
-  The window stays open while you work in Revit: click a test to load it, edit
-  it, run it, or save it with a name.
-  The report lists the clashes as an expandable list; clicking a row selects and
-  zooms to its elements, optionally fitting the section box of the active 3D view.
-
-  Clashes are found as in Revit's Interference Check (solid intersection). Each set can
-  also take elements from loaded Revit links (open model vs link and link vs link).
+tooltip: |-
+  Finds clashes between two sets of elements, with tests saved in your library.
+  Pick a test, define Set A and Set B (open model and links), then run.
+  Requires: a model view with a phase.
 author: Claude + Matteo Maiorano

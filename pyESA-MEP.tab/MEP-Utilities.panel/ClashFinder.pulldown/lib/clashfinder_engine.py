@@ -31,7 +31,7 @@ import time
 
 from System.Collections.Generic import List
 
-from pyrevit import DB
+from pyrevit import DB, script
 
 import clashfinder_rules as cr
 
@@ -926,8 +926,18 @@ def _category_value(element):
         return None
 
 
+def log_timing(label, started, detail=u""):
+    """Tempo impiegato, solo nel log di debug di pyRevit (nessun effetto altrimenti)."""
+    try:
+        script.get_logger().debug(u"ClashFinder {}: {:.2f} s {}".format(
+            label, time.time() - started, detail))
+    except Exception:
+        pass
+
+
 def summarize(doc, tests, loaded_ids, view, links):
     """Riepilogo dei test (sorgenti e link presi da ciascun test)."""
+    started = time.time()
     resolver = SetResolver(doc, loaded_ids, view, links)
     members = {"a": {}, "b": {}}
     summary = Summary()
@@ -955,6 +965,8 @@ def summarize(doc, tests, loaded_ids, view, links):
             summary.rows[side].append((key[1], key[2], counts[key]))
     summary.phase_text = resolver.phases.describe()
     summary.phase_problem = resolver.phases.problem
+    log_timing(u"summary", started, u"(A {}+{} B {}+{} elements)".format(
+        summary.host["a"], summary.linked["a"], summary.host["b"], summary.linked["b"]))
     return summary
 
 
@@ -1013,14 +1025,20 @@ def run_tests(doc, tests, loaded_ids, view, links, progress=None):
         prepared.append((test_result, a_host + a_link, b_host, b_link))
         total += test_result.count_a
 
+    log_timing(u"run, sets resolved", started, u"({} elements in A)".format(total))
     infos = {}
     done = [0]
     try:
         for test_result, items_a, b_host, b_link in prepared:
+            one_started = time.time()
             _run_one(doc, test_result, items_a, b_host, b_link, infos, done, total, progress)
+            log_timing(u"run, test " + test_result.name, one_started,
+                       u"(A {} B host {} B link {}, {} clashes)".format(
+                           len(items_a), len(b_host), len(b_link), len(test_result.clashes)))
     except ClashCancelled:
         result.cancelled = True
     result.seconds = time.time() - started
+    log_timing(u"run, total", started)
     result.phase_text = resolver.phases.describe()
     return result
 
