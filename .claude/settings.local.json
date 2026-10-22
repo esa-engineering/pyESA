@@ -46,7 +46,13 @@
       "Bash(ls \"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" \"/c/Program Files/Google/Chrome/Application/chrome.exe\" 2>&1; ls \"C:/Users/matteoma/AppData/Local/Temp/claude/c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension/953879cd-b0b8-41b0-9f86-9f38de459a6f/scratchpad/artifact-files/ea80631f-7f7d-45bd-8838-f90d5d272b62/project/slides\")",
       "Read(//c/Program Files \\\\\\(x86\\\\\\)/Microsoft/Edge/Application/**)",
       "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\matteoma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\953879cd-b0b8-41b0-9f86-9f38de459a6f\\\\scratchpad\\\\deck\\\\build.ps1\")",
-      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\matteoma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\953879cd-b0b8-41b0-9f86-9f38de459a6f\\\\scratchpad\\\\deck\\\\build.ps1\" | Select-String \"True|False\")"
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\matteoma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\953879cd-b0b8-41b0-9f86-9f38de459a6f\\\\scratchpad\\\\deck\\\\build.ps1\" | Select-String \"True|False\")",
+      "Bash(cd \"C:/Users/matteoma/AppData/Roaming/pyRevit/Extensions/ESAextensions.extension\" && ls \"C:/Program Files/Autodesk\" 2>/dev/null | head; grep -rn \"pattern\\\\|Pattern\" --include=*.py --include=*.md --include=*.xaml --include=*.yaml pyESA-MEP.tab/MEP-Routing.panel/FlexConnect.pushbutton -l)",
+      "Read(//c/Program Files/Autodesk/**)",
+      "Bash(file FlexConnect_*.py FlexConnect_*.xaml)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\matteoma\\AppData\\Roaming\\pyRevit\\Extensions\\ESAextensions.extension\\pyESA-MEP.tab\\MEP-Routing.panel\\FlexConnect.pushbutton"
     ]
   }
 }

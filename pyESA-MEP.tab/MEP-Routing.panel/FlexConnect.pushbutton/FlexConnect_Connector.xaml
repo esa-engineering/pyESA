@@ -16,8 +16,32 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Text="🔗 FLEXCONNECT" FontSize="16" FontWeight="Bold"
-                   HorizontalAlignment="Center" Margin="0,0,0,10"/>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="🔗 FLEXCONNECT" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <!-- icona info, uguale a quella della finestra delle impostazioni -->
+            <Border Width="22" Height="22" BorderBrush="#444444" BorderThickness="1.5" CornerRadius="3"
+                    Background="Transparent" Cursor="Help" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="120000">
+                <TextBlock Text="i" FontFamily="Georgia" FontWeight="Bold" FontSize="14"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border.ToolTip>
+                    <ToolTip MaxWidth="560">
+                        <StackPanel>
+                            <TextBlock FontWeight="Bold" Foreground="#2D5A8A" Text="HOW TO USE" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                                <Run Text="The equipment has several free connectors of the same system type. Choose the one the flex connects to."/>
+                                <LineBreak/>
+                                <Run Text="Double click a row, or select it and press OK. Cancel skips this connection and the command goes on."/>
+                            </TextBlock>
+                            <TextBlock FontWeight="Bold" Foreground="#2D5A8A" Text="THE LIST" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap">
+                                <Run Text="Each row shows the Connector Description set in the family, the system type, the size and the distance from the pipe or duct. The nearest connector is selected at the start."/>
+                            </TextBlock>
+                        </StackPanel>
+                    </ToolTip>
+                </Border.ToolTip>
+            </Border>
+        </Grid>
         <Border Grid.Row="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
             <Grid>
                 <Grid.RowDefinitions>

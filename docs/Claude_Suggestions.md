@@ -24,7 +24,28 @@ Voce aperta il 22.10.2026, durante lo sviluppo di FlexConnect.
 
 **Modello da copiare**: la testata di `FlexConnect.pushbutton/FlexConnect_Form.xaml` (riga con titolo centrato e icona a destra).
 
-## 2. Da decidere
+## 2. Invertire CLICK e SHIFT + CLICK
+
+Voce aperta il 22.10.2026.
+
+**Oggi in `CLAUDE.md`** ("SHIFT + CLICK"): CLICK apre la finestra delle impostazioni e dopo OK esegue; SHIFT + CLICK esegue subito con le ultime impostazioni.
+
+**Proposta**: invertire i due comportamenti per tutti i tool con finestra: CLICK esegue subito con le ultime impostazioni (alla prima volta, senza impostazioni salvate, apre la finestra); SHIFT + CLICK apre la finestra e dopo OK esegue.
+
+**Motivo indicato dal proprietario**: da aggiungere (il messaggio con la richiesta si e' interrotto prima).
+
+**Da pesare** (considerazioni, non dati):
+- A favore: dopo il primo uso le impostazioni cambiano di rado, quindi il gesto piu' semplice e' quello piu' frequente; il caso di FlexConnect, che gia' funziona cosi'.
+- Contro: un tool che modifica il modello parte senza conferma visibile; chi non conosce SHIFT + CLICK non trova le impostazioni (il tooltip del pulsante deve dirlo); tutti i tool esistenti con la regola attuale andrebbero allineati, o resterebbero incoerenti.
+- Resta valido il vincolo attuale: SHIFT + CLICK non salta la conferma di un'operazione distruttiva; per i tool distruttivi andrebbe deciso a parte.
+
+**Se accettata servono**: la tabella di "SHIFT + CLICK" e le righe `CLICK:` / `SHIFT + CLICK:` del modello di tooltip in `CLAUDE.md`; il Readme e il tooltip di ogni tool con finestra; per FlexConnect basta togliere dal Readme la dicitura "eccezione voluta".
+
+## 3. Finestra di scelta con icona info
+
+Anche le finestre di scelta (come quella del connettore di FlexConnect) possono avere l'icona `i`. Questo contraddice la proposta della voce 4 ("solo le finestre di impostazioni"): FlexConnect la usa in entrambe, con un tooltip breve nella finestra di scelta. Da decidere insieme alla voce 4.
+
+## 4. Da decidere
 
 - Le finestre senza campi da compilare (elenchi di scelta, report) hanno bisogno dell'icona? Proposta: no, solo le finestre di impostazioni. 
 - Il tooltip va tradotto in italiano nella wiki (come le altre guide)? Proposta: si, la wiki resta in italiano e il tooltip in inglese.

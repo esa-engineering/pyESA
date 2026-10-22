@@ -5,34 +5,36 @@ Collega un tubo a un'attrezzatura meccanica o idraulica con un flexpipe, e un co
 ## Uso
 
 - **CLICK**: esegue con le ultime impostazioni. Al primo uso (o se un tipo salvato non esiste piu' nel modello) apre la finestra.
-- **SHIFT + CLICK**: apre la finestra delle impostazioni, poi esegue. Eccezione voluta alla regola comune dei tool ESA (CLICK = finestra, SHIFT + CLICK = esecuzione immediata).
+- **SHIFT + CLICK**: apre la finestra delle impostazioni, poi esegue. Eccezione voluta alla regola comune dei tool ESA (CLICK = finestra, SHIFT + CLICK = esecuzione immediata); l'inversione della regola per tutti i tool e' proposta in `docs/Claude_Suggestions.md`.
 - L'ordine di selezione e' libero: si parte dal tubo o condotto, oppure dall'attrezzatura o terminale (anche preselezionando un solo tubo o condotto). Il clic sul condotto e' un punto, non solo un elemento.
 - Il comando resta attivo: dopo ogni collegamento riparte la selezione. Con un tubo si riparte da capo (tubo o attrezzatura, l'ordine e' libero); la preselezione vale solo per il primo collegamento. Sui condotti, dopo ogni collegamento il comando chiede il terminale successivo e il punto sullo stesso condotto.
 - Esc in una qualsiasi selezione termina il comando (sui condotti, per cambiare condotto si rilancia il comando).
+- Se durante l'attivazione e' stata inserita almeno una riduzione (tubi con misura diversa, condotti con transizione all'estremita'), a fine comando compare un solo messaggio breve con il numero di collegamenti coinvolti. Se non ce ne sono, non compare nulla.
 
 ## Impostazioni (`ESA_FlexConnect`)
 
 L'icona `i` in alto a destra della finestra mostra, al passaggio del mouse, il tooltip "How to use" (definito in `FlexConnect_Form.xaml`, come in Clash Setup). Se cambia il comportamento del tool va aggiornato anche quel testo.
 
-| Campo | Significato |
-| --- | --- |
-| Flex pipe type | tipo di flexpipe da creare (ricordato per nome) |
-| Flex duct type | tipo di flexduct da creare (ricordato per nome) |
-| Flex pipe pattern | valore del parametro grafico "Flex Pattern" dei flexpipe creati; la prima voce lascia il default del tipo |
-| Flex duct pattern | come sopra, per i flexduct (impostazione separata) |
-| Duct tap fitting | raccordo di derivazione (tap, spud) usato per la presa sul fianco di un condotto; la prima voce usa le preferenze di instradamento del tipo di condotto |
-| Reducer offset | distanza in mm della riduzione dal connettore dell'attrezzatura; usata solo se serve la riduzione |
-| Choose the connector if several are free | se l'attrezzatura ha piu' connettori liberi candidati, apre una finestra per sceglierlo (default: il piu' vicino) |
+I campi sono raggruppati per categoria. Il parametro "Flex Pattern" non e' piu' gestito: il flex prende il valore predefinito del suo tipo.
+
+| Sezione | Campo | Significato |
+| --- | --- | --- |
+| Pipes | Flex pipe type | tipo di flexpipe da creare (ricordato per nome) |
+| Ducts | Flex duct type | tipo di flexduct da creare (ricordato per nome) |
+| Ducts | Duct tap fitting | raccordo di derivazione (tap, spud) usato per la presa sul fianco di un condotto; la prima voce usa le preferenze di instradamento del tipo di condotto |
+| General | Reducer offset | distanza in mm della riduzione dal connettore dell'attrezzatura (tubi) o dall'estremita' del condotto (transizione); usata solo se serve |
+| General | Choose the connector if several are free | se l'attrezzatura ha piu' connettori liberi candidati, apre una finestra per sceglierlo (default: il piu' vicino) |
+
+Le chiavi di configurazione `flex_pipe_pattern` e `flex_duct_pattern` salvate dalle versioni precedenti restano nel file di configurazione e vengono ignorate.
 
 ## Logica comune
 
 1. Si considerano i connettori liberi del dominio giusto (tubazioni o canali) dell'attrezzatura, dei terminali d'aria e dell'elemento di partenza.
 2. Si sceglie il connettore dello stesso sistema (`PipeSystemType` o `DuctSystemType`) a distanza minima. Solo se non ce n'e' nessuno si accettano i connettori `Global` o `Undefined`.
-   Con la spunta attiva e piu' connettori candidati una finestra li elenca ordinati per distanza con id, sistema, misura e distanza; il piu' vicino e' preselezionato, doppio clic conferma, Annulla ferma il comando.
+   Con la spunta attiva e piu' connettori candidati una finestra li elenca ordinati per distanza con **Connector Description** (parametro della famiglia, `Connector.Description`; "(no description)" se vuoto), sistema, misura e distanza; il piu' vicino e' preselezionato, doppio clic conferma, Annulla salta quel collegamento. Anche questa finestra ha l'icona `i` con un tooltip breve.
 3. Il flex prende sistema e livello dell'elemento di partenza.
 4. Se l'elemento di partenza e' isolato, il flex (e il tratto corto, se c'e') riceve un isolamento dello stesso tipo e spessore. La riduzione e la presa non sono isolate.
 5. Il flex parte e arriva con le tangenti dei due connettori, cosi' esce perpendicolare.
-6. Il parametro "Flex Pattern" (Graphics) e' impostato al valore scelto per tubi o condotti. Le voci non sono elencabili dall'API: all'apertura della finestra si crea un flex temporaneo, si provano i valori interi 0..7 leggendo il testo mostrato da Revit e si annulla tutto. Si salva il valore intero, quindi la scelta vale in qualunque lingua di Revit.
 
 Tutto avviene in una transazione per collegamento (`FlexConnect` nel menu Annulla): se qualcosa fallisce, quel collegamento non lascia niente.
 

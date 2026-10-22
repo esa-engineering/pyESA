@@ -275,11 +275,20 @@ def connector_size_text(conn):
         return "?"
 
 
+def connector_description(conn):
+    """Valore di "Connector Description" della famiglia, o "(no description)"."""
+    try:
+        text = conn.Description
+    except Exception:
+        text = None
+    return text.strip() if text and text.strip() else "(no description)"
+
+
 def describe_candidate(candidate):
-    """Testo di una riga della finestra di scelta: id connettore, sistema, misura, distanza."""
+    """Testo di una riga della finestra di scelta: Connector Description, sistema, misura, distanza."""
     dist, _, target = candidate
-    return "Connector {}  |  {}  |  {}  |  {:g} mm away".format(
-        target.Id, system_of(target), connector_size_text(target), round(dist * MM_PER_FOOT))
+    return "{}  |  {}  |  {}  |  {:g} mm away".format(
+        connector_description(target), system_of(target), connector_size_text(target), round(dist * MM_PER_FOOT))
 
 
 def nearest_connector(element, point):
@@ -315,55 +324,6 @@ def create_flex(kind, doc, system_id, flex_type_id, level_id, start_pt, end_pt, 
         return kind.flex.Create(doc, system_id, flex_type_id, level_id, points)
 
 
-MAX_PATTERN_VALUE = 8       # valori interi provati per scoprire le voci di "Flex Pattern"
-
-
-def probe_flex_patterns(doc, kind, flex_type_id):
-    """[(nome, valore intero)] delle voci del parametro "Flex Pattern" per il tipo di flex.
-
-    L'API non elenca le voci: si crea un flex temporaneo, si provano i valori 0..7 leggendo il testo
-    mostrato da Revit e si annulla tutto (transazione con RollBack). Lista vuota se non e' possibile
-    (nessun livello o tipo di sistema, parametro non intero)."""
-    level_id = DB.FilteredElementCollector(doc).OfClass(DB.Level).FirstElementId()
-    system_id = DB.FilteredElementCollector(doc).OfClass(kind.system_class).FirstElementId()
-    if level_id == DB.ElementId.InvalidElementId or system_id == DB.ElementId.InvalidElementId:
-        return []
-    found = []
-    transaction = DB.Transaction(doc, "FlexConnect probe")
-    transaction.Start()
-    try:
-        points = List[DB.XYZ]([DB.XYZ(0, 0, 0), DB.XYZ(10, 0, 0)])
-        flex = kind.flex.Create(doc, system_id, flex_type_id, level_id, points)
-        param = flex.get_Parameter(DB.BuiltInParameter.RBS_FLEX_PATTERN_PARAM)
-        if param is not None and param.StorageType == DB.StorageType.Integer:
-            seen = set()
-            for value in range(MAX_PATTERN_VALUE):
-                try:
-                    param.Set(value)
-                except Exception:
-                    continue
-                name = param.AsValueString()
-                if param.AsInteger() != value or not name or name.isdigit() or name in seen:
-                    continue
-                seen.add(name)
-                found.append((name, value))
-    except Exception:
-        found = []
-    finally:
-        transaction.RollBack()
-    return found
-
-
-def apply_pattern(flex, pattern):
-    """Imposta "Flex Pattern" sul flex appena creato. pattern: valore intero o None (default del tipo)."""
-    if pattern is None:
-        return
-    param = flex.get_Parameter(DB.BuiltInParameter.RBS_FLEX_PATTERN_PARAM)
-    if param is None or param.IsReadOnly:
-        raise FlexConnectError("The flex pattern cannot be set.")
-    param.Set(int(pattern))
-
-
 def copy_insulation(kind, doc, source, targets):
     """Applica ai nuovi elementi l'isolamento dell'elemento di partenza (stesso tipo e spessore), se c'e'."""
     ids = DB.InsulationLiningBase.GetInsulationIds(doc, source.Id)
@@ -380,13 +340,14 @@ def _needs_reducer(trunk_conn, eq_conn):
     return abs(trunk_conn.Radius * 2.0 - eq_conn.Radius * 2.0) > DIAMETER_TOLERANCE_FT
 
 
-def connect_end(doc, trunk, trunk_conn, eq_conn, flex_type_id, gap_mm, pattern=None):
+def connect_end(doc, trunk, trunk_conn, eq_conn, flex_type_id, gap_mm):
     """Collega l'estremita' libera di un tubo o condotto all'attrezzatura. Da chiamare in una transazione.
 
     Stessa misura: il flex va dall'estremita' al connettore dell'attrezzatura.
     Misura (o forma) diversa: sull'attrezzatura si crea una riduzione seguita da un tratto rigido corto,
     lungo quanto il diametro, della misura del tubo/condotto; il flex va dall'estremita' al tratto corto.
-    Se l'elemento di partenza e' isolato, flex e tratto corto ricevono lo stesso isolamento."""
+    Se l'elemento di partenza e' isolato, flex e tratto corto ricevono lo stesso isolamento.
+    Ritorna True se e' stata inserita una riduzione."""
     kind = kind_of(trunk)
     level_id, system_id = trunk_reference(kind, trunk)
     diameter = trunk_conn.Radius * 2.0
@@ -395,7 +356,8 @@ def connect_end(doc, trunk, trunk_conn, eq_conn, flex_type_id, gap_mm, pattern=N
     target_conn = eq_conn
     target_pt = eq_conn.Origin
     new_elements = []
-    if _needs_reducer(trunk_conn, eq_conn):
+    reducer_added = _needs_reducer(trunk_conn, eq_conn)
+    if reducer_added:
         gap = max(gap_mm, 1.0) / MM_PER_FOOT
         stub_start = eq_conn.Origin + out_dir.Multiply(gap)
         stub_end = stub_start + out_dir.Multiply(diameter)  # lunghezza = DN
@@ -413,10 +375,9 @@ def connect_end(doc, trunk, trunk_conn, eq_conn, flex_type_id, gap_mm, pattern=N
     flex = create_flex(kind, doc, system_id, flex_type_id, level_id, trunk_conn.Origin, target_pt,
                        trunk_conn.CoordinateSystem.BasisZ, target_conn.CoordinateSystem.BasisZ.Negate())
     set_size(kind, flex, diameter)
-    apply_pattern(flex, pattern)
     doc.Regenerate()
     nearest_connector(flex, trunk_conn.Origin).ConnectTo(trunk_conn)
     nearest_connector(flex, target_pt).ConnectTo(target_conn)
     new_elements.append(flex)
     copy_insulation(kind, doc, trunk, new_elements)
-    return flex
+    return reducer_added

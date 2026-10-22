@@ -2,6 +2,23 @@
 
 Registro dei tentativi, il piu' recente in alto.
 
+## 22.10.2026, versione 0.11.0: aggiustamenti dopo la prova (con AI)
+
+**Richiesta** (screenshot della scelta del connettore): togliere i pattern; raggruppare le impostazioni per categoria; messaggio breve se viene inserita una riduzione, una volta per attivazione; "Connector Description" della famiglia come prima voce dell'elenco connettori al posto del numero; icona `i` anche nella finestra del connettore; aggiornare i file e proporre in `docs/Claude_Suggestions.md` l'inversione di CLICK e SHIFT + CLICK (il messaggio dell'utente si e' interrotto prima del motivo).
+
+**Fatto**:
+- Flex Pattern: rimossi `probe_flex_patterns` e `apply_pattern` da `FlexConnect_Build.py`, i parametri `pattern` da `Build` e `Duct`, i due combo e le chiavi di configurazione. Le chiavi gia' salvate restano nel file di config e sono ignorate.
+- Finestra impostazioni: tre sezioni, Pipes (Flex pipe type), Ducts (Flex duct type, Duct tap fitting), General (Reducer offset, scelta del connettore). Reducer offset sta in General perche' vale sia per i tubi sia per la transizione dei condotti.
+- Messaggio sulle riduzioni: `connect_end` (tubi e condotti) ritorna `True` se ha inserito riduzione o transizione, la presa ritorna `False`. `try_connect` conta in un dict `session` e `main` mostra un solo `forms.alert` a fine comando. Scelta fatta: a fine comando e non subito, per non interrompere la sequenza di selezioni; alternativa possibile, un avviso alla prima riduzione.
+- Elenco connettori: `describe_candidate` usa `connector_description(conn)` che legge `Connector.Description` (presente in `RevitAPI.xml` 2022, 2025 e 2026) e scrive "(no description)" se vuoto. Tolto "Connector <id>".
+- Icona `i` in `FlexConnect_Connector.xaml`, stesso `Border` della finestra impostazioni, tooltip con "How to use" e "The list".
+
+**Click e Shift + click**: il tool resta com'e' (CLICK esegue con le ultime impostazioni, SHIFT + CLICK apre la finestra, e' gia' l'inverso della regola di `CLAUDE.md`). L'inversione richiesta e' stata scritta come proposta per la regola comune in `docs/Claude_Suggestions.md`, voce 2. Non e' stato cambiato nessun altro tool.
+
+**Non provato in Revit**: che `Connector.Description` restituisca il valore del parametro "Connector Description" sui connettori di famiglie MEP (se restasse vuoto, il ripiego e' `GetMEPConnectorInfo()` e `MEPFamilyConnectorInfo.GetConnectorParameterValue`); l'altezza della finestra impostazioni con tre sezioni (500 di altezza, 470 minima).
+
+**Esito**: sintassi IronPython verificata, da provare in Revit.
+
 ## 22.10.2026, versione 0.10.1: titoli del tooltip in blu (con AI)
 
 **Richiesta** (screenshot del tooltip funzionante): titoli blu come in Clash Setup; annotare in `docs` cio' che riguarda i "How to use" e non e' in `CLAUDE.md`.

@@ -65,12 +65,13 @@ def _side_direction(axis, to_eq):
     return lateral.Normalize(), False
 
 
-def connect_end(doc, duct, end_conn, eq_conn, flex_type_id, gap_mm, pattern=None):
+def connect_end(doc, duct, end_conn, eq_conn, flex_type_id, gap_mm):
     """Flex dall'estremita' libera di un condotto al terminale. In una transazione.
 
     Il flex ha sempre la misura del connettore del terminale. Se l'estremita' del condotto ha forma o
     misura diversa, il flex parte a gap_mm dall'estremita' e una transizione (NewTransitionFitting,
-    il primo connettore e' quello del flex) lo collega al condotto; altrimenti si collega direttamente."""
+    il primo connettore e' quello del flex) lo collega al condotto; altrimenti si collega direttamente.
+    Ritorna True se e' stata inserita la transizione."""
     kind = fb.DUCT
     if eq_conn.Shape != fb.DB.ConnectorProfileType.Round:
         raise fb.FlexConnectError("The connector is not round: a flex duct cannot take its size.")
@@ -89,7 +90,6 @@ def connect_end(doc, duct, end_conn, eq_conn, flex_type_id, gap_mm, pattern=None
     flex = fb.create_flex(kind, doc, system_id, flex_type_id, level_id, start_pt, eq_conn.Origin,
                           out_dir, eq_conn.CoordinateSystem.BasisZ.Negate())
     fb.set_size(kind, flex, diameter)
-    fb.apply_pattern(flex, pattern)
     doc.Regenerate()
     flex_start = fb.nearest_connector(flex, start_pt)
     if same_profile:
@@ -98,11 +98,12 @@ def connect_end(doc, duct, end_conn, eq_conn, flex_type_id, gap_mm, pattern=None
         doc.Create.NewTransitionFitting(flex_start, end_conn)
     fb.nearest_connector(flex, eq_conn.Origin).ConnectTo(eq_conn)
     fb.copy_insulation(kind, doc, duct, [flex])
-    return flex
+    return not same_profile
 
 
-def connect_tap(doc, duct, axis_pt, eq_conn, flex_type_id, pattern=None):
-    """Flex dal connettore del terminale al fianco del condotto, chiuso da una presa. In una transazione."""
+def connect_tap(doc, duct, axis_pt, eq_conn, flex_type_id):
+    """Flex dal connettore del terminale al fianco del condotto, chiuso da una presa. In una transazione.
+    Ritorna False: la presa non ha riduzioni."""
     kind = fb.DUCT
     if eq_conn.Shape != fb.DB.ConnectorProfileType.Round:
         raise fb.FlexConnectError("The connector is not round: a flex duct cannot take its size.")
@@ -122,24 +123,24 @@ def connect_tap(doc, duct, axis_pt, eq_conn, flex_type_id, pattern=None):
     flex = fb.create_flex(kind, doc, system_id, flex_type_id, level_id, eq_conn.Origin, end_pt,
                           eq_conn.CoordinateSystem.BasisZ, side.Negate())
     fb.set_size(kind, flex, diameter)
-    fb.apply_pattern(flex, pattern)
     doc.Regenerate()
     fb.nearest_connector(flex, eq_conn.Origin).ConnectTo(eq_conn)
     doc.Create.NewTakeoffFitting(fb.nearest_connector(flex, end_pt), duct)
     fb.copy_insulation(kind, doc, duct, [flex])
-    return flex
+    return False
 
 
-def build(doc, duct, plan, flex_type_id, gap_mm, tap_symbol_id=None, pattern=None):
-    """Esegue il piano. tap_symbol_id: famiglia di derivazione da usare per la presa (None = preferenze
+def build(doc, duct, plan, flex_type_id, gap_mm, tap_symbol_id=None):
+    """Esegue il piano. Ritorna True se e' stata inserita una riduzione (transizione).
+    tap_symbol_id: famiglia di derivazione da usare per la presa (None = preferenze
     di instradamento del tipo di condotto)."""
     mode, end_conn, eq_conn, axis_pt = plan
     if mode == "end":
-        return connect_end(doc, duct, end_conn, eq_conn, flex_type_id, gap_mm, pattern)
+        return connect_end(doc, duct, end_conn, eq_conn, flex_type_id, gap_mm)
     if tap_symbol_id is None:
-        return connect_tap(doc, duct, axis_pt, eq_conn, flex_type_id, pattern)
+        return connect_tap(doc, duct, axis_pt, eq_conn, flex_type_id)
     return _with_tap_family(doc, duct, tap_symbol_id,
-                            lambda: connect_tap(doc, duct, axis_pt, eq_conn, flex_type_id, pattern))
+                            lambda: connect_tap(doc, duct, axis_pt, eq_conn, flex_type_id))
 
 
 def collect_tap_symbols(doc):

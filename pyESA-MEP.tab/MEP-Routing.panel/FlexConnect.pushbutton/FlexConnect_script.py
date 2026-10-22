@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __title__ = "Flex\nConnect"
-__doc__ = """Version = 0.10.1
+__doc__ = """Version = 0.11.0
 Date    = 22.10.2026
 Connects a pipe or duct to equipment or an air terminal with a flex pipe or flex duct.
 Author(s): Matteo Maiorano
@@ -9,6 +9,7 @@ __author__ = "Matteo Maiorano"
 
 # ======================= STORICO REVISIONI =======================
 # Versione | Data       | Tipo | Descrizione                                   | PR
+# 0.11.0   | 22.10.2026 | FEAT | Tolto Flex Pattern; impostazioni a sezioni (Pipes, Ducts, General); messaggio a fine comando se inserite riduzioni; Connector Description nell'elenco connettori; icona i anche nella scelta del connettore | -
 # 0.10.1   | 22.10.2026 | UI   | Titoli del tooltip How to use in blu come in Clash Setup | -
 # 0.10.0   | 22.10.2026 | UI   | Icona i nella finestra delle impostazioni con il tooltip How to use | -
 # 0.9.0    | 22.10.2026 | FEAT | Il comando resta attivo dopo ogni collegamento, Esc lo termina | -
@@ -48,15 +49,12 @@ def load_settings(config, pipe_names, duct_names):
     flex_type = config.get_option("flex_type", "")
     flex_duct_type = config.get_option("flex_duct_type", "")
     duct_tap = config.get_option("duct_tap", "")
-    flex_pipe_pattern = str(config.get_option("flex_pipe_pattern", ""))
-    flex_duct_pattern = str(config.get_option("flex_duct_pattern", ""))
     try:
         gap_mm = float(config.get_option("gap_mm", DEFAULT_GAP_MM))
     except (TypeError, ValueError):
         gap_mm = DEFAULT_GAP_MM
     ask_connector = str(config.get_option("ask_connector", "0")).lower() in ("1", "true")
     settings = {"flex_type": flex_type, "flex_duct_type": flex_duct_type, "duct_tap": duct_tap,
-                "flex_pipe_pattern": flex_pipe_pattern, "flex_duct_pattern": flex_duct_pattern,
                 "gap_mm": gap_mm, "ask_connector": ask_connector}
     valid = ((not pipe_names or flex_type in pipe_names) and
              (not duct_names or flex_duct_type in duct_names))
@@ -68,22 +66,11 @@ def save_settings(config, settings):
         config.set_option("flex_type", settings["flex_type"])
         config.set_option("flex_duct_type", settings["flex_duct_type"])
         config.set_option("duct_tap", settings["duct_tap"])
-        config.set_option("flex_pipe_pattern", settings["flex_pipe_pattern"])
-        config.set_option("flex_duct_pattern", settings["flex_duct_pattern"])
         config.set_option("gap_mm", settings["gap_mm"])
         config.set_option("ask_connector", "1" if settings["ask_connector"] else "0")
         script.save_config()
     except Exception:
         pass
-
-
-def probe_patterns(kind, flex_types, saved_name):
-    """Voci di Flex Pattern per il tipo di flex salvato (o il primo)."""
-    if not flex_types:
-        return []
-    ids = dict(flex_types)
-    type_id = ids.get(saved_name) or flex_types[0][1]
-    return fb.probe_flex_patterns(doc, kind, type_id)
 
 
 def get_settings(flex_types, tap_names):
@@ -95,10 +82,7 @@ def get_settings(flex_types, tap_names):
     if valid and not __shiftclick__:  # noqa: F821
         return settings
     xaml_path = script.get_bundle_file(XAML_FILE_NAME)
-    pipe_patterns = probe_patterns(fb.PIPE, flex_types[fb.PIPE], settings["flex_type"])
-    duct_patterns = probe_patterns(fb.DUCT, flex_types[fb.DUCT], settings["flex_duct_type"])
-    settings = fui.FlexConnectWindow(xaml_path, pipe_names, duct_names, tap_names,
-                                     pipe_patterns, duct_patterns, settings).show()
+    settings = fui.FlexConnectWindow(xaml_path, pipe_names, duct_names, tap_names, settings).show()
     if settings is None:
         script.exit()
     save_settings(config, settings)
@@ -114,33 +98,33 @@ def choose_connector(candidates):
 
 
 def connect_once(trunk, point, equipment, settings, type_ids, tap_ids):
-    """Un collegamento. Solleva FlexConnectError / FlexConnectCancelled / OperationCanceledException."""
+    """Un collegamento: True se e' stata inserita una riduzione.
+    Solleva FlexConnectError / FlexConnectCancelled / OperationCanceledException."""
     kind = fb.kind_of(trunk)
     name = settings["flex_type"] if kind is fb.PIPE else settings["flex_duct_type"]
     flex_type_id = type_ids[kind].get(name)
     if flex_type_id is None:
         raise fb.FlexConnectError("The project has no flex {} type.".format(kind.name))
     chooser = choose_connector if settings["ask_connector"] else None
-    pattern_text = settings["flex_pipe_pattern"] if kind is fb.PIPE else settings["flex_duct_pattern"]
-    pattern = int(pattern_text) if pattern_text != "" else None
 
     if kind is fb.PIPE:
         pipe_conn, eq_conn = fb.find_connector_pair(trunk, equipment, chooser)
         with revit.Transaction("FlexConnect"):
-            fb.connect_end(doc, trunk, pipe_conn, eq_conn, flex_type_id, settings["gap_mm"], pattern)
-        return
+            return fb.connect_end(doc, trunk, pipe_conn, eq_conn, flex_type_id, settings["gap_mm"])
 
     if point is None:
         point = fb.pick_point_on(uidoc, trunk)
     plan = fd.plan_connection(trunk, point, equipment, chooser)
     with revit.Transaction("FlexConnect"):
-        fd.build(doc, trunk, plan, flex_type_id, settings["gap_mm"], tap_ids.get(settings["duct_tap"]), pattern)
+        return fd.build(doc, trunk, plan, flex_type_id, settings["gap_mm"], tap_ids.get(settings["duct_tap"]))
 
 
-def try_connect(trunk, point, equipment, settings, type_ids, tap_ids):
-    """Un collegamento con gli errori mostrati in un avviso. False se l'utente ha annullato con Esc."""
+def try_connect(trunk, point, equipment, settings, type_ids, tap_ids, session):
+    """Un collegamento con gli errori mostrati in un avviso. False se l'utente ha annullato con Esc.
+    session: dict dell'attivazione, "reducers" conta le riduzioni inserite."""
     try:
-        connect_once(trunk, point, equipment, settings, type_ids, tap_ids)
+        if connect_once(trunk, point, equipment, settings, type_ids, tap_ids):
+            session["reducers"] += 1
     except OperationCanceledException:
         return False
     except fb.FlexConnectCancelled:
@@ -164,6 +148,7 @@ def main():
 
     # il comando resta attivo: dopo ogni collegamento riparte la selezione, Esc lo termina.
     # Sui condotti si continua con lo stesso condotto (solo terminale e punto); Esc termina il comando.
+    session = {"reducers": 0}
     first_round = True
     while True:
         try:
@@ -171,17 +156,22 @@ def main():
         except OperationCanceledException:
             break
         first_round = False
-        keep_going = try_connect(trunk, point, equipment, settings, type_ids, tap_ids)
+        keep_going = try_connect(trunk, point, equipment, settings, type_ids, tap_ids, session)
         if fb.is_duct(trunk):
             while keep_going:
                 next_connection = fb.pick_next_duct_connection(uidoc, trunk)
                 if next_connection is None:
                     break
                 point, equipment = next_connection
-                keep_going = try_connect(trunk, point, equipment, settings, type_ids, tap_ids)
+                keep_going = try_connect(trunk, point, equipment, settings, type_ids, tap_ids, session)
             break
         if not keep_going:
             break
+
+    # un solo messaggio per attivazione del comando, a fine comando
+    if session["reducers"]:
+        forms.alert("A reducer was added on {} connection(s). Check the fittings in the model.".format(
+            session["reducers"]), title="FlexConnect")
 
 
 main()
