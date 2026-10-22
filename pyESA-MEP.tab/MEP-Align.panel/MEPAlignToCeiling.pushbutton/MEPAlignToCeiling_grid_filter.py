@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_grid_filter.py - filtri per colonna, in stile Excel, sulle griglie legate a una
-DataTable.
+MEPAlignToCeiling_grid_filter.py - filtri per colonna, in stile Excel, sulle griglie legate
+a una DataTable.
+
+Copia di MEPQTO/MEPQTO_grid_filter.py con un nome proprio (Rocket mode: due moduli con lo
+stesso nome e contenuto diverso si sovrascrivono). Unica differenza: il glifo dell'imbuto
+e' scritto come escape. Le correzioni vanno riportate su entrambe le copie.
 
 Ogni colonna della griglia riceve nell'intestazione un pulsante a imbuto che apre un
 elenco dei valori della colonna, con caselle di spunta, una ricerca e "(Select All)".
@@ -38,7 +42,7 @@ BLANKS = u"(Blanks)"
 SELECT_ALL = u"(Select All)"
 # Imbuto di Segoe MDL2 Assets (Windows 10 e successivi, quindi tutte le versioni di
 # Revit supportate).
-FUNNEL = u""
+FUNNEL = u"\ue71c"
 ICON_FONT = FontFamily(u"Segoe MDL2 Assets")
 
 _BRUSHES = BrushConverter()

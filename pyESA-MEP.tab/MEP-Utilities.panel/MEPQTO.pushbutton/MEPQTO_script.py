@@ -70,8 +70,8 @@ __author__ = "Claude + Andrea Patti"
 
 from pyrevit import revit, script, forms
 
-import mepqto_model as qm
-from mepqto_ui import show_takeoff_window
+import MEPQTO_model as qm
+from MEPQTO_ui import show_takeoff_window
 
 doc = revit.doc
 

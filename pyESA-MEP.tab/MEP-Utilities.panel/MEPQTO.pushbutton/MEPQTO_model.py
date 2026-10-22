@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_model.py - raccolta dal modello e aggregazione del computo MEP.
+MEPQTO_model.py - raccolta dal modello e aggregazione del computo MEP.
 
 La parte Revit (collect_records) legge una volta sola gli elementi delle categorie
 computabili e li riduce a record semplici, con la geometria gia' convertita in mm
@@ -11,7 +11,7 @@ tornare sul modello.
 
 Misure: le categorie a pezzo contano le istanze (1 istanza = 1 pezzo); quelle
 lineari si misurano in m, mq o kg secondo l'unita' della voce, con le formule e
-le maggiorazioni di mepqto_rules.
+le maggiorazioni di MEPQTO_rules.
 """
 
 from collections import OrderedDict
@@ -20,7 +20,7 @@ from System.Collections.Generic import List
 
 from pyrevit import DB
 
-import mepqto_rules as qr
+import MEPQTO_rules as qr
 
 BIP = DB.BuiltInParameter
 ST = DB.StorageType

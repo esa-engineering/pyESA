@@ -430,7 +430,7 @@ MEP_CATEGORY_NAMES = [
     'OST_SecurityDevices',
 ]
 
-XAML_FILE_NAME = 'MEPAlignToWallWindow.xaml'
+XAML_FILE_NAME = 'MEPAlignToWall_Window.xaml'
 
 TRANSACTION_NAME = u'Align MEP to walls'
 
@@ -2641,7 +2641,7 @@ def resolve_elements():
 
 
 class MEPAlignToWallWindow(forms.WPFWindow):
-    """Finestra di dialogo definita in MEPAlignToWallWindow.xaml."""
+    """Finestra di dialogo definita in MEPAlignToWall_Window.xaml."""
 
     # Attributo di classe: gli handler delle CheckBox scattano durante il
     # popolamento iniziale, prima che __init__ abbia finito.

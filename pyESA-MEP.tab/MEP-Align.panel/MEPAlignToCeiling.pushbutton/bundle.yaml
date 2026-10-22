@@ -1,0 +1,28 @@
+title: "MEP\nAlign to Ceiling"
+tooltip: >
+  Moves the selected MEP devices vertically so that their insertion point lies on the bottom
+  face of the ceiling above them or, where the storey has no ceiling there, on the soffit of
+  the floor slab that closes their level. Plan position and rotation are never changed.
+
+  CLICK: select the devices, then run the command. Only instances with the Yes/No instance
+  parameter u_VIS_Ceiling_installation = Yes are processed. A dialog asks which categories to
+  process, the tolerance in mm (500 by default) and whether to run a simulation first.
+
+  The target is found automatically. A vertical line twice the tolerance long, centred on the
+  insertion point, must cross its bottom face. Ceilings and slabs are read in this model and in
+  the linked models; stacked instances in contact count as one package and the target is its
+  bottom face. A ceiling beyond the tolerance means the element is skipped, never pushed above
+  the ceiling.
+
+  False ceiling detectors (family name with "e_FA.DE" and "False Ceiling") always go to the
+  soffit (the slab, or a ceiling in contact with it), and their dz_Buzzer parameter is measured
+  down to the false ceiling. Without a false ceiling below, the detector is reported as
+  unsuitable.
+
+  At the end a window shows the totals and a searchable table of the elements not aligned. It
+  stays open: the search button of a row selects and zooms to the element, and you can edit it
+  in Revit straight away. The full report is one click away (Advanced Report).
+author: ESA Engineering
+help_url: https://esaengineeringsrl.sharepoint.com/sites/BIMESA-Wiki/SitePages/PyESA.aspx
+engine:
+  persistent: true

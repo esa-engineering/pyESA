@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_xlsx.py - writer .xlsx minimale (zip + xml), senza Excel installato.
+MEPQTO_xlsx.py - writer .xlsx minimale (zip + xml), senza Excel installato.
 
 Scrive solo cio' che serve al computo: celle di testo inline (niente
 sharedStrings), numeri, formule con il valore gia' calcolato in cache, pochi
@@ -18,8 +18,8 @@ from System.IO import File, IOException, StreamWriter
 from System.IO.Compression import ZipFile, ZipArchiveMode, CompressionLevel
 from System.Text import UTF8Encoding
 
-import mepqto_model as qm
-import mepqto_rules as qr
+import MEPQTO_model as qm
+import MEPQTO_rules as qr
 
 # Indici di cellXfs in styles.xml
 STYLE_DEFAULT = 0

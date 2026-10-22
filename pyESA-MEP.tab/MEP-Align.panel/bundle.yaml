@@ -5,3 +5,4 @@ layout:
   - MatchElevation
   - Spacing
   - MEPAlignToWall
+  - MEPAlignToCeiling

@@ -14,7 +14,7 @@ originariamente in Dynamo:
 
 Le due variabili che distinguevano i quattro grafi (fonte degli elementi e
 metodo di determinazione del livello) sono diventate opzioni della finestra
-di dialogo definita in LevelReassignmentWindow.xaml.
+di dialogo definita in ReLevelMEP_Window.xaml.
 
 --------------------------------------------------------------------------
 LOGICA APPLICATA (identica ai grafi Dynamo originali)
@@ -185,16 +185,16 @@ REFERENCE_LEVEL_PARAM_NAMES = [
     'Livello di riferimento',
 ]
 
-XAML_FILE_NAME = 'LevelReassignmentWindow.xaml'
+XAML_FILE_NAME = 'ReLevelMEP_Window.xaml'
 
 GROUP_A = 'A'
 GROUP_B = 'B'
 GROUP_C = 'C'
 
 GROUP_LABELS = {
-    GROUP_A: u'Gruppo A - elementi puntuali (Level + Elevation from Level)',
-    GROUP_B: u'Gruppo B - elementi lineari (Reference Level)',
-    GROUP_C: u'Gruppo C - raccordi e accessori (Level)',
+    GROUP_A: u'Group A - point elements (Level + Elevation from Level)',
+    GROUP_B: u'Group B - linear elements (Reference Level)',
+    GROUP_C: u'Group C - fittings and accessories (Level)',
 }
 
 MAX_SKIPPED_DETAIL_ROWS = 200
@@ -265,7 +265,7 @@ def resolve_categories(category_names):
     for name in category_names:
         built_in_category = getattr(DB.BuiltInCategory, name, None)
         if built_in_category is None:
-            logger.debug('BuiltInCategory non disponibile: %s', name)
+            logger.debug('BuiltInCategory not available: %s', name)
             continue
         resolved.append(built_in_category)
     return resolved
@@ -437,21 +437,21 @@ def apply_to_element(element, group, target_level, dry_run):
         if reference_z is None:
             return ElementOutcome(
                 ElementOutcome.SKIPPED,
-                u'nessuna posizione utilizzabile: elemento non basato su livello')
+                u'no usable location: element is not level based')
 
         level_parameter = get_writable_parameter(
             element, LEVEL_PARAM_BIPS, LEVEL_PARAM_NAMES)
         if level_parameter is None:
             return ElementOutcome(
                 ElementOutcome.SKIPPED,
-                u'parametro del livello assente o di sola lettura')
+                u'level parameter missing or read-only')
 
         elevation_parameter = get_writable_parameter(
             element, ELEVATION_PARAM_BIPS, ELEVATION_PARAM_NAMES)
         if elevation_parameter is None:
             return ElementOutcome(
                 ElementOutcome.SKIPPED,
-                u'parametro "Elevation from Level" assente o di sola lettura')
+                u'"Elevation from Level" parameter missing or read-only')
 
         current_level_id = get_current_level_id(level_parameter)
         if current_level_id is not None \
@@ -473,7 +473,7 @@ def apply_to_element(element, group, target_level, dry_run):
         if reference_parameter is None:
             return ElementOutcome(
                 ElementOutcome.SKIPPED,
-                u'parametro "Reference Level" assente o di sola lettura')
+                u'"Reference Level" parameter missing or read-only')
 
         current_level_id = get_current_level_id(reference_parameter)
         if current_level_id is not None \
@@ -491,7 +491,7 @@ def apply_to_element(element, group, target_level, dry_run):
         if level_parameter is None:
             return ElementOutcome(
                 ElementOutcome.SKIPPED,
-                u'parametro del livello assente o di sola lettura')
+                u'level parameter missing or read-only')
 
         current_level_id = get_current_level_id(level_parameter)
         if current_level_id is not None \
@@ -503,7 +503,7 @@ def apply_to_element(element, group, target_level, dry_run):
 
         return ElementOutcome(ElementOutcome.APPLIED)
 
-    return ElementOutcome(ElementOutcome.SKIPPED, u'categoria non gestita')
+    return ElementOutcome(ElementOutcome.SKIPPED, u'category not handled')
 
 
 def resolve_target_level(element, group, options, levels_ascending):
@@ -513,7 +513,7 @@ def resolve_target_level(element, group, options, levels_ascending):
 
     reference_z = get_reference_z(element)
     if reference_z is None:
-        return None, u'nessuna posizione utilizzabile: impossibile calcolare il livello'
+        return None, u'no usable location: cannot calculate the level'
 
     level = find_level_below(
         reference_z, levels_ascending, options.thickness_internal)
@@ -554,7 +554,7 @@ def collect_active_view_elements():
             .ToElements()
         )
     except Exception as error:
-        logger.debug('Raccolta dalla vista attiva non possibile: %s', error)
+        logger.debug('Cannot collect elements from the active view: %s', error)
         return None
 
 
@@ -576,7 +576,7 @@ class ReassignmentOptions(object):
 
 
 class LevelReassignmentWindow(forms.WPFWindow):
-    """Finestra di dialogo definita in LevelReassignmentWindow.xaml."""
+    """Finestra di dialogo definita in ReLevelMEP_Window.xaml."""
 
     def __init__(self, xaml_file, levels, selected_count, view_count,
                  view_name, preselect_level=None):
@@ -595,19 +595,19 @@ class LevelReassignmentWindow(forms.WPFWindow):
     def _setup_sources(self, selected_count, view_count, view_name):
         if selected_count:
             self.tb_selection_info.Text = \
-                u'{} elementi attualmente selezionati.'.format(selected_count)
+                u'{} elements currently selected.'.format(selected_count)
         else:
             self.tb_selection_info.Text = \
-                u'Nessun elemento selezionato in Revit.'
+                u'No elements selected in Revit.'
             self.rb_source_selection.IsEnabled = False
 
         if view_count is None:
             self.tb_view_info.Text = \
-                u'La vista attiva non consente la raccolta degli elementi.'
+                u'Elements cannot be collected from the active view.'
             self.rb_source_view.IsEnabled = False
         else:
             self.tb_view_info.Text = \
-                u'{} elementi MEP gestiti nella vista "{}".'.format(
+                u'{} handled MEP elements in view "{}".'.format(
                     view_count, view_name)
 
         if selected_count:
@@ -647,7 +647,7 @@ class LevelReassignmentWindow(forms.WPFWindow):
         use_selection = bool(self.rb_source_selection.IsChecked)
         use_view = bool(self.rb_source_view.IsChecked)
         if not use_selection and not use_view:
-            forms.alert(u'Indicare quali elementi elaborare.', title=u'Dati mancanti')
+            forms.alert(u'Choose which elements to process.', title=u'Missing input')
             return
 
         auto_level = bool(self.rb_level_auto.IsChecked)
@@ -656,8 +656,8 @@ class LevelReassignmentWindow(forms.WPFWindow):
         if not auto_level:
             index = self.cb_levels.SelectedIndex
             if index is None or index < 0:
-                forms.alert(u'Selezionare il livello di destinazione.',
-                            title=u'Dati mancanti')
+                forms.alert(u'Select the target level.',
+                            title=u'Missing input')
                 return
             manual_level = self._combo_levels[index]
 
@@ -670,15 +670,14 @@ class LevelReassignmentWindow(forms.WPFWindow):
                 thickness_mm = float(raw_value)
             except ValueError:
                 forms.alert(
-                    u'Lo spessore del pacchetto di finitura deve essere un '
-                    u'numero espresso in millimetri.',
-                    title=u'Valore non valido')
+                    u'The floor finish thickness must be a number in '
+                    u'millimetres.',
+                    title=u'Invalid value')
                 return
             if thickness_mm < 0:
                 forms.alert(
-                    u'Lo spessore del pacchetto di finitura non puo\' essere '
-                    u'negativo.',
-                    title=u'Valore non valido')
+                    u'The floor finish thickness cannot be negative.',
+                    title=u'Invalid value')
                 return
 
         self.options = ReassignmentOptions(
@@ -702,31 +701,31 @@ class LevelReassignmentWindow(forms.WPFWindow):
 def print_report(options, applied, already_ok, skipped, unmanaged_count,
                  total_count):
     if options.dry_run:
-        output.print_md(u'# Riassegnazione livello - simulazione')
+        output.print_md(u'# Level reassignment - dry run')
         output.print_md(
-            u'**Nessuna modifica e\' stata applicata al modello.** '
-            u'I valori seguenti sono una stima di quanto verrebbe modificato.')
+            u'**No changes were applied to the model.** '
+            u'The values below show what would be changed.')
     else:
-        output.print_md(u'# Riassegnazione livello - resoconto')
+        output.print_md(u'# Level reassignment - report')
 
     if options.auto_level:
         level_description = \
-            u'automatico (primo livello sottostante), spessore di finitura ' \
+            u'automatic (first level below), floor finish thickness ' \
             u'{:.0f} mm'.format(options.thickness_mm)
     else:
-        level_description = u'manuale, livello "{}"'.format(
+        level_description = u'manual, level "{}"'.format(
             options.manual_level.Name)
 
-    source_description = u'elementi selezionati' if options.use_selection \
-        else u'elementi della vista attiva'
+    source_description = u'selected elements' if options.use_selection \
+        else u'active view elements'
 
     output.print_md(
-        u'- Fonte: {}\n'
-        u'- Livello di destinazione: {}\n'
-        u'- Elementi esaminati: {}'.format(
+        u'- Source: {}\n'
+        u'- Target level: {}\n'
+        u'- Elements examined: {}'.format(
             source_description, level_description, total_count))
 
-    output.print_md(u'## Elementi elaborati')
+    output.print_md(u'## Processed elements')
     rows = []
     for group in (GROUP_A, GROUP_B, GROUP_C):
         rows.append([
@@ -735,26 +734,26 @@ def print_report(options, applied, already_ok, skipped, unmanaged_count,
             str(already_ok.get(group, 0)),
         ])
     rows.append([
-        u'**Totale**',
+        u'**Total**',
         str(sum(applied.values())),
         str(sum(already_ok.values())),
     ])
     output.print_table(
         table_data=rows,
         title='',
-        columns=[u'Gruppo', u'Modificati', u'Gia\' corretti'])
+        columns=[u'Group', u'Changed', u'Already correct'])
 
     output.print_md(
-        u'- Elementi con categoria non gestita: {}\n'
-        u'- Elementi ignorati: {}'.format(unmanaged_count, len(skipped)))
+        u'- Elements with unhandled category: {}\n'
+        u'- Skipped elements: {}'.format(unmanaged_count, len(skipped)))
 
     if not skipped:
         return
 
-    output.print_md(u'## Elementi ignorati')
+    output.print_md(u'## Skipped elements')
     output.print_md(
-        u'Tipicamente famiglie host based, workplane based o in place, '
-        u'oppure elementi i cui parametri di livello sono di sola lettura.')
+        u'Typically host based, workplane based or in-place families, '
+        u'or elements whose level parameters are read-only.')
 
     shown = skipped[:MAX_SKIPPED_DETAIL_ROWS]
     detail_rows = []
@@ -771,12 +770,12 @@ def print_report(options, applied, already_ok, skipped, unmanaged_count,
     output.print_table(
         table_data=detail_rows,
         title='',
-        columns=[u'Elemento', u'Categoria', u'Motivo'])
+        columns=[u'Element', u'Category', u'Reason'])
 
     remaining = len(skipped) - len(shown)
     if remaining > 0:
         output.print_md(
-            u'_...e altri {} elementi ignorati non elencati._'.format(remaining))
+            u'_...and {} more skipped elements not listed._'.format(remaining))
 
 
 # =========================================================================
@@ -786,21 +785,21 @@ def print_report(options, applied, already_ok, skipped, unmanaged_count,
 def main():
     if not ALL_CATEGORIES:
         forms.alert(
-            u'Nessuna delle categorie configurate e\' disponibile in questa '
-            u'versione di Revit.',
+            u'None of the configured categories is available in this '
+            u'Revit version.',
             exitscript=True)
 
     levels_ascending = get_project_levels()
     if not levels_ascending:
-        forms.alert(u'Nel progetto non sono presenti livelli.', exitscript=True)
+        forms.alert(u'The project contains no levels.', exitscript=True)
 
     selected_elements = collect_selected_elements()
     view_elements = collect_active_view_elements()
 
     if not selected_elements and not view_elements:
         forms.alert(
-            u'Non ci sono elementi da elaborare: nessun elemento selezionato '
-            u'e nessun elemento MEP gestito nella vista attiva.',
+            u'There are no elements to process: nothing is selected '
+            u'and the active view contains no handled MEP elements.',
             exitscript=True)
 
     active_view = doc.ActiveView
@@ -831,7 +830,7 @@ def main():
 
     elements = selected_elements if options.use_selection else view_elements
     if not elements:
-        forms.alert(u'Non ci sono elementi da elaborare.', exitscript=True)
+        forms.alert(u'There are no elements to process.', exitscript=True)
 
     applied = {GROUP_A: 0, GROUP_B: 0, GROUP_C: 0}
     already_ok = {GROUP_A: 0, GROUP_B: 0, GROUP_C: 0}
@@ -858,7 +857,7 @@ def main():
                 outcome = apply_to_element(
                     element, group, target_level, options.dry_run)
             except Exception as exception:
-                skipped.append((element, u'errore Revit: {}'.format(exception)))
+                skipped.append((element, u'Revit error: {}'.format(exception)))
                 continue
 
             if outcome.status == ElementOutcome.APPLIED:
@@ -871,7 +870,7 @@ def main():
     if options.dry_run:
         process_all()
     else:
-        with revit.Transaction('Riassegnazione livello elementi MEP'):
+        with revit.Transaction('MEP level reassignment'):
             process_all()
 
     print_report(options, applied, already_ok, skipped, len(unmanaged),

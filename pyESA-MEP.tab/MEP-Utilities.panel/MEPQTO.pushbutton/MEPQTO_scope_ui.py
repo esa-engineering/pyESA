@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-mepqto_scope_ui.py - scelta dei modelli, dei workset e delle categorie da leggere.
+MEPQTO_scope_ui.py - scelta dei modelli, dei workset e delle categorie da leggere.
 
 Si apre prima di ogni lettura del modello: all'avvio del tool e dal pulsante Models
 and Categories... della finestra del computo. Il modello aperto si legge sempre; si
@@ -38,7 +38,7 @@ from System.Windows.Threading import DispatcherPriority
 
 from pyrevit import script
 
-import mepqto_rules as qr
+import MEPQTO_rules as qr
 
 XAML_FILE_NAME = 'MEPQTO_scope.xaml'
 TITLE = "Models and categories"
