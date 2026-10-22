@@ -17,11 +17,16 @@ Pulldown **Clash Finder** (`ClashFinder.pulldown`, pannello MEP-Utilities) con t
   - le coppie elemento / host non sono clash (porta e muro). Un elemento ospitato che sfonda
     davvero il suo host non viene quindi segnalato.
 - **Set**: sorgenti, categorie, filtri di vista e regole, tutto salvato nel test.
-  - *From this model*: *Current selection*, vista attiva, intero modello o nulla. La
+  - *From this model*: *Current selection*, vista attiva, intero modello o *Links only* (nulla dal modello aperto, solo i link). La
     selezione corrente di Revit e' riletta a ogni aggiornamento del riepilogo e all'avvio del
     run (`_before_run`): si puo' cambiarla in Revit con la finestra aperta. Default per i test
     salvati prima di questa versione: A dalla selezione, B dal modello.
-  - *Plus elements of these links*: link salvati per **nome del file** (`Document.Title`),
+  - *Links*: menu a discesa (un bottone che apre un `Popup` con l'elenco a caselle, alto fino
+    a 260 px con scroll interno; si chiude cliccando fuori). Il testo del bottone dice quanti
+    link sono spuntati: "None (click to choose)", il nome se ce n'e' uno, "N links" da due in
+    su (`_update_links_button`); il tooltip elenca i nomi. Un clic sul bottone mentre il popup
+    e' aperto lo chiude e non lo riapre (guardia di 250 ms su `Closed`). Link salvati per
+    **nome del file** (`Document.Title`),
     validi per tutte le istanze caricate di quel file e in ogni progetto che carica gli stessi
     link. Un link del test non caricato resta in elenco come "(not loaded)" e compare nelle
     note. Gli elementi linkati vengono dall'intero link; con sorgente *Active view* da quanto
@@ -55,7 +60,8 @@ Resta aperta mentre si lavora in Revit. Ogni accesso al modello passa da un Exte
 Una sola pagina:
 
 - a sinistra la libreria: un clic carica il test nell'editor (sotto il nome, in grigio,
-  le sorgenti di A e B: `describe_scope()`); *New* (chiede il nome nella finestra di
+  le sorgenti di A e B: `describe_scope()`, con due o piu' link ridotti a "N links"; i nomi
+  restano nel tooltip della riga); *New* (chiede il nome nella finestra di
   salvataggio e aggiunge subito alla libreria un test vuoto: nessuna categoria, link o filtro,
   A e B dalla selezione corrente), *▲* / *▼* (sposta il test
   selezionato; l'ordine si salva subito nella libreria e vale anche per Quick Clash), *Delete*, *Import JSON*, *Export JSON* (tutta la libreria);

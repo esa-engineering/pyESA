@@ -5,7 +5,7 @@ title:
 tooltip: >
   Clash detection driven by saved tests, as in Navisworks. A test compares Set A
   with Set B; each set has its sources (current Revit selection, active view,
-  whole model or nothing, plus loaded links), ticked categories with the number of
+  whole model or links only, plus loaded links), ticked categories with the number of
   elements found, view filters of the model and custom rules on parameter values.
   Tests live in a personal library and can be exported to and imported from JSON
   files.

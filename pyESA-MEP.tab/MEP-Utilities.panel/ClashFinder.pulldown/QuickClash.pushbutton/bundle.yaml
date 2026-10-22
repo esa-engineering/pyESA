@@ -5,7 +5,7 @@ title:
 tooltip: >
   Compact version of Clash Setup: click a saved test, check or change where Set A
   and Set B come from (current Revit selection, active view, whole model or
-  nothing, plus loaded links) for this run, then run. The report is the same as
+  links only, plus loaded links) for this run, then run. The report is the same as
   Clash Setup's.
 
   The current selection is read again at every Refresh and when the run starts.

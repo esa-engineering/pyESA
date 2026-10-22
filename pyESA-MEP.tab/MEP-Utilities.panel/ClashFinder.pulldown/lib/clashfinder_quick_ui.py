@@ -26,7 +26,8 @@ class QuickClashForm(cu.ClashFinderForm):
     def _find_controls(self):
         for name in ("lst_tests", "txt_summary_state", "txt_links_hint",
                      "btn_refresh", "btn_close", "btn_run",
-                     "cbo_source_a", "cbo_source_b", "lst_links_a", "lst_links_b"):
+                     "cbo_source_a", "cbo_source_b", "lst_links_a", "lst_links_b",
+                     "btn_links_a", "btn_links_b", "pop_links_a", "pop_links_b"):
             setattr(self, name, self._root.FindName(name))
 
     def _init_controls(self):
@@ -36,6 +37,7 @@ class QuickClashForm(cu.ClashFinderForm):
                 combo.Items.Add(label)
             combo.SelectedIndex = 0
             combo.SelectionChanged += lambda s, e: self._changed()
+            self._wire_links_dropdown(side)
         self.lst_tests.SelectionChanged += self.OnTestSelected
         self.btn_refresh.Click += lambda s, e: self._request_summary()
         self.btn_close.Click += lambda s, e: self.Close()

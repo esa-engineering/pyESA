@@ -136,9 +136,16 @@
                                         <ComboBox x:Name="cbo_source_a" Grid.Column="3" Style="{StaticResource ComboStyle}"
                                                   ToolTip="Elements of the open model that can enter Set A"/>
                                     </Grid>
-                                    <TextBlock Text="Plus elements of these links:" FontSize="11" Margin="0,8,0,2"/>
-                                    <ListBox x:Name="lst_links_a" Height="60" ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                             ToolTip="Links are saved by file name: the test works in any project that loads the same links"/>
+                                    <TextBlock Text="Links" FontSize="11" Margin="0,8,0,2"/>
+                                    <Button x:Name="btn_links_a" HorizontalContentAlignment="Left" Padding="6,3"
+                                            ToolTip="Links are saved by file name: the test works in any project that loads the same links"/>
+                                    <Popup x:Name="pop_links_a" PlacementTarget="{Binding ElementName=btn_links_a}"
+                                           Placement="Bottom" StaysOpen="False"
+                                           Width="{Binding ActualWidth, ElementName=btn_links_a}">
+                                        <Border Background="White" BorderBrush="#CCCCCC" BorderThickness="1">
+                                            <ListBox x:Name="lst_links_a" MaxHeight="260" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                        </Border>
+                                    </Popup>
 
                                     <TextBlock Text="Categories" Style="{StaticResource SubHeader}"/>
                                     <Grid Margin="0,0,0,5">
@@ -218,9 +225,16 @@
                                         <ComboBox x:Name="cbo_source_b" Grid.Column="3" Style="{StaticResource ComboStyle}"
                                                   ToolTip="Elements of the open model that can enter Set B"/>
                                     </Grid>
-                                    <TextBlock Text="Plus elements of these links:" FontSize="11" Margin="0,8,0,2"/>
-                                    <ListBox x:Name="lst_links_b" Height="60" ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                             ToolTip="Links are saved by file name: the test works in any project that loads the same links"/>
+                                    <TextBlock Text="Links" FontSize="11" Margin="0,8,0,2"/>
+                                    <Button x:Name="btn_links_b" HorizontalContentAlignment="Left" Padding="6,3"
+                                            ToolTip="Links are saved by file name: the test works in any project that loads the same links"/>
+                                    <Popup x:Name="pop_links_b" PlacementTarget="{Binding ElementName=btn_links_b}"
+                                           Placement="Bottom" StaysOpen="False"
+                                           Width="{Binding ActualWidth, ElementName=btn_links_b}">
+                                        <Border Background="White" BorderBrush="#CCCCCC" BorderThickness="1">
+                                            <ListBox x:Name="lst_links_b" MaxHeight="260" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                        </Border>
+                                    </Popup>
 
                                     <TextBlock Text="Categories" Style="{StaticResource SubHeader}"/>
                                     <Grid Margin="0,0,0,5">

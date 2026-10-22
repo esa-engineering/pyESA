@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 __title__ = "Last\nReport"
 
-__doc__ = """Version = 1.1
-Date    = 20.10.2026
+__doc__ = """Version = 1.2
+Date    = 22.10.2026
 _____________________________________________________________________
 Opens again the last Clash Finder report made on this model, with the
 same navigation (colours, section box, isolation, export).
@@ -21,6 +21,13 @@ Author(s): Claude + Matteo Maiorano
 """
 
 __author__ = "Claude + Matteo Maiorano"
+
+# ======================= STORICO REVISIONI =======================
+# Versione | Data       | Tipo | Descrizione                                              | PR
+# 1.2.0    | 22.10.2026 | UI   | Nessun cambio al comando: versione allineata per la      |
+#          |            |      | modifica dei moduli condivisi in lib (etichette link)    |
+# Testato su Revit: (da compilare dopo le prove)
+# =================================================================
 
 # La finestra del report resta aperta dopo la fine dello script.
 __persistentengine__ = True

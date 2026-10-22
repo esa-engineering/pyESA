@@ -42,7 +42,7 @@ SOURCE_NONE = cr.SOURCE_NONE
 SOURCE_LABELS = [(SOURCE_SELECTION, "Current selection"),
                  (SOURCE_VIEW, "Active view"),
                  (SOURCE_MODEL, "Whole model"),
-                 (SOURCE_NONE, "Nothing (links only)")]
+                 (SOURCE_NONE, "Links only")]
 
 # Volume minimo dell'intersezione fra solidi linkati (piedi cubi, ~0.3 cm3).
 MIN_VOLUME_FT3 = 1e-5
