@@ -44,7 +44,7 @@ RevitAPI stubs (gitignored — each developer creates their own; see README.md).
 - All changes merge to `main` via admin-approved PR. `main` is what end users pull
   through **pyRevit → Update**, so a broken `main` is a broken toolbar for everybody.
 
-## Bundle structure — how the UI is assembled
+## Bundle structure: how the UI is assembled
 
 pyRevit builds the ribbon from directory suffixes, not from any manifest:
 
@@ -53,34 +53,113 @@ pyESA.tab/                       tab
   <Name>.panel/                  panel
     <Name>N.stack/               stack (up to 3 buttons in a vertical column)
       <Name>.pushbutton/         button
+      lib/                       code shared by the buttons of the stack (optional)
     <Name>.pulldown/             dropdown containing pushbuttons
+      lib/                       code shared by the buttons of the pulldown (optional)
     <Name>.urlbutton/            button that opens a hyperlink
 ```
 
-Inside a `.pushbutton` folder:
+### Files of a button folder
 
-- `script.py` **or** `<Anything>_script.py` — the command body. Both naming styles are in
-  use across the repo.
-- `bundle.yaml` — title / tooltip / author. **The filename must be exactly `bundle.yaml`.**
-  Several buttons carry a prefixed variant (`JoinUtils_bundle.yaml`,
-  `PaintRemove_bundle.yaml`, `CategoriesVisibility_bundle.yaml`,
-  `ReplaceTitleBlocks_bundle.yaml`, `PointCloudAnalysis_bundle.yaml`,
-  `RenameFilters&Views_bundle.yaml`); pyRevit does not read those, so those buttons fall
-  back to the folder name for their title. If you touch one of those tools, renaming the
-  file to `bundle.yaml` is the fix.
-- `icon.png` + `icon.dark.png` — light/dark theme icons (96×96). **Mandatory: every button
-  ships both files** (see "Icons" below).
-- Optional `README.md` per tool, and data files (`.csv`, `.xlsx`, `.txt`) read via
-  `script.get_bundle_file("name.csv")`.
+Every folder holding a script that a ribbon button runs ships the files below. `<Tool>` is the
+folder name without the `.pushbutton` suffix.
+
+| File | Content |
+| --- | --- |
+| `<Tool>_script.py` | the command: header, then calls into the helper modules. Keep it short |
+| `<Tool>_Readme.md` | how the tool works: logic, inputs, outputs, limits. Italian |
+| `<Tool>_DeveloperNote.md` | log of the attempts made on the tool (see "Developer notes"). Italian |
+| `icon.png` | icon for the light theme |
+| `icon.dark.png` | icon for the dark theme (see "Icons") |
+| `bundle.yaml` | `title`, `tooltip`, `author`, `help_url` (see below). **The filename must be exactly `bundle.yaml`** |
+| `<Tool>_<Window>.xaml` | the interface of one window; one file per window |
+| `<Tool>_<Window>_ui.py` | behaviour of a window that has logic. Only when needed: a window without logic has none, and one `<Tool>_ui.py` serving several windows is fine when that is enough |
+| `<Tool>_<Function>.py` | any further module holding one feature of the tool outside the script |
+
+Data files (`.csv`, `.xlsx`, `.txt`, `.json`) are allowed and read via
+`script.get_bundle_file("name.csv")`.
+
+`help_url` stays empty or absent until the wiki page of the tool exists. Whoever edits the
+script fills it in when the page is available. Never invent a URL, and never change a
+`help_url` that is already there.
 
 `bundle.yaml` on a `.panel`, `.stack`, or `.pulldown` carries a `layout:` list that fixes
 the display order of its children. Adding a new button means adding its name to the parent
 `bundle.yaml` layout, otherwise ordering is arbitrary.
 
-Folders named `_old` / `_Old` and files suffixed `_BK01`, `_v1`, `_script BK02`,
-`- Copia` are dead backups kept in-tree. pyRevit ignores `_old` (no recognized suffix) but
-**does** load stray `*_script.py` siblings in a live button folder, so don't leave a
-second `_script.py` variant next to an active one.
+### Naming
+
+- **`<Tool>`**: PascalCase, no spaces, hyphens or symbols (`RiserUp`, not `Rise&Turn` or
+  `Set Pipe Insulation - DPR412-93`). The same name appears in the folder, in the files
+  (`<Tool>_script.py`, `<Tool>_Form.xaml`), in the modules (`<Tool>_Form_ui.py` or `<Tool>_ui.py`) and in the
+  config section (`ESA_<Tool>`).
+- **`<Window>`**: PascalCase name of the window; the main window is `Form`, the others take
+  the name of their role (`MEPQTO_Scope.xaml`).
+- **`<Function>`**: PascalCase name of the feature. It is never `Script`: pyRevit loads every
+  file ending in `_script.py` as a command, so no helper may end that way. The suffix
+  `_script.py` is always lowercase.
+- **Unique module names.** A module imported by bare name stays in memory between commands
+  (Rocket mode), so two modules with the same name and different content would run the wrong
+  code. Every module name is unique in the whole extension (the `<Tool>_` prefix guarantees it).
+
+### Shared code: `lib`
+
+When several buttons of the same pulldown or stack share windows, XAML or helpers, those files
+live once in a `lib` folder inside that `.pulldown` or `.stack`, not copied into each button.
+pyRevit puts the `lib` of any container on the search path of every button below it.
+
+- Name shared files after the group (`Branch_Form.xaml`, `Branch_Form_ui.py`,
+  `Riser_Core.py`), with the same rules and the same uniqueness as above.
+- A shared XAML is resolved from `os.path.dirname(__file__)` first, because
+  `script.get_bundle_file` only knows the bundle of the running command.
+- Each button keeps its own script, Readme, DeveloperNote, icons and `bundle.yaml`, and only
+  the window, UI and function files that are specific to it.
+- Documentation of the shared code lives in `lib/<Group>_Readme.md` and
+  `lib/<Group>_DeveloperNote.md`; the button files describe only what is specific to the button.
+- `lib` is scoped to its container. Nothing outside it imports from it, and there is no `lib`
+  at panel or tab level. `ClashFinder.pulldown/lib` is the model.
+
+### Developer notes (`<Tool>_DeveloperNote.md`)
+
+The file exists so that nobody (human or AI) repeats a solution that was already tried and
+did not work.
+
+- Read it **before** changing the tool.
+- After **every** change made with AI, add an entry, fixes included. Record the attempts that
+  failed or were discarded as carefully as the one that worked.
+- Entry (Italian, newest first): date, script version, what was asked, what was tried, result
+  (works / fails / partial) and why, final decision.
+- It is not the Readme and not the revision history. The Readme says how the tool works now;
+  the revision history in the script says what changed in each version; the DeveloperNote says
+  how we got there and what does not work. Do not copy one into the other.
+- `TagLinkedRooms_NOTE-SVILUPPO.md` is an older note of this kind; keep it as the reference
+  for its tool.
+
+### Backups and variants
+
+No `_old` / `_Old` folders and no `_BK01`, `_v1`, `_v2`, `- Copia` files in the repository.
+Git history is the archive: tag the version before a major change. Archives outside Git live
+on the server, one folder per tool, named `<Tool>_<version>_<date>`. pyRevit **does** load
+stray `*_script.py` siblings in a live button folder, so a second `_script.py` variant next to
+an active one is a bug. Experimental tools live on a branch, not in a `_hidden` folder on `main`.
+
+### Existing tools: nothing is applied retroactively
+
+The rules in this file apply to **new tools**, and to existing tools only when the user
+explicitly asks for it. Do not rename, move, add or delete files of an existing tool on your
+own initiative, and do not bring a tool to this layout as a side effect of another change.
+Existing tools stay as they are: `script.py` instead of `<Tool>_script.py`, `README.md`
+instead of `<Tool>_Readme.md`, no DeveloperNote, folders with spaces or symbols, lowercase
+`_form.xaml`, windows copied in several buttons, backups still in the tree, buttons with a
+prefixed `bundle.yaml` (`JoinUtils_bundle.yaml`, `PaintRemove_bundle.yaml`,
+`CategoriesVisibility_bundle.yaml`, `ReplaceTitleBlocks_bundle.yaml`,
+`PointCloudAnalysis_bundle.yaml`, `RenameFilters&Views_bundle.yaml`) which pyRevit does not
+read, so those buttons fall back to the folder name for their title.
+
+When you edit an existing tool for another reason, follow the conventions of that tool's own
+files. When the user asks to update one to the current layout, the request says how far to
+go; renaming a button folder changes the identity of the command in pyRevit, so say so in the
+PR description.
 
 ## Icons
 
@@ -116,43 +195,147 @@ Rules:
   (not fills) survive.
 - `icon.small.png` is **not** a name pyRevit reads — it is inert. Don't add new ones.
 
+## Tooltips and text inside windows
+
+### Button tooltip (`bundle.yaml`)
+
+```yaml
+title: Turn
+tooltip: |-
+  Adds a new run at the end of a pipe, duct or tray.
+  CLICK: opens the settings window, then runs.
+  SHIFT + CLICK: runs at once with the last settings.
+  Requires: a selection of one run.
+author: Name Surname
+help_url: <page of the tool on the company wiki>
+```
+
+- Line 1: what the tool does, one sentence, about 100 characters, present tense.
+- The `CLICK:` and `SHIFT + CLICK:` lines exist only if the tool has both modes (see
+  "SHIFT + CLICK"). A tool without SHIFT + CLICK has no such line.
+- The `Requires:` line exists only if a selection or a specific view is needed.
+- No history, no technical notes, no long warnings: they belong in the guide
+  (`<Tool>_Readme.md` and the wiki page behind `help_url`). At most 4 lines.
+- English. `it_it:` keys are optional.
+
+### Field tooltips (XAML `ToolTip`)
+
+A field tooltip is written only when it adds what the label does not say: a unit or a limit
+("0-90, degrees from the horizontal"), a special value ("0 = merge only when the overpasses
+touch"), a side effect ("existing connections are removed"). One sentence, at most 100 to
+120 characters. Never repeat the label, never put a tooltip on OK, Cancel, search or clear
+icons, and write it once for twin fields (Set A / Set B) or write only what tells them apart.
+Use the same terms in every window (run, riser, branch, tee, tap, clash).
+
+### Notes inside windows
+
+A window is for filling in fields, not for explaining the method. Only what is indispensable
+stays on screen:
+
+- A `HintText` is allowed only to prevent an error, announce an irreversible effect or clarify
+  a unit or sign. One sentence, at most 2 lines at the standard width (about 100 characters).
+- At most 2 or 3 hints per window, each right under the field it refers to.
+- A live status line (`Now: last junction, same size as the run`) is fine: it informs, it does
+  not explain.
+- Acceptance test: the window shows everything without a scroll bar (see "No vertical
+  scrolling"). A hint that forces a scroll gets shortened or moved to the guide.
+- Method, edge cases, criteria and formulas go to `<Tool>_Readme.md` and the wiki.
+- `MessageBox` / `forms.alert`: a short title, one or two sentences, and what to do next.
+
+## SHIFT + CLICK
+
+One meaning for every tool:
+
+| Action | Behaviour |
+| --- | --- |
+| CLICK | opens the settings window and, after OK, runs |
+| SHIFT + CLICK | runs at once with the last settings, no window |
+
+- The last settings come from `script.get_config('ESA_<Tool>')`. With no saved settings
+  (first use), SHIFT + CLICK behaves like CLICK.
+- SHIFT + CLICK never does more, or something different, than CLICK: it does not open another
+  tool and does not skip the confirmation of a destructive operation.
+- A tool without a window does not read `__shiftclick__` and does not mention it.
+- Ctrl + CLICK and Alt + CLICK belong to pyRevit (debug mode, configuration): do not redefine
+  them.
+- A tool that really needs a different second mode documents it as an exception in its
+  tooltip and Readme. Existing tools that behave differently are left as they are until the user
+  asks to align them.
+
+## Versions and revision history
+
+Every script has a version `MAJOR.MINOR.PATCH` (a two number version such as `5.1` stays
+valid until the first fix).
+
+| Increase | When |
+| --- | --- |
+| MAJOR | behaviour changes in an incompatible way, or the settings / file formats change |
+| MINOR | a new function, field, option or a visible change of the interface |
+| PATCH | a fix with no change in expected behaviour |
+
+- Each PR that changes a script updates `Version` and `Date` in `__doc__` and adds a row to the
+  revision history block (types: `FEAT`, `UI`, `FIX`, `DOC`, `REFACTOR`), with the PR number.
+- The version belongs to the button. Modules in a `lib` have no version of their own: a change
+  to a shared module raises the version of every button that uses it.
+- Buttons of a same stack or pulldown that share a window keep the same version.
+- `Testato su Revit:` lists the versions the tool was actually tried on (see "Revit version
+  compatibility"). At least the oldest and the newest available for a new tool or a functional
+  change.
+
+When you change a tool, in the same PR:
+
+1. Read its `<Tool>_DeveloperNote.md` first.
+2. Raise the version and add the history row.
+3. If the change is `FEAT`, `UI` or MAJOR, update `<Tool>_Readme.md` and tell the owner that
+   the wiki page behind `help_url` needs the same update. A `FIX` does not touch the guide.
+4. Append the entry to `<Tool>_DeveloperNote.md`, failed attempts included (see "Developer
+   notes").
+
 ## Script conventions
 
-Every script is standalone — there is **no shared library module**. Helpers are duplicated
-per-script by design; when you fix a helper, check whether the same helper exists elsewhere
+There is **no extension-wide shared library**. Helpers are duplicated per script by design;
+when you fix a helper, check whether the same helper exists elsewhere
 (`get_element_id_value` alone appears in ~6 files with three slightly different bodies).
-The one exception to "one file per tool" is MEPQTO, which splits a large tool into helper
-modules *inside its own bundle folder* (see "Multi-module tools" below). That is still not
-a shared library: nothing outside the bundle imports those modules.
+Code shared by the buttons of one pulldown or stack goes in that container's `lib` folder,
+never in a folder shared by the whole extension (see "Shared code").
 
-Openings (`pyESA-MEP.tab/MEP-Utilities.panel/Openings.pulldown`) is the second exception: its
-buttons share one code base in `Openings.pulldown/openings_modules/` (a folder without a bundle
-suffix, so pyRevit does not load it as a button), which each button's `script.py` adds to
-`sys.path`. It is scoped to that pulldown, not a shared library: only Openings buttons import it.
-Its modules keep no document, output or settings at module level; they live in
-`openings_core.ctx`, filled by `start(MODE)` at the start of every command. Read the tool
-`README.md` before changing it.
+The command script stays short. Window logic goes in `<Tool>_<Window>_ui.py` (or in one `<Tool>_ui.py` for several windows), each further feature in
+`<Tool>_<Function>.py`. MEPQTO is the template for a large tool (see "Multi-module tools:
+MEPQTO"); it keeps no code outside its own bundle folder.
 
-Standard header:
+Openings (`pyESA-MEP.tab/MEP-Utilities.panel/Openings.pulldown`) shares one code base between
+its buttons in `Openings.pulldown/openings_modules/`, which each button's `script.py` adds to
+`sys.path`. That folder is the old form of a `lib`; it stays as it is until the user asks to convert it. Its modules keep no document, output or settings at module
+level; they live in `openings_core.ctx`, filled by `start(MODE)` at the start of every command.
+Read the tool `README.md` before changing it.
+
+Standard header (what the user sees stays in English, the history block is Italian):
 
 ```python
 # -*- coding: utf-8 -*-
 __title__   = "Button\nLabel"        # \n splits the label across two lines
-__doc__     = """Version = 5.1
-Date    = 27.08.2026
-...
+__doc__     = """Version = 2.3.1
+Date    = 21.10.2026
+One sentence saying what the tool does.
 Author(s): Name
 """
 __author__  = "..."
 __context__ = "zero-doc"             # only for tools that run without an open model
+
+# ======================= STORICO REVISIONI =======================
+# Versione | Data       | Tipo | Descrizione                         | PR
+# 2.3.1    | 21.10.2026 | FIX  | Corretto calcolo con tubi inclinati | #47
+# 2.3.0    | 02.10.2026 | FEAT | Aggiunta opzione Keep slope         | #44
+# Testato su Revit: 2024, 2026
+# =================================================================
 ```
 
-pyRevit injects `__shiftclick__` (bool) at runtime — the widespread pattern is a single
-command with two modes, documented in the `bundle.yaml` tooltip as `CLICK:` / `SHIFT + CLICK:`.
-Reference it as `__shiftclick__` directly (add `# noqa: F821` if the linter complains).
+pyRevit injects `__shiftclick__` (bool) at runtime. Its meaning is fixed for every tool, see
+"SHIFT + CLICK". Reference it as `__shiftclick__` directly (add `# noqa: F821` if the linter
+complains).
 
 Runtime is **IronPython 2.7**: no f-strings anywhere in the repo, `.format()` throughout.
-Non-ASCII characters are avoided inside the `.py` (see "Language" below).
+Accented letters only in comments, never in string literals (see "Language").
 
 Entry points, in order of preference:
 
@@ -173,12 +356,13 @@ command, so users are expected to turn it on. The command script
 is executed fresh each time, but **helper modules imported by bare name stay in `sys.modules`**
 across commands. Hence:
 
-- A helper module's name must be unique in the whole extension, unless the copies are
-  byte-identical (`Branch_ui`, `MatchElevation_ui`, `Riser_ui`, `Select_ui` are). Two different
-  `Turn_ui.py` would make the second button run the first one's code. Name new helpers after the
-  tool (`ClashOverpass_ui.py`, `MultiTurn_ui.py`); keep the old local name with
-  `import ClashOverpass_ui as Overpass_ui` if the script refers to it everywhere. When you edit a
-  shared copy, edit all copies.
+- A helper module's name must be unique in the whole extension. Name every helper after its
+  tool, or after its group when it lives in a `lib` folder (`<Tool>_<Function>.py`,
+  `<Group>_<Function>.py`), so two tools can never ship a different `Turn_ui.py`. Existing
+  byte-identical copies (`Branch_ui`, `MatchElevation_ui`, `Riser_ui`, `Select_ui`) are
+  tolerated until they are moved into a `lib`; while they exist, edit all copies together.
+  When you rename a module, keep the old local name with
+  `import ClashOverpass_ui as Overpass_ui` if the script refers to it everywhere.
 - No document, UI document or output window at module level in a helper
   (`OUTPUT = script.get_output()`, `doc = revit.doc`): it would stay bound to the first run.
   Fetch them inside the function, or pass them in. Command scripts may keep doing it.
@@ -190,6 +374,24 @@ Cancellation is `script.exit()`. It raises `SystemExit`, which derives from
 `BaseException` and is therefore **not** caught by a trailing `except Exception` — several
 scripts rely on that to keep user cancellation out of the error report. Don't wrap it in a
 bare `except:`.
+
+### File order and names of new scripts
+
+Order of a script file: 1. header (`coding`, `__title__`, `__doc__`, `__author__`,
+`__context__`); 2. revision history block; 3. imports (standard, .NET with `clr`, Revit,
+pyRevit); 4. constants and XAML file names; 5. helper functions; 6. classes (windows); 7. main
+function; 8. the call to the main function.
+
+| Element | Style | Example |
+| --- | --- | --- |
+| Functions and variables | `lowercase_with_underscores` | `get_element_id_value`, `run_length` |
+| Constants | `UPPERCASE_WITH_UNDERSCORES` | `XAML_FILE_NAME`, `TO_WRITE` |
+| Classes | `PascalCase` | `TakeoffForm` |
+| XAML controls (`x:Name`) | `PascalCase` ending with the control type | `LengthBox`, `OkButton` |
+| Config section | `ESA_<Tool>` | `ESA_MEPQTO` |
+
+Errors are caught with `except Exception`, never with a bare `except:`; transaction names are
+English (they show up in Revit's Undo menu).
 
 ## UI: two competing WPF approaches
 
@@ -215,7 +417,7 @@ Resolve the XAML path with `script.get_bundle_file(XAML_FILE_NAME)`, falling bac
 **Modeless windows** (the user keeps working in Revit while the window is open) exist only in
 `ClashFinder.pulldown` (`pyESA-MEP.tab/MEP-Utilities.panel`: Clash Setup, Quick Clash and
 Last Report). Its buttons share their modules and XAML through `ClashFinder.pulldown/lib`, which pyRevit
-puts on the search path of every button in the pulldown (any container's `lib/` is): the one place where code is shared between bundles, still
+puts on the search path of every button in the pulldown (any container's `lib/` is): the model for every `lib` (see "Shared code"), still
 private to that tool. From a modeless window's WPF events there is no
 valid API context, so every model read, selection change or transaction goes through
 `clashfinder_bridge.RevitBridge`: a queue of callables run by one `ExternalEvent`, created in
@@ -234,7 +436,7 @@ codebase isolates such calls with a `forms.CommandSwitchWindow.show` fallback
 
 ### House style for new XAML windows
 
-New dialogs use approach 2 (raw `XamlReader.Load` from a `<Tool>_ui.py` module beside the
+New dialogs use approach 2 (raw `XamlReader.Load` from a `<Tool>_<Window>_ui.py` module beside the
 script) and follow the look of `AutoComponents.pushbutton/legend_form.xaml` and
 `ElementsInRoom.pushbutton/ElementsInRoom_form.xaml` — copy from either rather than
 inventing a new one:
@@ -245,7 +447,7 @@ inventing a new one:
   `Foreground="#2D5A8A"`), `FieldLabel`, `InputField` (`Width="70"`, left-aligned),
   `ComboStyle`, `UnitLabel` (gray 11pt) — plus `HintText` for gray 11pt wrapping notes.
 - Root `Grid Margin="15"` with rows `Auto / * / Auto`: centred emoji + title TextBlock,
-  a `ScrollViewer` holding the sections, then the button row.
+  the sections laid out as described in "No vertical scrolling", then the button row.
 - One section per `Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
   Padding="10" Margin="0,0,0,10"`, opened by a `SectionHeader` TextBlock reading
   `emoji + ALL CAPS TITLE`. Informational panels use `BorderBrush="#E8E8E8"
@@ -261,23 +463,96 @@ inventing a new one:
   `MessageBox.Show(...)` and leaving the window open — never with input masks.
 - Persist the last-used settings with `script.get_config('ESA_<ToolName>')` /
   `script.save_config()`, wrapped in silent `try/except`.
+- The window title is the button name in English. `Cancel` has `IsCancel="True"` so Esc closes
+  the window, and the tab order follows the visual order, top to bottom.
+- One emoji per section header, chosen by concept and the same in every tool (for example
+  `📏` sizes and lengths, `🔍` search, `⚙` options).
+- File names: `<Tool>_<Window>.xaml` with its `<Tool>_<Window>_ui.py` when the window has logic (see "Naming"). The main
+  window is called `Form`.
+- Text inside the window follows "Tooltips and text inside windows": no long notes, at most
+  2 or 3 hints, and the window never needs a vertical scroll bar (see "No vertical scrolling").
+
+### No vertical scrolling
+
+Every window shows all the functions it offers at once. The user never has to scroll to find
+an option, a field or a button.
+
+- No vertical `ScrollViewer` on the window or on its root grid, and no vertical scroll bar on
+  the window itself. If the content does not fit, **make the window wider and arrange the
+  sections differently**; never turn it into a long single column.
+- Put the sections side by side: two or three columns (a root `Grid` with `*` columns, or a
+  `WrapPanel` of section `Border`s), with related sections stacked in the same column. The
+  reading order is left to right, then top to bottom. Label and field rows can also use two
+  columns inside a section.
+- Size by hand, since `SizeToContent` is not allowed: set `Width` and `Height` so that all the
+  content fits at 100% display scaling and still fits at 125% and 150%. Indicative limits, in
+  device independent units: width up to about 1100, height up to about 700, so that the window
+  also fits a 1920 x 1080 screen at 125%. Keep `MinWidth` and `MinHeight`, and the resize grip.
+- `TabControl` and expanders hide functions, so they are not the answer to a lack of space
+  unless the tool owner agrees.
+- The only exception is a list or a table whose length depends on the model (categories,
+  elements, report rows). It keeps its own internal scroll bar and a fixed visible height. Fields,
+  options, hints and buttons are never inside a scrolling area.
+- If the tool does not fit even in three columns of about 1100 units, do not fall back to a
+  scroll bar: ask the tool owner whether to split it into two buttons or two steps.
 
 ## Reporting
 
-User-facing results go to the pyRevit output panel, not to `print`:
-`output.print_md()`, `output.print_table()`, `output.linkify(element_id)` for clickable
-element links, `output.close_others()`. Reports are the primary debugging surface for
-these tools — when a tool finds nothing, still emit the report explaining why, rather than
-an alert pointing at an empty panel.
+**By default a tool produces no final report.** It does its job and ends. Do not print
+results, totals or a "nothing found" message to the pyRevit output panel
+(`output.print_md()`, `output.print_table()`) for the end user.
 
-Exception: tools whose whole workflow lives in a long-lived window (MEPQTO) show results,
-totals and anomalies inside the window (an Issues tab) and in their Excel export, and
-deliberately emit **no** pyRevit report on close.
+A report exists only when the user asks for it before running:
+
+- The tool's window carries a checkbox `Show report at the end`, **unticked at every run**
+  (not persisted between runs).
+- A tool without a window has no report. If it needs one, give it a window first.
+- The report is an **XAML window**, never the output panel, written to be as readable as
+  possible for the end user:
+  - title with tool name, date and time, model name;
+  - a summary line on top: processed, skipped, warnings, errors, each with a symbol as well
+    as a colour (colour alone is not enough);
+  - a table with one row per element (Id, category, name or type, outcome, reason), sortable,
+    with an outcome filter and a text search, long cells wrapped;
+  - double click on a row selects the element in Revit. That needs a modeless window and the
+    `RevitBridge` / `ExternalEvent` pattern of ClashFinder;
+  - `Copy`, `Export` (CSV or Excel) and `Close` buttons;
+  - same look as the other windows (see "House style for new XAML windows").
+  Models to copy: `ClashFinder_report.xaml`, `OpeningsCheck_report.xaml`. For Excel export
+  without Excel installed, copy the writer of `mepqto_xlsx.py` (see "Excel without Excel").
+- If something goes wrong (an error, or elements skipped) a short alert is shown even when no
+  report was requested: how many elements, the main reason, and a `Show details` button that
+  opens the report. When everything worked, nothing is shown.
+- Diagnostics for the developer go through `script.get_logger()`, which pyRevit shows in debug
+  mode only. Do not leave `print` calls behind.
+
+Existing tools that still write to the output panel stay as they are until the user asks to
+convert them. Exception:
+tools whose whole workflow lives in a long-lived window (MEPQTO) show results, totals and
+anomalies inside the window (an Issues tab) and in their Excel export, and emit **no** report
+on close.
 
 ## Revit version compatibility
 
-The extension targets **Revit 2022 through 2026**. Older scripts guard with
-`if int(doc.Application.VersionNumber) < 2022: script.exit()`.
+The extension targets **Revit 2022 through 2027, all included**. Every script must run on
+every one of them without edits. A tool that truly cannot (a missing API) says so in its
+tooltip and its Readme, and exits cleanly instead of failing half way. Old scripts guard with
+`if int(doc.Application.VersionNumber) < 2022: script.exit()`; do not add checks that block
+versions *newer* than the last one tested, so a tool can still run on a release nobody has
+tried yet.
+
+How to write version-proof code:
+
+- Every API difference between versions lives in one small helper function (like
+  `get_element_id_value` below), not scattered through the code.
+- Test the feature, not the version, when possible: `hasattr(eid, "Value")` is more robust
+  than comparing version numbers.
+- Never import at module level a name that is missing in some versions: wrap it in
+  `try/except` with a fallback.
+- Prefer the APIs that already exist in 2022 over the ones being removed: `ForgeTypeId`
+  based units and specs (`UnitTypeId`, `SpecTypeId`), `GroupTypeId` for parameter groups
+  instead of `BuiltInParameterGroup`, `ElementId` values as `Int64`.
+- Revit 2025 and later run on .NET 8: avoid references to libraries tied to .NET Framework.
 
 `ElementId.IntegerValue` was removed in 2026 (`.Value`, an `Int64`, replaces it). Use the
 existing helper shape:
@@ -292,6 +567,12 @@ def get_element_id_value(eid):
 `ModelReport_script.py` still uses `.IntegerValue` directly in many places and is not
 2026-safe.
 
+The list of API differences above is indicative: check it against the Revit API release notes
+when touching a tool. Compatibility cannot be proven without running the tool, so the revision
+history of every script carries a `Testato su Revit:` line with the versions actually tried
+(see "Versions and revision history"). The last verified environment is Revit 2026.4 / pyRevit
+5.3.1; Revit 2027 has not been verified yet.
+
 Coordinate gotcha, learned the hard way (documented in
 `TagLinkedRooms_NOTE-SVILUPPO.md`): `Level.Elevation` can be reported against the Survey
 Point, while all geometry (bounding boxes, `LocationPoint`, link `Transform`) is always in
@@ -301,23 +582,32 @@ against geometry.
 
 ## Language
 
-**Everything the user sees is in English — no exceptions.** Button titles and tooltips,
+**Everything the user sees is in English, no exceptions.** Button titles and tooltips,
 `bundle.yaml` (with `it_it:` localization keys where a translation is wanted), `__title__`
-and `__doc__`, every XAML label / ToolTip / button caption, every `forms.alert` and
-`MessageBox` text, `forms.ProgressBar` titles, and the whole `output.print_md` /
-`print_table` report, column headers and status labels included. Constants whose *value* is
-a displayed label get English names too (`TO_WRITE = "TO WRITE"`, not
-`DA_SCRIVERE = "DA SCRIVERE"`).
+and `__doc__`, every XAML label / ToolTip / hint / button caption, every `forms.alert` and
+`MessageBox` text, `forms.ProgressBar` titles, the names of Revit transactions (they show up
+in the Undo menu) and the whole report window, column headers and status labels included.
+Constants whose *value* is a displayed label get English names too (`TO_WRITE = "TO WRITE"`,
+not `DA_SCRIVERE = "DA SCRIVERE"`).
 
-Code comments, docstrings and per-tool `README.md` files are mostly Italian — keep writing
-those in Italian, matching the file you are editing. The split is: **English out, Italian
-in.** Older tools still carry Italian UI strings; translate them when you touch them.
+Italian is for people who read the source: code comments, docstrings, the revision history
+block, `<Tool>_Readme.md` and `<Tool>_DeveloperNote.md`. Keep writing those in Italian,
+matching the file you are editing. The split is: **English out, Italian in.** Older tools
+still carry Italian UI strings; leave them as they are unless the user asks to translate them.
+
+Other languages:
+
+- Commit messages and branch names: English (see "Git workflow").
+- Wiki guides (the page `help_url` points to): Italian.
+- Accented letters are allowed in comments only (the file is UTF-8 and declares it). Never put
+  them in a string literal: user-facing text is English, and for anything else use an escape
+  (`u"è"`), because IronPython 2.7 is fragile with non-ASCII literals.
 
 ## Multi-module tools: MEPQTO
 
 `pyESA-MEP.tab/MEP-Utilities.panel/MEPQTO.pushbutton` (MEP quantity takeoff driven by Type Mark and price
 codes, ~6,800 lines) is the only tool split across several modules. Use it as the template
-when a tool outgrows one file. Its `README.md` (Italian) is the functional spec: categories,
+when a tool outgrows one file. Its `README.md` (Italian; it keeps its current name) is the functional spec: categories,
 measurement formulas, file formats, the full Issues list, merge and concurrency rules.
 Read it before changing behaviour, and keep it in sync with the code.
 
@@ -334,8 +624,9 @@ Read it before changing behaviour, and keep it in sync with the code.
 Rules that come with the pattern:
 
 - Helper modules live in the bundle folder and are imported by bare name
-  (`import MEPQTO_model as qm`; aliases `qm`, `qr`, `qs`, `qx`). Prefix every module with
-  the tool name so it cannot shadow another bundle's module, and never end a helper's name
+  (`import mepqto_model as qm`; aliases `qm`, `qr`, `qs`, `qx`). Prefix every module with
+  the tool name so it cannot shadow another bundle's module (MEPQTO keeps its lowercase
+  `mepqto_` prefix, grandfathered; new tools use `<Tool>_<Function>.py`), and never end a helper's name
   with `_script.py` (pyRevit would load it as a command).
 - **Read the model once, compute in Python.** `_collect_model()` runs only when phase, phase
   status, parameter map, WBS levels, project file or the scope (links
@@ -480,5 +771,5 @@ these two modules when another tool needs .xlsx I/O instead of introducing COM i
 `pyESA.tab/Utilities.panel/Utilities4.stack/Tag.pulldown/TagLinkedRooms_new.pushbutton/TagLinkedRooms_NOTE-SVILUPPO.md`
 is a detailed record of a full redesign: view-range resolution, crop-shape testing,
 link transforms, the dry-run-before-transaction pattern, and the open/unverified points.
-It is the best reference in the repo for how visibility-dependent tools should be
+It is also the model of a `<Tool>_DeveloperNote.md`. It is the best reference in the repo for how visibility-dependent tools should be
 structured.
