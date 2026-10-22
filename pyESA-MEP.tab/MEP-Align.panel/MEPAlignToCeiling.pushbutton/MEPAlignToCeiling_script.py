@@ -37,8 +37,8 @@
 # descritta nel README.md della cartella: va tenuto allineato al codice.
 # --------------------------------------------------------------------------
 __title__ = "MEP\nAlign to Ceiling"
-__doc__ = """Version = 1.3
-Date    = 21.10.2026
+__doc__ = """Version = 1.4
+Date    = 22.10.2026
 ________________________________________________________________
 Description:
 Moves the selected MEP devices vertically so that their insertion point
@@ -1950,16 +1950,15 @@ def ask_options(elements, source_label, category_info):
 
     flagged_total = sum(row[3] for row in category_info)
     out_of_scope = out_of_scope_count(elements)
-    detail = (u'{} of them are flagged for ceiling installation ({} = Yes): only those are '
-              u'aligned, the others are listed in the report.'.format(flagged_total, INSTALLATION_PARAM))
+    # Solo righe di stato brevi: le spiegazioni stanno nel README.
+    detail = u'{} with {} = Yes: only those are aligned.'.format(flagged_total, INSTALLATION_PARAM)
     if out_of_scope:
-        detail += u' {} do not belong to the handled categories and will be skipped.'.format(out_of_scope)
+        detail += u' {} outside the handled categories.'.format(out_of_scope)
 
     buzzers, buzzers_flagged = buzzer_count(elements)
     if buzzers:
-        buzzer_text = (u'{} false ceiling detectors in the selection ({} with {} = Yes): they '
-                       u'always go to the soffit, and {} is measured on the model.'.format(
-                           buzzers, buzzers_flagged, INSTALLATION_PARAM, BUZZER_PARAM))
+        buzzer_text = u'{} in the selection, {} with {} = Yes.'.format(
+            buzzers, buzzers_flagged, INSTALLATION_PARAM)
     else:
         buzzer_text = u'No false ceiling detector in the selection.'
 

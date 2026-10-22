@@ -32,14 +32,16 @@ degli avvisi di Revit.
 1. **Selezione.** Il comando parte dagli elementi già selezionati; se non ce ne sono chiede di
    indicarli nella vista (`Finish` per confermare). Gli elementi scelti restano selezionati,
    così si può rilanciare dopo una simulazione.
-2. **Finestra di dialogo.**
+2. **Finestra di dialogo**, su due colonne e senza barra di scorrimento: a sinistra
+   *Elements* e *Categories*, a destra *Tolerance*, *False ceiling detectors* e *Options*.
+   Nella finestra restano solo righe di stato brevi; il metodo è descritto in questo file.
 
    | Sezione | Contenuto |
    | --- | --- |
-   | Elements | Quanti elementi sono selezionati e quanti hanno `u_VIS_Ceiling_installation = Yes` |
-   | Categories | Solo le categorie presenti nella selezione, con i due conteggi. Ricerca, Select All / Deselect All |
-   | False ceiling detectors | Quanti rilevatori da controsoffitto ci sono nella selezione (solo informazione: `dz_Buzzer` è sempre misurato) |
-   | Tolerance | **In mm**, predefinita 500, massimo 5000. Accetta virgola o punto. Il valore salvato in cm dalle versioni precedenti viene convertito |
+   | Elements | Quanti elementi sono selezionati, quanti hanno `u_VIS_Ceiling_installation = Yes` e quanti sono fuori dalle categorie gestite |
+   | Categories | Solo le categorie presenti nella selezione, con i due conteggi fra parentesi. Ricerca, Select All / Deselect All. La lista occupa l'altezza della colonna (al massimo nove categorie, quindi non serve la maniglia di ridimensionamento). Le categorie tolte finiscono fra gli elementi saltati |
+   | Tolerance | **In mm**, sopra e sotto il punto di inserimento; predefinita 500, massimo 5000. Accetta virgola o punto. Il valore salvato in cm dalle versioni precedenti viene convertito. Sotto il campo, la lunghezza attuale della retta di analisi |
+   | False ceiling detectors | Quanti rilevatori da controsoffitto ci sono nella selezione e quanti con `Yes`. Vanno sempre all'intradosso e `dz_Buzzer` viene scritto (vedi "Rilevatori da controsoffitto") |
    | Options | Cerca nei modelli collegati (attiva), salta gli elementi connessi (non attiva), simulazione (non attiva) |
 
    Il bersaglio non si sceglie: lo strumento riconosce da solo se sulla verticale del

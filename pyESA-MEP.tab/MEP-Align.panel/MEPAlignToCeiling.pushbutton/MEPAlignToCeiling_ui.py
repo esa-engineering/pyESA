@@ -69,7 +69,6 @@ class AlignToCeilingWindow(object):
         find("ClearSearchButton").Click += self._on_clear_search
         find("SelectAllButton").Click += self._on_select_all
         find("DeselectAllButton").Click += self._on_deselect_all
-        find("ListResizeGrip").DragDelta += self._on_resize_list
         find("OkButton").Click += self._on_ok
 
         self._refresh_count()
@@ -127,23 +126,16 @@ class AlignToCeilingWindow(object):
             check.IsChecked = False
         self._refresh_count()
 
-    def _on_resize_list(self, sender, args):
-        height = self.category_list.ActualHeight + args.VerticalChange
-        self.category_list.Height = max(self.category_list.MinHeight, height)
-
     # --- tolleranza ----------------------------------------------------
 
     def _refresh_tolerance_hint(self):
+        # Solo una riga di stato: il metodo della retta di analisi e' nel README.
         ok, value = parse_number(self.tolerance_box.Text)
         if ok and value > 0:
-            line = u"{:g} mm".format(value * self._info["line_factor"])
+            self.tolerance_hint.Text = u"Now: search line {:g} mm long, centred on the insertion point.".format(
+                value * self._info["line_factor"])
         else:
-            line = u"twice the tolerance"
-        self.tolerance_hint.Text = (
-            u"A vertical analysis line {} long is drawn through the insertion point, centred on "
-            u"it. A ceiling or slab counts when the line crosses its bottom face, or when the "
-            u"insertion point lies inside it. Beyond the tolerance the element is skipped and "
-            u"reported with the move it would need.".format(line))
+            self.tolerance_hint.Text = u"Enter a tolerance greater than zero."
 
     def _on_tolerance_changed(self, sender, args):
         self._refresh_tolerance_hint()
