@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-rnwflow_results_ui.py - finestra dei risultati di RNWFlowCalculation.
+RNWFlowCalculation_Results_ui.py - finestra dei risultati di RNWFlowCalculation.
 
 Tre schede (la finestra si apre su Sections).
 
@@ -10,9 +10,9 @@ portate, indice pluviometrico ricavato da ogni terminale come Q / (A x C1 x C2)
 (lo calcola la famiglia, lo script non lo conosce), e l'elenco dei sistemi con
 superficie e portata. Valori letti dal modello all'apertura.
 
-Sections: una riga per parte di tratto (SectionResult di rnwflow_check) e una
+Sections: una riga per parte di tratto (SectionResult di RNWFlowCalculation_Check) e una
 per terminale (FixtureItem: bocchettone con la sua portata), nell'ordine della
-rete da monte a valle (colonna "#", da rnwflow_check.order_network). L'utente
+rete da monte a valle (colonna "#", da RNWFlowCalculation_Check.order_network). L'utente
 sceglie da una tendina la nuova misura fra quelle del tipo di tubazione
 (PipeSize del tratto, lette dallo script dai segmenti del tipo); a ogni scelta la
 riga ricalcola portata ammissibile, velocita', riempimento ed esito con la nuova
@@ -47,10 +47,11 @@ un'azione (kind):
     ResultsState, cioe' con misure, modifiche, ricerca, filtro e scheda di prima;
   * None: chiusa senza modifiche.
 
-Export Excel (rnwflow_xlsx) scrive il calcolo: tutte le righe nell'ordine della
-rete, con le sole colonne del risultato (misura di calcolo, Qmax, utilizzo,
-velocita', riempimento ed esito della misura nuova), senza lo stato attuale del
-modello; piu' un foglio con le impostazioni (ExportInfo, dallo script).
+Export apre la finestra di impostazione (RNWFlowCalculation_Export_ui: formato
+Excel o PDF, colonne di ogni scheda), poi build_report() riduce le tre schede a
+un report neutro (RNWFlowCalculation_Report: tutte le righe nell'ordine della
+rete, filtro e ricerca non contano) che RNWFlowCalculation_Xlsx o
+RNWFlowCalculation_Pdf scrivono; titolo e impostazioni da ExportInfo (script).
 
 Griglie legate a System.Data.DataTable come in MEPQTO: il binding a due vie lo
 gestisce .NET, senza oggetti INotifyPropertyChanged in IronPython. Le tendine
@@ -71,7 +72,7 @@ clr.AddReference('System.Data')
 
 import System
 from System import Action
-from System.Diagnostics import Process
+from System.Diagnostics import Process, ProcessStartInfo
 from Microsoft.Win32 import SaveFileDialog
 from System.Collections.Generic import List
 from System.Data import DataTable, DataRowVersion
@@ -85,10 +86,13 @@ from System.IO import FileStream, FileMode
 
 from pyrevit import script
 
-import rnwflow_check as rc
-import rnwflow_xlsx as rx
+import RNWFlowCalculation_Check as rc
+import RNWFlowCalculation_Report as rp
+import RNWFlowCalculation_Xlsx as rx
+import RNWFlowCalculation_Pdf as rpdf
+import RNWFlowCalculation_Export_ui as rexp
 
-XAML_FILE_NAME = 'RNWFlowCalculation_results.xaml'
+XAML_FILE_NAME = 'RNWFlowCalculation_Results.xaml'
 CONFIG_SECTION = 'ESA_RNWFlowCalculation'
 WINDOW_TITLE = 'Rainwater Sections'
 
@@ -125,7 +129,7 @@ INTENSITY_TOLERANCE = 0.005
 INTENSITY_TO_MMH = 3600.0
 
 # Tendina della pendenza simulata: prima voce = pendenza del modello (nessuna
-# simulazione), poi le pendenze di rnwflow_check.SIMULATED_SLOPES [cm/m = %].
+# simulazione), poi le pendenze di RNWFlowCalculation_Check.SIMULATED_SLOPES [cm/m = %].
 SLOPE_MODEL = "Model"
 
 
@@ -274,7 +278,8 @@ class ResultsState(object):
 
 
 class ExportInfo(object):
-    """Dati dello script per l'esportazione Excel."""
+    """Dati dello script per l'esportazione: titolo, impostazioni, cartella e
+    nome proposto (l'estensione si cambia secondo il formato scelto)."""
 
     def __init__(self, title, settings_rows, folder, file_name):
         self.title = title
@@ -438,39 +443,55 @@ def number_or_dash(value, digits):
     return "{0:.{1}f}".format(float(value), digits)
 
 
-# Colonne del foglio Calculation: solo il risultato del calcolo (la misura nuova),
-# niente stato attuale del modello. L'esito e' la penultima, l'elemento l'ultima.
-EXPORT_COLUMNS = [
-    rx.Column("#", 5, rx.STYLE_NUM0),
-    rx.Column("System", 14),
-    rx.Column("Element code", 16),
-    rx.Column("Section", 9),
-    rx.Column("Part", 11),
-    rx.Column("Fed by", 16),
-    rx.Column("Pipes", 7, rx.STYLE_NUM0),
-    rx.Column("Pipe Type", 14),
-    rx.Column("Min slope [cm/m]", 10, rx.STYLE_NUM2),
-    rx.Column("Simulated slope [cm/m]", 11, rx.STYLE_NUM2),
-    rx.Column("Q [l/s]", 9, rx.STYLE_NUM2),
-    rx.Column("DN [mm]", 9),
-    rx.Column("De [mm]", 9),
-    rx.Column("Qmax [l/s]", 10, rx.STYLE_NUM1),
-    rx.Column("Use [%]", 8, rx.STYLE_NUM0),
-    rx.Column("v [m/s]", 8, rx.STYLE_NUM2),
-    rx.Column("Fill [%]", 8, rx.STYLE_NUM0),
-    rx.Column("Check", 22),
-    rx.Column("Element", 42),
-]
+def export_severity(status):
+    """Gravita' di un esito per il report (colore della cella in Excel e PDF)."""
+    if status == rc.STATUS_OK:
+        return rp.SEV_PASS
+    severity = SEVERITY.get(status, "")
+    return severity if severity in (rp.SEV_ERROR, rp.SEV_WARNING, rp.SEV_INFO) else None
 
-CHECK_STYLES = {
-    rc.STATUS_UNDERSIZED: rx.STYLE_ERROR,
-    rc.STATUS_BEYOND: rx.STYLE_ERROR,
-    rc.STATUS_NOT_IN_TABLE: rx.STYLE_WARNING,
-    rc.STATUS_LOW_SLOPE: rx.STYLE_WARNING,
-    rc.STATUS_HIGH_VELOCITY: rx.STYLE_WARNING,
-    rc.STATUS_LOW_VELOCITY: rx.STYLE_WARNING,
-    rc.STATUS_OK: rx.STYLE_PASS,
-}
+
+def number_or_text(value):
+    """Numero se il testo lo e' (De e DN del modello, De suggerito), altrimenti
+    il testo ("110/125", "-"); None se vuoto."""
+    text = _text(value).strip()
+    if not text:
+        return None
+    number = parse_decimal(text)
+    return number if number is not None else text
+
+
+def general_notes(summary):
+    """Note della scheda General (finestra ed export)."""
+    notes = ["{0} system(s), {1} fixture(s).".format(len(summary.systems), summary.fixtures)]
+    if summary.no_area:
+        notes.append("{0} fixture(s) without a collection area ({1}) are not in the "
+                     "covered area.".format(summary.no_area, PARAM_AREA))
+    if summary.no_flow:
+        notes.append("{0} fixture(s) without a readable flow are not in the collected "
+                     "flow.".format(summary.no_flow))
+    used = len(summary.intensities)
+    if used:
+        notes.append("Rainfall intensity derived from {0} fixture(s).".format(used))
+        if used < summary.fixtures:
+            notes.append("{0} fixture(s) with no flow, collection area, C1 or C2 are "
+                         "not used for it.".format(summary.fixtures - used))
+        _per_m2, _per_hour, varies = intensity_texts(summary.intensities)
+        if varies:
+            notes.append("The fixtures give different values: check the rainfall "
+                         "intensity in the fixture families.")
+    elif summary.fixtures:
+        notes.append("The rainfall intensity cannot be derived: no fixture has flow, "
+                     "collection area, C1 and C2 all above zero.")
+    return notes
+
+
+def open_file(path):
+    """Apre il file con il programma predefinito. Serve UseShellExecute: in
+    .NET 8 (Revit 2025 e successivi) Process.Start(path) non apre i documenti."""
+    info = ProcessStartInfo(path)
+    info.UseShellExecute = True
+    Process.Start(info)
 
 
 def is_change(section, size):
@@ -650,33 +671,13 @@ class ResultsForm(Window):
         """Riepilogo: superficie, indice pluviometrico, portata e sistemi. Si
         ricostruisce a ogni apertura: dipende solo dai dati letti dallo script."""
         summary = general_summary(self.sections, fixture_data)
+        self._summary = summary
         self.txt_total_area.Text = number_or_dash(summary.area, 2)
         self.txt_total_flow.Text = number_or_dash(summary.flow, 2)
-        per_m2, per_hour, varies = intensity_texts(summary.intensities)
+        per_m2, per_hour, _varies = intensity_texts(summary.intensities)
         self.txt_intensity.Text = per_m2
         self.txt_intensity_mmh.Text = per_hour
-
-        notes = ["{0} system(s), {1} fixture(s).".format(len(summary.systems),
-                                                          summary.fixtures)]
-        if summary.no_area:
-            notes.append("{0} fixture(s) without a collection area ({1}) are not in the "
-                         "covered area.".format(summary.no_area, PARAM_AREA))
-        if summary.no_flow:
-            notes.append("{0} fixture(s) without a readable flow are not in the collected "
-                         "flow.".format(summary.no_flow))
-        used = len(summary.intensities)
-        if used:
-            notes.append("Rainfall intensity derived from {0} fixture(s).".format(used))
-            if used < summary.fixtures:
-                notes.append("{0} fixture(s) with no flow, collection area, C1 or C2 are "
-                             "not used for it.".format(summary.fixtures - used))
-            if varies:
-                notes.append("The fixtures give different values: check the rainfall "
-                             "intensity in the fixture families.")
-        elif summary.fixtures:
-            notes.append("The rainfall intensity cannot be derived: no fixture has flow, "
-                         "collection area, C1 and C2 all above zero.")
-        self.txt_general_notes.Text = " ".join(notes)
+        self.txt_general_notes.Text = " ".join(general_notes(summary))
 
         table = DataTable("Systems")
         for name, kind in (("System", System.String), ("Fixtures", System.Int32),
@@ -789,7 +790,7 @@ class ResultsForm(Window):
 
     def _fill_fed_by(self, table):
         """Colonna "Fed by": le righe che confluiscono direttamente in ogni riga,
-        da rnwflow_check.order_network, in forma breve: "Fixture <id>" per un
+        da RNWFlowCalculation_Check.order_network, in forma breve: "Fixture <id>" per un
         terminale, "<Section>V" / "<Section>O" per la parte verticale / orizzontale
         di una Section, unite da "+" (per esempio "1V+2O"); "-" se a monte non c'e'
         nulla."""
@@ -1234,63 +1235,154 @@ class ResultsForm(Window):
             return
         self._request_show([fixture_id], key)
 
-    # ---------------------------------------------------------------- Excel
+    # ---------------------------------------------------------------- Export
 
-    def export_rows(self):
-        """Righe del foglio Calculation, nell'ordine della rete (#), tutte (il
-        filtro e la ricerca della griglia non contano)."""
+    def _general_export(self, choice):
+        """Scheda General del report: riepilogo, note e tabella dei sistemi."""
+        summary = self._summary
+        per_m2, per_hour, _varies = intensity_texts(summary.intensities)
+        pairs = rp.Pairs("Project", [
+            (u"Total covered area [m\u00b2]", summary.area if summary.area is not None else "-"),
+            (u"Rainfall intensity [l/(s\u00b7m\u00b2)]", per_m2),
+            ("Rainfall intensity [mm/h]", per_hour),
+            ("Total collected flow [l/s]", summary.flow if summary.flow is not None else "-"),
+        ])
+        notes = general_notes(summary)
+        pending = self._fixture_edits().count
+        if pending:
+            notes.append("{0} fixture change(s) not written to the model yet are included "
+                         "in the Fixtures tab.".format(pending))
+        rows = [rp.Row({"system": item.name, "fixtures": item.fixtures, "area": item.area,
+                        "flow": item.flow}) for item in summary.systems]
+        table = rp.build_table("Systems", rp.GENERAL_COLUMNS, choice.columns[rexp.GENERAL],
+                               rows)
+        return rp.Tab(rp.TAB_GENERAL, [pairs, rp.Text(" ".join(notes)), table])
+
+    def _section_export_rows(self):
+        """Righe della scheda Sections, nell'ordine della rete (#), tutte (il
+        filtro e la ricerca della griglia non contano). Le colonne New sono la
+        misura di calcolo (la tendina New size) con la pendenza simulata."""
         result = []
-        rows = sorted(self.table.Rows, key=lambda r: r["Order"])
-        for row in rows:
+        for row in sorted(self.table.Rows, key=lambda r: r["Order"]):
             entry = self._by_key[row["Key"]]
-            code = _text(row["Code"])
+            values = {
+                "order": row["Order"],
+                "system": entry.system,
+                "code": _text(row["Code"]),
+                "fed_by": _text(row["FedBy"]),
+                "flow": entry.flow,
+                "status": _text(row["Status"]),
+                "notes": _text(row["Notes"]),
+            }
             if getattr(entry, "is_fixture", False):
-                values = [row["Order"], entry.system, code, "-", rc.RUN_FIXTURE, row["FedBy"],
-                          None, "", None, None, entry.flow, entry.dn_mm, None, None, None, None,
-                          None,
-                          "-", "; ".join([entry.label] + entry.notes)]
-                result.append((values, None, True))
+                values.update({"section": "-", "run": rc.RUN_FIXTURE, "model_dn": entry.dn_mm,
+                               "check_new": "-"})
+                result.append(rp.Row(values, rp.ROW_FIXTURE))
                 continue
             size = self._size_of(row, entry)
-            flow = entry.flow
             capacity = _number(row["QNew"])
-            use = flow / capacity * 100.0 if capacity else None
             check = _text(row["CheckNew"]) or "-"
-            values = [row["Order"], entry.system, code, entry.section or "-", entry.run,
-                      row["FedBy"], len(entry.pipe_ids), _text(row["PipeType"]),
-                      entry.min_slope, self._sim_slope(row),
-                      flow,
-                      size.dn_mm if size is not None else None,
-                      size.od_mm if size is not None else None,
-                      capacity, use, _number(row["VNew"]), _number(row["FillNew"]), check, ""]
-            result.append((values, CHECK_STYLES.get(check), False))
+            use_new = None
+            if capacity and entry.flow is not None:
+                use_new = entry.flow / capacity * 100.0
+            values.update({
+                "section": entry.section or "-",
+                "pipes": len(entry.pipe_ids),
+                "pipe_type": _text(row["PipeType"]),
+                "run": entry.run,
+                "slope": entry.min_slope,
+                "model_dn": number_or_text(row["ModelDn"]),
+                "model_de": number_or_text(row["ModelDe"]),
+                "capacity": _number(row["Capacity"]),
+                "use": _number(row["Use"]),
+                "v_model": _number(row["VModel"]),
+                "fill_model": _number(row["FillModel"]),
+                "suggested": number_or_text(row["Suggested"]),
+                "new_dn": size.dn_mm if size is not None else None,
+                "new_de": size.od_mm if size is not None else None,
+                "sim_slope": self._sim_slope(row),
+                "q_new": capacity,
+                "use_new": use_new,
+                "v_new": _number(row["VNew"]),
+                "fill_new": _number(row["FillNew"]),
+                "check_new": check,
+            })
+            kind = rp.ROW_NO_FLOW if _text(row["Severity"]) == "none" else None
+            result.append(rp.Row(values, kind, {"status": export_severity(values["status"]),
+                                                "check_new": export_severity(check)}))
         return result
 
-    def export_to(self, path):
-        """Scrive il file. Solleva rx.FileLockedError se e' aperto in Excel."""
+    def _fixture_export_rows(self):
+        """Righe della scheda Fixtures con i valori della griglia, modifiche non
+        ancora scritte comprese (colonna pending); numeri come numeri."""
+        result = []
+        for row in sorted(self.ftable.Rows, key=lambda r: r["Order"]):
+            values = {
+                "order": row["Order"],
+                "system": _text(row["System"]),
+                "level": _text(row["Level"]),
+                "id": _text(row["FixtureId"]),
+                "type": _text(row["TypeLabel"]),
+                "flow": _number(row["Flow"]),
+                "pending": "Yes" if row["Dirty"] is True else "",
+                "notes": _text(row["Notes"]),
+            }
+            for _name, prefix in FIXTURE_PARAMS:
+                key = prefix.lower()        # Area, C1, C2, Code -> chiavi del catalogo
+                text = _text(row[prefix])
+                number = parse_decimal(text) if row[prefix + "Num"] is True else None
+                values[key] = number if number is not None else text
+                values[key + "_from"] = _text(row[prefix + "From"])
+            result.append(rp.Row(values))
+        return result
+
+    def build_report(self, choice):
+        """Le tre schede con le colonne scelte (ExportChoice), piu' le impostazioni."""
         self._commit_edits()
         info = self._export_info
-        rx.export_calculation(path, info.title, info.settings_rows, EXPORT_COLUMNS,
-                              self.export_rows())
+        tabs = [
+            self._general_export(choice),
+            rp.Tab(rp.TAB_SECTIONS, [rp.build_table(
+                "", rp.SECTION_COLUMNS, choice.columns[rexp.SECTIONS],
+                self._section_export_rows())]),
+            rp.Tab(rp.TAB_FIXTURES, [rp.build_table(
+                "", rp.FIXTURE_COLUMNS, choice.columns[rexp.FIXTURES],
+                self._fixture_export_rows())]),
+        ]
+        return rp.Report(info.title, "Rainwater flow calculation", "RNW Flow Calculation",
+                         tabs, info.settings_rows)
 
     def OnExport(self, sender, args):
         if self._export_info is None:
             return
+        self._commit_edits()
+        choice = rexp.ask_export_options(self)
+        if choice is None:
+            return
+        is_pdf = choice.file_format == rexp.FORMAT_PDF
         dialog = SaveFileDialog()
-        dialog.Title = "Export the calculation to Excel"
-        dialog.Filter = "Excel workbook (*.xlsx)|*.xlsx"
-        dialog.DefaultExt = ".xlsx"
-        dialog.FileName = self._export_info.file_name
+        if is_pdf:
+            dialog.Title = "Export the calculation to PDF"
+            dialog.Filter = "PDF document (*.pdf)|*.pdf"
+        else:
+            dialog.Title = "Export the calculation to Excel"
+            dialog.Filter = "Excel workbook (*.xlsx)|*.xlsx"
+        dialog.DefaultExt = choice.extension
+        dialog.FileName = os.path.splitext(self._export_info.file_name)[0] + choice.extension
         if self._export_info.folder and os.path.isdir(self._export_info.folder):
             dialog.InitialDirectory = self._export_info.folder
         if dialog.ShowDialog(self) != True:     # noqa: E712 (Nullable[bool] di .NET)
             return
         path = dialog.FileName
         try:
-            self.export_to(path)
-        except rx.FileLockedError:
-            MessageBox.Show("The file is open in Excel: close it and export again.\n" + path,
-                            WINDOW_TITLE)
+            report = self.build_report(choice)
+            if is_pdf:
+                rpdf.export_report(path, report, choice.paper)
+            else:
+                rx.export_report(path, report)
+        except (rx.FileLockedError, rpdf.FileLockedError):
+            MessageBox.Show("The file is open in another program: close it and export "
+                            "again.\n" + path, WINDOW_TITLE)
             return
         except Exception as error:
             MessageBox.Show("The export failed:\n{0}".format(error), WINDOW_TITLE)
@@ -1299,7 +1391,7 @@ class ResultsForm(Window):
                                  WINDOW_TITLE, MessageBoxButton.YesNo)
         if answer == MessageBoxResult.Yes:
             try:
-                Process.Start(path)
+                open_file(path)
             except Exception:
                 pass
 

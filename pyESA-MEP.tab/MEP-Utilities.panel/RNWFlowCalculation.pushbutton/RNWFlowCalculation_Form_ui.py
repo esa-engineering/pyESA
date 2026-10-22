@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-rnwflow_ui.py - finestra XAML di configurazione per RNWFlowCalculation.
+RNWFlowCalculation_Form_ui.py - finestra XAML di configurazione per RNWFlowCalculation.
 
 Raccoglie il tipo di sistema di tubazioni degli scarichi meteorici, i sistemi di
 quel tipo da calcolare (uno o piu', non per forza tutti), il grado di
@@ -35,9 +35,9 @@ from System.IO import FileStream, FileMode
 
 from pyrevit import script
 
-import rnwflow_tables as rt
+import RNWFlowCalculation_Tables as rt
 
-XAML_FILE_NAME = 'RNWFlowCalculation_form.xaml'
+XAML_FILE_NAME = 'RNWFlowCalculation_Form.xaml'
 CONFIG_SECTION = 'ESA_RNWFlowCalculation'
 
 DEFAULT_FILL = 0.5

@@ -37,8 +37,8 @@
 # descritta nel README.md della cartella: va tenuto allineato al codice.
 # --------------------------------------------------------------------------
 __title__ = "MEP\nAlign to Ceiling"
-__doc__ = """Version = 1.3
-Date    = 21.10.2026
+__doc__ = """Version = 1.5
+Date    = 22.10.2026
 ________________________________________________________________
 Description:
 Moves the selected MEP devices vertically so that their insertion point
@@ -54,6 +54,22 @@ ________________________________________________________________
 Author(s): ESA Engineering
 """
 __author__ = "ESA Engineering"
+
+# ======================= STORICO REVISIONI =======================
+# Versione | Data       | Tipo | Descrizione                                         | PR
+# 1.5      | 22.10.2026 | UI   | Rimossa l'opzione di simulazione: il comando        | -
+#          |            |      | applica sempre le modifiche; i rilevatori da        |
+#          |            |      | controsoffitto passano nella sezione Elements       |
+# 1.4     | 22.10.2026 | UI   | Finestra su due colonne senza scorrimento, testi    | -
+#          |            |      | ridotti a righe di stato (spiegazioni nel README)   |
+# 1.3      | 21.10.2026 | FEAT | Rilevatori sempre all'intradosso, dz_Buzzer sempre  | -
+#          |            |      | misurato; finestra di esito non modale; tolleranza  |
+#          |            |      | in mm (massimo 5000)                                |
+# 1.1      | 20.10.2026 | FEAT | Bersaglio automatico, rilevatori da controsoffitto  | -
+#          |            |      | con dz_Buzzer, finestra di esito interrogabile      |
+# 1.0      | 20.10.2026 | FEAT | Prima versione                                      | -
+# Testato su Revit: nessuna prova registrata
+# =================================================================
 
 import os.path as op
 
@@ -952,7 +968,7 @@ def collect_surface_sources(host_min, host_max, options, context):
 class AlignOptions(object):
     """Scelte effettuate dall'utente nella finestra di dialogo."""
 
-    def __init__(self, category_keys, tolerance_mm, include_links, skip_connected, dry_run):
+    def __init__(self, category_keys, tolerance_mm, include_links, skip_connected):
         self.category_keys = category_keys
         self.tolerance_mm = tolerance_mm
         self.tolerance_internal = mm_to_internal(tolerance_mm)
@@ -961,7 +977,6 @@ class AlignOptions(object):
         self.half_line = self.tolerance_internal * LINE_FACTOR / 2.0
         self.include_links = include_links
         self.skip_connected = skip_connected
-        self.dry_run = dry_run
 
 
 class Target(object):
@@ -1824,8 +1839,8 @@ def pick_elements():
             continue
         elements.append(element)
         ids.Add(element.Id)
-    # Gli elementi restano selezionati: rilanciando il comando dopo una
-    # simulazione non serve ripetere la selezione grafica.
+    # Gli elementi restano selezionati: rilanciando il comando non serve
+    # ripetere la selezione grafica.
     if ids.Count:
         try:
             uidoc.Selection.SetElementIds(ids)
@@ -1950,18 +1965,16 @@ def ask_options(elements, source_label, category_info):
 
     flagged_total = sum(row[3] for row in category_info)
     out_of_scope = out_of_scope_count(elements)
-    detail = (u'{} of them are flagged for ceiling installation ({} = Yes): only those are '
-              u'aligned, the others are listed in the report.'.format(flagged_total, INSTALLATION_PARAM))
+    # Solo righe di stato brevi: le spiegazioni stanno nel README.
+    detail = u'{} with {} = Yes: only those are aligned.'.format(flagged_total, INSTALLATION_PARAM)
     if out_of_scope:
-        detail += u' {} do not belong to the handled categories and will be skipped.'.format(out_of_scope)
+        detail += u' {} outside the handled categories.'.format(out_of_scope)
 
     buzzers, buzzers_flagged = buzzer_count(elements)
-    if buzzers:
-        buzzer_text = (u'{} false ceiling detectors in the selection ({} with {} = Yes): they '
-                       u'always go to the soffit, and {} is measured on the model.'.format(
-                           buzzers, buzzers_flagged, INSTALLATION_PARAM, BUZZER_PARAM))
-    else:
-        buzzer_text = u'No false ceiling detector in the selection.'
+    buzzer_text = u'Of which false ceiling detectors: {}'.format(buzzers)
+    if buzzers_flagged < buzzers:
+        buzzer_text += u' ({} with Yes)'.format(buzzers_flagged)
+    buzzer_text += u'.'
 
     dialog_info = {
         'selection_text': u'{} elements selected ({}).'.format(len(elements), source_label),
@@ -1972,6 +1985,7 @@ def ask_options(elements, source_label, category_info):
         'max_tolerance_mm': MAX_TOLERANCE_MM,
         'line_factor': LINE_FACTOR,
         'buzzer_text': buzzer_text,
+        'buzzers': buzzers,
         'include_links': settings['include_links'],
         'skip_connected': settings['skip_connected'],
     }
@@ -1993,7 +2007,7 @@ def ask_options(elements, source_label, category_info):
     by_name = dict(MEP_CATEGORIES)
     keys = [bic_key(by_name[name]) for name in chosen['categories'] if name in by_name]
     return AlignOptions(keys, chosen['tolerance_mm'], chosen['include_links'],
-                        chosen['skip_connected'], chosen['dry_run'])
+                        chosen['skip_connected'])
 
 
 # =========================================================================
@@ -2021,12 +2035,7 @@ def format_buzzer(value):
 
 
 def print_header(options, elements, source_label, result):
-    if options.dry_run:
-        output.print_md(u'# MEP alignment to ceilings - simulation')
-        output.print_md(u'**No change has been applied to the model.** '
-                        u'The figures below are the result that would be produced.')
-    else:
-        output.print_md(u'# MEP alignment to ceilings - report')
+    output.print_md(u'# MEP alignment to ceilings - report')
 
     screened = sum(1 for r in result.skipped if r.screened)
     lines = [
@@ -2057,9 +2066,8 @@ def print_header(options, elements, source_label, result):
     output.print_md(u'\n'.join(lines))
 
 
-def print_category_summary(result, options):
+def print_category_summary(result):
     output.print_md(u'## Summary by category')
-    moved_header = u'To align' if options.dry_run else u'Aligned'
     rows = []
     totals = [0, 0, 0, 0, 0, 0]
     fields = ('selected', 'moved', 'ok', 'screened', 'skipped', 'over')
@@ -2070,21 +2078,20 @@ def print_category_summary(result, options):
             totals[index] += row[field]
     rows.append([u'**Total**'] + [str(v) for v in totals])
     output.print_table(table_data=rows, title='',
-                       columns=[u'Category', u'Selected', moved_header, u'Already aligned',
+                       columns=[u'Category', u'Selected', u'Aligned', u'Already aligned',
                                 u'Not ceiling-installed', u'Skipped', u'Beyond tolerance'])
 
 
-def print_moves_table(result, options):
+def print_moves_table(result):
     if not result.planned:
         return
-    output.print_md(u'## Elements {}'.format(u'to align' if options.dry_run else u'aligned'))
+    output.print_md(u'## Elements aligned')
 
     ordered = sorted(result.planned, key=lambda r: (r.level_name, r.kind, -abs(r.distance)))
     shown = ordered[:MAX_MOVED_ROWS]
     columns = [u'Element', u'Category', u'Type', u'Level', u'Target', u'Surface',
-               u'Elev. before', u'Elev. target', u'Move', BUZZER_PARAM, u'Connectors', u'Notes']
-    if not options.dry_run:
-        columns.append(u'Outcome')
+               u'Elev. before', u'Elev. target', u'Move', BUZZER_PARAM, u'Connectors', u'Notes',
+               u'Outcome']
 
     rows = []
     for record in shown:
@@ -2106,9 +2113,8 @@ def print_moves_table(result, options):
             buzzer,
             str(record.connected) if record.connected else u'-',
             record.note or u'',
+            record_problem(record) or u'OK',
         ]
-        if not options.dry_run:
-            row.append(record_problem(record) or u'OK')
         rows.append(row)
     output.print_table(table_data=rows, title='', columns=columns)
 
@@ -2271,8 +2277,8 @@ def print_report(options, elements, source_label, result, preprocessor,
     output.close_others()
 
     print_header(options, elements, source_label, result)
-    print_category_summary(result, options)
-    print_moves_table(result, options)
+    print_category_summary(result)
+    print_moves_table(result)
     print_already_ok(result)
     print_over_tolerance_table(result, options)
     print_skipped_table(result)
@@ -2290,9 +2296,6 @@ def print_report(options, elements, source_label, result, preprocessor,
         output.print_md(u'Nothing to align. The tables above say whether the problem is the '
                         u'screening parameter, the tolerance, the categories or the ceilings and '
                         u'floors found.')
-    elif options.dry_run:
-        output.print_md(u'**{}** elements would be aligned. Run the command again with '
-                        u'"Simulation" cleared to apply the change.'.format(len(result.planned)))
     else:
         output.print_md(u'Elements aligned: **{}** of {} planned.'.format(
             applied_ok - mismatched, len(result.planned)))
@@ -2350,12 +2353,12 @@ def join_notes(*parts):
     return u'; '.join(part for part in parts if part)
 
 
-def result_rows(options, result, context):
+def result_rows(result, context):
     """(righe per la finestra, {chiave: elemento}).
 
     Solo gli elementi NON allineati: falliti in applicazione, oltre
     tolleranza e saltati (screening compreso). Gli allineati e quelli gia' a
-    posto compaiono solo nei totali; in simulazione anche gli "da allineare".
+    posto compaiono solo nei totali.
     """
     rows = []
     elements = {}
@@ -2380,7 +2383,7 @@ def result_rows(options, result, context):
             'notes': notes,
         })
 
-    for record in failed_records(options, result):
+    for record in failed_records(result):
         add(record.element, STATUS_FAILED, record.category_name, record.level_name, record.kind,
             record.move, record.buzzer_value if record.is_buzzer else None,
             join_notes(record_problem(record), record.note))
@@ -2400,19 +2403,14 @@ def result_rows(options, result, context):
     return rows, elements
 
 
-def failed_records(options, result):
-    """Pianificati che non risultano allineati: errore, rollback o quota sbagliata.
-
-    In simulazione nessuno e' fallito: sono tutti "da allineare".
-    """
-    if options.dry_run:
-        return []
+def failed_records(result):
+    """Pianificati che non risultano allineati: errore, rollback o quota sbagliata."""
     return [r for r in result.planned if not r.applied or record_problem(r) is not None]
 
 
-def result_summary(options, result, rolled_back):
+def result_summary(result, rolled_back):
     """Totali in testa alla finestra: gli allineati non sono elencati."""
-    failed_list = failed_records(options, result)
+    failed_list = failed_records(result)
     failed = len(failed_list)
     done = len(result.planned) - failed
     buzzers = sum(1 for r in result.planned if r.is_buzzer and r not in failed_list)
@@ -2421,18 +2419,13 @@ def result_summary(options, result, rolled_back):
         + len(result.over_tolerance_items)
 
     lines = []
-    if options.dry_run:
-        lines.append(u'Simulation: nothing was changed.')
-    elif rolled_back:
+    if rolled_back:
         lines.append(u'The edit was rolled back: nothing was changed.')
     lines.append(u'Elements selected: {}'.format(total))
-    if options.dry_run:
-        lines.append(u'To align: {}'.format(done))
-    else:
-        lines.append(u'Aligned: {}'.format(done))
+    lines.append(u'Aligned: {}'.format(done))
     if buzzers:
-        lines.append(u'   of which false ceiling detectors (to the soffit, {} {}): {}'.format(
-            BUZZER_PARAM, u'to set' if options.dry_run else u'set', buzzers))
+        lines.append(u'   of which false ceiling detectors (to the soffit, {} set): {}'.format(
+            BUZZER_PARAM, buzzers))
     lines.append(u'Already aligned: {}'.format(len(result.already_ok)))
     if not_aligned:
         detail = u' ({} failed)'.format(failed) if failed else u''
@@ -2501,13 +2494,13 @@ def show_elements(uiapp, document, elements):
     return message
 
 
-def show_result_window(options, result, context, rolled_back, advanced_report):
+def show_result_window(result, context, rolled_back, advanced_report):
     """Apre la finestra di esito NON MODALE e ritorna subito.
 
     Il comando termina con la finestra a video: da li' il pulsante di una
     riga seleziona l'elemento e Revit resta libero per modificarlo.
     """
-    rows, elements = result_rows(options, result, context)
+    rows, elements = result_rows(result, context)
     document = doc
     handler = ResultEventHandler()
     event = UI.ExternalEvent.Create(handler)
@@ -2536,9 +2529,8 @@ def show_result_window(options, result, context, rolled_back, advanced_report):
             pass
 
     info = {
-        'title': u'MEP Align to Ceiling - simulation' if options.dry_run
-        else u'MEP Align to Ceiling - result',
-        'summary': result_summary(options, result, rolled_back),
+        'title': u'MEP Align to Ceiling - result',
+        'summary': result_summary(result, rolled_back),
         'buzzer_header': u'{} (mm)'.format(BUZZER_PARAM),
         'rows': rows,
         'show': show,
@@ -2693,7 +2685,7 @@ def main():
     mismatched = 0
     rolled_back = False
 
-    if not options.dry_run and result.planned:
+    if result.planned:
         preprocessor = AlignFailurePreprocessor()
         transaction = DB.Transaction(doc, TRANSACTION_NAME)
         handling = transaction.GetFailureHandlingOptions()
@@ -2738,7 +2730,7 @@ def main():
     # output e' il report avanzato, su richiesta. Se la finestra non si apre
     # il resoconto si stampa subito: l'utente deve sempre vedere l'esito.
     try:
-        show_result_window(options, result, context, rolled_back, advanced_report)
+        show_result_window(result, context, rolled_back, advanced_report)
     except Exception as error:
         logger.debug('Finestra di esito non disponibile: %s', error)
         warn(u'The result window could not be opened ({}): the full report is shown '

@@ -6,7 +6,7 @@ tooltip: >
 
   CLICK: select the devices, then run the command. Only instances with the Yes/No instance
   parameter u_VIS_Ceiling_installation = Yes are processed. A dialog asks which categories to
-  process, the tolerance in mm (500 by default) and whether to run a simulation first.
+  process and the tolerance in mm (500 by default).
 
   The target is found automatically. A vertical line twice the tolerance long, centred on the
   insertion point, must cross its bottom face. Ceilings and slabs are read in this model and in

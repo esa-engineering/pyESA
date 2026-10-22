@@ -1,0 +1,146 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Export Calculation"
+        Height="580" Width="1000"
+        MinHeight="540" MinWidth="900"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <!-- Common Styles -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,10,0,5"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,15,0"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+        <!-- Pulsanti di selezione sotto le liste di colonne -->
+        <Style x:Key="ListButton" TargetType="Button">
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0"
+                   Text="📤 Export Calculation"
+                   FontSize="16" FontWeight="Bold"
+                   Margin="0,0,0,10"
+                   HorizontalAlignment="Center"/>
+
+        <!-- Tre colonne, nessuno scorrimento verticale -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="270"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Colonna 1: formato e scheda General -->
+            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                <!-- SECTION: Format -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📄 FORMAT" Style="{StaticResource SectionHeader}"/>
+                        <RadioButton x:Name="rb_excel" GroupName="Format" Margin="0,5"
+                                     Content="Excel workbook (.xlsx)"/>
+                        <RadioButton x:Name="rb_pdf" GroupName="Format" Margin="0,5"
+                                     Content="PDF document (.pdf)"/>
+                        <Grid Margin="20,5,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="60"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="lbl_paper" Text="Paper:" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbo_paper" Grid.Column="1" Style="{StaticResource ComboStyle}"
+                                      ToolTip="Wide tables use a smaller text, then wrap: A3 keeps more columns on one line"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- SECTION: General -->
+                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="📋 GENERAL" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock Style="{StaticResource HintText}"
+                                   Text="The summary and the settings of the check are always exported. Columns of the systems table:"/>
+                        <StackPanel x:Name="pnl_general" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Colonna 2: scheda Sections -->
+            <Border Grid.Column="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10"
+                    Margin="0,0,10,10" VerticalAlignment="Top">
+                <StackPanel>
+                    <TextBlock Text="📏 SECTIONS" Style="{StaticResource SectionHeader}"/>
+                    <TextBlock Style="{StaticResource HintText}"
+                               Text="Every row of the tab, in network order: the search and the filter of the window do not apply."/>
+                    <UniformGrid x:Name="pnl_sections" Columns="2" Margin="0,3,0,0"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button x:Name="btn_sections_default" Content="Default" Style="{StaticResource ListButton}"/>
+                        <Button x:Name="btn_sections_all" Content="Select All" Style="{StaticResource ListButton}"/>
+                        <Button x:Name="btn_sections_none" Content="Deselect All" Style="{StaticResource ListButton}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Colonna 3: scheda Fixtures -->
+            <Border Grid.Column="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10"
+                    Margin="0,0,0,10" VerticalAlignment="Top">
+                <StackPanel>
+                    <TextBlock Text="🚰 FIXTURES" Style="{StaticResource SectionHeader}"/>
+                    <StackPanel x:Name="pnl_fixtures" Margin="0,3,0,0"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button x:Name="btn_fixtures_default" Content="Default" Style="{StaticResource ListButton}"/>
+                        <Button x:Name="btn_fixtures_all" Content="Select All" Style="{StaticResource ListButton}"/>
+                        <Button x:Name="btn_fixtures_none" Content="Deselect All" Style="{StaticResource ListButton}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button x:Name="btn_cancel" Content="Cancel" Width="100" Height="30"
+                    Margin="0,0,10,0" IsCancel="True"/>
+            <Button x:Name="btn_ok" Content="Export" Width="100" Height="30"
+                    IsDefault="True"
+                    Background="#2D5A8A" Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -12,7 +12,7 @@ clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
 from System.IO import File
-from System.Windows import MessageBox, Thickness
+from System.Windows import MessageBox, Thickness, Visibility
 from System.Windows.Controls import CheckBox
 from System.Windows.Markup import XamlReader
 
@@ -42,11 +42,13 @@ class AlignToCeilingWindow(object):
         self.tolerance_hint = find("ToleranceHint")
         self.include_links = find("IncludeLinks")
         self.skip_connected = find("SkipConnected")
-        self.dry_run = find("DryRun")
 
         find("SelectionText").Text = info["selection_text"]
         find("SelectionDetail").Text = info["detail_text"]
         find("BuzzerText").Text = info["buzzer_text"]
+        # La nota sui rilevatori serve solo se ce n'e' qualcuno nella selezione.
+        if not info["buzzers"]:
+            find("BuzzerHint").Visibility = Visibility.Collapsed
 
         for name, label, count, flagged, checked in info["categories"]:
             check = CheckBox()
@@ -62,14 +64,12 @@ class AlignToCeilingWindow(object):
         self.tolerance_box.Text = u"{:g}".format(info["tolerance_mm"])
         self.include_links.IsChecked = info["include_links"]
         self.skip_connected.IsChecked = info["skip_connected"]
-        self.dry_run.IsChecked = False
 
         self.search_box.TextChanged += self._on_search
         self.tolerance_box.TextChanged += self._on_tolerance_changed
         find("ClearSearchButton").Click += self._on_clear_search
         find("SelectAllButton").Click += self._on_select_all
         find("DeselectAllButton").Click += self._on_deselect_all
-        find("ListResizeGrip").DragDelta += self._on_resize_list
         find("OkButton").Click += self._on_ok
 
         self._refresh_count()
@@ -127,23 +127,16 @@ class AlignToCeilingWindow(object):
             check.IsChecked = False
         self._refresh_count()
 
-    def _on_resize_list(self, sender, args):
-        height = self.category_list.ActualHeight + args.VerticalChange
-        self.category_list.Height = max(self.category_list.MinHeight, height)
-
     # --- tolleranza ----------------------------------------------------
 
     def _refresh_tolerance_hint(self):
+        # Solo una riga di stato: il metodo della retta di analisi e' nel README.
         ok, value = parse_number(self.tolerance_box.Text)
         if ok and value > 0:
-            line = u"{:g} mm".format(value * self._info["line_factor"])
+            self.tolerance_hint.Text = u"Now: search line {:g} mm long, centred on the insertion point.".format(
+                value * self._info["line_factor"])
         else:
-            line = u"twice the tolerance"
-        self.tolerance_hint.Text = (
-            u"A vertical analysis line {} long is drawn through the insertion point, centred on "
-            u"it. A ceiling or slab counts when the line crosses its bottom face, or when the "
-            u"insertion point lies inside it. Beyond the tolerance the element is skipped and "
-            u"reported with the move it would need.".format(line))
+            self.tolerance_hint.Text = u"Enter a tolerance greater than zero."
 
     def _on_tolerance_changed(self, sender, args):
         self._refresh_tolerance_hint()
@@ -168,7 +161,6 @@ class AlignToCeilingWindow(object):
             "tolerance_mm": tolerance,
             "include_links": bool(self.include_links.IsChecked),
             "skip_connected": bool(self.skip_connected.IsChecked),
-            "dry_run": bool(self.dry_run.IsChecked),
         }
 
     def _on_ok(self, sender, args):

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-rnwflow_check.py - verifica dei tubi e aggregazione per tratto (Section).
+RNWFlowCalculation_Check.py - verifica dei tubi e aggregazione per tratto (Section).
 
 Modulo puro Python (nessun import di Revit): lo script legge il modello e
 riduce ogni tubo a un PipeCheck con dati semplici; qui si fanno la verifica
-contro le tabelle (rnwflow_tables) e il raggruppamento per tratto.
+contro le tabelle (RNWFlowCalculation_Tables) e il raggruppamento per tratto.
 
 Tratto = (nome del sistema, parametro Section del tubo, orientamento). Revit
 numera i tratti per sistema: un tratto e' una sequenza di tubi a portata e
@@ -16,7 +16,7 @@ I tubi senza Section formano un tratto ciascuno.
 
 Verifica di un tubo a un De (evaluate): portata ammissibile dalla tabella,
 grado di riempimento e velocita' alla portata di progetto (solo orizzontali,
-rnwflow_tables.partial_state), confronto con le velocita' minima e massima
+RNWFlowCalculation_Tables.partial_state), confronto con le velocita' minima e massima
 scelte dall'utente. La stessa funzione serve per il De del modello e per il De
 scelto nella tendina della finestra dei risultati.
 
@@ -32,7 +32,7 @@ Regole di aggregazione del tratto:
   di tubazione, vedi lo script).
 """
 
-import rnwflow_tables as rt
+import RNWFlowCalculation_Tables as rt
 
 # Inclinazione sull'orizzontale oltre la quale un tubo e' una colonna: i tratti a
 # 45 gradi restano orizzontali (verificati con le tabelle 6.3 - 6.5, riga 10 cm/m).

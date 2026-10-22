@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-rnwflow_tables.py - tabelle di dimensionamento delle reti di acque meteoriche.
+RNWFlowCalculation_Tables.py - tabelle di dimensionamento delle reti di acque meteoriche.
 
 Dati trascritti dal manuale tecnico allegato alla richiesta (cap. 6):
 
