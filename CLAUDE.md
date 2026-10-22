@@ -1,6 +1,15 @@
 # CLAUDE.md
 
+Version: 1.0.0 | Last revision: 22.10.2026
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Editing this file
+
+Edit `CLAUDE.md` **only when the user explicitly asks for it**. Never update it on your own
+initiative, and never as a follow-up to work on scripts, bundles, XAML, icons or docs, even
+when that work makes something here incomplete or out of date. In that case, say so in your
+reply and propose the change; apply it only after the user asks.
 
 ## What this repo is
 
