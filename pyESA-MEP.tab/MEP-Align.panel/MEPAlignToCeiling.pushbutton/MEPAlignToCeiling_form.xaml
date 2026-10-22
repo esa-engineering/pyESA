@@ -68,7 +68,10 @@
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionHeader}" Text="📋 ELEMENTS"/>
                         <TextBlock x:Name="SelectionText" TextWrapping="Wrap" Text="-"/>
+                        <TextBlock x:Name="BuzzerText" TextWrapping="Wrap" Text="-"/>
                         <TextBlock x:Name="SelectionDetail" Style="{StaticResource HintText}" Text="-"/>
+                        <TextBlock x:Name="BuzzerHint" Style="{StaticResource HintText}"
+                                   Text="False ceiling detectors always go to the soffit, and dz_Buzzer is written with the distance to the false ceiling."/>
                     </StackPanel>
                 </Border>
 
@@ -142,17 +145,6 @@
                     </StackPanel>
                 </Border>
 
-                <!-- SECTION: False ceiling detectors -->
-                <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
-                        Padding="10" Margin="0,0,0,10">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="🔔 FALSE CEILING DETECTORS"/>
-                        <TextBlock x:Name="BuzzerText" TextWrapping="Wrap" Text="-"/>
-                        <TextBlock Style="{StaticResource HintText}"
-                                   Text="They always go to the soffit, and dz_Buzzer is written with the distance to the false ceiling."/>
-                    </StackPanel>
-                </Border>
-
                 <!-- SECTION: Options -->
                 <Border BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5"
                         Padding="10" Margin="0,0,0,10">
@@ -164,8 +156,6 @@
                         <CheckBox x:Name="SkipConnected" Margin="0,3"
                                   Content="Skip elements connected to others (connectors)"
                                   ToolTip="Moving a connected device may stretch its duct or break the connection."/>
-                        <CheckBox x:Name="DryRun" Margin="0,3"
-                                  Content="Simulation: do not modify the model"/>
                     </StackPanel>
                 </Border>
 

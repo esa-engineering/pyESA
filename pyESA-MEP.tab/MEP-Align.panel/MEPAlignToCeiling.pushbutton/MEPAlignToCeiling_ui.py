@@ -12,7 +12,7 @@ clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
 from System.IO import File
-from System.Windows import MessageBox, Thickness
+from System.Windows import MessageBox, Thickness, Visibility
 from System.Windows.Controls import CheckBox
 from System.Windows.Markup import XamlReader
 
@@ -42,11 +42,13 @@ class AlignToCeilingWindow(object):
         self.tolerance_hint = find("ToleranceHint")
         self.include_links = find("IncludeLinks")
         self.skip_connected = find("SkipConnected")
-        self.dry_run = find("DryRun")
 
         find("SelectionText").Text = info["selection_text"]
         find("SelectionDetail").Text = info["detail_text"]
         find("BuzzerText").Text = info["buzzer_text"]
+        # La nota sui rilevatori serve solo se ce n'e' qualcuno nella selezione.
+        if not info["buzzers"]:
+            find("BuzzerHint").Visibility = Visibility.Collapsed
 
         for name, label, count, flagged, checked in info["categories"]:
             check = CheckBox()
@@ -62,7 +64,6 @@ class AlignToCeilingWindow(object):
         self.tolerance_box.Text = u"{:g}".format(info["tolerance_mm"])
         self.include_links.IsChecked = info["include_links"]
         self.skip_connected.IsChecked = info["skip_connected"]
-        self.dry_run.IsChecked = False
 
         self.search_box.TextChanged += self._on_search
         self.tolerance_box.TextChanged += self._on_tolerance_changed
@@ -160,7 +161,6 @@ class AlignToCeilingWindow(object):
             "tolerance_mm": tolerance,
             "include_links": bool(self.include_links.IsChecked),
             "skip_connected": bool(self.skip_connected.IsChecked),
-            "dry_run": bool(self.dry_run.IsChecked),
         }
 
     def _on_ok(self, sender, args):

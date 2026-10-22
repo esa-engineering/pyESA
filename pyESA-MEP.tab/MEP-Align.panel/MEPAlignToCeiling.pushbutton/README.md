@@ -32,22 +32,20 @@ degli avvisi di Revit.
 
 1. **Selezione.** Il comando parte dagli elementi già selezionati; se non ce ne sono chiede di
    indicarli nella vista (`Finish` per confermare). Gli elementi scelti restano selezionati,
-   così si può rilanciare dopo una simulazione.
+   così si può rilanciare il comando senza ripetere la selezione.
 2. **Finestra di dialogo**, su due colonne e senza barra di scorrimento: a sinistra
-   *Elements* e *Categories*, a destra *Tolerance*, *False ceiling detectors* e *Options*.
+   *Elements* e *Categories*, a destra *Tolerance* e *Options*.
    Nella finestra restano solo righe di stato brevi; il metodo è descritto in questo file.
 
    | Sezione | Contenuto |
    | --- | --- |
-   | Elements | Quanti elementi sono selezionati, quanti hanno `u_VIS_Ceiling_installation = Yes` e quanti sono fuori dalle categorie gestite |
+   | Elements | Quanti elementi sono selezionati e, fra questi, quanti sono rilevatori da controsoffitto (con quanti `Yes`, se non lo sono tutti); quanti hanno `u_VIS_Ceiling_installation = Yes` e quanti sono fuori dalle categorie gestite. Se ci sono rilevatori, una riga ricorda che vanno sempre all'intradosso e che `dz_Buzzer` viene scritto (vedi "Rilevatori da controsoffitto") |
    | Categories | Solo le categorie presenti nella selezione, con i due conteggi fra parentesi. Ricerca, Select All / Deselect All. La lista occupa l'altezza della colonna (al massimo nove categorie, quindi non serve la maniglia di ridimensionamento). Le categorie tolte finiscono fra gli elementi saltati |
-   | Tolerance | **In mm**, sopra e sotto il punto di inserimento; predefinita 500, massimo 5000. Accetta virgola o punto. Il valore salvato in cm dalle versioni precedenti viene convertito. Sotto il campo, la lunghezza attuale della retta di analisi |
-   | False ceiling detectors | Quanti rilevatori da controsoffitto ci sono nella selezione e quanti con `Yes`. Vanno sempre all'intradosso e `dz_Buzzer` viene scritto (vedi "Rilevatori da controsoffitto") |
-   | Options | Cerca nei modelli collegati (attiva), salta gli elementi connessi (non attiva), simulazione (non attiva) |
+   | Tolerance | **In mm**, sopra e sotto il punto di inserimento; predefinita 500, massimo 5000. Accetta virgola o punto. Il valore salvato in cm dalle versioni precedenti viene convertito. Sotto il campo, la lunghezza attuale della retta di analisi |   | Options | Cerca nei modelli collegati (attiva), salta gli elementi connessi (non attiva) |
 
    Il bersaglio non si sceglie: lo strumento riconosce da solo se sulla verticale del
    dispositivo il piano ha un controsoffitto (vedi "Controsoffitto prima del solaio").
-   Le scelte (tranne la simulazione) restano memorizzate nella sezione `ESA_MEPAlignToCeiling`
+   Le scelte restano memorizzate nella sezione `ESA_MEPAlignToCeiling`
    della configurazione pyRevit. Le categorie tolte restano tolte alla prossima apertura.
 3. **Finestra di esito**, non modale: i totali e la tabella degli elementi non allineati, con
    le note e un pulsante per selezionarli nel modello e modificarli a finestra aperta. Il resoconto completo nel pannello di output è il **report avanzato**, stampato
@@ -253,9 +251,8 @@ sbloccarlo, uno a 400 mm probabilmente no.
 
 ### Finestra di esito
 
-È il report semplificato. In testa solo i **totali**: elementi selezionati, allineati (in
-simulazione: da allineare), di cui rilevatori da controsoffitto con `dz_Buzzer`, già a posto,
-non allineati. Gli elementi allineati **non sono elencati**.
+È il report semplificato. In testa solo i **totali**: elementi selezionati, allineati, di cui
+rilevatori da controsoffitto con `dz_Buzzer`, già a posto, non allineati. Gli elementi allineati **non sono elencati**.
 
 Sotto, la tabella dei soli **elementi non allineati**: falliti in applicazione, oltre
 tolleranza e saltati, screening compreso. Se non ce n'è nessuno la tabella lo dice.
@@ -306,7 +303,7 @@ resoconto completo, con le sezioni elencate qui sotto. Se la finestra di esito n
 | --- | --- |
 | Intestazione | Impostazioni usate, quanti esclusi dallo screening |
 | Summary by category | Selezionati, allineati, già a posto, non a soffitto, saltati, oltre tolleranza |
-| Elements aligned / to align | Livello, bersaglio, superficie, quota prima e dopo rispetto al livello, spostamento (positivo verso l'alto), `dz_Buzzer` prima -> dopo, note, esito |
+| Elements aligned | Livello, bersaglio, superficie, quota prima e dopo rispetto al livello, spostamento (positivo verso l'alto), `dz_Buzzer` prima -> dopo, note, esito |
 | Elements already aligned | Già entro 1 mm dalla superficie |
 | Skipped as beyond the tolerance | Superficie, spostamento necessario, sforamento, e una riga che dice di quanto alzare la tolleranza |
 | Skipped elements | Motivo, superficie bersaglio, spostamento necessario |

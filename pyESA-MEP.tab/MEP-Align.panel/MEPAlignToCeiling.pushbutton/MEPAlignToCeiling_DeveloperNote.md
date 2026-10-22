@@ -9,6 +9,41 @@ riportano le scelte che risultano dal codice, non i tentativi intermedi non regi
 
 ---
 
+## 22.10.2026, versione 1.5
+
+**Richiesta.** Rimuovere la funzione di simulazione. Poi, nella stessa versione: unire la
+sezione *False ceiling detectors* a *Elements*, con il totale dei selezionati e quanti di
+questi sono rilevatori da controsoffitto.
+
+**Fatto (rilevatori).** Tolta la sezione della colonna destra. In *Elements*: riga dei
+selezionati, riga "Of which false ceiling detectors: N" (con "(M with Yes)" solo se non lo
+sono tutti), riga di stato sullo screening, nota sui rilevatori. La nota (`BuzzerHint`) è
+nascosta quando nella selezione non ci sono rilevatori, così non occupa spazio inutile; per
+questo `ask_options()` passa anche `buzzers` alla finestra.
+
+**Fatto (simulazione).** Tolti la casella *Simulation: do not modify the model* dalla finestra, il campo
+`dry_run` di `AlignOptions` e tutti i rami che ne dipendevano: intestazione e totali del
+report avanzato, colonna *Outcome* (ora sempre presente), riga finale "would be aligned",
+titolo e totali della finestra di esito, `failed_records()` (in simulazione restituiva una
+lista vuota). Le funzioni che ricevevano `options` solo per la simulazione
+(`print_category_summary`, `print_moves_table`, `result_rows`, `failed_records`,
+`result_summary`, `show_result_window`) non lo ricevono più. Aggiornati tooltip e README.
+
+La simulazione non era salvata nella configurazione (si apriva sempre disattivata): nessuna
+chiave da migrare in `ESA_MEPAlignToCeiling`.
+
+**Conseguenza.** Il comando modifica sempre il modello. Resta la protezione di prima: una sola
+transazione (un solo passo di annullamento), rollback sugli errori, quota riletta dopo il
+commit. Per vedere l'effetto prima di confermare non c'è più un percorso nello strumento:
+si annulla con Ctrl+Z.
+
+**Esito.** Sintassi verificata fuori da Revit. Non provato in Revit.
+
+**Decisione.** Simulazione rimossa su richiesta. Se dovesse tornare, il punto da cui ripartire
+è il commit precedente a questa voce.
+
+---
+
 ## 22.10.2026, versione 1.4
 
 **Richiesta.** Allineare la finestra di avvio alle regole del CLAUDE.md: niente barra di
