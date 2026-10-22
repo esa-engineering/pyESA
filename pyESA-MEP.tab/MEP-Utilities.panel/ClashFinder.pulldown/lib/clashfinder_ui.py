@@ -27,7 +27,7 @@ clr.AddReference('PresentationFramework')
 clr.AddReference('PresentationCore')
 clr.AddReference('WindowsBase')
 
-from System import Object
+from System import Object, DateTime
 from System.IO import FileStream, FileMode
 from System.Windows import (Window, MessageBox, MessageBoxButton, MessageBoxImage,
                             MessageBoxResult, Thickness, GridLength, GridUnitType,
@@ -37,12 +37,14 @@ from System.Windows.Controls import (CheckBox, ComboBox, TextBox, TextBlock, But
                                      ColumnDefinition, ListBoxItem, StackPanel)
 from System.Windows.Input import Keyboard, ModifierKeys
 from System.Windows.Markup import XamlReader
-from System.Windows.Media import SolidColorBrush, Colors
+from System.Windows.Documents import Run, LineBreak
+from System.Windows.Media import SolidColorBrush, Colors, Color
 
 from pyrevit import DB, script, forms
 
 import clashfinder_rules as cr
 import clashfinder_engine as ce
+import clashfinder_guide_ui as guide_ui
 import clashfinder_report_ui as report_ui
 
 XAML_FILE_NAME = 'ClashFinder_form.xaml'
@@ -60,6 +62,19 @@ GRAY_BRUSH = SolidColorBrush(Colors.Gray)
 GRAY_BRUSH.Freeze()
 RED_BRUSH = SolidColorBrush(Colors.Firebrick)
 RED_BRUSH.Freeze()
+GREEN_BRUSH = SolidColorBrush(Color.FromRgb(23, 116, 63))
+GREEN_BRUSH.Freeze()
+
+
+def set_status_lines(text_block, lines):
+    """Riga di stato su piu' righe, ognuna col suo colore: lines = [(testo, pennello)]."""
+    text_block.Inlines.Clear()
+    for index, (text, brush) in enumerate(lines):
+        if index:
+            text_block.Inlines.Add(LineBreak())
+        run = Run(text)
+        run.Foreground = brush
+        text_block.Inlines.Add(run)
 
 
 def _ask(message, buttons=MessageBoxButton.YesNoCancel, image=MessageBoxImage.Question):
@@ -215,14 +230,14 @@ class ClashFinderForm(Window):
 
     def _find_controls(self):
         names = ("lst_tests", "btn_up", "btn_down", "btn_new", "btn_delete", "btn_import",
-                 "btn_export",
+                 "btn_export", "btn_help",
                  "txt_library_path", "pnl_editor", "txt_editor_state",
                  "txt_summary_state", "txt_links_hint",
                  "btn_refresh", "btn_save", "btn_save_as", "btn_close", "btn_run")
         for name in names:
             setattr(self, name, self._root.FindName(name))
         for side in SIDES:
-            for name in ("cbo_source_{}", "lst_links_{}",
+            for name in ("cbo_source_{}", "lst_links_{}", "btn_links_{}", "pop_links_{}",
                          "txt_search_{}", "btn_clear_search_{}", "lst_cats_{}", "thumb_{}",
                          "chk_used_{}", "chk_ticked_{}", "btn_none_{}",
                          "txt_filter_search_{}", "btn_clear_filter_search_{}",
@@ -258,6 +273,7 @@ class ClashFinderForm(Window):
         self.btn_save.Click += lambda s, e: self._save()
         self.btn_save_as.Click += lambda s, e: self._save_as()
         self.btn_close.Click += lambda s, e: self.Close()
+        self.btn_help.Click += self.OnHelp
         self.btn_run.Click += self.OnRun
         self.Closing += self.OnWindowClosing
         self.Closed += self.OnWindowClosed
@@ -277,8 +293,27 @@ class ClashFinderForm(Window):
         getattr(self, "thumb_" + side).DragDelta += \
             lambda s, e: self._resize_list(getattr(self, "lst_cats_" + side), e)
         getattr(self, "cbo_match_" + side).SelectionChanged += lambda s, e: self._changed()
+        self._wire_links_dropdown(side)
         getattr(self, "btn_add_rule_" + side).Click += \
             lambda s, e: (self._add_rule_row(side, None), self._mark_dirty())
+
+    def _wire_links_dropdown(self, side):
+        """Bottone + popup dei link (anche in Quick Clash)."""
+        popup = getattr(self, "pop_links_" + side)
+        closed_at = [None]
+
+        def popup_closed(s, e):
+            closed_at[0] = DateTime.Now
+
+        def open_links(s, e):
+            # Un clic sul bottone con il popup aperto lo chiude (StaysOpen=False) e
+            # arriva qui subito dopo: non va riaperto.
+            if closed_at[0] is not None and \
+                    (DateTime.Now - closed_at[0]).TotalMilliseconds < 250:
+                return
+            popup.IsOpen = True
+        popup.Closed += popup_closed
+        getattr(self, "btn_links_" + side).Click += open_links
 
     def _categories_in_use(self):
         """Categorie con almeno un elemento nel modello aperto o in un link caricato."""
@@ -722,6 +757,7 @@ class ClashFinderForm(Window):
                     checkbox.IsChecked = title in self.edit_links[side]
                     checkbox.Click += self._link_click_handler(side)
                     listbox.Items.Add(checkbox)
+                self._update_links_button(side)
         finally:
             self._editor_loading = loading
         self.txt_links_hint.Text = (u"" if loaded else
@@ -734,8 +770,23 @@ class ClashFinderForm(Window):
                 self.edit_links[side].add(sender.Tag)
             else:
                 self.edit_links[side].discard(sender.Tag)
+            self._update_links_button(side)
             self._changed()
         return handler
+
+    def _update_links_button(self, side):
+        """Testo del menu a discesa: nessun link, il nome del link o "N links"."""
+        picked = sorted(self.edit_links[side], key=lambda n: n.lower())
+        if not picked:
+            text = u"None (click to choose)"
+        elif len(picked) == 1:
+            text = picked[0]
+        else:
+            text = u"{} links".format(len(picked))
+        button = getattr(self, "btn_links_" + side)
+        button.Content = text
+        button.ToolTip = u"\n".join(picked) if picked else \
+            u"Links are saved by file name: the test works in any project that loads the same links"
 
     # Categorie -----------------------------------------------------------------
 
@@ -1031,6 +1082,10 @@ class ClashFinderForm(Window):
         self.txt_summary_state.Text = u"\n".join(lines)
 
     # ================================================================ ESECUZIONE
+
+    def OnHelp(self, sender, args):
+        """Guida a slide, la stessa di tutti i comandi del pulsante."""
+        guide_ui.show_guide(self)
 
     def OnRun(self, sender, args):
         valid, message = self._validate_rules(self._read_editor_raw())

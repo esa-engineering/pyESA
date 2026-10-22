@@ -2,13 +2,8 @@ title:
   Quick
 
   Clash
-tooltip: >
-  Compact version of Clash Setup: click a saved test, check or change where Set A
-  and Set B come from (current Revit selection, active view, whole model or
-  nothing, plus loaded links) for this run, then run. The report is the same as
-  Clash Setup's.
-
-  The current selection is read again at every Refresh and when the run starts.
-  Tests and settings are shared with Clash Setup, where the tests are created and
-  edited.
+tooltip: |-
+  Runs a saved clash test in a few clicks, changing sources and links for this run only.
+  Tests are created and edited in Clash Setup.
+  Requires: a model view with a phase.
 author: Claude + Matteo Maiorano

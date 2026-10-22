@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 __title__ = "Quick\nClash"
 
-__doc__ = """Version = 1.0
-Date    = 20.10.2026
+__doc__ = """Version = 1.1
+Date    = 22.10.2026
 _____________________________________________________________________
 Compact version of Clash Setup: only the Run part.
 
 Click a saved test, check or change where Set A and Set B come from
-(current Revit selection, active view, whole model or nothing, plus
+(current Revit selection, active view, whole model or links only, plus
 loaded links) for this run, then run. The report is the same as Clash
 Setup's.
 
@@ -21,6 +21,14 @@ Author(s): Claude + Matteo Maiorano
 """
 
 __author__ = "Claude + Matteo Maiorano"
+
+# ======================= STORICO REVISIONI =======================
+# Versione | Data       | Tipo | Descrizione                                              | PR
+# 1.1.0    | 22.10.2026 | UI   | Link scelti da un menu a discesa; etichette "Links" e    |
+#          |            |      | "Links only" (modulo condiviso in lib); riga di stato su |
+#          |            |      | tre righe (fase, Set A, Set B) con colori per esito      |
+# Testato su Revit: (da compilare dopo le prove)
+# =================================================================
 
 # Le finestre restano aperte dopo la fine dello script: il motore IronPython
 # deve sopravvivere per gestirne gli eventi.

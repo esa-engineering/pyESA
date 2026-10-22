@@ -17,11 +17,16 @@ Pulldown **Clash Finder** (`ClashFinder.pulldown`, pannello MEP-Utilities) con t
   - le coppie elemento / host non sono clash (porta e muro). Un elemento ospitato che sfonda
     davvero il suo host non viene quindi segnalato.
 - **Set**: sorgenti, categorie, filtri di vista e regole, tutto salvato nel test.
-  - *From this model*: *Current selection*, vista attiva, intero modello o nulla. La
+  - *From this model*: *Current selection*, vista attiva, intero modello o *Links only* (nulla dal modello aperto, solo i link). La
     selezione corrente di Revit e' riletta a ogni aggiornamento del riepilogo e all'avvio del
     run (`_before_run`): si puo' cambiarla in Revit con la finestra aperta. Default per i test
     salvati prima di questa versione: A dalla selezione, B dal modello.
-  - *Plus elements of these links*: link salvati per **nome del file** (`Document.Title`),
+  - *Links*: menu a discesa (un bottone che apre un `Popup` con l'elenco a caselle, alto fino
+    a 260 px con scroll interno; si chiude cliccando fuori). Il testo del bottone dice quanti
+    link sono spuntati: "None (click to choose)", il nome se ce n'e' uno, "N links" da due in
+    su (`_update_links_button`); il tooltip elenca i nomi. Un clic sul bottone mentre il popup
+    e' aperto lo chiude e non lo riapre (guardia di 250 ms su `Closed`). Link salvati per
+    **nome del file** (`Document.Title`),
     validi per tutte le istanze caricate di quel file e in ogni progetto che carica gli stessi
     link. Un link del test non caricato resta in elenco come "(not loaded)" e compare nelle
     note. Gli elementi linkati vengono dall'intero link; con sorgente *Active view* da quanto
@@ -55,7 +60,8 @@ Resta aperta mentre si lavora in Revit. Ogni accesso al modello passa da un Exte
 Una sola pagina:
 
 - a sinistra la libreria: un clic carica il test nell'editor (sotto il nome, in grigio,
-  le sorgenti di A e B: `describe_scope()`); *New* (chiede il nome nella finestra di
+  le sorgenti di A e B: `describe_scope()`, con due o piu' link ridotti a "N links"; i nomi
+  restano nel tooltip della riga); *New* (chiede il nome nella finestra di
   salvataggio e aggiunge subito alla libreria un test vuoto: nessuna categoria, link o filtro,
   A e B dalla selezione corrente), *▲* / *▼* (sposta il test
   selezionato; l'ordine si salva subito nella libreria e vale anche per Quick Clash), *Delete*, *Import JSON*, *Export JSON* (tutta la libreria);
@@ -180,22 +186,20 @@ report intero, riapribile con Last Report; vedi sotto).
 
 ### Refresh
 
-*Refresh* rifa' i test del report sul modello com'e' adesso (`ce.run_tests`, via bridge, con
-la vista attiva per la sorgente *Active view*) e confronta con il **report di partenza**
-(quello aperto, non l'ultimo refresh: `self.baseline`). Un'interferenza e' la coppia
-(istanza di link o host, id) dei due elementi (`ce.pair_key`):
+*Refresh* ricontrolla le coppie A/B gia' presenti nel report sul modello com'e' adesso,
+senza rilanciare i test e senza usare la vista attiva o la selezione corrente. Confronta
+con il **report di partenza** (quello aperto, non l'ultimo refresh: `self.baseline`).
+Un'interferenza e' la coppia (istanza di link o host, id) dei due elementi
+(`ce.pair_key`):
 
 - quelle ancora presenti tengono il loro numero;
-- le nuove sono marcate **NEW** (arancio) e proseguono la numerazione;
 - quelle non piu' trovate finiscono nel gruppo grigio *✔ Resolved since the report*, con il
   loro numero, ancora navigabili.
 
-La sorgente *Current selection* usa la selezione del run, salvata nel report
-(`selection_ids`): gli elementi cancellati nel frattempo sono segnalati. Un report senza
-`selection_ids` (scritto prima di questa versione) usa la selezione corrente, con una nota.
+Il refresh controlla solo clash gia' contenute nel report: non scopre nuove coppie.
 Il refresh **non scrive** il file: Export JSON salva le interferenze di adesso (il file
 precedente va in `_old`, perche' non e' piu' lo stesso report). Export CSV ha la colonna
-*Status* (`new` / `resolved`) e le risolte in coda.
+*Status* (`resolved`) e le risolte in coda.
 
 ## Cartella dei report e Last Report
 
@@ -257,8 +261,14 @@ la versione non sale.
 Secondo comando del pulldown (`QuickClash.pushbutton`), per eseguire in fretta. A sinistra
 l'elenco dei test (un clic sceglie quello da eseguire), a destra sorgente nel modello aperto
 e link di Set A e Set B: vengono dal test e si possono cambiare per l'esecuzione, senza
-salvarli. Categorie, filtri e regole restano quelli del test. Nessuna tabella: una riga di
-stato riporta conteggi e note. Libreria e `last_test` condivisi con Clash Setup; il report
+salvarli. Categorie, filtri e regole restano quelli del test. Nessuna tabella: lo stato e'
+su tre righe, nell'ordine fase della vista attiva, Set A, Set B (`_show_summary`, scritte
+con `set_status_lines` di `clashfinder_ui.py`, una `Run` colorata per riga). Colori: verde
+per la fase se c'e' e per un insieme con elementi, grigio per un insieme con zero elementi,
+rosso solo se la vista non ha fase / filtro di fase. Eventuali note del riepilogo (per
+esempio link senza la fase) seguono in grigio; "Set A is empty" / "Set B is empty" non si
+mostrano, ripeterebbero il conteggio.
+Libreria e `last_test` condivisi con Clash Setup; il report
 e' lo stesso.
 
 `QuickClashForm` (`clashfinder_quick_ui.py`) eredita da `ClashFinderForm` e cambia

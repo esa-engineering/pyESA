@@ -321,19 +321,24 @@ SOURCE_SHORT = {SOURCE_SELECTION: u"selection", SOURCE_VIEW: u"active view",
                 SOURCE_MODEL: u"model", SOURCE_NONE: u""}
 
 
-def describe_sources(set_data):
-    """Da dove viene l'insieme, breve: "selection + ARC_Model"."""
+def describe_sources(set_data, compact=False):
+    """Da dove viene l'insieme, breve: "selection + ARC_Model".
+    Con compact=True due o piu link diventano "3 links" (i nomi restano nel tooltip)."""
     parts = []
     if SOURCE_SHORT.get(set_data["source"]):
         parts.append(SOURCE_SHORT[set_data["source"]])
-    parts += set_data["links"]
+    links = list(set_data["links"])
+    if compact and len(links) > 1:
+        parts.append(u"{} links".format(len(links)))
+    else:
+        parts += links
     return u" + ".join(parts) or u"nothing"
 
 
 def describe_scope(test):
-    """Riga mostrata sotto il nome del test: "A: selection | B: ARC_Model"."""
-    return u"A: {}  |  B: {}".format(describe_sources(test["set_a"]),
-                                     describe_sources(test["set_b"]))
+    """Riga mostrata sotto il nome del test: "A: selection | B: 3 links"."""
+    return u"A: {}  |  B: {}".format(describe_sources(test["set_a"], True),
+                                     describe_sources(test["set_b"], True))
 
 
 # =============================================================================
