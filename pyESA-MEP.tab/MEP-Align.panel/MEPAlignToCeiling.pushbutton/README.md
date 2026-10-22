@@ -26,6 +26,7 @@ degli avvisi di Revit.
 | `bundle.yaml` | Etichetta e descrizione del pulsante |
 | `icon.png` / `icon.dark.png` | Icone per il tema chiaro e per quello scuro |
 | `README.md` | Questo file |
+| `MEPAlignToCeiling_DeveloperNote.md` | Registro dei tentativi fatti sullo strumento, scartati compresi: da leggere prima di modificarlo |
 
 ## Uso
 

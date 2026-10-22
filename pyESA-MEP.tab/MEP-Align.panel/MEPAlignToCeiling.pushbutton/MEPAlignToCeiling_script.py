@@ -55,6 +55,19 @@ Author(s): ESA Engineering
 """
 __author__ = "ESA Engineering"
 
+# ======================= STORICO REVISIONI =======================
+# Versione | Data       | Tipo | Descrizione                                         | PR
+# 1.4      | 22.10.2026 | UI   | Finestra su due colonne senza scorrimento, testi    | -
+#          |            |      | ridotti a righe di stato (spiegazioni nel README)   |
+# 1.3      | 21.10.2026 | FEAT | Rilevatori sempre all'intradosso, dz_Buzzer sempre  | -
+#          |            |      | misurato; finestra di esito non modale; tolleranza  |
+#          |            |      | in mm (massimo 5000)                                |
+# 1.1      | 20.10.2026 | FEAT | Bersaglio automatico, rilevatori da controsoffitto  | -
+#          |            |      | con dz_Buzzer, finestra di esito interrogabile      |
+# 1.0      | 20.10.2026 | FEAT | Prima versione                                      | -
+# Testato su Revit: nessuna prova registrata
+# =================================================================
+
 import os.path as op
 
 import clr
