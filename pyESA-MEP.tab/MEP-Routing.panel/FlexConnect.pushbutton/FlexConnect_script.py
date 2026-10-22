@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __title__ = "Flex\nConnect"
-__doc__ = """Version = 0.8.0
+__doc__ = """Version = 0.10.1
 Date    = 22.10.2026
 Connects a pipe or duct to equipment or an air terminal with a flex pipe or flex duct.
 Author(s): Matteo Maiorano
@@ -9,6 +9,9 @@ __author__ = "Matteo Maiorano"
 
 # ======================= STORICO REVISIONI =======================
 # Versione | Data       | Tipo | Descrizione                                   | PR
+# 0.10.1   | 22.10.2026 | UI   | Titoli del tooltip How to use in blu come in Clash Setup | -
+# 0.10.0   | 22.10.2026 | UI   | Icona i nella finestra delle impostazioni con il tooltip How to use | -
+# 0.9.0    | 22.10.2026 | FEAT | Il comando resta attivo dopo ogni collegamento, Esc lo termina | -
 # 0.8.0    | 22.10.2026 | FEAT | Scelta del parametro Flex Pattern, separata per tubi e condotti | -
 # 0.7.0    | 22.10.2026 | FEAT | Condotti: misura sempre dal connettore, estremita' con transizione, estremita' o fianco dalla distanza assiale | -
 # 0.6.0    | 22.10.2026 | FEAT | Scelta nelle impostazioni del raccordo di derivazione (tap) per la presa | -
@@ -134,6 +137,21 @@ def connect_once(trunk, point, equipment, settings, type_ids, tap_ids):
         fd.build(doc, trunk, plan, flex_type_id, settings["gap_mm"], tap_ids.get(settings["duct_tap"]), pattern)
 
 
+def try_connect(trunk, point, equipment, settings, type_ids, tap_ids):
+    """Un collegamento con gli errori mostrati in un avviso. False se l'utente ha annullato con Esc."""
+    try:
+        connect_once(trunk, point, equipment, settings, type_ids, tap_ids)
+    except OperationCanceledException:
+        return False
+    except fb.FlexConnectCancelled:
+        pass    # finestra di scelta del connettore chiusa: si salta questo collegamento
+    except fb.FlexConnectError as err:
+        forms.alert(str(err), title="FlexConnect")
+    except Exception as err:
+        forms.alert("The connection could not be created.\n{}".format(err), title="FlexConnect")
+    return True
+
+
 def main():
     flex_types = {fb.PIPE: fb.collect_flex_types(doc, fb.PIPE),
                   fb.DUCT: fb.collect_flex_types(doc, fb.DUCT)}
@@ -144,27 +162,26 @@ def main():
     tap_ids = dict(tap_symbols)
     settings = get_settings(flex_types, [n for n, _ in tap_symbols])
 
-    try:
-        trunk, point, equipment = fb.pick_elements(uidoc)
-    except OperationCanceledException:
-        script.exit()
-
-    # sui condotti si continua a collegare terminali allo stesso condotto finche' non si preme Esc
+    # il comando resta attivo: dopo ogni collegamento riparte la selezione, Esc lo termina.
+    # Sui condotti si continua con lo stesso condotto (solo terminale e punto); Esc termina il comando.
+    first_round = True
     while True:
         try:
-            connect_once(trunk, point, equipment, settings, type_ids, tap_ids)
-        except (fb.FlexConnectCancelled, OperationCanceledException):
-            script.exit()
-        except fb.FlexConnectError as err:
-            forms.alert(str(err), title="FlexConnect")
-        except Exception as err:
-            forms.alert("The connection could not be created.\n{}".format(err), title="FlexConnect")
-        if not fb.is_duct(trunk):
+            trunk, point, equipment = fb.pick_elements(uidoc, use_preselection=first_round)
+        except OperationCanceledException:
             break
-        next_connection = fb.pick_next_duct_connection(uidoc, trunk)
-        if next_connection is None:
+        first_round = False
+        keep_going = try_connect(trunk, point, equipment, settings, type_ids, tap_ids)
+        if fb.is_duct(trunk):
+            while keep_going:
+                next_connection = fb.pick_next_duct_connection(uidoc, trunk)
+                if next_connection is None:
+                    break
+                point, equipment = next_connection
+                keep_going = try_connect(trunk, point, equipment, settings, type_ids, tap_ids)
             break
-        point, equipment = next_connection
+        if not keep_going:
+            break
 
 
 main()

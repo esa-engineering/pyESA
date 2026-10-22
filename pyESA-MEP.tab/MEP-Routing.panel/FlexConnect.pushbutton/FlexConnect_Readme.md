@@ -7,10 +7,12 @@ Collega un tubo a un'attrezzatura meccanica o idraulica con un flexpipe, e un co
 - **CLICK**: esegue con le ultime impostazioni. Al primo uso (o se un tipo salvato non esiste piu' nel modello) apre la finestra.
 - **SHIFT + CLICK**: apre la finestra delle impostazioni, poi esegue. Eccezione voluta alla regola comune dei tool ESA (CLICK = finestra, SHIFT + CLICK = esecuzione immediata).
 - L'ordine di selezione e' libero: si parte dal tubo o condotto, oppure dall'attrezzatura o terminale (anche preselezionando un solo tubo o condotto). Il clic sul condotto e' un punto, non solo un elemento.
-- Sui condotti, dopo ogni collegamento il comando chiede il terminale successivo e il punto sullo stesso condotto, finche' non si preme Esc. Sui tubi il collegamento e' uno solo.
-- Esc in qualsiasi selezione annulla senza modificare nulla.
+- Il comando resta attivo: dopo ogni collegamento riparte la selezione. Con un tubo si riparte da capo (tubo o attrezzatura, l'ordine e' libero); la preselezione vale solo per il primo collegamento. Sui condotti, dopo ogni collegamento il comando chiede il terminale successivo e il punto sullo stesso condotto.
+- Esc in una qualsiasi selezione termina il comando (sui condotti, per cambiare condotto si rilancia il comando).
 
 ## Impostazioni (`ESA_FlexConnect`)
+
+L'icona `i` in alto a destra della finestra mostra, al passaggio del mouse, il tooltip "How to use" (definito in `FlexConnect_Form.xaml`, come in Clash Setup). Se cambia il comportamento del tool va aggiornato anche quel testo.
 
 | Campo | Significato |
 | --- | --- |

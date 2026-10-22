@@ -132,11 +132,12 @@ def _trunk_predicate_for(equipment):
     return is_trunk
 
 
-def pick_elements(uidoc):
+def pick_elements(uidoc, use_preselection=True):
     """(tubo o condotto, punto cliccato su di esso o None se preselezionato, attrezzatura).
 
-    L'ordine e' libero: prima il tubo/condotto o prima l'attrezzatura/terminale."""
-    trunk = preselected_trunk(uidoc)
+    L'ordine e' libero: prima il tubo/condotto o prima l'attrezzatura/terminale.
+    use_preselection: False dopo il primo collegamento, quando la selezione di Revit e' quella vecchia."""
+    trunk = preselected_trunk(uidoc) if use_preselection else None
     if trunk is not None:
         equipment, _ = _pick(uidoc, _equipment_predicate_for(trunk), "Select the equipment or air terminal")
         return trunk, None, equipment

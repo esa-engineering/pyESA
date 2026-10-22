@@ -2,6 +2,38 @@
 
 Registro dei tentativi, il piu' recente in alto.
 
+## 22.10.2026, versione 0.10.1: titoli del tooltip in blu (con AI)
+
+**Richiesta** (screenshot del tooltip funzionante): titoli blu come in Clash Setup; annotare in `docs` cio' che riguarda i "How to use" e non e' in `CLAUDE.md`.
+
+**Fatto**: i quattro titoli del tooltip (HOW TO USE, PIPES, DUCTS, SETTINGS) hanno `Foreground="#2D5A8A"`, lo stesso blu di `SectionHeader` della finestra. Creato `docs/Claude_Suggestions.md` con la proposta di regola per `CLAUDE.md` (icona, tooltip, tempi, larghezza, titoli, manutenzione). `CLAUDE.md` non e' stato toccato.
+
+**Esito**: da provare (solo colore).
+
+## 22.10.2026, versione 0.10.0: icona info con "How to use" (con AI)
+
+**Richiesta**: pulsante info in alto a destra della scheda impostazioni, con il "How to use", "come per il clash setup"; poi, con uno screenshot, "deve essere tipo questo".
+
+**Primo tentativo, scartato**: pulsante `?` che apriva una finestra "How to use" separata (due colonne, `FlexConnect_Help.xaml` e codice in `FlexConnect_Form_ui.py`). Non era quello che l'utente intendeva: in Clash Setup l'icona `i` mostra un tooltip, non una finestra. Il pulsante `?` di cui parlava la nota sulla guida a slide di Clash Finder non c'entra (guida messa da parte, non nel repo). File e codice rimossi.
+
+**Fatto**: un `Border` 22x22 con una `i` in alto a destra della testata della finestra, con `ToolTip` ricco (titoli in grassetto, testo che va a capo, `MaxWidth` 560). `ToolTipService.InitialShowDelay=0` e `ShowDuration=120000` perche' il testo e' lungo e resti leggibile finche' il mouse e' sopra. Nessuna logica Python. Il tooltip e' riprodotto dallo screenshot: nel repo non c'e' il codice della versione di Clash Setup che l'utente vede (`ClashFinder_form.xaml` ha solo la sezione "HOW SETS ARE BUILT" in fondo alla scheda).
+
+**Non provato in Revit**: aspetto reale del tooltip (altezza con il testo completo, taglio ai bordi dello schermo).
+
+**Esito**: da provare.
+
+## 22.10.2026, versione 0.9.0: comando sempre attivo (con AI)
+
+**Richiesta**: dopo la creazione di un flexpipe il comando non deve finire, ma restare attivo per crearne altri.
+
+**Fatto**: il ciclo principale in `main` ora riparte da `fb.pick_elements` dopo ogni collegamento sui tubi. La preselezione di Revit si usa solo al primo giro (`use_preselection`): dopo un collegamento la selezione e' quella vecchia. Sui condotti resta il ciclo interno (stesso condotto, si chiede terminale e punto). `try_connect` raccoglie la gestione degli errori: un errore mostra l'avviso e il ciclo continua; Esc durante un collegamento termina il comando; la chiusura della finestra di scelta del connettore salta quel solo collegamento (prima usciva dal comando).
+
+**Scelta da confermare**: Esc sui condotti termina il comando, non torna alla scelta di un altro condotto: per cambiare condotto si rilancia il comando. Alternativa possibile: Esc una volta torna alla selezione completa, due volte esce.
+
+**Non provato in Revit**.
+
+**Esito**: da provare.
+
 ## 22.10.2026, versione 0.8.0: Flex Pattern (con AI)
 
 **Richiesta** (screenshot del parametro "Flex Pattern = Single Line"): sceglierlo nelle impostazioni, con valore diverso per tubi e condotti.
