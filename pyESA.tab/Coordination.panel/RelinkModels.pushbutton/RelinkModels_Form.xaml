@@ -1,0 +1,157 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Relink Models"
+        Height="680" Width="1000"
+        MinHeight="560" MinWidth="860"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip">
+
+    <Window.Resources>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,15,0"/>
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="🔗 Relink Models" FontSize="16" FontWeight="Bold"
+                   Margin="0,0,0,10" HorizontalAlignment="Center"/>
+
+        <Grid Grid.Row="1" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10">
+                <StackPanel>
+                    <TextBlock Text="📁 MODELS TO FIX" Style="{StaticResource SectionHeader}"/>
+                    <ListBox x:Name="ModelsList" Height="110" SelectionMode="Extended"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
+                        <Button x:Name="AddFilesButton" Content="Add files..." Padding="10,3" Margin="0,0,5,0"/>
+                        <Button x:Name="RemoveButton" Content="Remove" Padding="10,3" Margin="0,0,5,0"/>
+                        <Button x:Name="ClearButton" Content="Clear" Padding="10,3"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10">
+                <StackPanel>
+                    <TextBlock Text="🔍 NEW LOCATION" Style="{StaticResource SectionHeader}"/>
+                    <Grid Margin="0,0,0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Folder:" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="RootBox" Grid.Column="1" Padding="5,3"
+                                 ToolTip="Optional for Check. Linked files are searched here and matched by file name"/>
+                        <Button x:Name="BrowseRootButton" Grid.Column="2" Content="Browse..." Padding="10,3" Margin="5,0,0,0"/>
+                    </Grid>
+                    <CheckBox x:Name="SubfoldersCheck" Content="Include subfolders" Margin="20,3,0,0"/>
+
+                    <TextBlock Text="⚙ OPTIONS" Style="{StaticResource SectionHeader}" Margin="0,12,0,5"/>
+                    <CheckBox x:Name="RevitCheck" Content="Revit links" Margin="20,3,0,0"/>
+                    <CheckBox x:Name="CadCheck" Content="CAD links" Margin="20,3,0,0"/>
+                    <CheckBox x:Name="BackupCheck" Content="Back up each model before writing" Margin="20,3,0,0"
+                              ToolTip="Copy saved in a _RelinkBackup folder next to the model"/>
+                    <CheckBox x:Name="CentralCheck" Content="Open and save as new central after writing" Margin="20,3,0,0"
+                              ToolTip="Minutes per model. Local files of the old central must be recreated"/>
+                    <CheckBox x:Name="ShowNotFoundCheck" Content="Show links not in the new folder" Margin="20,3,0,0"
+                              ToolTip="Links to files that were not moved, left as they are"/>
+                    <TextBlock Style="{StaticResource HintText}" Margin="0,8,0,0"
+                               Text="Models must be closed in Revit. They are rewritten in place."/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="📋 LINKS FOUND" Style="{StaticResource SectionHeader}"/>
+                <DataGrid x:Name="LinksGrid" Grid.Row="1"
+                          AutoGenerateColumns="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                          CanUserSortColumns="False"
+                          SelectionMode="Extended" GridLinesVisibility="Horizontal"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                          ToolTip="Double-click a model row to collapse or expand its links">
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Kind}" Value="H">
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Background" Value="#EEF3F8"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+                </DataGrid>
+                <Grid Grid.Row="2" Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="SummaryLabel" Style="{StaticResource HintText}" VerticalAlignment="Center"
+                               Text=""/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button x:Name="PickFileButton" Content="Pick file for selected..." Padding="10,3" Margin="0,0,5,0"
+                                ToolTip="Choose the new file by hand for the selected row"/>
+                        <Button x:Name="CheckAllButton" Content="Select All" Padding="10,3" Margin="0,0,5,0"/>
+                        <Button x:Name="CheckNoneButton" Content="Deselect All" Padding="10,3"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="CancelButton" Content="Close" Width="100" Height="30" Margin="0,0,10,0" IsCancel="True"/>
+            <Button x:Name="CheckButton" Content="Check" Width="100" Height="30" Margin="0,0,10,0"
+                    ToolTip="Nothing is written: shows whether each linked file exists and if the link is loaded"/>
+            <Button x:Name="ApplyButton" Content="Apply" Width="100" Height="30"
+                    IsDefault="True" Background="#2D5A8A" Foreground="White" IsEnabled="False"
+                    ToolTip="Rewrites every ticked link, working ones included"/>
+        </StackPanel>
+    </Grid>
+</Window>

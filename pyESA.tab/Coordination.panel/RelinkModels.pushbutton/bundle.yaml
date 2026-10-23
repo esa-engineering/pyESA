@@ -1,0 +1,7 @@
+title: Relink
+  Models
+tooltip: |-
+  Checks the Revit and CAD links of closed models and repoints them to a new folder.
+  Check: shows whether each linked file exists and is loaded. Apply: rewrites the paths.
+author: Matteo Maiorano
+help_url:

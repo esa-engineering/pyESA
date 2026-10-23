@@ -49,10 +49,13 @@
       "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\matteoma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\953879cd-b0b8-41b0-9f86-9f38de459a6f\\\\scratchpad\\\\deck\\\\build.ps1\" | Select-String \"True|False\")",
       "Bash(cd \"C:/Users/matteoma/AppData/Roaming/pyRevit/Extensions/ESAextensions.extension\" && ls \"C:/Program Files/Autodesk\" 2>/dev/null | head; grep -rn \"pattern\\\\|Pattern\" --include=*.py --include=*.md --include=*.xaml --include=*.yaml pyESA-MEP.tab/MEP-Routing.panel/FlexConnect.pushbutton -l)",
       "Read(//c/Program Files/Autodesk/**)",
-      "Bash(file FlexConnect_*.py FlexConnect_*.xaml)"
+      "Bash(file FlexConnect_*.py FlexConnect_*.xaml)",
+      "Bash(git checkout *)",
+      "Bash(cd \"c:/Users/matteoma/AppData/Roaming/pyRevit/Extensions/ESAextensions.extension/pyESA.tab/Coordination.panel/RelinkModels.pushbutton\" && rm -rf __pycache__ && git status --short)"
     ],
     "additionalDirectories": [
-      "C:\\Users\\matteoma\\AppData\\Roaming\\pyRevit\\Extensions\\ESAextensions.extension\\pyESA-MEP.tab\\MEP-Routing.panel\\FlexConnect.pushbutton"
+      "C:\\Users\\matteoma\\AppData\\Roaming\\pyRevit\\Extensions\\ESAextensions.extension\\pyESA-MEP.tab\\MEP-Routing.panel\\FlexConnect.pushbutton",
+      "c:\\Users\\matteoma\\AppData\\Roaming\\pyRevit\\Extensions\\ESAextensions.extension\\pyESA.tab\\Coordination.panel\\RelinkModels.pushbutton\\__pycache__"
     ]
   }
 }
