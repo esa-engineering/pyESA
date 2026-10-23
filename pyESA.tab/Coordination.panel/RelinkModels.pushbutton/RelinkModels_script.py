@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __title__   = "Relink\nModels"
-__doc__     = """Version = 1.5.0
+__doc__     = """Version = 1.6.0
 Date    = 23.10.2026
 Checks the Revit and CAD links of closed models and repoints them to a new folder.
 Author(s): Matteo Maiorano
@@ -10,6 +10,8 @@ __context__ = "zero-doc"
 
 # ======================= STORICO REVISIONI =======================
 # Versione | Data       | Tipo | Descrizione                                   | PR
+# 1.6.0    | 23.10.2026 | UI   | Colonna Model / Link, Result senza percorso, opzioni su due colonne, guida | -
+# 1.5.1    | 23.10.2026 | FIX  | Spunta Apply con un clic, applicata subito (gruppo e riepilogo) | -
 # 1.5.0    | 23.10.2026 | FEAT | Opzione: apre e salva come nuova central dopo la scrittura | -
 # 1.4.1    | 23.10.2026 | FIX  | IsTransmitted = True in scrittura; Check segnala i link riscritti in attesa | -
 # 1.4.0    | 23.10.2026 | UI   | Tabella raggruppata per modello (intestazioni con totali, apri/chiudi) | -

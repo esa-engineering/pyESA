@@ -20,9 +20,11 @@ Il pulsante fa due cose:
 
 Una riga per **link** (coppia modello che contiene il link, file linkato), non per file: un file linkato da tre modelli compare tre volte, una sotto ogni modello.
 
-Le righe sono raggruppate per modello. L'intestazione del gruppo (in grassetto) riporta il nome del modello e i totali dei suoi link: quanti link, quanti file mancanti, quanti non caricati, quanti trovati nella nuova cartella, l'esito di Apply. Doppio clic sull'intestazione: chiude o apre il gruppo. Spunta sull'intestazione: spunta o toglie tutti i link del modello che hanno un nuovo percorso. Le colonne non si ordinano, per non rompere i gruppi.
+Le righe sono raggruppate per modello. La prima colonna, `Model / Link`, mostra sull'intestazione del gruppo (in grassetto) il nome del modello con il numero dei suoi link e, sotto, il nome di ogni link rientrato. Le altre colonne dell'intestazione riportano i totali: file mancanti, link non caricati, link trovati nella nuova cartella, esito di Apply. Doppio clic sull'intestazione: chiude o apre il gruppo. Spunta sull'intestazione: spunta o toglie tutti i link del modello che hanno un nuovo percorso. Le colonne non si ordinano, per non rompere i gruppi.
 
 Un modello che non si legge ha solo l'intestazione, con il motivo in `Result`.
+
+La ℹ️ in alto a destra della finestra mostra, al passaggio del mouse, la guida rapida (HOW TO USE e lettura della tabella), come in Clash Setup.
 
 ## Colonne
 
@@ -48,7 +50,7 @@ Il riepilogo sotto la tabella conta file mancanti, link non caricati, righe spun
 - I percorsi scritti sono assoluti, anche se il link originale era relativo (`Relative to Central Model`).
 - Dopo la scrittura il modello viene riletto e il percorso confrontato; se non coincide, `Result` riporta cosa e' stato letto.
 - Il modello viene marcato come "trasmesso" (`IsTransmitted`): senza questo flag Revit ignora i nuovi percorsi all'apertura. I nuovi percorsi diventano effettivi quando il modello viene aperto in Revit e salvato.
-- Finche' non succede, il Check mostra ancora il vecchio percorso in `Current path` e in `Result` scrive `Rewritten, not yet opened in Revit`. Aprendo a mano un modello condiviso, Revit chiede se salvarlo come nuova central.
+- Finche' non succede, il Check mostra ancora il vecchio percorso in `Current path` e in `Result` scrive `Rewritten, not yet opened in Revit` (il nuovo percorso e' quello in `New path`). Aprendo a mano un modello condiviso, Revit chiede se salvarlo come nuova central.
 
 ## Opzione `Open and save as new central after writing`
 

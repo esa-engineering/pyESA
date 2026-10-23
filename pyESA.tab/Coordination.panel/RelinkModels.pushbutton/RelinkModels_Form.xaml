@@ -49,8 +49,43 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="🔗 Relink Models" FontSize="16" FontWeight="Bold"
-                   Margin="0,0,0,10" HorizontalAlignment="Center"/>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="🔗 Relink Models" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <!-- Guida rapida: solo al passaggio del mouse, come in Clash Setup -->
+            <TextBlock Text="ℹ️" FontSize="18" Foreground="#2D5A8A"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Help"
+                       ToolTipService.InitialShowDelay="200" ToolTipService.ShowDuration="120000">
+                <TextBlock.ToolTip>
+                    <ToolTip MaxWidth="560">
+                        <TextBlock TextWrapping="Wrap" FontSize="12">
+                            <Run Text="HOW TO USE" FontWeight="Bold" Foreground="#2D5A8A"/>
+                            <LineBreak/>
+                            <Run Text="1. Click Add files... and pick the Revit models to check. They must be closed in Revit."/>
+                            <LineBreak/>
+                            <Run Text="2. Choose the Folder where the linked files are now. It is optional if you only want to check."/>
+                            <LineBreak/>
+                            <Run Text="3. Click Check. Nothing is written: the table lists the links of each model. Double-click a model row to collapse it."/>
+                            <LineBreak/>
+                            <Run Text="4. Untick the links to leave as they are. For an ambiguous link, select it and click Pick file for selected..."/>
+                            <LineBreak/>
+                            <Run Text="5. Click Apply. Every ticked link is rewritten, working ones included."/>
+                            <LineBreak/>
+                            <Run Text="6. Open each model in Revit and accept to save it as a new central, or tick Open and save as new central to let the tool do it."/>
+                            <LineBreak/><LineBreak/>
+                            <Run Text="READING THE TABLE" FontWeight="Bold" Foreground="#2D5A8A"/>
+                            <LineBreak/>
+                            <Run Text="File exists: the linked file is at the path saved in the model now."/>
+                            <LineBreak/>
+                            <Run Text="Saved state: Loaded, Unloaded or Not found when the model was last saved."/>
+                            <LineBreak/>
+                            <Run Text="In new folder: Match = found there; Already correct = the link already points there; Ambiguous = more files with that name; Not in folder = not moved, hidden unless Show links not in the new folder is ticked."/>
+                            <LineBreak/>
+                            <Run Text="Result: Rewritten, not yet opened in Revit = the new path is in the file and takes effect when the model is opened and saved."/>
+                        </TextBlock>
+                    </ToolTip>
+                </TextBlock.ToolTip>
+            </TextBlock>
+        </Grid>
 
         <Grid Grid.Row="1" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
@@ -89,14 +124,26 @@
                     <CheckBox x:Name="SubfoldersCheck" Content="Include subfolders" Margin="20,3,0,0"/>
 
                     <TextBlock Text="⚙ OPTIONS" Style="{StaticResource SectionHeader}" Margin="0,12,0,5"/>
-                    <CheckBox x:Name="RevitCheck" Content="Revit links" Margin="20,3,0,0"/>
-                    <CheckBox x:Name="CadCheck" Content="CAD links" Margin="20,3,0,0"/>
-                    <CheckBox x:Name="BackupCheck" Content="Back up each model before writing" Margin="20,3,0,0"
-                              ToolTip="Copy saved in a _RelinkBackup folder next to the model"/>
-                    <CheckBox x:Name="CentralCheck" Content="Open and save as new central after writing" Margin="20,3,0,0"
-                              ToolTip="Minutes per model. Local files of the old central must be recreated"/>
-                    <CheckBox x:Name="ShowNotFoundCheck" Content="Show links not in the new folder" Margin="20,3,0,0"
-                              ToolTip="Links to files that were not moved, left as they are"/>
+                    <!-- sinistra: cosa leggere e mostrare; destra: come scrivere -->
+                    <Grid Margin="20,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <CheckBox x:Name="RevitCheck" Content="Revit links" Margin="0,3,0,0"/>
+                            <CheckBox x:Name="CadCheck" Content="CAD links" Margin="0,3,0,0"/>
+                            <CheckBox x:Name="ShowNotFoundCheck" Content="Show links not in the new folder" Margin="0,3,0,0"
+                                      ToolTip="Links to files that were not moved, left as they are"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <CheckBox x:Name="BackupCheck" Content="Back up each model before writing" Margin="0,3,0,0"
+                                      ToolTip="Copy saved in a _RelinkBackup folder next to the model"/>
+                            <CheckBox x:Name="CentralCheck" Content="Open and save as new central" Margin="0,3,0,0"
+                                      ToolTip="After writing. Minutes per model; local files of the old central must be recreated"/>
+                        </StackPanel>
+                    </Grid>
                     <TextBlock Style="{StaticResource HintText}" Margin="0,8,0,0"
                                Text="Models must be closed in Revit. They are rewritten in place."/>
                 </StackPanel>

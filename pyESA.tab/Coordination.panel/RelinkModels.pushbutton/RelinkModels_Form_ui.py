@@ -27,8 +27,12 @@ clr.AddReference('System.Windows.Forms')
 from System import Boolean, Int32, String
 from System.Data import DataTable
 from System.IO import FileStream, FileMode
-from System.Windows import Window, MessageBox, MessageBoxButton, MessageBoxImage, MessageBoxResult
+from System.Windows import (Window, MessageBox, MessageBoxButton, MessageBoxImage,
+                            MessageBoxResult, RoutedEventHandler)
+from System.Windows.Controls import CheckBox, DataGrid, DataGridTemplateColumn
+from System.Windows.Controls.Primitives import ButtonBase
 from System.Windows.Input import Mouse, Cursors
+from System.Windows.Media import VisualTreeHelper
 from System.Windows.Markup import XamlReader
 from System.Windows.Forms import OpenFileDialog, DialogResult
 
@@ -42,8 +46,10 @@ CONFIG_SECTION = 'ESA_RelinkModels'
 MAX_SAVED_MODELS = 50
 
 COL_APPLY = "Apply"
-COL_MODEL = "Model"
-COL_LINK = "Link"
+# nome del modello sull'intestazione, nome del link (rientrato) sotto. Il nome della colonna
+# non puo' contenere "/" (nei binding WPF e' il "current item"): il titolo mostrato e' NAME_HEADER
+COL_NAME = "Name"
+NAME_HEADER = "Model / Link"
 COL_KIND = "Type"
 COL_EXISTS = "File exists"
 COL_STATE = "Saved state"
@@ -58,8 +64,19 @@ COL_GROUP = "Group"        # percorso del modello: lega link e intestazione
 COL_HIDDEN = "Hidden"      # True per i link di un gruppo chiuso
 
 HIDDEN_COLUMNS = (COL_IDX, COL_ROW, COL_GROUP, COL_HIDDEN)
-READ_ONLY_COLUMNS = (COL_MODEL, COL_LINK, COL_KIND, COL_EXISTS, COL_STATE, COL_MATCH,
+READ_ONLY_COLUMNS = (COL_NAME, COL_KIND, COL_EXISTS, COL_STATE, COL_MATCH,
                      COL_RESULT, COL_OLD)
+
+# Colonna Apply: checkbox in un template con binding in sola lettura. Il clic e' gestito
+# in OnApplyClick, che scrive direttamente nel DataRow: la DataGridCheckBoxColumn generata
+# chiedeva due clic e confermava il valore solo all'uscita dalla riga (v1.5.0).
+APPLY_TEMPLATE = (
+    '<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">'
+    '<CheckBox HorizontalAlignment="Center" VerticalAlignment="Center" Focusable="False" '
+    'IsChecked="{Binding Path=Apply, Mode=OneWay}"/>'
+    '</DataTemplate>')
+
+LINK_INDENT = u"      "    # rientro dei link sotto il nome del modello
 
 ROW_HEADER = "H"
 ROW_LINK = "L"
@@ -156,6 +173,7 @@ class RelinkForm(Window):
         self.ApplyButton.Click += self.OnApply
         self.LinksGrid.AutoGeneratingColumn += self.OnAutoColumn
         self.LinksGrid.MouseDoubleClick += self.OnGridDoubleClick
+        self.LinksGrid.AddHandler(ButtonBase.ClickEvent, RoutedEventHandler(self.OnApplyClick))
         self.ShowNotFoundCheck.Checked += self.OnShowNotFound
         self.ShowNotFoundCheck.Unchecked += self.OnShowNotFound
 
@@ -266,7 +284,7 @@ class RelinkForm(Window):
     def _new_table(self):
         table = DataTable()
         table.Columns.Add(COL_APPLY, Boolean)
-        for title in (COL_MODEL, COL_LINK, COL_KIND, COL_EXISTS, COL_STATE, COL_MATCH,
+        for title in (COL_NAME, COL_KIND, COL_EXISTS, COL_STATE, COL_MATCH,
                       COL_RESULT, COL_OLD, COL_NEW):
             table.Columns.Add(title, String)
         table.Columns.Add(COL_IDX, Int32)
@@ -278,8 +296,8 @@ class RelinkForm(Window):
     def _add_header(self, table, model, result=""):
         row = table.NewRow()
         row[COL_APPLY] = False
-        row[COL_MODEL] = os.path.basename(model)
-        for title in (COL_LINK, COL_KIND, COL_EXISTS, COL_STATE, COL_MATCH, COL_OLD, COL_NEW):
+        row[COL_NAME] = os.path.basename(model)
+        for title in (COL_KIND, COL_EXISTS, COL_STATE, COL_MATCH, COL_OLD, COL_NEW):
             row[title] = ""
         row[COL_RESULT] = result
         row[COL_IDX] = -1
@@ -321,15 +339,13 @@ class RelinkForm(Window):
                     exists_cache[key] = os.path.isfile(rec.old_path)
                 self._records.append(rec)
                 row = table.NewRow()
-                row[COL_MODEL] = ""
-                row[COL_LINK] = rec.name
+                row[COL_NAME] = LINK_INDENT + rec.name
                 row[COL_KIND] = rec.kind
                 row[COL_EXISTS] = YES if exists_cache[key] else NO
                 row[COL_STATE] = rec.load_state
                 # il Check legge il percorso dell'ultimo salvataggio: un link gia' riscritto
                 # lo mostra finche' Revit non apre e salva il modello
-                row[COL_RESULT] = "{}: {}".format(RESULT_PENDING, rec.pending_path) \
-                    if rec.pending_path else ""
+                row[COL_RESULT] = RESULT_PENDING if rec.pending_path else ""
                 row[COL_OLD] = rec.old_path
                 if root:
                     new_path, match, count = rm.pick_candidate(rec.old_path, index)
@@ -398,11 +414,13 @@ class RelinkForm(Window):
                     continue
                 group = row[COL_GROUP]
                 glyph = GLYPH_CLOSED if group in self._collapsed else GLYPH_OPEN
-                row[COL_MODEL] = u"{} {}".format(glyph, os.path.basename(group))
                 s = stats.get(group)
+                name = u"{} {}".format(glyph, os.path.basename(group))
+                if s is not None:
+                    name += u"  ({} links)".format(s['n'])
+                row[COL_NAME] = name
                 if s is None:
                     continue            # modello illeggibile o senza link: resta il Result
-                row[COL_LINK] = "{} links".format(s['n'])
                 row[COL_EXISTS] = "{} missing".format(s['missing'])
                 row[COL_STATE] = "{} not loaded".format(s['unloaded'])
                 if self._has_folder:
@@ -439,7 +457,39 @@ class RelinkForm(Window):
         self._refresh_headers()
         self._update_summary()
 
+    def OnApplyClick(self, sender, args):
+        """Un clic sulla checkbox Apply cambia subito il valore nel DataTable."""
+        box = args.OriginalSource
+        if not isinstance(box, CheckBox) or self._table is None:
+            return
+        args.Handled = True
+        try:
+            row = box.DataContext.Row
+        except Exception:
+            return
+        if row[COL_ROW] == ROW_LINK and not row[COL_NEW]:
+            pass                    # senza nuovo percorso non si puo' spuntare
+        else:
+            row[COL_APPLY] = bool(box.IsChecked)   # ColumnChanged aggiorna gruppo e riepilogo
+        # riallinea la checkbox al dato (il clic l'ha gia' cambiata da se')
+        binding = box.GetBindingExpression(CheckBox.IsCheckedProperty)
+        if binding is not None:
+            binding.UpdateTarget()
+
+    @staticmethod
+    def _inside_checkbox(element):
+        while element is not None and not isinstance(element, DataGrid):
+            if isinstance(element, CheckBox):
+                return True
+            try:
+                element = VisualTreeHelper.GetParent(element)
+            except Exception:
+                return False
+        return False
+
     def OnGridDoubleClick(self, sender, args):
+        if self._inside_checkbox(args.OriginalSource):
+            return                  # due clic rapidi sulla spunta non chiudono il gruppo
         item = self.LinksGrid.SelectedItem
         if item is None or self._table is None:
             return
@@ -480,9 +530,17 @@ class RelinkForm(Window):
         header = str(args.Column.Header)
         if header in HIDDEN_COLUMNS:
             args.Cancel = True
+        elif header == COL_APPLY:
+            column = DataGridTemplateColumn()
+            column.Header = COL_APPLY
+            column.CellTemplate = XamlReader.Parse(APPLY_TEMPLATE)
+            column.IsReadOnly = True
+            args.Column = column
         elif header in READ_ONLY_COLUMNS:
             # sola lettura solo per l'utente: DataColumn.ReadOnly bloccherebbe anche il codice
             args.Column.IsReadOnly = True
+            if header == COL_NAME:
+                args.Column.Header = NAME_HEADER
 
     def _update_summary(self):
         if self._table is None:

@@ -2,6 +2,27 @@
 
 Registro dei tentativi. Piu' recente in alto.
 
+## 23.10.2026 - v1.6.0 - pulizia della finestra (con AI)
+
+**Richiesta** (da screenshot dell'utente): togliere la colonna Model, vuota sulle righe dei link, unendola a Link; togliere da `Result` il percorso ridondante; opzioni su due colonne; guida "how to use" come in Clash Setup.
+**Fatto**:
+
+- Colonna unica `Model / Link`: sull'intestazione `▼ modello.rvt  (n links)`, sotto il nome del link rientrato (`LINK_INDENT`). Il conteggio dei link, prima nella colonna Link dell'intestazione, e' ora accanto al nome del modello. Il nome interno della colonna e' `Name`, perche' una `/` nel nome di una colonna di DataTable rompe il binding delle colonne generate (in un Path WPF la `/` indica il "current item"); il titolo mostrato si imposta in `OnAutoColumn`.
+- `Result` scrive solo `Rewritten, not yet opened in Revit`: il percorso e' gia' in `New path`.
+- Opzioni su una griglia a due colonne: a sinistra cosa leggere e mostrare (Revit links, CAD links, Show links not in the new folder), a destra come scrivere (backup, nuova central). Etichetta accorciata in `Open and save as new central`, il "dopo la scrittura" e' nel tooltip.
+- Guida: la ℹ️ nel titolo con tooltip HOW TO USE / READING THE TABLE, copiata da `ClashFinder_form.xaml`. Non il pulsante "?" di Clash Setup: apre una guida a slide, che qui non esiste.
+
+**Stato**: compilato e XAML caricata in WPF, non provato in Revit.
+
+## 23.10.2026 - v1.5.1 - spunta Apply (con AI)
+
+**Problema** (utente, in Revit): la spunta degli elementi "e' un po' buggata".
+**Causa**: la colonna `Apply` era la `DataGridCheckBoxColumn` generata da `AutoGenerateColumns`. Comportamento noto del DataGrid WPF: primo clic seleziona la riga, secondo entra in modifica e cambia il valore, che viene confermato solo all'uscita dalla riga (`CommitEdit`). Quindi spunte che "non prendono", e la spunta di un'intestazione propagata ai link solo dopo un clic altrove (rischio gia' annotato in v1.4.0).
+**Scartato**: lasciare la colonna generata e forzare `CommitEdit` in `CurrentCellChanged` o simili: rincorre il DataGrid, e la riga resta in modifica mentre `_refresh_headers()` riscrive le intestazioni.
+**Fatto**: in `OnAutoColumn` la colonna `Apply` e' sostituita da una `DataGridTemplateColumn` (sola lettura per il DataGrid) con una `CheckBox` legata in `OneWay` ad `Apply`. Il clic arriva a `OnApplyClick` (handler di `ButtonBase.ClickEvent` sul DataGrid), che scrive direttamente nel `DataRow` (quindi `ColumnChanged` propaga a gruppo e riepilogo subito) e riallinea la checkbox con `UpdateTarget()`. Una riga di link senza nuovo percorso non si spunta. Il doppio clic sulla checkbox non chiude il gruppo (`_inside_checkbox`).
+**Verificato fuori da Revit** (PowerShell STA, finestra WPF con dispatcher): la checkbox segue il dato quando lo cambia il codice, il clic accettato resta, quello rifiutato torna indietro, il binding sopravvive ai clic. Senza dispatcher il binding non si aggiorna: falso negativo del test, non del codice.
+**Stato**: da riprovare in Revit.
+
 ## 23.10.2026 - v1.5.0 - opzione nuova central (con AI)
 
 **Esito del test v1.4.1** (utente, in Revit): **funziona**. Con `IsTransmitted = True` aprendo il modello i link puntano al nuovo percorso, e Revit chiede se salvarlo come nuova central.
