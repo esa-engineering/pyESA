@@ -1,0 +1,120 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pipe Wye" Width="860" Height="300" MinWidth="820" MinHeight="290"
+        WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip">
+    <Window.Resources>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+        </Style>
+        <!-- righe di stato: compaiono solo quando c'e' qualcosa da dire (set_status in BranchTools_Controls.py) -->
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="🔗 PIPE WYE" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <!-- icona info: il tooltip "How to use" resta aperto finche' il mouse e' sopra -->
+            <Border Width="22" Height="22" BorderBrush="#444444" BorderThickness="1.5" CornerRadius="3"
+                    Background="Transparent" Cursor="Help" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="120000">
+                <TextBlock Text="i" FontFamily="Georgia" FontWeight="Bold" FontSize="14"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border.ToolTip>
+                    <ToolTip MaxWidth="600">
+                        <StackPanel>
+                            <TextBlock FontWeight="Bold" Foreground="#2D5A8A" Text="HOW TO USE" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                                <Run Text="Select the main pipe first, or pick it after the click. OK keeps the changes as one Undo step; Cancel or Esc puts everything back. The Connect buttons keep the changes and close the window, then ask for the other pipe."/>
+                            </TextBlock>
+                            <TextBlock FontWeight="Bold" Foreground="#2D5A8A" Text="PLACE WYE" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                                <Run Text="Inserts a wye where you clicked the pipe (the middle if it was selected before). Rotation: 0 = branch horizontal on the right looking downstream, 90 = up, 180 = left. Angle: between the branch and the main, upstream. Then use Side Branch on the new wye."/>
+                            </TextBlock>
+                            <TextBlock FontWeight="Bold" Foreground="#2D5A8A" Text="CONNECT" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                                <Run Text="From above: pick a pipe passing above the main; it turns down at 45 degrees towards downstream into a wye on top of the main. From the side: pick a pipe ending beside the main; a pipe from its end enters a wye at 45 degrees towards downstream, with the slope it needs. The main never changes elevation."/>
+                            </TextBlock>
+                            <TextBlock FontWeight="Bold" Foreground="#2D5A8A" Text="FLOW AND WYE" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap">
+                                <Run Text="Downstream: down the slope of the main, or the pipe direction if the main is level. Reverse flow turns it round. Wye: the tee, cross or wye family to place. (routing preferences) lets Revit choose; if it refuses, a family with Part Type Wye is used."/>
+                            </TextBlock>
+                        </StackPanel>
+                    </ToolTip>
+                </Border.ToolTip>
+            </Border>
+        </Grid>
+        <Border Grid.Row="1" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Style="{StaticResource SectionHeader}" Text="🔗 PIPE"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="PlaceWyeButton" Grid.Column="0" Content="Place wye" Padding="12,4"
+                            ToolTip="Wye where you clicked the pipe, with the rotation and angle below."/>
+                    <Button x:Name="ConnectAboveButton" Grid.Column="1" Content="Connect from above" Padding="12,4" Margin="10,0,0,0"
+                            ToolTip="Pick a pipe passing above the main: it turns down at 45 degrees towards downstream."/>
+                    <Button x:Name="ConnectSideButton" Grid.Column="2" Content="Connect from the side" Padding="12,4" Margin="10,0,0,0"
+                            ToolTip="Pick a pipe ending beside the main: it enters a wye at 45 degrees with the slope it needs."/>
+                    <CheckBox x:Name="ReverseFlowBox" Grid.Column="3" Content="Reverse flow" Margin="16,0,0,0" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="4" Style="{StaticResource FieldLabel}" Text="Wye" Margin="16,0,6,0"/>
+                    <ComboBox x:Name="WyeFamilyCombo" Grid.Column="5" Style="{StaticResource ComboStyle}"
+                              IsEditable="True" IsTextSearchEnabled="True"
+                              ToolTip="Tee, cross or wye family used by Place wye and Connect. Type to search."/>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="Place wye with rotation"/>
+                    <TextBox x:Name="RollBox" Style="{StaticResource InputField}" Margin="8,0,0,0"
+                             ToolTip="0 = branch horizontal on the right looking downstream, 90 = up, 180 = left."/>
+                    <TextBlock Style="{StaticResource UnitLabel}" Text="°"/>
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="angle" Margin="16,0,0,0"/>
+                    <TextBox x:Name="AngleBox" Style="{StaticResource InputField}" Margin="8,0,0,0"
+                             ToolTip="Between the branch and the main, upstream."/>
+                    <TextBlock Style="{StaticResource UnitLabel}" Text="°"/>
+                </StackPanel>
+                <TextBlock x:Name="PipeStatus" Style="{StaticResource HintText}"/>
+            </StackPanel>
+        </Border>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="CancelButton" Content="Cancel" Width="80" Height="30" Margin="0,0,10,0" IsCancel="True"/>
+            <Button x:Name="OkButton" Content="OK" Width="100" Height="30" IsDefault="True"
+                    Background="#2D5A8A" Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>

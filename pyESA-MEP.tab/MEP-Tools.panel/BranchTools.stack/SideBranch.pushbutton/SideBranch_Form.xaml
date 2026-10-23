@@ -1,0 +1,183 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Side Branch" Width="860" Height="420" MinWidth="820" MinHeight="410"
+        WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip">
+    <Window.Resources>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#2D5A8A"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="InputField" TargetType="TextBox">
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ComboStyle" TargetType="ComboBox">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="UnitLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+        </Style>
+        <!-- righe di stato: compaiono solo quando c'e' qualcosa da dire (set_status in BranchTools_Controls.py) -->
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="↗ SIDE BRANCH" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <!-- icona info: il tooltip "How to use" resta aperto finche' il mouse e' sopra -->
+            <Border Width="22" Height="22" BorderBrush="#444444" BorderThickness="1.5" CornerRadius="3"
+                    Background="Transparent" Cursor="Help" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="120000">
+                <TextBlock Text="i" FontFamily="Georgia" FontWeight="Bold" FontSize="14"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border.ToolTip>
+                    <ToolTip MaxWidth="600">
+                        <StackPanel>
+                            <TextBlock FontWeight="Bold" Foreground="#2D5A8A" Text="HOW TO USE" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                                <Run Text="Select one wye on a main pipe first, or pick it after the click. Every change shows in the model at once. OK keeps all changes as one Undo step; Cancel or Esc puts everything back."/>
+                            </TextBlock>
+                            <TextBlock FontWeight="Bold" Foreground="#2D5A8A" Text="SIDE BRANCH" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                                <Run Text="For a wye with a free branch. Create branch adds a sloped pipe, an elbow and a horizontal pipe whose bottom is Invert offset above (+) or below (-) the bottom of the main."/>
+                                <LineBreak/>
+                                <Run Text="Branch slope: From rotation keeps the rotation of the wye (set it with Fitting Rotate); an angle rotates the wye to that slope. Horizontal run: perpendicular to the main, or along the branch in plan. The elbow takes the angle between the two pipes."/>
+                                <LineBreak/>
+                                <Run Text="Place copies: keeps the changes and closes the window; each click on the same main adds the same branch; Esc ends. Copies keep this elevation brings each copy back to the elevation of this branch on a sloped main."/>
+                            </TextBlock>
+                            <TextBlock FontWeight="Bold" Foreground="#2D5A8A" Text="BRANCH LENGTH" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap">
+                                <Run Text="For a wye that already has a branch. Changing the length of the sloped pipe slides the elbow and the following pipes along it, so the elevation changes while the wye and the main stay put. Type an invert offset to get the length for it."/>
+                            </TextBlock>
+                        </StackPanel>
+                    </ToolTip>
+                </Border.ToolTip>
+            </Border>
+        </Grid>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10"
+                    VerticalAlignment="Top">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="↗ SIDE BRANCH"/>
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Invert offset"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                    ToolTip="From the pipe bottom of the main to the pipe bottom of the branch. + up, - down.">
+                            <TextBox x:Name="OffsetBox" Style="{StaticResource InputField}"/>
+                            <TextBlock Style="{StaticResource UnitLabel}" Text="mm"/>
+                        </StackPanel>
+                    </Grid>
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Branch slope"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                    ToolTip="From rotation keeps the rotation of the wye; an angle rotates the wye.">
+                            <ComboBox x:Name="SlopeCombo" Width="120" Style="{StaticResource ComboStyle}"
+                                      HorizontalAlignment="Left"/>
+                            <TextBlock Style="{StaticResource UnitLabel}" Text="°"/>
+                        </StackPanel>
+                    </Grid>
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Horizontal run"/>
+                        <ComboBox x:Name="DirectionCombo" Grid.Column="1" Width="160" Style="{StaticResource ComboStyle}"
+                                  HorizontalAlignment="Left"/>
+                    </Grid>
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Horizontal length"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" ToolTip="Measured from the elbow.">
+                            <TextBox x:Name="LengthBox" Style="{StaticResource InputField}"/>
+                            <TextBlock Style="{StaticResource UnitLabel}" Text="mm"/>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button x:Name="CreateBranchButton" Content="Create branch" Padding="12,4"/>
+                        <Button x:Name="PlaceCopiesButton" Content="Place copies" Padding="12,4" Margin="10,0,0,0"
+                                ToolTip="Keeps the changes, then each click on the same main adds the same branch. Esc to finish."/>
+                    </StackPanel>
+                    <CheckBox x:Name="KeepLevelBox" Margin="0,8,0,0" Content="Copies keep this elevation"
+                              ToolTip="Unticked, copies keep the invert offset from the main and follow its slope."/>
+                    <TextBlock x:Name="BranchStatus" Style="{StaticResource HintText}"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="5" Padding="10" Margin="0,0,0,10"
+                    VerticalAlignment="Top">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="📏 BRANCH LENGTH"/>
+                    <Grid Margin="0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="SlopedMinusButton" Grid.Column="0" Content="−" Width="26" Height="24"/>
+                        <Slider x:Name="SlopedSlider" Grid.Column="1" Minimum="20" Maximum="2000" Value="20"
+                                IsSnapToTickEnabled="True" TickFrequency="10"
+                                VerticalAlignment="Center" Margin="8,0"/>
+                        <Button x:Name="SlopedPlusButton" Grid.Column="2" Content="+" Width="26" Height="24"/>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Margin="0,5">
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Sloped pipe (L)" Width="110"/>
+                        <TextBox x:Name="SlopedBox" Style="{StaticResource InputField}"/>
+                        <TextBlock Style="{StaticResource UnitLabel}" Text="mm"/>
+                        <Button x:Name="SlopedResetButton" Content="Back to start" Margin="10,0,0,0" Padding="8,2"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5">
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Invert offset (H)" Width="110"/>
+                        <TextBox x:Name="HeightBox" Style="{StaticResource InputField}"
+                                 ToolTip="Pipe bottom after the elbow minus pipe bottom of the main. Type a value to get the length for it."/>
+                        <TextBlock Style="{StaticResource UnitLabel}" Text="mm"/>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Step" Margin="14,0,6,0"/>
+                        <ComboBox x:Name="SlopedStepCombo" Width="60" Style="{StaticResource ComboStyle}"/>
+                        <TextBlock Style="{StaticResource UnitLabel}" Text="mm"/>
+                    </StackPanel>
+                    <TextBlock x:Name="SlopedStatus" Style="{StaticResource HintText}"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="CancelButton" Content="Cancel" Width="80" Height="30" Margin="0,0,10,0" IsCancel="True"/>
+            <Button x:Name="OkButton" Content="OK" Width="100" Height="30" IsDefault="True"
+                    Background="#2D5A8A" Foreground="White"/>
+        </StackPanel>
+    </Grid>
+</Window>

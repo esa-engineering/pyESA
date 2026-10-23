@@ -1,0 +1,6 @@
+title: "Side\nBranch"
+tooltip: |-
+  Makes a side branch from a wye at a set invert offset, repeats it along the main and changes its length.
+  Requires: one wye on a main pipe, selected or picked after the click.
+author: Matteo Maiorano
+help_url:

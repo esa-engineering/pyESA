@@ -1,0 +1,6 @@
+title: "Fitting\nRotate"
+tooltip: |-
+  Rotates a fitting and sets its branch angle with sliders; aligns and connects an open end to another element.
+  Requires: one fitting (or a pipe, for Align), selected or picked after the click.
+author: Matteo Maiorano
+help_url:

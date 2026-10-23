@@ -49,7 +49,9 @@
       "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\matteoma\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-matteoma-AppData-Roaming-pyRevit-Extensions-ESAextensions-extension\\\\953879cd-b0b8-41b0-9f86-9f38de459a6f\\\\scratchpad\\\\deck\\\\build.ps1\" | Select-String \"True|False\")",
       "Bash(cd \"C:/Users/matteoma/AppData/Roaming/pyRevit/Extensions/ESAextensions.extension\" && ls \"C:/Program Files/Autodesk\" 2>/dev/null | head; grep -rn \"pattern\\\\|Pattern\" --include=*.py --include=*.md --include=*.xaml --include=*.yaml pyESA-MEP.tab/MEP-Routing.panel/FlexConnect.pushbutton -l)",
       "Read(//c/Program Files/Autodesk/**)",
-      "Bash(file FlexConnect_*.py FlexConnect_*.xaml)"
+      "Bash(file FlexConnect_*.py FlexConnect_*.xaml)",
+      "Bash(cd \"/c/Program Files/Autodesk/Revit 2022\"; grep -A25 'name=\"M:Autodesk.Revit.DB.UpdaterRegistry.RegisterUpdater\\(Autodesk.Revit.DB.IUpdater,System.Boolean\\)\"' RevitAPI.xml | head -40; grep -A20 'name=\"M:Autodesk.Revit.DB.UpdaterRegistry.UnregisterUpdater\\(Autodesk.Revit.DB.UpdaterId\\)\"' RevitAPI.xml | head -25; grep -A12 'name=\"M:Autodesk.Revit.DB.IUpdater.Execute' RevitAPI.xml)",
+      "Read(//c/Program Files/Autodesk/Revit 2022/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\matteoma\\AppData\\Roaming\\pyRevit\\Extensions\\ESAextensions.extension\\pyESA-MEP.tab\\MEP-Routing.panel\\FlexConnect.pushbutton"

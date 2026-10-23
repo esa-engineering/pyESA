@@ -1,0 +1,6 @@
+title: "Pipe\nWye"
+tooltip: |-
+  Places a wye on a pipe, or connects another pipe to it from above or from the side with a 45 degree wye.
+  Requires: one pipe, selected or picked after the click.
+author: Matteo Maiorano
+help_url:
